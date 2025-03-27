@@ -5,7 +5,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Initialize Mapbox access token
-mapboxgl.accessToken = 'pk.eyJ1Ijoia3dpZW5zIiwiYSI6ImNpa3NyenF0MjAwMDF2b20zbTR3aHN2ZGMifQ.6N8iaMsSQHZZsr8S46Pdbw';
+mapboxgl.accessToken = 'pk.eyJ1Ijoic3d1bGxlciIsImEiOiJjbThyZTVuMzEwMTZwMmpvdTRzM3JpMGlhIn0.CF5lzLSkkfO-c0qt6a168A ';
 
 export default function Map() {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -22,7 +22,7 @@ export default function Map() {
       try {
         const mapInstance = new mapboxgl.Map({
           container: mapContainer.current,
-          style: 'mapbox://styles/kwiens/cm6au0n48006h01s28k1p0faz',
+          style: 'mapbox://styles/swuller/cm8re9zyp004q01qkek8pdrsk',
           center: [-85.31225, 35.04828],
           zoom: 14.89,
           pitch: -22.4,
@@ -34,10 +34,54 @@ export default function Map() {
 
         mapInstance.on('load', () => {
           console.log('Map loaded successfully');
+          
+          // Add bike lanes layer
+          mapInstance.addLayer({
+            'id': 'bike-lanes',
+            'type': 'line',
+            'source': {
+              'type': 'vector',
+              'url': 'mapbox://mapbox.mapbox-streets-v8'
+            },
+            'source-layer': 'transportation',
+            'filter': ['==', ['get', 'class'], 'bike'],
+            'layout': {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            'paint': {
+              'line-color': '#007cbf',
+              'line-width': 3,
+              'line-opacity': 0.8
+            }
+          });
+
+          // Add bike parking layer
+          mapInstance.addLayer({
+            'id': 'bike-parking',
+            'type': 'symbol',
+            'source': {
+              'type': 'vector',
+              'url': 'mapbox://mapbox.mapbox-streets-v8'
+            },
+            'source-layer': 'poi_label',
+            'filter': ['==', ['get', 'class'], 'bicycle_parking'],
+            'layout': {
+              'text-field': ['get', 'name'],
+              'text-size': 12,
+              'icon-image': 'bicycle',
+              'icon-size': 1
+            },
+            'paint': {
+              'text-color': '#007cbf',
+              'icon-color': '#007cbf'
+            }
+          });
+
           setMapInitialized(true);
         });
 
-        mapInstance.on('error', (e) => {
+        mapInstance.on('error', (e: mapboxgl.ErrorEvent) => {
           console.error('Mapbox error:', e);
         });
 
