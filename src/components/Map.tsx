@@ -10,6 +10,8 @@ mapboxgl.accessToken = 'pk.eyJ1Ijoic3d1bGxlciIsImEiOiJjbThyZTVuMzEwMTZwMmpvdTRzM
 export default function Map() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const locationMarker = useRef<mapboxgl.Marker | null>(null);
+  const watchId = useRef<number | null>(null);
   const [mapInitialized, setMapInitialized] = useState(false);
 
   useEffect(() => {
@@ -35,49 +37,61 @@ export default function Map() {
         mapInstance.on('load', () => {
           console.log('Map loaded successfully');
           
-          // Add bike lanes layer
-          mapInstance.addLayer({
-            'id': 'bike-lanes',
-            'type': 'line',
-            'source': {
-              'type': 'vector',
-              'url': 'mapbox://mapbox.mapbox-streets-v8'
-            },
-            'source-layer': 'transportation',
-            'filter': ['==', ['get', 'class'], 'bike'],
-            'layout': {
-              'line-join': 'round',
-              'line-cap': 'round'
-            },
-            'paint': {
-              'line-color': '#007cbf',
-              'line-width': 3,
-              'line-opacity': 0.8
-            }
-          });
+          // Request user's location with battery-efficient options
+          if (navigator.geolocation) {
+            const options = {
+              enableHighAccuracy: false, // Use low accuracy for better battery life
+              timeout: 10000,           // Increased timeout to 10 seconds
+              maximumAge: 60000         // Accept cached positions up to 1 minute old
+            };
 
-          // Add bike parking layer
-          mapInstance.addLayer({
-            'id': 'bike-parking',
-            'type': 'symbol',
-            'source': {
-              'type': 'vector',
-              'url': 'mapbox://mapbox.mapbox-streets-v8'
-            },
-            'source-layer': 'poi_label',
-            'filter': ['==', ['get', 'class'], 'bicycle_parking'],
-            'layout': {
-              'text-field': ['get', 'name'],
-              'text-size': 12,
-              'icon-image': 'bicycle',
-              'icon-size': 1
-            },
-            'paint': {
-              'text-color': '#007cbf',
-              'icon-color': '#007cbf'
-            }
-          });
+            // Function to handle location updates
+            const handleLocationUpdate = (position: GeolocationPosition) => {
+              const { longitude, latitude } = position.coords;
+              
+              // Create marker only when we have valid coordinates
+              if (!locationMarker.current) {
+                locationMarker.current = new mapboxgl.Marker({
+                  color: '#007AFF',
+                  scale: 0.8
+                })
+                  .setLngLat([longitude, latitude])
+                  .addTo(mapInstance);
+              } else {
+                locationMarker.current.setLngLat([longitude, latitude]);
+              }
+            };
 
+            // Function to handle location errors
+            const handleLocationError = (error: GeolocationPositionError) => {
+              switch (error.code) {
+                case error.PERMISSION_DENIED:
+                  console.error('Location permission denied. Please enable location services in your browser settings.');
+                  break;
+                case error.POSITION_UNAVAILABLE:
+                  console.error('Location information is unavailable. Please check your device\'s location settings.');
+                  break;
+                case error.TIMEOUT:
+                  console.warn('Location request timed out. Retrying...');
+                  // Try to get a single position update
+                  navigator.geolocation.getCurrentPosition(handleLocationUpdate, handleLocationError, options);
+                  break;
+                default:
+                  console.error('An unknown error occurred while getting location:', error.message);
+                  break;
+              }
+            };
+
+            // Start watching position
+            watchId.current = navigator.geolocation.watchPosition(
+              handleLocationUpdate,
+              handleLocationError,
+              options
+            );
+          } else {
+            console.error('Geolocation is not supported by your browser');
+          }
+          
           setMapInitialized(true);
         });
 
@@ -93,6 +107,9 @@ export default function Map() {
     // Cleanup function
     return () => {
       console.log('Cleanup called, map exists:', !!map.current);
+      if (watchId.current !== null) {
+        navigator.geolocation.clearWatch(watchId.current);
+      }
       if (map.current) {
         map.current.remove();
         map.current = null;
