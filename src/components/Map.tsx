@@ -51,12 +51,70 @@ export default function Map() {
               
               // Create marker only when we have valid coordinates
               if (!locationMarker.current) {
+                // Create custom marker element
+                const el = document.createElement('div');
+                el.className = 'current-location-marker';
+                
+                // Create the inner dot and pulse elements
+                el.innerHTML = `
+                  <div class="location-dot"></div>
+                  <div class="location-pulse"></div>
+                `;
+                
+                // Create and add the marker
                 locationMarker.current = new mapboxgl.Marker({
-                  color: '#007AFF',
-                  scale: 0.8
+                  element: el,
+                  anchor: 'center'
                 })
                   .setLngLat([longitude, latitude])
                   .addTo(mapInstance);
+
+                // Add the CSS styles to the document
+                const style = document.createElement('style');
+                style.textContent = `
+                  .current-location-marker {
+                    width: 22px;
+                    height: 22px;
+                    position: relative;
+                  }
+                  
+                  .location-dot {
+                    background: #4285F4;
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    border: 3px solid white;
+                    box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+                  }
+                  
+                  .location-pulse {
+                    background: rgba(66, 133, 244, 0.15);
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 50%;
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    animation: pulse 2s ease-out infinite;
+                  }
+                  
+                  @keyframes pulse {
+                    0% {
+                      transform: translate(-50%, -50%) scale(0.5);
+                      opacity: 1;
+                    }
+                    100% {
+                      transform: translate(-50%, -50%) scale(2);
+                      opacity: 0;
+                    }
+                  }
+                `;
+                document.head.appendChild(style);
               } else {
                 locationMarker.current.setLngLat([longitude, latitude]);
               }
