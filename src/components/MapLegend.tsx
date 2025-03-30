@@ -1,109 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { 
   faMap, 
-  faInfoCircle, 
-  faLayerGroup, 
-  faCompass, 
   faMapMarkerAlt, 
-  faRoute, 
-  faHiking,
-  faTimes, faFish, faPaw, faTrain, faGamepad,
-  faLocationArrow
+  faTimes,
+  faLocationArrow,
+  faBicycle,
+  faLayerGroup
 } from '@fortawesome/free-solid-svg-icons';
-import { bikeRoutes } from '@/data/bike_routes';
-
-// Map Features
-export const mapFeatures = [
-  {
-    name: 'Tennessee Aquarium',
-    description: "Immerse yourself in Chattanooga's underwater world—perfect for families and nature lovers!",
-    address: '1 Broad Street, Chattanooga, TN 37402',
-    latitude: 35.0558333, // :contentReference[oaicite:0]{index=0}
-    longitude: -85.3111111, // :contentReference[oaicite:1]{index=1}
-    icon: faFish,
-  },
-  {
-    name: 'Chattanooga Zoo at Warner Park',
-    description: 'Meet furry, feathered, and scaly friends at the Chattanooga Zoo—an easy, fun stop for all ages.',
-    address: '301 N Holtzclaw Avenue, Chattanooga, TN 37404',
-    latitude: 35.0431,
-    longitude: -85.2837,
-    icon: faPaw,
-  },
-  {
-    name: 'Tennessee Valley Railroad Museum',
-    description: 'Step back in time on nostalgic train rides and explore vintage locomotives at the Railroad Museum.',
-    address: '4119 Cromwell Road, Chattanooga, TN 37421',
-    latitude: 35.0657,
-    longitude: -85.2031,
-    icon: faTrain,
-  },
-  {
-    name: 'Chattanooga Pinball Museum',
-    description: 'Score big with classic and modern pinball games—get your flippers ready for family-friendly fun!',
-    address: '409 Broad Street, Chattanooga, TN 37402',
-    latitude: 35.0539,
-    longitude: -85.3121,
-    icon: faGamepad,
-  },
-  {
-    name: 'Outdoor Chattanooga',
-    description: 'Your go-to resource for outdoor adventure and recreation in Chattanooga.',
-    address: '200 River Street, Chattanooga, TN 37405',
-    latitude: 35.0628,
-    longitude: -85.3060,
-    icon: faHiking,
-  },
-];
-
-import { faBicycle, faMountain, faRoad, faBolt, faHandsHelping } from '@fortawesome/free-solid-svg-icons';
-
-export const bikeResources = [
-  {
-    name: 'Suck Creek Cycle',
-    description: "Chattanooga's premier local bike shop offering premium brands and expert repairs for mountain biking enthusiasts.",
-    address: '630 W Bell Avenue, Chattanooga, TN 37405',
-    latitude: 35.0735,
-    longitude: -85.3188,
-    icon: faMountain,
-  },
-  {
-    name: 'East Ridge Bicycles',
-    description: 'Serving the community for over 35 years with a wide selection of bikes and professional fitting services.',
-    address: '5910 Ringgold Road, Chattanooga, TN 37412',
-    latitude: 34.9899,
-    longitude: -85.1992,
-    icon: faBicycle,
-  },
-  {
-    name: 'Trek Bicycle Store',
-    description: 'Official retailer offering a range of Trek bikes, accessories, and professional maintenance services.',
-    address: '307 Manufacturers Road, Suite 117, Chattanooga, TN 37405',
-    latitude: 35.0617,
-    longitude: -85.3086,
-    icon: faRoad,
-  },
-  {
-    name: 'Chatt eBikes',
-    description: "Chattanooga's premium electric bike shop specializing in sales, rentals, and services for electric bicycles.",
-    address: '1404 McCallie Avenue, Suite 102, Chattanooga, TN 37404',
-    latitude: 35.0375,
-    longitude: -85.2845,
-    icon: faBolt,
-  },
-  {
-    name: 'Two Bikes Chattanooga',
-    description: 'Non-profit bike shop transforming donated bikes into practical transportation for underserved community members.',
-    address: '1810 E. Main Street, Suite 100, Chattanooga, TN 37404',
-    latitude: 35.0350,
-    longitude: -85.2830,
-    icon: faHandsHelping,
-  },
-];
+import { bikeRoutes, mapFeatures, bikeResources, localResources } from '@/data/bike_routes';
 
 // Directly export a single component that combines provider, sidebar and trigger
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
@@ -116,7 +24,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
   
-  const toggle = () => {
+  const toggle = useCallback(() => {
     console.log('Toggling sidebar from', isOpen, 'to', !isOpen);
     setIsOpen(!isOpen);
     
@@ -124,7 +32,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     window.dispatchEvent(new CustomEvent('sidebar-toggle', { 
       detail: { isOpen: !isOpen } 
     }));
-  };
+  }, [isOpen]);
 
   // Handle clicks outside the sidebar
   useEffect(() => {
@@ -148,7 +56,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, toggle]);
 
   // Function to handle route selection
   const handleRouteSelect = (routeId: string) => {
@@ -197,7 +105,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Function to center map on a specific location
-  const centerOnLocation = (location: any) => {
+  const centerOnLocation = (location: { latitude: number; longitude: number; name: string; }) => {
     console.log('MapLegend: Centering on location:', location);
     
     // Dispatch event for map to center and show pin
@@ -623,26 +531,85 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                 Information
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ padding: '8px', borderRadius: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <FontAwesomeIcon 
-                      icon={faInfoCircle} 
-                      style={{ width: '16px', height: '16px', color: '#6b7280' }} 
-                    />
-                    <span style={{ fontWeight: 500 }}>About This Map</span>
-                    <p>This map is a guide to the best bike routes in Chattanooga. Made with ❤️ by <a href="https://www.ifixit.com">iFixit</a>, the free repair guide for every thing.</p>
+                {localResources.map((resource) => (
+                  <div 
+                    key={resource.name}
+                    style={{ 
+                      padding: '8px', 
+                      borderRadius: '6px',
+                      transition: 'all 0.2s ease-in-out',
+                      border: '1px solid transparent',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ 
+                        width: '28px', 
+                        height: '28px', 
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#F3F4F6',
+                        border: `2px solid ${resource.color}`
+                      }}>
+                        <FontAwesomeIcon 
+                          icon={resource.icon} 
+                          style={{ width: '14px', height: '14px', color: resource.color }} 
+                        />
+                      </div>
+                      <span style={{ fontWeight: 500 }}>{resource.name}</span>
+                    </div>
+                    <div style={{ 
+                      fontSize: '12px', 
+                      color: '#6b7280', 
+                      marginTop: '4px',
+                      marginLeft: '40px' 
+                    }}>
+                      {resource.description.includes('iFixit') ? (
+                        <>
+                          This map is a guide to the best bike routes in Chattanooga. Made with ❤️ by <a 
+                            href={resource.url}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ 
+                              color: '#3b82f6', 
+                              textDecoration: 'none',
+                              fontWeight: 500,
+                              transition: 'text-decoration 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.textDecoration = 'underline';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.textDecoration = 'none';
+                            }}
+                          >iFixit</a>, the free repair guide for every thing.
+                        </>
+                      ) : (
+                        <>
+                          <a 
+                            href={resource.url}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ 
+                              color: '#3b82f6', 
+                              textDecoration: 'none',
+                              fontWeight: 500,
+                              transition: 'text-decoration 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.textDecoration = 'underline';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.textDecoration = 'none';
+                            }}
+                          >{resource.name}</a> - {resource.description}
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div style={{ padding: '8px', borderRadius: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <FontAwesomeIcon 
-                      icon={faLayerGroup} 
-                      style={{ width: '16px', height: '16px', color: '#6b7280' }} 
-                    />
-                    <span style={{ fontWeight: 500 }}>Local resources</span>
-                    <p><a href="https://www.chattanooga.gov/bike-map">Chattanooga City Bike Rentals</a></p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>

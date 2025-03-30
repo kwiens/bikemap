@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapLegendProvider, mapFeatures, bikeResources } from '@/components/MapLegend';
-import { bikeRoutes } from '@/data/bike_routes';
+import { MapLegendProvider } from '@/components/MapLegend';
+import { bikeRoutes, mapFeatures, bikeResources } from '@/data/bike_routes';
 
 // Initialize Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1Ijoic3d1bGxlciIsImEiOiJjbThyZTVuMzEwMTZwMmpvdTRzM3JpMGlhIn0.CF5lzLSkkfO-c0qt6a168A';
@@ -18,21 +18,12 @@ const MapboxMap = memo(function MapboxMap() {
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const watchId = useRef<number | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
   const [isUsingDebugLocation, setIsUsingDebugLocation] = useState(false);
   // Track markers for attractions and bike resources
   const attractionMarkers = useRef<mapboxgl.Marker[]>([]);
   const bikeResourceMarkers = useRef<mapboxgl.Marker[]>([]);
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
-
-  // Function to update line width
-  const updateLineWidth = useCallback((layerId: string, width: number) => {
-    if (!map.current) return;
-    
-    console.log(`Updating line width for ${layerId} to ${width}`);
-    map.current.setPaintProperty(layerId, 'line-width', width);
-  }, []);
 
   // Create location marker (using the styled approach from previous code)
   const createLocationMarker = useCallback((longitude: number, latitude: number) => {
@@ -127,7 +118,7 @@ const MapboxMap = memo(function MapboxMap() {
     
     // Check if geolocation is available
     if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser');
+      console.log('Geolocation is not supported by your browser');
       return;
     }
     
@@ -142,9 +133,6 @@ const MapboxMap = memo(function MapboxMap() {
     const handleLocationUpdate = (position: GeolocationPosition) => {
       const { longitude, latitude } = position.coords;
       console.log(`Location updated: [${longitude}, ${latitude}]`);
-      
-      // Clear any previous errors
-      setLocationError(null);
       
       // Create or update marker
       createLocationMarker(longitude, latitude);
@@ -207,32 +195,6 @@ const MapboxMap = memo(function MapboxMap() {
       console.log('Using debug location:', DEBUG_LOCATION);
     }
   }, [isUsingDebugLocation, createLocationMarker]);
-
-  // Debug: Add function to test opacity changes directly
-  const testOpacityChange = useCallback(() => {
-    if (!map.current) {
-      console.log('TEST: No map instance available for opacity test');
-      return;
-    }
-    
-    console.log('TEST: Available bike routes:', bikeRoutes.map(r => r.id));
-    
-    // Log all map layers for comparison
-    const style = map.current.getStyle();
-    const mapLayers = style && style.layers ? style.layers : [];
-    console.log('TEST: Available map layers:', mapLayers.map(l => l.id));
-    
-    // Try setting opacity directly
-    const routeId = bikeRoutes[0].id;
-    console.log(`TEST: Attempting to set opacity for route ${routeId} to 0.8`);
-    
-    try {
-      map.current.setPaintProperty(routeId, 'line-opacity', 0.8);
-      console.log(`TEST: Successfully set opacity for ${routeId}`);
-    } catch (error) {
-      console.error('TEST: Error setting opacity:', error);
-    }
-  }, []);
 
   // Handle route selection events - outside the map initialization
   const handleRouteSelect = useCallback((event: CustomEvent) => {
@@ -347,25 +309,31 @@ const MapboxMap = memo(function MapboxMap() {
         if (attractionMarkers.current.length === 0) {
           console.log('Map: Recreating attraction markers as array is empty');
           // Re-initialize attraction markers
-          mapFeatures.forEach((feature: any) => {
+          mapFeatures.forEach((feature) => {
             const el = document.createElement('div');
             el.className = 'map-marker attraction-marker';
             
             const icon = document.createElement('div');
             icon.className = 'marker-icon';
             
-            let iconClass = 'marker-default-icon';
+            // Create and add FontAwesome icon instead of emoji
+            const iconElement = document.createElement('i');
+            iconElement.className = 'fas';
+            
+            // Add icon based on attraction type
             if (feature.icon) {
               switch (feature.icon.iconName) {
-                case 'fish': iconClass = 'marker-aquarium-icon'; break;
-                case 'paw': iconClass = 'marker-zoo-icon'; break;
-                case 'train': iconClass = 'marker-train-icon'; break;
-                case 'gamepad': iconClass = 'marker-game-icon'; break;
-                default: iconClass = 'marker-default-icon';
+                case 'fish': iconElement.className += ' fa-fish'; break;
+                case 'paw': iconElement.className += ' fa-paw'; break;
+                case 'train': iconElement.className += ' fa-train'; break;
+                case 'gamepad': iconElement.className += ' fa-gamepad'; break;
+                default: iconElement.className += ' fa-map-marker-alt';
               }
+            } else {
+              iconElement.className += ' fa-map-marker-alt';
             }
             
-            icon.classList.add(iconClass);
+            icon.appendChild(iconElement);
             el.appendChild(icon);
             
             const popup = new mapboxgl.Popup({ 
@@ -422,26 +390,32 @@ const MapboxMap = memo(function MapboxMap() {
         if (bikeResourceMarkers.current.length === 0) {
           console.log('Map: Recreating bike resource markers as array is empty');
           // Re-initialize bike resource markers
-          bikeResources.forEach((resource: any) => {
+          bikeResources.forEach((resource) => {
             const el = document.createElement('div');
             el.className = 'map-marker bike-marker';
             
             const icon = document.createElement('div');
             icon.className = 'marker-icon';
             
-            let iconClass = 'marker-bike-icon';
+            // Create and add FontAwesome icon instead of emoji
+            const iconElement = document.createElement('i');
+            iconElement.className = 'fas';
+            
+            // Add icon based on resource type
             if (resource.icon) {
               switch (resource.icon.iconName) {
-                case 'bicycle': iconClass = 'marker-bike-icon'; break;
-                case 'mountain': iconClass = 'marker-mountain-bike-icon'; break;
-                case 'road': iconClass = 'marker-road-bike-icon'; break;
-                case 'bolt': iconClass = 'marker-ebike-icon'; break;
-                case 'hands-helping': iconClass = 'marker-nonprofit-icon'; break;
-                default: iconClass = 'marker-bike-icon';
+                case 'bicycle': iconElement.className += ' fa-bicycle'; break;
+                case 'mountain': iconElement.className += ' fa-mountain'; break;
+                case 'road': iconElement.className += ' fa-road'; break;
+                case 'bolt': iconElement.className += ' fa-bolt'; break;
+                case 'hands-helping': iconElement.className += ' fa-hands-helping'; break;
+                default: iconElement.className += ' fa-bicycle';
               }
+            } else {
+              iconElement.className += ' fa-bicycle';
             }
             
-            icon.classList.add(iconClass);
+            icon.appendChild(iconElement);
             el.appendChild(icon);
             
             const popup = new mapboxgl.Popup({ 
@@ -629,7 +603,7 @@ const MapboxMap = memo(function MapboxMap() {
       window.removeEventListener('layer-toggle', layerToggleHandler);
       window.removeEventListener('center-location', centerLocationHandler);
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, [handleLayerToggle, handleCenterLocation]);
 
   // Set up route-select event listener outside the map initialization
   useEffect(() => {
@@ -644,7 +618,7 @@ const MapboxMap = memo(function MapboxMap() {
       console.log('Removing route-select event listener');
       window.removeEventListener('route-select', routeSelectHandler);
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, [handleRouteSelect]);
 
   // Initialize map on component mount
   useEffect(() => {
@@ -652,11 +626,29 @@ const MapboxMap = memo(function MapboxMap() {
     
     console.log('Attempting to initialize map');
     
+    // Helper function to ensure FontAwesome is loaded
+    const ensureFontAwesomeLoaded = () => {
+      if (!document.getElementById('fontawesome-css')) {
+        console.log('Loading FontAwesome CSS');
+        const link = document.createElement('link');
+        link.id = 'fontawesome-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css';
+        link.integrity = 'sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==';
+        link.crossOrigin = 'anonymous';
+        link.referrerPolicy = 'no-referrer';
+        document.head.appendChild(link);
+      }
+    };
+    
     // Initialize map
     if (mapContainer.current) {
       console.log('Container exists, initializing map');
       
       try {
+        // Ensure FontAwesome is loaded
+        ensureFontAwesomeLoaded();
+        
         const newMap = new mapboxgl.Map({
           container: mapContainer.current,
           style: 'mapbox://styles/swuller/cm8re9zyp004q01qkek8pdrsk',
@@ -785,7 +777,7 @@ const MapboxMap = memo(function MapboxMap() {
           
           // Pre-create attraction markers (they will be added to map only when toggled on)
           console.log(`Creating ${mapFeatures.length} attraction markers`);
-          mapFeatures.forEach((feature: any) => {
+          mapFeatures.forEach((feature) => {
             // Create element for marker
             const el = document.createElement('div');
             el.className = 'map-marker attraction-marker';
@@ -794,19 +786,24 @@ const MapboxMap = memo(function MapboxMap() {
             const icon = document.createElement('div');
             icon.className = 'marker-icon';
             
+            // Create and add FontAwesome icon instead of emoji
+            const iconElement = document.createElement('i');
+            iconElement.className = 'fas';
+            
             // Add icon based on attraction type
-            let iconClass = 'marker-default-icon';
             if (feature.icon) {
               switch (feature.icon.iconName) {
-                case 'fish': iconClass = 'marker-aquarium-icon'; break;
-                case 'paw': iconClass = 'marker-zoo-icon'; break;
-                case 'train': iconClass = 'marker-train-icon'; break;
-                case 'gamepad': iconClass = 'marker-game-icon'; break;
-                default: iconClass = 'marker-default-icon';
+                case 'fish': iconElement.className += ' fa-fish'; break;
+                case 'paw': iconElement.className += ' fa-paw'; break;
+                case 'train': iconElement.className += ' fa-train'; break;
+                case 'gamepad': iconElement.className += ' fa-gamepad'; break;
+                default: iconElement.className += ' fa-map-marker-alt';
               }
+            } else {
+              iconElement.className += ' fa-map-marker-alt';
             }
             
-            icon.classList.add(iconClass);
+            icon.appendChild(iconElement);
             el.appendChild(icon);
             
             // Create popup with attraction details
@@ -841,7 +838,7 @@ const MapboxMap = memo(function MapboxMap() {
           
           // Pre-create bike resource markers
           console.log(`Creating ${bikeResources.length} bike resource markers`);
-          bikeResources.forEach((resource: any) => {
+          bikeResources.forEach((resource) => {
             // Create element for marker
             const el = document.createElement('div');
             el.className = 'map-marker bike-marker';
@@ -850,20 +847,25 @@ const MapboxMap = memo(function MapboxMap() {
             const icon = document.createElement('div');
             icon.className = 'marker-icon';
             
+            // Create and add FontAwesome icon instead of emoji
+            const iconElement = document.createElement('i');
+            iconElement.className = 'fas';
+            
             // Add icon based on resource type
-            let iconClass = 'marker-bike-icon';
             if (resource.icon) {
               switch (resource.icon.iconName) {
-                case 'bicycle': iconClass = 'marker-bike-icon'; break;
-                case 'mountain': iconClass = 'marker-mountain-bike-icon'; break;
-                case 'road': iconClass = 'marker-road-bike-icon'; break;
-                case 'bolt': iconClass = 'marker-ebike-icon'; break;
-                case 'hands-helping': iconClass = 'marker-nonprofit-icon'; break;
-                default: iconClass = 'marker-bike-icon';
+                case 'bicycle': iconElement.className += ' fa-bicycle'; break;
+                case 'mountain': iconElement.className += ' fa-mountain'; break;
+                case 'road': iconElement.className += ' fa-road'; break;
+                case 'bolt': iconElement.className += ' fa-bolt'; break;
+                case 'hands-helping': iconElement.className += ' fa-hands-helping'; break;
+                default: iconElement.className += ' fa-bicycle';
               }
+            } else {
+              iconElement.className += ' fa-bicycle';
             }
             
-            icon.classList.add(iconClass);
+            icon.appendChild(iconElement);
             el.appendChild(icon);
             
             // Create popup with resource details
@@ -926,50 +928,17 @@ const MapboxMap = memo(function MapboxMap() {
                 border: 3px solid #34d399;
               }
               
-              .marker-icon::before {
+              .marker-icon i {
+                font-size: 22px;
                 position: relative;
-                top: -3px; /* Move icons up to center them better */
-                font-size: 24px;
               }
               
-              .marker-aquarium-icon::before {
-                content: "🐠";
+              .attraction-marker .marker-icon i {
+                color: #3b82f6;
               }
               
-              .marker-zoo-icon::before {
-                content: "🐘";
-              }
-              
-              .marker-train-icon::before {
-                content: "🚂";
-              }
-              
-              .marker-game-icon::before {
-                content: "🎮";
-              }
-              
-              .marker-default-icon::before {
-                content: "📍";
-              }
-              
-              .marker-bike-icon::before {
-                content: "🚲";
-              }
-              
-              .marker-mountain-bike-icon::before {
-                content: "🏔️";
-              }
-              
-              .marker-road-bike-icon::before {
-                content: "🛣";
-              }
-              
-              .marker-ebike-icon::before {
-                content: "⚡";
-              }
-              
-              .marker-nonprofit-icon::before {
-                content: "❤️";
+              .bike-marker .marker-icon i {
+                color: #34d399;
               }
               
               /* Custom popup styling */
