@@ -6,6 +6,12 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/app/map.css';
 import { MapLegendProvider } from '@/components/MapLegend';
 import { bikeRoutes, mapFeatures, bikeResources } from '@/data/geo_data';
+import { 
+  createLocationMarker, 
+  createAttractionMarker, 
+  createBikeResourceMarker, 
+  createHighlightMarker 
+} from '@/components/MapMarkers';
 
 // Initialize Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1Ijoic3d1bGxlciIsImEiOiJjbThyZTVuMzEwMTZwMmpvdTRzM3JpMGlhIn0.CF5lzLSkkfO-c0qt6a168A';
@@ -27,7 +33,7 @@ const MapboxMap = memo(function MapboxMap() {
   const [showBikeResources, setShowBikeResources] = useState(false);
 
   // Create location marker
-  const createLocationMarker = useCallback((longitude: number, latitude: number) => {
+  const createLocationMarkerHandler = useCallback((longitude: number, latitude: number) => {
     if (!map.current) return;
     
     // Don't create duplicate markers
@@ -36,23 +42,13 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
     
-    // Create marker element with classes
-    const el = document.createElement('div');
-    el.className = 'current-location-marker';
+    // Create marker using the React component
+    locationMarker.current = createLocationMarker(longitude, latitude);
     
-    // Create inner elements
-    el.innerHTML = `
-      <div class="location-dot"></div>
-      <div class="location-pulse"></div>
-    `;
-    
-    // Create and store marker instance
-    locationMarker.current = new mapboxgl.Marker({
-      element: el,
-      anchor: 'center'
-    })
-    .setLngLat([longitude, latitude])
-    .addTo(map.current);
+    // Add to map
+    if (map.current) {
+      locationMarker.current.addTo(map.current);
+    }
   }, []);
 
   // Start watching user location
@@ -81,7 +77,7 @@ const MapboxMap = memo(function MapboxMap() {
       const { longitude, latitude } = position.coords;
       
       // Create or update marker
-      createLocationMarker(longitude, latitude);
+      createLocationMarkerHandler(longitude, latitude);
       
       // Center map on first location fix if not already moving
       if (map.current && !map.current.isMoving()) {
@@ -119,13 +115,13 @@ const MapboxMap = memo(function MapboxMap() {
         watchId.current = null;
       }
     };
-  }, [isUsingDebugLocation, createLocationMarker]);
+  }, [isUsingDebugLocation, createLocationMarkerHandler]);
 
   // Simulate location updates when using debug location
   useEffect(() => {
     if (DEBUG_LOCATION && map.current && isUsingDebugLocation) {
       // Create the location marker with debug coordinates
-      createLocationMarker(DEBUG_LOCATION[0], DEBUG_LOCATION[1]);
+      createLocationMarkerHandler(DEBUG_LOCATION[0], DEBUG_LOCATION[1]);
       
       // Center map on debug location
       map.current.flyTo({
@@ -134,7 +130,7 @@ const MapboxMap = memo(function MapboxMap() {
         essential: true
       });
     }
-  }, [isUsingDebugLocation, createLocationMarker]);
+  }, [isUsingDebugLocation, createLocationMarkerHandler]);
 
   // Handle route selection events - outside the map initialization
   const handleRouteSelect = useCallback((event: CustomEvent) => {
@@ -223,59 +219,10 @@ const MapboxMap = memo(function MapboxMap() {
         
         // Check if we need to recreate the markers if array is empty
         if (attractionMarkers.current.length === 0) {
-          // Re-initialize attraction markers
-          mapFeatures.forEach((feature) => {
-            const el = document.createElement('div');
-            el.className = 'map-marker attraction-marker';
-            
-            const icon = document.createElement('div');
-            icon.className = 'marker-icon';
-            
-            // Create and add FontAwesome icon instead of emoji
-            const iconElement = document.createElement('i');
-            iconElement.className = 'fas';
-            
-            // Add icon based on attraction type
-            if (feature.icon) {
-              switch (feature.icon.iconName) {
-                case 'fish': iconElement.className += ' fa-fish'; break;
-                case 'paw': iconElement.className += ' fa-paw'; break;
-                case 'train': iconElement.className += ' fa-train'; break;
-                case 'gamepad': iconElement.className += ' fa-gamepad'; break;
-                default: iconElement.className += ' fa-map-marker-alt';
-              }
-            } else {
-              iconElement.className += ' fa-map-marker-alt';
-            }
-            
-            icon.appendChild(iconElement);
-            el.appendChild(icon);
-            
-            const popup = new mapboxgl.Popup({ 
-              offset: 25,
-              closeButton: true,
-              closeOnClick: false,
-              className: 'custom-popup'
-            })
-              .setHTML(`
-                <div class="map-popup">
-                  <h3>${feature.name}</h3>
-                  <p>${feature.description}</p>
-                  <p class="address">
-                    <strong>Address:</strong> 
-                    <a href="https://maps.google.com/?q=${feature.address}" target="_blank" rel="noopener noreferrer">
-                      ${feature.address}
-                    </a>
-                  </p>
-                </div>
-              `);
-            
-            const marker = new mapboxgl.Marker(el)
-              .setLngLat([feature.longitude, feature.latitude])
-              .setPopup(popup);
-            
-            attractionMarkers.current.push(marker);
-          });
+          // Re-initialize attraction markers using React components
+          attractionMarkers.current = mapFeatures.map(feature => 
+            createAttractionMarker(feature)
+          );
         }
         
         // Add all markers to the map
@@ -299,60 +246,10 @@ const MapboxMap = memo(function MapboxMap() {
         
         // Check if we need to recreate the markers if array is empty
         if (bikeResourceMarkers.current.length === 0) {
-          // Re-initialize bike resource markers
-          bikeResources.forEach((resource) => {
-            const el = document.createElement('div');
-            el.className = 'map-marker bike-marker';
-            
-            const icon = document.createElement('div');
-            icon.className = 'marker-icon';
-            
-            // Create and add FontAwesome icon instead of emoji
-            const iconElement = document.createElement('i');
-            iconElement.className = 'fas';
-            
-            // Add icon based on resource type
-            if (resource.icon) {
-              switch (resource.icon.iconName) {
-                case 'bicycle': iconElement.className += ' fa-bicycle'; break;
-                case 'mountain': iconElement.className += ' fa-mountain'; break;
-                case 'road': iconElement.className += ' fa-road'; break;
-                case 'bolt': iconElement.className += ' fa-bolt'; break;
-                case 'hands-helping': iconElement.className += ' fa-hands-helping'; break;
-                default: iconElement.className += ' fa-bicycle';
-              }
-            } else {
-              iconElement.className += ' fa-bicycle';
-            }
-            
-            icon.appendChild(iconElement);
-            el.appendChild(icon);
-            
-            const popup = new mapboxgl.Popup({ 
-              offset: 25,
-              closeButton: true,
-              closeOnClick: false,
-              className: 'custom-popup'
-            })
-              .setHTML(`
-                <div class="map-popup">
-                  <h3>${resource.name}</h3>
-                  <p>${resource.description}</p>
-                  <p class="address">
-                    <strong>Address:</strong> 
-                    <a href="https://maps.google.com/?q=${resource.address}" target="_blank" rel="noopener noreferrer">
-                      ${resource.address}
-                    </a>
-                  </p>
-                </div>
-              `);
-            
-            const marker = new mapboxgl.Marker(el)
-              .setLngLat([resource.longitude, resource.latitude])
-              .setPopup(popup);
-            
-            bikeResourceMarkers.current.push(marker);
-          });
+          // Re-initialize bike resource markers using React components
+          bikeResourceMarkers.current = bikeResources.map(resource => 
+            createBikeResourceMarker(resource)
+          );
         }
         
         // Add all markers to the map
@@ -397,13 +294,8 @@ const MapboxMap = memo(function MapboxMap() {
         duration: 1000
       });
       
-      // Create a temporary highlight marker
-      const el = document.createElement('div');
-      el.className = 'highlight-marker';
-      
-      // Create and add temporary highlight marker
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([location.longitude, location.latitude]);
+      // Create a temporary highlight marker using React component
+      const marker = createHighlightMarker(location.longitude, location.latitude);
 
       // Only add to map if it exists
       if (map.current) {
@@ -586,7 +478,7 @@ const MapboxMap = memo(function MapboxMap() {
           
           // If using debug location, create marker
           if (DEBUG_LOCATION && isUsingDebugLocation) {
-            createLocationMarker(DEBUG_LOCATION[0], DEBUG_LOCATION[1]);
+            createLocationMarkerHandler(DEBUG_LOCATION[0], DEBUG_LOCATION[1]);
           } else {
             // Otherwise start real location tracking
             startLocationWatch();
@@ -598,124 +490,15 @@ const MapboxMap = memo(function MapboxMap() {
           attractionMarkers.current = [];
           bikeResourceMarkers.current = [];
           
-          // Pre-create attraction markers (they will be added to map only when toggled on)
-          mapFeatures.forEach((feature) => {
-            // Create element for marker
-            const el = document.createElement('div');
-            el.className = 'map-marker attraction-marker';
-            
-            // Add icon
-            const icon = document.createElement('div');
-            icon.className = 'marker-icon';
-            
-            // Create and add FontAwesome icon instead of emoji
-            const iconElement = document.createElement('i');
-            iconElement.className = 'fas';
-            
-            // Add icon based on attraction type
-            if (feature.icon) {
-              switch (feature.icon.iconName) {
-                case 'fish': iconElement.className += ' fa-fish'; break;
-                case 'paw': iconElement.className += ' fa-paw'; break;
-                case 'train': iconElement.className += ' fa-train'; break;
-                case 'gamepad': iconElement.className += ' fa-gamepad'; break;
-                default: iconElement.className += ' fa-map-marker-alt';
-              }
-            } else {
-              iconElement.className += ' fa-map-marker-alt';
-            }
-            
-            icon.appendChild(iconElement);
-            el.appendChild(icon);
-            
-            // Create popup with attraction details
-            const popup = new mapboxgl.Popup({ 
-              offset: 25,
-              closeButton: true,
-              closeOnClick: false,
-              className: 'custom-popup'
-            })
-              .setHTML(`
-                <div class="map-popup">
-                  <h3>${feature.name}</h3>
-                  <p>${feature.description}</p>
-                  <p class="address">
-                    <strong>Address:</strong> 
-                    <a href="https://maps.google.com/?q=${feature.address}" target="_blank" rel="noopener noreferrer">
-                      ${feature.address}
-                    </a>
-                  </p>
-                </div>
-              `);
-            
-            // Create marker but don't add to map yet
-            const marker = new mapboxgl.Marker(el)
-              .setLngLat([feature.longitude, feature.latitude])
-              .setPopup(popup);
-            
-            // Store in ref for later use
-            attractionMarkers.current.push(marker);
-          });
+          // Pre-create attraction markers using React components (they will be added to map only when toggled on)
+          attractionMarkers.current = mapFeatures.map(feature => 
+            createAttractionMarker(feature)
+          );
           
-          // Pre-create bike resource markers
-          bikeResources.forEach((resource) => {
-            // Create element for marker
-            const el = document.createElement('div');
-            el.className = 'map-marker bike-marker';
-            
-            // Add icon
-            const icon = document.createElement('div');
-            icon.className = 'marker-icon';
-            
-            // Create and add FontAwesome icon instead of emoji
-            const iconElement = document.createElement('i');
-            iconElement.className = 'fas';
-            
-            // Add icon based on resource type
-            if (resource.icon) {
-              switch (resource.icon.iconName) {
-                case 'bicycle': iconElement.className += ' fa-bicycle'; break;
-                case 'mountain': iconElement.className += ' fa-mountain'; break;
-                case 'road': iconElement.className += ' fa-road'; break;
-                case 'bolt': iconElement.className += ' fa-bolt'; break;
-                case 'hands-helping': iconElement.className += ' fa-hands-helping'; break;
-                default: iconElement.className += ' fa-bicycle';
-              }
-            } else {
-              iconElement.className += ' fa-bicycle';
-            }
-            
-            icon.appendChild(iconElement);
-            el.appendChild(icon);
-            
-            // Create popup with resource details
-            const popup = new mapboxgl.Popup({ 
-              offset: 25,
-              closeButton: true,
-              closeOnClick: false,
-              className: 'custom-popup'
-            })
-              .setHTML(`
-                <div class="map-popup">
-                  <h3>${resource.name}</h3>
-                  <p>${resource.description}</p>
-                  <p class="address">
-                    <strong>Address:</strong> 
-                    <a href="https://maps.google.com/?q=${resource.address}" target="_blank" rel="noopener noreferrer">
-                      ${resource.address}
-                    </a>
-                  </p>
-                </div>
-              `);
-            
-            // Create marker but don't add to map yet
-            const marker = new mapboxgl.Marker(el)
-              .setLngLat([resource.longitude, resource.latitude])
-              .setPopup(popup);
-            
-            // Store in ref for later use
-            bikeResourceMarkers.current.push(marker);
-          });
+          // Pre-create bike resource markers using React components
+          bikeResourceMarkers.current = bikeResources.map(resource => 
+            createBikeResourceMarker(resource)
+          );
         });
 
         // Handle errors
@@ -728,6 +511,22 @@ const MapboxMap = memo(function MapboxMap() {
           if (watchId.current !== null) {
             navigator.geolocation.clearWatch(watchId.current);
           }
+          
+          // Clean up all markers before removing the map
+          if (locationMarker.current) {
+            locationMarker.current.remove();
+          }
+          
+          if (attractionMarkers.current.length > 0) {
+            attractionMarkers.current.forEach(marker => marker.remove());
+            attractionMarkers.current = [];
+          }
+          
+          if (bikeResourceMarkers.current.length > 0) {
+            bikeResourceMarkers.current.forEach(marker => marker.remove());
+            bikeResourceMarkers.current = [];
+          }
+          
           if (map.current) {
             map.current.remove();
             map.current = null;
@@ -737,18 +536,7 @@ const MapboxMap = memo(function MapboxMap() {
         console.error('Error initializing map:', error);
       }
     }
-    
-    // Cleanup on unmount
-    return () => {
-      if (watchId.current !== null) {
-        navigator.geolocation.clearWatch(watchId.current);
-      }
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-    };
-  }, [isUsingDebugLocation, startLocationWatch, createLocationMarker]);
+  }, [isUsingDebugLocation, startLocationWatch, createLocationMarkerHandler]);
   
   // Add resize event listener
   useEffect(() => {
@@ -774,6 +562,36 @@ const MapboxMap = memo(function MapboxMap() {
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('sidebar-toggle', handleSidebarToggle);
+    };
+  }, []);
+
+  // Add cleanup for component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up all markers before unmounting
+      if (locationMarker.current) {
+        locationMarker.current.remove();
+      }
+      
+      if (attractionMarkers.current.length > 0) {
+        attractionMarkers.current.forEach(marker => marker.remove());
+        attractionMarkers.current = [];
+      }
+      
+      if (bikeResourceMarkers.current.length > 0) {
+        bikeResourceMarkers.current.forEach(marker => marker.remove());
+        bikeResourceMarkers.current = [];
+      }
+      
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+      
+      if (watchId.current !== null) {
+        navigator.geolocation.clearWatch(watchId.current);
+        watchId.current = null;
+      }
     };
   }, []);
 

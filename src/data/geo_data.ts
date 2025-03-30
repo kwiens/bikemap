@@ -147,9 +147,17 @@ export const bikeResources: BikeResource[] = [
     name: 'Two Bikes Chattanooga',
     description: 'Non-profit bike shop transforming donated bikes into practical transportation for underserved community members.',
     address: '1810 E. Main Street, Suite 100, Chattanooga, TN 37404',
-    latitude: 35.0350,
-    longitude: -85.2830,
+    latitude: 35.026111,
+    longitude: -85.281111,
     icon: faHandsHelping,
+  },
+  {
+    name: 'Pedego Electric Bikes Chattanooga',
+    description: 'Specializing in electric bike sales, rentals, and services, offering a variety of models for all riders.',
+    address: '191 River St, Chattanooga, TN 37405',
+    latitude: 35.0625,
+    longitude: -85.3077,
+    icon: faBolt,
   },
 ];
 
