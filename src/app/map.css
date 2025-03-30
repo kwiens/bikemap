@@ -146,14 +146,23 @@
   box-shadow: 0 3px 8px rgba(0,0,0,0.15);
 }
 
+/* First reset the button completely */
 .custom-popup .mapboxgl-popup-close-button {
-  font-size: 22px;
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  font-size: 24px;
+  font-family: 'Arial', sans-serif;
   color: #666;
-  padding: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
   right: 5px;
   top: 5px;
-  line-height: 0.5;
-  border-radius: 50%;
+  text-align: center;
+  line-height: 22px; /* Slightly less than height to shift up */
+  padding: 0;
   transition: background-color 0.2s;
 }
 
