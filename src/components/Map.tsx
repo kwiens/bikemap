@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, memo } from 'react';
+import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapLegendProvider } from '@/components/MapLegend';
@@ -21,25 +21,8 @@ const MapboxMap = memo(function MapboxMap() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isUsingDebugLocation, setIsUsingDebugLocation] = useState(false);
   
-  // Simulate location updates when using debug location
-  useEffect(() => {
-    if (DEBUG_LOCATION && map.current && isUsingDebugLocation) {
-      // Create the location marker with debug coordinates
-      createLocationMarker(DEBUG_LOCATION[0], DEBUG_LOCATION[1]);
-      
-      // Center map on debug location
-      map.current.flyTo({
-        center: DEBUG_LOCATION,
-        zoom: 15,
-        essential: true
-      });
-      
-      console.log('Using debug location:', DEBUG_LOCATION);
-    }
-  }, [isUsingDebugLocation]);
-
   // Create location marker (using the styled approach from previous code)
-  const createLocationMarker = (longitude: number, latitude: number) => {
+  const createLocationMarker = useCallback((longitude: number, latitude: number) => {
     if (!map.current) return;
     
     // Don't create duplicate markers
@@ -117,10 +100,10 @@ const MapboxMap = memo(function MapboxMap() {
       `;
       document.head.appendChild(style);
     }
-  };
-  
+  }, []);
+
   // Start watching user location
-  const startLocationWatch = () => {
+  const startLocationWatch = useCallback(() => {
     // Skip if debug location is being used
     if (DEBUG_LOCATION && isUsingDebugLocation) {
       return;
@@ -206,7 +189,24 @@ const MapboxMap = memo(function MapboxMap() {
         console.log('Location watch cleared');
       }
     };
-  };
+  }, [isUsingDebugLocation, createLocationMarker]);
+
+  // Simulate location updates when using debug location
+  useEffect(() => {
+    if (DEBUG_LOCATION && map.current && isUsingDebugLocation) {
+      // Create the location marker with debug coordinates
+      createLocationMarker(DEBUG_LOCATION[0], DEBUG_LOCATION[1]);
+      
+      // Center map on debug location
+      map.current.flyTo({
+        center: DEBUG_LOCATION,
+        zoom: 15,
+        essential: true
+      });
+      
+      console.log('Using debug location:', DEBUG_LOCATION);
+    }
+  }, [isUsingDebugLocation, createLocationMarker]);
 
   // Initialize map on component mount
   useEffect(() => {
@@ -271,7 +271,7 @@ const MapboxMap = memo(function MapboxMap() {
         map.current = null;
       }
     };
-  }, [isUsingDebugLocation, startLocationWatch]);
+  }, [isUsingDebugLocation, startLocationWatch, createLocationMarker]);
   
   // Add resize event listener
   useEffect(() => {

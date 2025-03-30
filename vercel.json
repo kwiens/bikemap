@@ -1,5 +1,6 @@
 {
-  "toolbar": {
-    "show": false
-  }
+  "buildCommand": "pnpm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "regions": ["iad1"]
 } 
