@@ -1,0 +1,464 @@
+/* Color Variables */
+:root {
+  /* Primary colors */
+  --color-blue-primary: #3b82f6;
+  --color-blue-dark: #2563eb;
+  --color-blue-light: #EBF4FF;
+  
+  /* Secondary colors */
+  --color-green-primary: #34d399;
+  --color-green-light: #ECFDF5;
+  
+  /* Additional accent colors */
+  --color-red-primary: #EF4444;
+  --color-red-light: #FEE2E2;
+  --color-yellow-primary: #F59E0B;
+  --color-yellow-light: #FEF3C7;
+  --color-purple-primary: #8B5CF6;
+  --color-purple-light: #EDE9FE;
+  
+  /* Neutral colors */
+  --color-white: #ffffff;
+  --color-gray-50: #f8f9fa;
+  --color-gray-100: #eee;
+  --color-gray-200: #d1d5db;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #F3F4F6;
+  
+  /* Transparency values */
+  --color-blue-transparent: rgba(37, 99, 235, 0.05);
+  --color-blue-transparent-border: rgba(37, 99, 235, 0.3);
+  --color-blue-transparent-bg: rgba(37, 99, 235, 0.1);
+  --color-green-transparent: rgba(52, 211, 153, 0.05);
+  --color-green-transparent-border: rgba(52, 211, 153, 0.3);
+  
+  /* Shadow colors */
+  --shadow-light: rgba(0, 0, 0, 0.05);
+  --shadow-medium: rgba(0, 0, 0, 0.1);
+}
+
+/* Toggle Button Styles */
+.toggle-button-container {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+}
+
+.toggle-button {
+  background-color: var(--color-white);
+  border-radius: 9999px;
+  padding: 12px;
+  box-shadow: 0 4px 6px var(--shadow-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+}
+
+.toggle-button:hover {
+  background-color: var(--color-gray-50);
+}
+
+.toggle-button-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--color-gray-700);
+}
+
+/* Sidebar Styles */
+.sidebar-container {
+  position: fixed;
+  top: 100px;
+  left: 0;
+  height: 100%;
+  width: 280px;
+  background-color: var(--color-white);
+  box-shadow: 2px 0 5px var(--shadow-medium);
+  z-index: 999;
+  overflow: hidden;
+  transition: transform 0.3s ease-in-out;
+}
+
+.sidebar-content {
+  overflow-y: auto;
+  height: calc(100% - 56px);
+}
+
+.sidebar-inner-content {
+  padding: 16px;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-gray-100);
+  background-color: var(--color-gray-50);
+}
+
+.sidebar-header-title {
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-header-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--color-blue-dark);
+}
+
+/* Section Styles */
+.section-container {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--color-gray-600);
+}
+
+.section-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+  width: 40px;
+  height: 20px;
+  border-radius: 999px;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+.toggle-switch-active {
+  background-color: var(--color-blue-primary);
+}
+
+.toggle-switch-inactive {
+  background-color: var(--color-gray-200);
+}
+
+.toggle-switch-handle {
+  position: absolute;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  background-color: var(--color-white);
+  border-radius: 50%;
+  transition: left 0.2s;
+}
+
+.toggle-switch-handle-active {
+  left: 22px;
+}
+
+.toggle-switch-handle-inactive {
+  left: 2px;
+}
+
+/* Card Styles */
+.card {
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px var(--shadow-light);
+  cursor: pointer;
+}
+
+.card:hover {
+  background-color: var(--color-blue-transparent);
+  border-color: var(--color-blue-transparent-border);
+  box-shadow: 0 2px 4px var(--shadow-medium);
+}
+
+.card-green:hover {
+  background-color: var(--color-green-transparent);
+  border-color: var(--color-green-transparent-border);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-icon-container {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-icon-blue {
+  background-color: var(--color-blue-light);
+  border: 2px solid var(--color-blue-primary);
+}
+
+.card-icon-green {
+  background-color: var(--color-green-light);
+  border: 2px solid var(--color-green-primary);
+}
+
+.card-icon-neutral {
+  background-color: var(--color-gray-800);
+}
+
+/* Custom resource icon containers - support both named colors and hex colors */
+.card-icon-container[data-color="blue"] {
+  background-color: var(--color-blue-light);
+  border: 2px solid var(--color-blue-primary);
+}
+
+.card-icon-container[data-color="green"] {
+  background-color: var(--color-green-light);
+  border: 2px solid var(--color-green-primary);
+}
+
+.card-icon-container[data-color="gray"] {
+  background-color: var(--color-gray-800);
+  border: 2px solid var(--color-gray-500);
+}
+
+.card-icon-container[data-color="red"] {
+  background-color: var(--color-red-light);
+  border: 2px solid var(--color-red-primary);
+}
+
+.card-icon-container[data-color="yellow"] {
+  background-color: var(--color-yellow-light);
+  border: 2px solid var(--color-yellow-primary);
+}
+
+.card-icon-container[data-color="purple"] {
+  background-color: var(--color-purple-light);
+  border: 2px solid var(--color-purple-primary);
+}
+
+/* Fallback for custom colors */
+.card-icon-container:not([data-color^="blue"]):not([data-color^="green"]):not([data-color^="gray"]):not([data-color^="red"]):not([data-color^="yellow"]):not([data-color^="purple"]) {
+  background-color: var(--color-gray-800);
+  border: 2px solid currentColor;
+}
+
+/* Custom resource icons */
+.card-icon[data-color="blue"] {
+  color: var(--color-blue-primary);
+}
+
+.card-icon[data-color="green"] {
+  color: var(--color-green-primary);
+}
+
+.card-icon[data-color="gray"] {
+  color: var(--color-gray-500);
+}
+
+.card-icon[data-color="red"] {
+  color: var(--color-red-primary);
+}
+
+.card-icon[data-color="yellow"] {
+  color: var(--color-yellow-primary);
+}
+
+.card-icon[data-color="purple"] {
+  color: var(--color-purple-primary);
+}
+
+/* Fallback for custom colors */
+.card-icon:not([data-color^="blue"]):not([data-color^="green"]):not([data-color^="gray"]):not([data-color^="red"]):not([data-color^="yellow"]):not([data-color^="purple"]) {
+  color: inherit;
+}
+
+.card-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.icon-blue {
+  color: var(--color-blue-primary);
+}
+
+.icon-green {
+  color: var(--color-green-primary);
+}
+
+.card-title {
+  font-weight: 500;
+}
+
+.card-description {
+  font-size: 12px;
+  color: var(--color-gray-500);
+  margin-top: 4px;
+  margin-left: 40px;
+}
+
+.card-description-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.description-text {
+  flex: 1;
+}
+
+.location-arrow-container-blue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 4px;
+  background-color: var(--color-blue-light);
+  color: var(--color-blue-primary);
+  margin-left: 8px;
+}
+
+.location-arrow-container-green {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 4px;
+  background-color: var(--color-green-light);
+  color: var(--color-green-primary);
+  margin-left: 8px;
+}
+
+.location-arrow-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* BikeRoutes styles */
+.route-item {
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid transparent;
+}
+
+.route-item-selected {
+  background-color: var(--color-blue-transparent-bg);
+  border-color: var(--color-blue-dark);
+}
+
+.route-item:hover:not(.route-item-selected) {
+  background-color: var(--color-blue-transparent);
+  border-color: var(--color-blue-primary);
+}
+
+.route-color-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.route-name {
+  font-weight: 500;
+}
+
+.route-description {
+  font-size: 12px;
+  color: var(--color-gray-500);
+  margin-top: 4px;
+  margin-left: 28px;
+}
+
+/* Layer toggle styles */
+.layer-toggle {
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.layer-toggle:hover {
+  background-color: var(--color-blue-transparent);
+}
+
+.layer-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-gray-500);
+}
+
+.layer-name {
+  font-weight: 500;
+}
+
+/* Footer Styles */
+.footer {
+  border-top: 1px solid var(--color-gray-100);
+  padding: 12px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--color-gray-500);
+}
+
+.footer-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.footer p {
+  margin: 0;
+}
+
+.footer p + p {
+  margin-top: 4px;
+}
+
+/* Link Styles */
+.external-link {
+  color: var(--color-blue-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: text-decoration 0.2s ease;
+}
+
+.external-link:hover {
+  text-decoration: underline;
+}
+
+/* Utility classes */
+.hidden {
+  display: none;
+}
+
+.sidebar-hidden {
+  transform: translateX(-100%);
+}
+
+.sidebar-visible {
+  transform: translateX(0);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .sidebar-container {
+    width: 100%;
+    max-width: 320px;
+  }
+} 

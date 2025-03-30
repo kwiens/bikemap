@@ -11,9 +11,275 @@ import {
   faBicycle,
   faLayerGroup
 } from '@fortawesome/free-solid-svg-icons';
+import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { bikeRoutes, mapFeatures, bikeResources, localResources } from '@/data/bike_routes';
+import './map-legend.css';
 
-// Directly export a single component that combines provider, sidebar and trigger
+// Define interfaces for various component props
+interface ToggleSwitchProps {
+  isActive: boolean;
+  color?: string;
+}
+
+interface BikeRoutesProps {
+  selectedRoute: string | null;
+  onRouteSelect: (routeId: string) => void;
+}
+
+interface MapLayersProps {
+  showAttractions: boolean;
+  showBikeResources: boolean;
+  onToggleAttractions: () => void;
+  onToggleBikeResources: () => void;
+}
+
+interface LocationProps {
+  latitude: number;
+  longitude: number;
+  name: string;
+  description: string;
+  icon: IconDefinition;
+}
+
+interface AttractionsListProps {
+  show: boolean;
+  onCenterLocation: (location: LocationProps) => void;
+}
+
+interface BikeResourcesListProps {
+  show: boolean;
+  onCenterLocation: (location: LocationProps) => void;
+}
+
+interface ExternalLinkProps {
+  href: string;
+  children: React.ReactNode;
+}
+
+// Toggle Switch Component
+const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ isActive }) => (
+  <div className={`toggle-switch ${isActive ? 'toggle-switch-active' : 'toggle-switch-inactive'}`}>
+    <div className={`toggle-switch-handle ${isActive ? 'toggle-switch-handle-active' : 'toggle-switch-handle-inactive'}`} />
+  </div>
+);
+
+// Header Component
+const SidebarHeader = () => (
+  <div className="sidebar-header">
+    <h2 className="sidebar-header-title">
+      <FontAwesomeIcon icon={faMap} className="sidebar-header-icon" />
+      <span>Chattanooga Bike Map</span>
+    </h2>
+  </div>
+);
+
+// BikeRoutes Component
+const BikeRoutes: React.FC<BikeRoutesProps> = ({ selectedRoute, onRouteSelect }) => (
+  <div className="section-container">
+    <h3 className="section-title">
+      Pick a Loop
+    </h3>
+    <div className="section-items">
+      {bikeRoutes.map((route) => (
+        <div 
+          key={route.id} 
+          onClick={() => onRouteSelect(route.id)}
+          className={`route-item ${selectedRoute === route.id ? 'route-item-selected' : ''}`}
+        >
+          <div className="card-header">
+            <div
+              className="route-color-indicator"
+              style={{ backgroundColor: route.color }}
+            />
+            <span className="route-name">{route.name}</span>
+          </div>
+          <div className="route-description">
+            {route.description}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// MapLayers Component
+const MapLayers: React.FC<MapLayersProps> = ({ showAttractions, showBikeResources, onToggleAttractions, onToggleBikeResources }) => (
+  <div className="section-container">
+    <h3 className="section-title">
+      Map Layers
+    </h3>
+    <div className="section-items">
+      {/* Attractions Layer Toggle */}
+      <div 
+        onClick={onToggleAttractions}
+        className="layer-toggle"
+      >
+        <div className="card-header">
+          <FontAwesomeIcon 
+            icon={faMapMarkerAlt} 
+            className="layer-icon" 
+          />
+          <span className="layer-name">Attractions</span>
+        </div>
+        <ToggleSwitch isActive={showAttractions} />
+      </div>
+
+      {/* Bike Resources Layer Toggle */}
+      <div 
+        onClick={onToggleBikeResources}
+        className="layer-toggle"
+      >
+        <div className="card-header">
+          <FontAwesomeIcon 
+            icon={faBicycle} 
+            className="layer-icon" 
+          />
+          <span className="layer-name">Bike Resources</span>
+        </div>
+        <ToggleSwitch isActive={showBikeResources} />
+      </div>
+    </div>
+  </div>
+);
+
+// AttractionsList Component
+const AttractionsList: React.FC<AttractionsListProps> = ({ show, onCenterLocation }) => (
+  <div className={`section-container ${!show ? 'hidden' : ''}`}>
+    <h3 className="section-title">
+      Attractions
+    </h3>
+    <div className="section-items">
+      {mapFeatures.map((location) => (
+        <div 
+          key={location.name} 
+          className="card"
+          onClick={() => onCenterLocation(location)}
+        >
+          <div className="card-header">
+            <div className="card-icon-container card-icon-blue">
+              <FontAwesomeIcon 
+                icon={location.icon} 
+                className="card-icon icon-blue" 
+              />
+            </div>
+            <span className="card-title">{location.name}</span>
+          </div>
+          <div className="card-description card-description-flex">
+            <span className="description-text">{location.description}</span>
+            <div className="location-arrow-container-blue">
+              <FontAwesomeIcon 
+                icon={faLocationArrow} 
+                className="location-arrow-icon" 
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// BikeResourcesList Component
+const BikeResourcesList: React.FC<BikeResourcesListProps> = ({ show, onCenterLocation }) => (
+  <div className={`section-container ${!show ? 'hidden' : ''}`}>
+    <h3 className="section-title">
+      Bike Resources
+    </h3>
+    <div className="section-items">
+      {bikeResources.map((location) => (
+        <div 
+          key={location.name} 
+          className="card card-green"
+          onClick={() => onCenterLocation(location)}
+        >
+          <div className="card-header">
+            <div className="card-icon-container card-icon-green">
+              <FontAwesomeIcon 
+                icon={location.icon} 
+                className="card-icon icon-green" 
+              />
+            </div>
+            <span className="card-title">{location.name}</span>
+          </div>
+          <div className="card-description card-description-flex">
+            <span className="description-text">{location.description}</span>
+            <div className="location-arrow-container-green">
+              <FontAwesomeIcon 
+                icon={faLocationArrow} 
+                className="location-arrow-icon" 
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Link Component
+const ExternalLink: React.FC<ExternalLinkProps> = ({ href, children }) => (
+  <a 
+    href={href}
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="external-link"
+  >
+    {children}
+  </a>
+);
+
+// InformationSection Component
+const InformationSection = () => (
+  <div className="section-container">
+    <h3 className="section-title">
+      Information
+    </h3>
+    <div className="section-items">
+      {localResources.map((resource) => (
+        <div 
+          key={resource.name}
+          className="card"
+        >
+          <div className="card-header">
+            <div 
+              className="card-icon-container"
+              data-color={resource.color}
+            >
+              <FontAwesomeIcon 
+                icon={resource.icon} 
+                className="card-icon"
+                data-color={resource.color}
+              />
+            </div>
+            <span className="card-title">{resource.name}</span>
+          </div>
+          <div className="card-description">
+            {resource.description.includes('iFixit') ? (
+              <>
+                This map is a guide to the best bike routes in Chattanooga. Made with ❤️ by <ExternalLink href={resource.url}>iFixit</ExternalLink>, the free repair guide for every thing.
+              </>
+            ) : (
+              <>
+                <ExternalLink href={resource.url}>{resource.name}</ExternalLink> - {resource.description}
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Footer Component
+const Footer = () => (
+  <div className="footer">
+    <h4 className="footer-title">Get Out and Have Fun</h4>
+    <p>Pedal your way through Chattanooga&apos;s best spots—feel the river breeze, roll up to the Zoo for an up-close animal encounter, explore the Aquarium&apos;s underwater wonders, and step back in time at the Railroad Museum. Grab your bike, gather friends, and enjoy the ride!</p>
+    <p>© {new Date().getFullYear()} BikeMap</p>
+  </div>
+);
+
+// Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   // Track state in this parent component
   const [isOpen, setIsOpen] = useState(true);
@@ -25,7 +291,6 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
   
   const toggle = useCallback(() => {
-    console.log('Toggling sidebar from', isOpen, 'to', !isOpen);
     setIsOpen(!isOpen);
     
     // Dispatch event for map resizing
@@ -59,25 +324,22 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   }, [isOpen, toggle]);
 
   // Function to handle route selection
-  const handleRouteSelect = (routeId: string) => {
-    console.log('MapLegend: Route selected:', routeId);
+  const handleRouteSelect = useCallback((routeId: string) => {
     setSelectedRoute(routeId);
     
     // Dispatch event for map to update route opacity
-    const event = new CustomEvent('route-select', { 
+    window.dispatchEvent(new CustomEvent('route-select', { 
       detail: { routeId } 
-    });
-    console.log('MapLegend: Dispatching route-select event:', event);
-    window.dispatchEvent(event);
+    }));
 
     // Close sidebar on mobile after selection
     if (window.innerWidth <= 768 && isOpen) {
       toggle();
     }
-  };
+  }, [isOpen, toggle]);
 
   // Function to toggle attraction layer
-  const toggleAttractionLayer = () => {
+  const toggleAttractionLayer = useCallback(() => {
     const newValue = !showAttractions;
     setShowAttractions(newValue);
     
@@ -88,10 +350,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         visible: newValue 
       } 
     }));
-  };
+  }, [showAttractions]);
 
   // Function to toggle bike resources layer
-  const toggleBikeResourcesLayer = () => {
+  const toggleBikeResourcesLayer = useCallback(() => {
     const newValue = !showBikeResources;
     setShowBikeResources(newValue);
     
@@ -102,12 +364,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         visible: newValue 
       } 
     }));
-  };
+  }, [showBikeResources]);
 
   // Function to center map on a specific location
-  const centerOnLocation = (location: { latitude: number; longitude: number; name: string; }) => {
-    console.log('MapLegend: Centering on location:', location);
-    
+  const centerOnLocation = useCallback((location: { latitude: number; longitude: number; name: string; }) => {
     // Dispatch event for map to center and show pin
     window.dispatchEvent(new CustomEvent('center-location', { 
       detail: { 
@@ -119,22 +379,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     if (window.innerWidth <= 768 && isOpen) {
       toggle();
     }
-  };
-  
-  // Log the state on mount
-  useEffect(() => {
-    console.log('MapLegendProvider mounted with isOpen:', isOpen);
-  }, [isOpen]);
-  
-  // Log state changes
-  useEffect(() => {
-    console.log('Sidebar isOpen changed to:', isOpen);
-  }, [isOpen]);
+  }, [isOpen, toggle]);
 
   // Listen for route-deselect event
   useEffect(() => {
     const handleRouteDeselect = () => {
-      console.log('MapLegend: Received route-deselect event');
       setSelectedRoute(null);
     };
 
@@ -150,32 +399,15 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {children}
       
       {/* Toggle button */}
-      <div 
-        style={{
-          position: 'fixed',
-          top: '16px',
-          left: '16px',
-          zIndex: 1000
-        }}
-      >
+      <div className="toggle-button-container">
         <button 
           ref={toggleButtonRef}
           onClick={toggle}
-          style={{
-            backgroundColor: 'white',
-            borderRadius: '9999px',
-            padding: '12px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none'
-          }}
+          className="toggle-button"
         >
           <FontAwesomeIcon 
             icon={isOpen ? faTimes : faLayerGroup} 
-            style={{ width: '20px', height: '20px', color: '#374151' }}
+            className="toggle-button-icon"
           />
         </button>
       </div>
@@ -183,463 +415,40 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {/* Sidebar - always in DOM but transforms off-screen when closed */}
       <div 
         ref={sidebarRef}
-        style={{
-          position: 'fixed',
-          top: 100,
-          left: 0,
-          height: '100%',
-          width: '280px',
-          backgroundColor: 'white',
-          boxShadow: '2px 0 5px rgba(0,0,0,0.1)',
-          zIndex: 999,
-          overflow: 'hidden',
-          transition: 'transform 0.3s ease-in-out',
-          transform: isOpen ? 'translateX(0)' : 'translateX(-100%)'
-        }}
+        className={`sidebar-container ${isOpen ? 'sidebar-visible' : 'sidebar-hidden'}`}
       >
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          padding: '12px 16px',
-          borderBottom: '1px solid #eee',
-          backgroundColor: '#f8f9fa'
-        }}>
-          <h2 style={{ 
-            fontSize: '18px', 
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <FontAwesomeIcon icon={faMap} style={{ width: '20px', height: '20px', color: '#2563eb' }} />
-            <span>Chattanooga Bike Map</span>
-          </h2>
-        </div>
+        <SidebarHeader />
         
-        <div style={{ overflowY: 'auto', height: 'calc(100% - 56px)' }}>
-          <div style={{ padding: '16px' }}>
-            {/* Trail Types */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#4b5563' }}>
-                Pick a Loop
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {bikeRoutes.map((route) => (
-                  <div 
-                    key={route.id} 
-                    onClick={() => handleRouteSelect(route.id)}
-                    style={{ 
-                      padding: '8px', 
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease-in-out',
-                      backgroundColor: selectedRoute === route.id ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
-                      border: '1px solid',
-                      borderColor: selectedRoute === route.id ? 'rgb(37, 99, 235)' : 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.05)';
-                      e.currentTarget.style.borderColor = 'rgb(37, 99, 235)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedRoute !== route.id) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.borderColor = 'transparent';
-                      }
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div
-                        style={{ 
-                          width: '16px', 
-                          height: '16px', 
-                          borderRadius: '4px',
-                          backgroundColor: route.color 
-                        }}
-                      />
-                      <span style={{ fontWeight: 500 }}>{route.name}</span>
-                    </div>
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#6b7280', 
-                      marginTop: '4px',
-                      marginLeft: '28px' 
-                    }}>
-                      {route.description}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+        <div className="sidebar-content">
+          <div className="sidebar-inner-content">
+            <BikeRoutes 
+              selectedRoute={selectedRoute} 
+              onRouteSelect={handleRouteSelect} 
+            />
 
-            {/* Map Layers */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#4b5563' }}>
-                Map Layers
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Attractions Layer Toggle */}
-                <div 
-                  onClick={toggleAttractionLayer}
-                  style={{ 
-                    padding: '8px', 
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease-in-out',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <FontAwesomeIcon 
-                      icon={faMapMarkerAlt} 
-                      style={{ width: '16px', height: '16px', color: '#6b7280' }} 
-                    />
-                    <span style={{ fontWeight: 500 }}>Attractions</span>
-                  </div>
-                  <div style={{
-                    width: '40px',
-                    height: '20px',
-                    backgroundColor: showAttractions ? '#3b82f6' : '#d1d5db',
-                    borderRadius: '999px',
-                    position: 'relative',
-                    transition: 'background-color 0.2s',
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '2px',
-                      left: showAttractions ? '22px' : '2px',
-                      width: '16px',
-                      height: '16px',
-                      backgroundColor: 'white',
-                      borderRadius: '50%',
-                      transition: 'left 0.2s',
-                    }}/>
-                  </div>
-                </div>
+            <MapLayers 
+              showAttractions={showAttractions}
+              showBikeResources={showBikeResources}
+              onToggleAttractions={toggleAttractionLayer}
+              onToggleBikeResources={toggleBikeResourcesLayer}
+            />
 
-                {/* Bike Resources Layer Toggle */}
-                <div 
-                  onClick={toggleBikeResourcesLayer}
-                  style={{ 
-                    padding: '8px', 
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease-in-out',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <FontAwesomeIcon 
-                      icon={faBicycle} 
-                      style={{ width: '16px', height: '16px', color: '#6b7280' }} 
-                    />
-                    <span style={{ fontWeight: 500 }}>Bike Resources</span>
-                  </div>
-                  <div style={{
-                    width: '40px',
-                    height: '20px',
-                    backgroundColor: showBikeResources ? '#3b82f6' : '#d1d5db',
-                    borderRadius: '999px',
-                    position: 'relative',
-                    transition: 'background-color 0.2s',
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '2px',
-                      left: showBikeResources ? '22px' : '2px',
-                      width: '16px',
-                      height: '16px',
-                      backgroundColor: 'white',
-                      borderRadius: '50%',
-                      transition: 'left 0.2s',
-                    }}/>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AttractionsList 
+              show={showAttractions} 
+              onCenterLocation={centerOnLocation} 
+            />
 
-            {/* Attractions */}
-            <div style={{ 
-              marginBottom: '24px',
-              display: showAttractions ? 'block' : 'none' 
-            }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#4b5563' }}>
-                Attractions
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {mapFeatures.map((location) => (
-                  <div 
-                    key={location.name} 
-                    style={{ 
-                      padding: '8px', 
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease-in-out',
-                      border: '1px solid transparent',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                    }}
-                    onClick={() => centerOnLocation(location)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.05)';
-                      e.currentTarget.style.borderColor = 'rgba(37, 99, 235, 0.3)';
-                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.borderColor = 'transparent';
-                      e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ 
-                        width: '28px', 
-                        height: '28px', 
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#EBF4FF',
-                        border: '2px solid #3b82f6'
-                      }}>
-                        <FontAwesomeIcon 
-                          icon={location.icon} 
-                          style={{ width: '14px', height: '14px', color: '#3b82f6' }} 
-                        />
-                      </div>
-                      <span style={{ fontWeight: 500 }}>{location.name}</span>
-                    </div>
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#6b7280', 
-                      marginTop: '4px',
-                      marginLeft: '40px', 
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <span style={{ flex: 1 }}>{location.description}</span>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        padding: '6px',
-                        borderRadius: '4px',
-                        backgroundColor: '#EBF4FF',
-                        color: '#3b82f6',
-                        marginLeft: '8px'
-                      }}>
-                        <FontAwesomeIcon 
-                          icon={faLocationArrow} 
-                          style={{ width: '14px', height: '14px' }} 
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <BikeResourcesList 
+              show={showBikeResources} 
+              onCenterLocation={centerOnLocation} 
+            />
 
-            {/* Bike Resources */}
-            <div style={{ 
-              marginBottom: '24px',
-              display: showBikeResources ? 'block' : 'none' 
-            }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#4b5563' }}>
-                Bike Resources
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {bikeResources.map((location) => (
-                  <div 
-                    key={location.name} 
-                    style={{ 
-                      padding: '8px', 
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease-in-out',
-                      border: '1px solid transparent',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                    }}
-                    onClick={() => centerOnLocation(location)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(52, 211, 153, 0.05)';
-                      e.currentTarget.style.borderColor = 'rgba(52, 211, 153, 0.3)';
-                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.borderColor = 'transparent';
-                      e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ 
-                        width: '28px', 
-                        height: '28px', 
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#ECFDF5',
-                        border: '2px solid #34d399'
-                      }}>
-                        <FontAwesomeIcon 
-                          icon={location.icon} 
-                          style={{ width: '14px', height: '14px', color: '#34d399' }} 
-                        />
-                      </div>
-                      <span style={{ fontWeight: 500 }}>{location.name}</span>
-                    </div>
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#6b7280', 
-                      marginTop: '4px',
-                      marginLeft: '40px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <span style={{ flex: 1 }}>{location.description}</span>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        padding: '6px',
-                        borderRadius: '4px',
-                        backgroundColor: '#ECFDF5',
-                        color: '#34d399',
-                        marginLeft: '8px'
-                      }}>
-                        <FontAwesomeIcon 
-                          icon={faLocationArrow} 
-                          style={{ width: '14px', height: '14px' }} 
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Information */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#4b5563' }}>
-                Information
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {localResources.map((resource) => (
-                  <div 
-                    key={resource.name}
-                    style={{ 
-                      padding: '8px', 
-                      borderRadius: '6px',
-                      transition: 'all 0.2s ease-in-out',
-                      border: '1px solid transparent',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ 
-                        width: '28px', 
-                        height: '28px', 
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: '#F3F4F6',
-                        border: `2px solid ${resource.color}`
-                      }}>
-                        <FontAwesomeIcon 
-                          icon={resource.icon} 
-                          style={{ width: '14px', height: '14px', color: resource.color }} 
-                        />
-                      </div>
-                      <span style={{ fontWeight: 500 }}>{resource.name}</span>
-                    </div>
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#6b7280', 
-                      marginTop: '4px',
-                      marginLeft: '40px' 
-                    }}>
-                      {resource.description.includes('iFixit') ? (
-                        <>
-                          This map is a guide to the best bike routes in Chattanooga. Made with ❤️ by <a 
-                            href={resource.url}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            style={{ 
-                              color: '#3b82f6', 
-                              textDecoration: 'none',
-                              fontWeight: 500,
-                              transition: 'text-decoration 0.2s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.textDecoration = 'underline';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.textDecoration = 'none';
-                            }}
-                          >iFixit</a>, the free repair guide for every thing.
-                        </>
-                      ) : (
-                        <>
-                          <a 
-                            href={resource.url}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            style={{ 
-                              color: '#3b82f6', 
-                              textDecoration: 'none',
-                              fontWeight: 500,
-                              transition: 'text-decoration 0.2s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.textDecoration = 'underline';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.textDecoration = 'none';
-                            }}
-                          >{resource.name}</a> - {resource.description}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <InformationSection />
           </div>
         </div>
 
-        <div style={{ 
-          borderTop: '1px solid #eee', 
-          padding: '12px', 
-          fontSize: '12px', 
-          textAlign: 'center', 
-          color: '#6b7280' 
-        }}>
-          <h4 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px' }}>Get Out and Have Fun</h4>
-          <p>Pedal your way through Chattanooga&apos;s best spots—feel the river breeze, roll up to the Zoo for an up-close animal encounter, explore the Aquarium&apos;s underwater wonders, and step back in time at the Railroad Museum. Grab your bike, gather friends, and enjoy the ride!</p>
-          <p style={{ marginTop: '4px' }}>© {new Date().getFullYear()} BikeMap</p>
-        </div>
+        <Footer />
       </div>
     </>
   );
 }
-
-// Export these components to maintain compatibility with existing imports
-export function MapLegend() {
-  return null; // This is now handled in the provider
-}
-
-export function MapLegendTrigger() {
-  return null; // This is now handled in the provider
-}
-
-export function SidebarDebug() {
-  return null; // This is now handled in the provider
-} 
