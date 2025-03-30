@@ -7,166 +7,163 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 // Initialize Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1Ijoic3d1bGxlciIsImEiOiJjbThyZTVuMzEwMTZwMmpvdTRzM3JpMGlhIn0.CF5lzLSkkfO-c0qt6a168A ';
 
+const DEFAULT_CENTER: [number, number] = [-85.31225, 35.04828];
+const TEST_LOCATION: [number, number] = [-85.31225, 35.04828];
+
 export default function Map() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const watchId = useRef<number | null>(null);
+  const retryTimeout = useRef<NodeJS.Timeout | null>(null);
   const [mapInitialized, setMapInitialized] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [isTestMode] = useState(true);
 
-  useEffect(() => {
-    console.log('Component mounted');
+  const createLocationMarker = () => {
+    const el = document.createElement('div');
+    el.className = 'current-location-marker';
+    el.innerHTML = `
+      <div class="location-dot"></div>
+      <div class="location-pulse"></div>
+    `;
     
-    // Only initialize the map if it hasn't been initialized yet
-    if (mapContainer.current && !map.current && !mapInitialized) {
-      console.log('Initializing map');
-      
-      try {
-        const mapInstance = new mapboxgl.Map({
-          container: mapContainer.current,
-          style: 'mapbox://styles/swuller/cm8re9zyp004q01qkek8pdrsk',
-          center: [-85.31225, 35.04828],
-          zoom: 14.89,
-          pitch: -22.4,
-          bearing: 11,
-          antialias: true
-        });
+    return new mapboxgl.Marker({
+      element: el,
+      anchor: 'center'
+    });
+  };
 
-        map.current = mapInstance;
+  const updateMarkerPosition = (mapInstance: mapboxgl.Map, coordinates: [number, number]) => {
+    if (!locationMarker.current) {
+      locationMarker.current = createLocationMarker();
+      locationMarker.current.setLngLat(coordinates);
+      locationMarker.current.addTo(mapInstance);
+    } else {
+      locationMarker.current.setLngLat(coordinates);
+    }
+  };
 
-        mapInstance.on('load', () => {
-          console.log('Map loaded successfully');
-          
-          // Request user's location with battery-efficient options
-          if (navigator.geolocation) {
-            const options = {
-              enableHighAccuracy: false, // Use low accuracy for better battery life
-              timeout: 10000,           // Increased timeout to 10 seconds
-              maximumAge: 60000         // Accept cached positions up to 1 minute old
-            };
-
-            // Function to handle location updates
-            const handleLocationUpdate = (position: GeolocationPosition) => {
-              const { longitude, latitude } = position.coords;
-              
-              // Create marker only when we have valid coordinates
-              if (!locationMarker.current) {
-                // Create custom marker element
-                const el = document.createElement('div');
-                el.className = 'current-location-marker';
-                
-                // Create the inner dot and pulse elements
-                el.innerHTML = `
-                  <div class="location-dot"></div>
-                  <div class="location-pulse"></div>
-                `;
-                
-                // Create and add the marker
-                locationMarker.current = new mapboxgl.Marker({
-                  element: el,
-                  anchor: 'center'
-                })
-                  .setLngLat([longitude, latitude])
-                  .addTo(mapInstance);
-
-                // Add the CSS styles to the document
-                const style = document.createElement('style');
-                style.textContent = `
-                  .current-location-marker {
-                    width: 22px;
-                    height: 22px;
-                    position: relative;
-                  }
-                  
-                  .location-dot {
-                    background: #4285F4;
-                    width: 16px;
-                    height: 16px;
-                    border-radius: 50%;
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    border: 3px solid white;
-                    box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
-                  }
-                  
-                  .location-pulse {
-                    background: rgba(66, 133, 244, 0.15);
-                    width: 22px;
-                    height: 22px;
-                    border-radius: 50%;
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    animation: pulse 2s ease-out infinite;
-                  }
-                  
-                  @keyframes pulse {
-                    0% {
-                      transform: translate(-50%, -50%) scale(0.5);
-                      opacity: 1;
-                    }
-                    100% {
-                      transform: translate(-50%, -50%) scale(2);
-                      opacity: 0;
-                    }
-                  }
-                `;
-                document.head.appendChild(style);
-              } else {
-                locationMarker.current.setLngLat([longitude, latitude]);
-              }
-            };
-
-            // Function to handle location errors
-            const handleLocationError = (error: GeolocationPositionError) => {
-              switch (error.code) {
-                case error.PERMISSION_DENIED:
-                  console.error('Location permission denied. Please enable location services in your browser settings.');
-                  break;
-                case error.POSITION_UNAVAILABLE:
-                  console.error('Location information is unavailable. Please check your device\'s location settings.');
-                  break;
-                case error.TIMEOUT:
-                  console.warn('Location request timed out. Retrying...');
-                  // Try to get a single position update
-                  navigator.geolocation.getCurrentPosition(handleLocationUpdate, handleLocationError, options);
-                  break;
-                default:
-                  console.error('An unknown error occurred while getting location:', error.message);
-                  break;
-              }
-            };
-
-            // Start watching position
-            watchId.current = navigator.geolocation.watchPosition(
-              handleLocationUpdate,
-              handleLocationError,
-              options
-            );
-          } else {
-            console.error('Geolocation is not supported by your browser');
-          }
-          
-          setMapInitialized(true);
-        });
-
-        mapInstance.on('error', (e: mapboxgl.ErrorEvent) => {
-          console.error('Mapbox error:', e);
-        });
-
-      } catch (error) {
-        console.error('Error initializing map:', error);
-      }
+  const startLocationWatch = (mapInstance: mapboxgl.Map) => {
+    if (isTestMode) {
+      updateMarkerPosition(mapInstance, TEST_LOCATION);
+      return;
     }
 
-    // Cleanup function
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    const options = {
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 60000
+    };
+
+    const handleLocationUpdate = (position: GeolocationPosition) => {
+      const { longitude, latitude } = position.coords;
+      setLocationError(null);
+      setIsRetrying(false);
+      updateMarkerPosition(mapInstance, [longitude, latitude]);
+    };
+
+    const handleLocationError = (error: GeolocationPositionError) => {
+      let errorMessage = '';
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage = 'Please enable location services in your browser settings to use this feature.';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = 'Unable to determine your location. Please check your device\'s GPS or network connection.';
+          break;
+        case error.TIMEOUT:
+          if (!isRetrying) {
+            setIsRetrying(true);
+            errorMessage = 'Location request timed out. Retrying...';
+            if (retryTimeout.current) {
+              clearTimeout(retryTimeout.current);
+            }
+            retryTimeout.current = setTimeout(() => {
+              navigator.geolocation.getCurrentPosition(handleLocationUpdate, handleLocationError, options);
+            }, 2000);
+          }
+          break;
+        default:
+          errorMessage = 'An error occurred while getting your location.';
+          break;
+      }
+      setLocationError(errorMessage);
+    };
+
+    watchId.current = navigator.geolocation.watchPosition(
+      handleLocationUpdate,
+      handleLocationError,
+      options
+    );
+  };
+
+  useEffect(() => {
+    if (!mapContainer.current || map.current || mapInitialized) return;
+
+    try {
+      console.log('Initializing map');
+      const mapInstance = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/swuller/cm8re9zyp004q01qkek8pdrsk', // Restore original custom style
+        center: TEST_LOCATION, 
+        zoom: 14.89,
+        pitch: -22.4, // Restore original pitch
+        bearing: 11,  // Restore original bearing
+        antialias: true,
+        transformRequest: (url, resourceType) => {
+          if (resourceType === 'Model') {
+            return {
+              url: url,
+              headers: {
+                'Access-Control-Allow-Origin': '*'
+              }
+            };
+          }
+          return { url };
+        }
+      });
+
+      mapInstance.on('load', () => {
+        map.current = mapInstance;
+        
+        // Add marker immediately after map loads
+        const marker = createLocationMarker();
+        marker.setLngLat(TEST_LOCATION);
+        marker.addTo(mapInstance);
+        locationMarker.current = marker;
+        
+        // Center map on test location
+        mapInstance.flyTo({
+          center: TEST_LOCATION,
+          zoom: 14.89,
+          duration: 0
+        });
+        
+        setMapInitialized(true);
+      });
+
+      mapInstance.on('error', (e: mapboxgl.ErrorEvent) => {
+        console.error('Mapbox error:', e);
+      });
+
+    } catch (error) {
+      console.error('Error initializing map:', error);
+      setLocationError('Failed to initialize the map. Please refresh the page.');
+    }
+
     return () => {
-      console.log('Cleanup called, map exists:', !!map.current);
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
+      }
+      if (retryTimeout.current !== null) {
+        clearTimeout(retryTimeout.current);
       }
       if (map.current) {
         map.current.remove();
@@ -174,20 +171,35 @@ export default function Map() {
         setMapInitialized(false);
       }
     };
-  }, []); // Empty dependency array to run only once
+  }, []);
+
+  useEffect(() => {
+    if (map.current) {
+      startLocationWatch(map.current);
+    }
+  }, [isTestMode]);
 
   return (
-    <div 
-      ref={mapContainer} 
-      className="w-full h-full absolute inset-0"
-      style={{ 
-        backgroundColor: '#f0f0f0',
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0
-      }}
-    />
+    <div className="map-wrapper">
+      <div 
+        ref={mapContainer} 
+        className="map-container"
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+      />
+      
+      {/* Map overlays */}
+      {locationError && (
+        <div className="map-notification">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg">
+            <p className="text-sm">{locationError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Additional overlays can be added here */}
+      <div className="map-overlay absolute top-4 right-4">
+        {/* Future controls can go here */}
+      </div>
+    </div>
   );
 } 

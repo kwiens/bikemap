@@ -2,28 +2,110 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
-
-html,
-body {
-  height: 100%;
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-.mapboxgl-map {
+html, 
+body {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Next.js app wrapper */
+body > div,
+#__next,
+#root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Map container styles */
+.map-wrapper {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.map-container {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   width: 100%;
   height: 100%;
+  z-index: 1;
+}
+
+/* Map overlay elements */
+.map-overlay {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none; /* Allow clicks to pass through to map */
+}
+
+.map-overlay > * {
+  pointer-events: auto; /* Re-enable clicks for actual UI elements */
+}
+
+/* Error notification */
+.map-notification {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  max-width: 80%;
+}
+
+/* Location Marker Styles */
+.current-location-marker {
+  width: 24px;
+  height: 24px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.location-dot {
+  width: 14px;
+  height: 14px;
+  background-color: #4285f4;
+  border: 2px solid white;
+  border-radius: 50%;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+}
+
+.location-pulse {
+  width: 32px;
+  height: 32px;
+  background-color: #4285f4;
+  border-radius: 50%;
+  position: absolute;
+  animation: pulse 1.5s ease-out infinite;
+  opacity: 0.4;
+  z-index: 1;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
 }

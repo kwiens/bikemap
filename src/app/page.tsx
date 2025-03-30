@@ -15,7 +15,7 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 export default function Home(): ReactElement {
   return (
-    <main className="fixed inset-0 w-full h-full overflow-hidden">
+    <main className="w-screen h-screen overflow-hidden absolute inset-0 m-0 p-0">
       <Map />
     </main>
   );
