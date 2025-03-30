@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import '@/app/map.css';
 import { MapLegendProvider } from '@/components/MapLegend';
 import { bikeRoutes, mapFeatures, bikeResources } from '@/data/geo_data';
 
@@ -25,7 +26,7 @@ const MapboxMap = memo(function MapboxMap() {
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
 
-  // Create location marker (using the styled approach from previous code)
+  // Create location marker
   const createLocationMarker = useCallback((longitude: number, latitude: number) => {
     if (!map.current) return;
     
@@ -34,8 +35,6 @@ const MapboxMap = memo(function MapboxMap() {
       locationMarker.current.setLngLat([longitude, latitude]);
       return;
     }
-    
-    console.log('Creating location marker at', [longitude, latitude]);
     
     // Create marker element with classes
     const el = document.createElement('div');
@@ -54,56 +53,6 @@ const MapboxMap = memo(function MapboxMap() {
     })
     .setLngLat([longitude, latitude])
     .addTo(map.current);
-    
-    // Add CSS styles if not already present
-    if (!document.getElementById('location-marker-style')) {
-      const style = document.createElement('style');
-      style.id = 'location-marker-style';
-      style.textContent = `
-        .current-location-marker {
-          width: 22px;
-          height: 22px;
-          position: relative;
-        }
-        
-        .location-dot {
-          background: #4285F4;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          border: 3px solid white;
-          box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
-        }
-        
-        .location-pulse {
-          background: rgba(66, 133, 244, 0.15);
-          width: 22px;
-          height: 22px;
-          border-radius: 50%;
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          animation: pulse 2s ease-out infinite;
-        }
-        
-        @keyframes pulse {
-          0% {
-            transform: translate(-50%, -50%) scale(0.5);
-            opacity: 1;
-          }
-          100% {
-            transform: translate(-50%, -50%) scale(2);
-            opacity: 0;
-          }
-        }
-      `;
-      document.head.appendChild(style);
-    }
   }, []);
 
   // Start watching user location
@@ -114,15 +63,13 @@ const MapboxMap = memo(function MapboxMap() {
     }
     
     if (!map.current) return;
-    console.log('Starting location watch');
     
     // Check if geolocation is available
     if (!navigator.geolocation) {
-      console.log('Geolocation is not supported by your browser');
       return;
     }
     
-    // Options for geolocation - using battery-friendly settings from original code
+    // Options for geolocation - using battery-friendly settings
     const options = {
       enableHighAccuracy: false, // Less battery usage
       timeout: 10000,           // 10-second timeout
@@ -132,7 +79,6 @@ const MapboxMap = memo(function MapboxMap() {
     // Function to handle location updates
     const handleLocationUpdate = (position: GeolocationPosition) => {
       const { longitude, latitude } = position.coords;
-      console.log(`Location updated: [${longitude}, ${latitude}]`);
       
       // Create or update marker
       createLocationMarker(longitude, latitude);
@@ -149,9 +95,6 @@ const MapboxMap = memo(function MapboxMap() {
     
     // Function to handle location errors
     const handleLocationError = (error: GeolocationPositionError) => {
-      // Just log the error without showing it to the user
-      console.log('Location service not available:', error.message);
-      
       // Try to get a single position update as fallback
       if (error.code === error.TIMEOUT) {
         navigator.geolocation.getCurrentPosition(
@@ -174,7 +117,6 @@ const MapboxMap = memo(function MapboxMap() {
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
         watchId.current = null;
-        console.log('Location watch cleared');
       }
     };
   }, [isUsingDebugLocation, createLocationMarker]);
@@ -191,27 +133,20 @@ const MapboxMap = memo(function MapboxMap() {
         zoom: 15,
         essential: true
       });
-      
-      console.log('Using debug location:', DEBUG_LOCATION);
     }
   }, [isUsingDebugLocation, createLocationMarker]);
 
   // Handle route selection events - outside the map initialization
   const handleRouteSelect = useCallback((event: CustomEvent) => {
-    console.log('Map: Received route-select event:', event);
-    
     if (!map.current) {
-      console.log('Map: No map instance available');
       return;
     }
     
     const { routeId } = event.detail;
-    console.log(`Map: Route selected: ${routeId}`);
     
     // Update opacities for all routes
     bikeRoutes.forEach(route => {
       if (map.current) {
-        console.log(`Map: Setting opacity for route ${route.id} to ${route.id === routeId ? 0.8 : 0.2}`);
         try {
           map.current.setPaintProperty(
             route.id, 
@@ -219,23 +154,16 @@ const MapboxMap = memo(function MapboxMap() {
             route.id === routeId ? 0.8 : 0.2
           );
         } catch (error) {
-          console.error(`Map: Error setting opacity for route ${route.id}:`, error);
+          console.error(`Error setting opacity for route ${route.id}:`, error);
         }
       }
     });
 
     // Find the selected route and its bounds
     const selectedRoute = bikeRoutes.find(route => route.id === routeId);
-    console.log('Map: Selected route:', selectedRoute);
     
     if (selectedRoute?.bounds) {
       const bounds = selectedRoute.bounds;
-      console.log(`Map: Flying to route "${selectedRoute.name}":`, {
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest()
-      });
       
       try {
         // Calculate the center of the bounds
@@ -250,7 +178,6 @@ const MapboxMap = memo(function MapboxMap() {
         
         // Check if we're on mobile
         const isMobile = window.innerWidth <= 768;
-        console.log(`Device detected as: ${isMobile ? 'mobile' : 'desktop'}`);
         
         // Use a different zoom formula for mobile vs desktop
         // Mobile gets zoomed out more to show more context
@@ -258,14 +185,10 @@ const MapboxMap = memo(function MapboxMap() {
         if (isMobile) {
           // Mobile zoom - more zoomed out
           zoom = Math.max(11, 15 - maxDiff * 100);
-          console.log('Using mobile zoom level:', zoom);
         } else {
           // Desktop zoom - more zoomed in
           zoom = Math.max(13, 17 - maxDiff * 100);
-          console.log('Using desktop zoom level:', zoom);
         }
-        
-        console.log(`Map: Flying to center of route [${centerLng}, ${centerLat}] with zoom ${zoom}`);
         
         // Use flyTo which tends to be more reliable
         map.current.flyTo({
@@ -282,32 +205,24 @@ const MapboxMap = memo(function MapboxMap() {
           }
         }, 100);
       } catch (error) {
-        console.error('Map: Error flying to route:', error);
+        console.error('Error flying to route:', error);
       }
-    } else {
-      console.log(`Map: No bounds found for route "${selectedRoute?.name}"`);
     }
   }, []);
 
   // Handle layer toggle events
   const handleLayerToggle = useCallback((event: CustomEvent) => {
-    console.log('Map: Received layer-toggle event:', event);
-    
     const { layer, visible } = event.detail;
     
     if (layer === 'attractions') {
-      console.log(`Map: Setting attractions visibility to ${visible}`);
       setShowAttractions(visible);
       
       if (visible && map.current) {
-        console.log('Map: Showing attraction markers');
-        
         // First remove any existing markers to prevent duplicates
         attractionMarkers.current.forEach(marker => marker.remove());
         
         // Check if we need to recreate the markers if array is empty
         if (attractionMarkers.current.length === 0) {
-          console.log('Map: Recreating attraction markers as array is empty');
           // Re-initialize attraction markers
           mapFeatures.forEach((feature) => {
             const el = document.createElement('div');
@@ -370,25 +285,20 @@ const MapboxMap = memo(function MapboxMap() {
           }
         });
       } else if (!visible) {
-        console.log('Map: Hiding attraction markers');
         // Remove markers from map but keep them in the array
         attractionMarkers.current.forEach(marker => marker.remove());
       }
     }
     
     if (layer === 'bikeResources') {
-      console.log(`Map: Setting bike resources visibility to ${visible}`);
       setShowBikeResources(visible);
       
       if (visible && map.current) {
-        console.log('Map: Showing bike resource markers');
-        
         // First remove any existing markers to prevent duplicates
         bikeResourceMarkers.current.forEach(marker => marker.remove());
         
         // Check if we need to recreate the markers if array is empty
         if (bikeResourceMarkers.current.length === 0) {
-          console.log('Map: Recreating bike resource markers as array is empty');
           // Re-initialize bike resource markers
           bikeResources.forEach((resource) => {
             const el = document.createElement('div');
@@ -452,7 +362,6 @@ const MapboxMap = memo(function MapboxMap() {
           }
         });
       } else if (!visible) {
-        console.log('Map: Hiding bike resource markers');
         // Remove markers from map but keep them in the array
         bikeResourceMarkers.current.forEach(marker => marker.remove());
       }
@@ -473,18 +382,13 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Handler for centering on a specific location
   const handleCenterLocation = useCallback((event: CustomEvent) => {
-    console.log('Map: Received center-location event:', event);
-    
     if (!map.current) {
-      console.log('Map: No map instance available');
       return;
     }
     
     const { location } = event.detail;
     
     if (location && location.latitude && location.longitude) {
-      console.log(`Map: Centering on location [${location.longitude}, ${location.latitude}]`);
-      
       // Fly to the location
       map.current.flyTo({
         center: [location.longitude, location.latitude],
@@ -496,33 +400,6 @@ const MapboxMap = memo(function MapboxMap() {
       // Create a temporary highlight marker
       const el = document.createElement('div');
       el.className = 'highlight-marker';
-      
-      // Add CSS for highlight marker if not already present
-      if (!document.getElementById('highlight-marker-style')) {
-        const style = document.createElement('style');
-        style.id = 'highlight-marker-style';
-        style.textContent = `
-          .highlight-marker {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background-color: rgba(59, 130, 246, 0.3);
-            animation: pulse-highlight 2s ease-out infinite;
-          }
-          
-          @keyframes pulse-highlight {
-            0% {
-              transform: scale(0.8);
-              opacity: 1;
-            }
-            100% {
-              transform: scale(2);
-              opacity: 0;
-            }
-          }
-        `;
-        document.head.appendChild(style);
-      }
       
       // Create and add temporary highlight marker
       const marker = new mapboxgl.Marker(el)
@@ -544,7 +421,6 @@ const MapboxMap = memo(function MapboxMap() {
       );
       
       if (isAttraction && !showAttractions) {
-        console.log('Map: Location is an attraction but layer is not visible. Toggling attractions layer on.');
         // Toggle attractions layer on
         window.dispatchEvent(new CustomEvent('layer-toggle', { 
           detail: { layer: 'attractions', visible: true } 
@@ -557,7 +433,6 @@ const MapboxMap = memo(function MapboxMap() {
       );
       
       if (isBikeResource && !showBikeResources) {
-        console.log('Map: Location is a bike resource but layer is not visible. Toggling bike resources layer on.');
         // Toggle bike resources layer on
         window.dispatchEvent(new CustomEvent('layer-toggle', { 
           detail: { layer: 'bikeResources', visible: true } 
@@ -582,15 +457,11 @@ const MapboxMap = memo(function MapboxMap() {
           bikeMarker.togglePopup();
         }
       }
-    } else {
-      console.log('Map: Invalid location data', location);
     }
   }, [showAttractions, showBikeResources]);
 
   // Set up event listeners for map layers and location centering
   useEffect(() => {
-    console.log('Setting up layer-toggle and center-location event listeners');
-    
     // Create stable wrapper functions that don't change between renders
     const layerToggleHandler = (e: Event) => handleLayerToggle(e as CustomEvent);
     const centerLocationHandler = (e: Event) => handleCenterLocation(e as CustomEvent);
@@ -599,7 +470,6 @@ const MapboxMap = memo(function MapboxMap() {
     window.addEventListener('center-location', centerLocationHandler);
     
     return () => {
-      console.log('Removing layer-toggle and center-location event listeners');
       window.removeEventListener('layer-toggle', layerToggleHandler);
       window.removeEventListener('center-location', centerLocationHandler);
     };
@@ -607,15 +477,12 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Set up route-select event listener outside the map initialization
   useEffect(() => {
-    console.log('Setting up route-select event listener');
-    
     // Create stable wrapper function that doesn't change between renders
     const routeSelectHandler = (e: Event) => handleRouteSelect(e as CustomEvent);
     
     window.addEventListener('route-select', routeSelectHandler);
     
     return () => {
-      console.log('Removing route-select event listener');
       window.removeEventListener('route-select', routeSelectHandler);
     };
   }, [handleRouteSelect]);
@@ -624,12 +491,9 @@ const MapboxMap = memo(function MapboxMap() {
   useEffect(() => {
     if (map.current) return; // already initialized
     
-    console.log('Attempting to initialize map');
-    
     // Helper function to ensure FontAwesome is loaded
     const ensureFontAwesomeLoaded = () => {
       if (!document.getElementById('fontawesome-css')) {
-        console.log('Loading FontAwesome CSS');
         const link = document.createElement('link');
         link.id = 'fontawesome-css';
         link.rel = 'stylesheet';
@@ -643,8 +507,6 @@ const MapboxMap = memo(function MapboxMap() {
     
     // Initialize map
     if (mapContainer.current) {
-      console.log('Container exists, initializing map');
-      
       try {
         // Ensure FontAwesome is loaded
         ensureFontAwesomeLoaded();
@@ -666,20 +528,13 @@ const MapboxMap = memo(function MapboxMap() {
         
         // Log when map is loaded
         newMap.on('load', () => {
-          console.log('Map loaded successfully');
-          
-          // Log all layers in the style
-          console.log('Available layers in style:');
+          // Set initial line width for specific layers
           const style = newMap.getStyle();
           if (style && style.layers) {
-            style.layers.forEach((layer, index) => {
-              console.log(`${index + 1}. Layer ID: "${layer.id}", Type: "${layer.type}"`);
-              
-              // Set initial line width for specific layers
+            style.layers.forEach((layer) => {
               if (layer.type === 'line') {
                 const route = bikeRoutes.find(r => r.id === layer.id);
                 if (route) {
-                  console.log(`Setting initial line properties for layer: ${layer.id}`);
                   newMap.setPaintProperty(layer.id, 'line-width', route.defaultWidth);
                   newMap.setPaintProperty(layer.id, 'line-color', route.color);
                   newMap.setPaintProperty(layer.id, 'line-opacity', 0.2); // Start with low opacity
@@ -689,23 +544,12 @@ const MapboxMap = memo(function MapboxMap() {
                   const sourceLayer = layer['source-layer'];
                   
                   if (sourceId && sourceLayer) {
-                    console.log(`Querying features for route "${route.name}" from source "${sourceId}" layer "${sourceLayer}"`);
-                    
                     // Query all features in this layer
                     const features = newMap.querySourceFeatures(sourceId, {
                       sourceLayer: sourceLayer
                     });
                     
-                    console.log(`Found ${features.length} features for route "${route.name}"`);
-                    
                     if (features.length > 0) {
-                      // Log feature details for debugging
-                      console.log(`Feature details for route "${route.name}":`, {
-                        firstFeature: features[0],
-                        featureCount: features.length,
-                        geometryTypes: [...new Set(features.map(f => f.geometry.type))]
-                      });
-                      
                       // Calculate bounds of all features
                       const bounds = new mapboxgl.LngLatBounds();
                       
@@ -727,28 +571,8 @@ const MapboxMap = memo(function MapboxMap() {
                       if (bounds.getNorth() !== undefined && bounds.getSouth() !== undefined) {
                         // Store the bounds for later use
                         route.bounds = bounds;
-                        
-                        console.log(`Bounds for route "${route.name}":`, {
-                          north: bounds.getNorth(),
-                          south: bounds.getSouth(),
-                          east: bounds.getEast(),
-                          west: bounds.getWest()
-                        });
-                      } else {
-                        console.log(`No valid bounds found for route "${route.name}"`);
                       }
-                    } else {
-                      console.log(`No features found for route "${route.name}". Layer details:`, {
-                        sourceId,
-                        sourceLayer,
-                        layerId: layer.id
-                      });
                     }
-                  } else {
-                    console.log(`Could not find source information for route "${route.name}"`, {
-                      sourceId,
-                      sourceLayer
-                    });
                   }
                 }
               }
@@ -769,14 +593,12 @@ const MapboxMap = memo(function MapboxMap() {
           }
           
           // Initialize attraction and bike resource markers (but don't display yet)
-          console.log('Initializing attraction and bike resource markers');
           
           // Clear existing marker arrays before initialization
           attractionMarkers.current = [];
           bikeResourceMarkers.current = [];
           
           // Pre-create attraction markers (they will be added to map only when toggled on)
-          console.log(`Creating ${mapFeatures.length} attraction markers`);
           mapFeatures.forEach((feature) => {
             // Create element for marker
             const el = document.createElement('div');
@@ -833,11 +655,9 @@ const MapboxMap = memo(function MapboxMap() {
             
             // Store in ref for later use
             attractionMarkers.current.push(marker);
-            console.log(`Created attraction marker for ${feature.name} at [${feature.longitude}, ${feature.latitude}]`);
           });
           
           // Pre-create bike resource markers
-          console.log(`Creating ${bikeResources.length} bike resource markers`);
           bikeResources.forEach((resource) => {
             // Create element for marker
             const el = document.createElement('div');
@@ -895,133 +715,7 @@ const MapboxMap = memo(function MapboxMap() {
             
             // Store in ref for later use
             bikeResourceMarkers.current.push(marker);
-            console.log(`Created bike resource marker for ${resource.name} at [${resource.longitude}, ${resource.latitude}]`);
           });
-          
-          // Add CSS for markers if not already present
-          if (!document.getElementById('map-markers-style')) {
-            const style = document.createElement('style');
-            style.id = 'map-markers-style';
-            style.textContent = `
-              .map-marker {
-                cursor: pointer;
-              }
-              
-              .attraction-marker .marker-icon,
-              .bike-marker .marker-icon {
-                width: 48px;
-                height: 48px;
-                border-radius: 50%;
-                background-color: #ffffff;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-                position: relative;
-              }
-              
-              .attraction-marker .marker-icon {
-                border: 3px solid #3b82f6;
-              }
-              
-              .bike-marker .marker-icon {
-                border: 3px solid #34d399;
-              }
-              
-              .marker-icon i {
-                font-size: 22px;
-                position: relative;
-              }
-              
-              .attraction-marker .marker-icon i {
-                color: #3b82f6;
-              }
-              
-              .bike-marker .marker-icon i {
-                color: #34d399;
-              }
-              
-              /* Custom popup styling */
-              .custom-popup {
-                border-radius: 12px !important;
-                overflow: hidden;
-              }
-              
-              .custom-popup .mapboxgl-popup-content {
-                border-radius: 12px;
-                padding: 15px;
-                box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-              }
-              
-              .custom-popup .mapboxgl-popup-close-button {
-                font-size: 22px;
-                color: #666;
-                padding: 8px;
-                right: 5px;
-                top: 5px;
-                line-height: 0.5;
-                border-radius: 50%;
-                transition: background-color 0.2s;
-              }
-              
-              .custom-popup .mapboxgl-popup-close-button:hover {
-                background-color: rgba(0,0,0,0.05);
-              }
-              
-              .map-popup {
-                padding: 8px;
-                max-width: 280px;
-              }
-              
-              .map-popup h3 {
-                margin-top: 0;
-                margin-bottom: 8px;
-                font-size: 16px;
-                font-weight: 600;
-              }
-              
-              .map-popup p {
-                margin-bottom: 8px;
-                font-size: 14px;
-                line-height: 1.4;
-              }
-              
-              .map-popup p.address {
-                margin-top: 10px;
-                border-top: 1px solid #eee;
-                padding-top: 8px;
-              }
-              
-              .map-popup a {
-                color: #3b82f6;
-                text-decoration: none;
-              }
-              
-              .map-popup a:hover {
-                text-decoration: underline;
-              }
-              
-              .highlight-marker {
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                background-color: rgba(59, 130, 246, 0.3);
-                animation: pulse-highlight 2s ease-out infinite;
-              }
-              
-              @keyframes pulse-highlight {
-                0% {
-                  transform: scale(0.8);
-                  opacity: 1;
-                }
-                100% {
-                  transform: scale(2);
-                  opacity: 0;
-                }
-              }
-            `;
-            document.head.appendChild(style);
-          }
         });
 
         // Handle errors
@@ -1060,7 +754,6 @@ const MapboxMap = memo(function MapboxMap() {
   useEffect(() => {
     const handleResize = () => {
       if (map.current) {
-        console.log('Handling window resize');
         map.current.resize();
       }
     };
@@ -1069,10 +762,8 @@ const MapboxMap = memo(function MapboxMap() {
     
     // Listen for sidebar toggle events
     const handleSidebarToggle = () => {
-      console.log('Handling sidebar toggle event');
       setTimeout(() => {
         if (map.current) {
-          console.log('Resizing map after sidebar toggle');
           map.current.resize();
         }
       }, 300); // Longer delay to wait for transition
@@ -1093,61 +784,29 @@ const MapboxMap = memo(function MapboxMap() {
 
   return (
     <>
-      <div 
-        ref={mapContainer}
-        style={{ 
-          width: '100%', 
-          height: '100%',
-          position: 'absolute', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0,
-          zIndex: 500 // Add z-index to ensure map and its controls are visible
-        }}
-      />
+      <div ref={mapContainer} className="map-container" />
       
       {/* Debug mode toggle */}
       {DEBUG_LOCATION && (
         <div 
           onClick={toggleDebugLocation}
-          style={{
-            position: 'absolute',
-            bottom: '20px',
-            left: '20px',
-            backgroundColor: isUsingDebugLocation ? 'rgba(67, 56, 202, 0.9)' : 'rgba(75, 85, 99, 0.9)',
-            color: 'white',
-            padding: '6px 12px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            zIndex: 900,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-          }}
+          className={`debug-location-toggle ${isUsingDebugLocation ? 'active' : 'inactive'}`}
         >
           {isUsingDebugLocation ? 'Using Debug Location' : 'Using Real Location'}
         </div>
       )}
-
-
     </>
   );
 });
 
 // Main Map component - manages layout and UI chrome
 export default function Map() {
-  // Log when the component mounts for debugging
-  useEffect(() => {
-    console.log('Map component mounted');
-  }, []);
-
   return (
     <MapLegendProvider>
       <div style={{ 
         width: '100vw', 
         height: '100vh', 
         position: 'relative',
-        // Allow controls to be visible even if they extend beyond the container
         overflow: 'visible'
       }}>
         <MapboxMap />

@@ -2,6 +2,7 @@
 
 import { type ReactElement } from 'react';
 import dynamic from 'next/dynamic';
+import '@/app/map.css';
 
 // Dynamically import the Map component with no SSR since Mapbox requires window
 const Map = dynamic(() => import('@/components/Map'), {

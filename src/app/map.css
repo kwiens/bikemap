@@ -1,0 +1,195 @@
+/* Map Container Styles */
+.map-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 500;
+}
+
+/* Debug Mode Toggle */
+.debug-location-toggle {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  z-index: 900;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  color: white;
+}
+
+.debug-location-toggle.active {
+  background-color: rgba(67, 56, 202, 0.9);
+}
+
+.debug-location-toggle.inactive {
+  background-color: rgba(75, 85, 99, 0.9);
+}
+
+/* Location Marker Styles */
+.current-location-marker {
+  width: 22px;
+  height: 22px;
+  position: relative;
+}
+
+.location-dot {
+  background: #4285F4;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 3px solid white;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+}
+
+.location-pulse {
+  background: rgba(66, 133, 244, 0.15);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: pulse 2s ease-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+/* Highlight Marker Styles */
+.highlight-marker {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: rgba(59, 130, 246, 0.3);
+  animation: pulse-highlight 2s ease-out infinite;
+}
+
+@keyframes pulse-highlight {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Map Marker Styles */
+.map-marker {
+  cursor: pointer;
+}
+
+.attraction-marker .marker-icon,
+.bike-marker .marker-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  position: relative;
+}
+
+.attraction-marker .marker-icon {
+  border: 3px solid #3b82f6;
+}
+
+.bike-marker .marker-icon {
+  border: 3px solid #34d399;
+}
+
+.marker-icon i {
+  font-size: 22px;
+  position: relative;
+}
+
+.attraction-marker .marker-icon i {
+  color: #3b82f6;
+}
+
+.bike-marker .marker-icon i {
+  color: #34d399;
+}
+
+/* Custom Popup Styling */
+.custom-popup {
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.custom-popup .mapboxgl-popup-content {
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+}
+
+.custom-popup .mapboxgl-popup-close-button {
+  font-size: 22px;
+  color: #666;
+  padding: 8px;
+  right: 5px;
+  top: 5px;
+  line-height: 0.5;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.custom-popup .mapboxgl-popup-close-button:hover {
+  background-color: rgba(0,0,0,0.05);
+}
+
+.map-popup {
+  padding: 8px;
+  max-width: 280px;
+}
+
+.map-popup h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.map-popup p {
+  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.map-popup p.address {
+  margin-top: 10px;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+
+.map-popup a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.map-popup a:hover {
+  text-decoration: underline;
+} 
