@@ -19,7 +19,7 @@ const MapboxMap = memo(function MapboxMap() {
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const watchId = useRef<number | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [isUsingDebugLocation, setIsUsingDebugLocation] = useState(!!DEBUG_LOCATION);
+  const [isUsingDebugLocation, setIsUsingDebugLocation] = useState(false);
   
   // Simulate location updates when using debug location
   useEffect(() => {
