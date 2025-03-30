@@ -17,25 +17,25 @@ const legendItems = [
   {
     name: 'Zoo Loop',
     color: 'red',
-    description: 'Bike-friendly paved trails and paths',
+    description: 'Fun route through the university to visit the zoo and a nearby park',
     icon: faRoute,
   },
   {
     name: 'Downtown Loop',
-    color: 'green',
-    description: 'Unpaved trails suitable for mountain bikes',
+    color: '#00FF00',
+    description: 'Explore the riverwalk and visit the aquarium',
     icon: faRoute,
   },
   {
     name: 'The View Loop',
     color: 'blue',
-    description: 'Dedicated bike lanes on roads',
+    description: 'The best city and river views around',
     icon: faRoute,
   },
   {
     name: 'Points of Interest',
     color: '#FBBC05',
-    description: 'Parks, rest areas, and repair stations',
+    description: 'Aquarium, Zoo, & Railroad Museum',
     icon: faMapMarkerAlt,
   },
 ];
@@ -43,13 +43,31 @@ const legendItems = [
 const mapFeatures = [
   {
     name: 'Your Location',
-    description: 'Blue pulsing dot shows your current position',
+    description: 'Blue Dot: Your real-time location',
     icon: faMapMarkerAlt,
   },
   {
     name: 'Navigation',
-    description: 'Drag to pan, scroll to zoom, rotate with Ctrl+drag',
+    description: 'Controls: Drag to move, pinch to zoom, hold Ctrl to rotate',
     icon: faCompass,
+  },
+  {
+    name: 'Map Layers',
+    description: 'Toggle for different views',
+    icon: faLayerGroup,
+  },
+];
+
+const proTips = [
+  {
+    name: 'Points of Interest',
+    description: 'Look for parks, rest areas, and repair stations along the way',
+    icon: faMapMarkerAlt,
+  },
+  {
+    name: 'Scenic Routes',
+    description: 'Enjoy the scenic greenways, perfect for all skill levels',
+    icon: faRoute,
   },
 ];
 
@@ -164,18 +182,6 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             <FontAwesomeIcon icon={faMap} style={{ width: '20px', height: '20px', color: '#2563eb' }} />
             <span>Chattanooga Bike Map</span>
           </h2>
-          <button 
-            onClick={toggle}
-            style={{
-              backgroundColor: 'transparent',
-              border: 'none',
-              padding: '8px',
-              cursor: 'pointer',
-              color: '#6b7280'
-            }}
-          >
-            <FontAwesomeIcon icon={faTimes} style={{ width: '20px', height: '20px' }} />
-          </button>
         </div>
         
         <div style={{ overflowY: 'auto', height: 'calc(100% - 56px)' }}>
@@ -183,7 +189,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             {/* Trail Types */}
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#4b5563' }}>
-                Trail Types
+                Pick a Loop
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {legendItems.map((item) => (
@@ -240,6 +246,34 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
+            {/* Pro Tips */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#4b5563' }}>
+                Pro Tips
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {proTips.map((tip) => (
+                  <div key={tip.name} style={{ padding: '8px', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <FontAwesomeIcon 
+                        icon={tip.icon} 
+                        style={{ width: '16px', height: '16px', color: '#6b7280' }} 
+                      />
+                      <span style={{ fontWeight: 500 }}>{tip.name}</span>
+                    </div>
+                    <div style={{ 
+                      fontSize: '12px', 
+                      color: '#6b7280', 
+                      marginTop: '4px',
+                      marginLeft: '28px' 
+                    }}>
+                      {tip.description}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Information */}
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', color: '#4b5563' }}>
@@ -276,8 +310,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           textAlign: 'center', 
           color: '#6b7280' 
         }}>
-          <p>Discover the Scenic City on two wheels! Whether you’re pedaling past the Tennessee Aquarium for a glimpse of underwater wonders, coasting by the Chattanooga Zoo to see furry friends, or cruising toward the historic Railroad Museum for a step back in time, this map has you covered. From easy-going boardwalks to mountain-bike-ready trails, there’s a loop for every cyclist’s sense of adventure.
-          </p>
+          <h4 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px' }}>Get Out and Have Fun</h4>
+          <p>Pedal your way through Chattanooga's best spots—feel the river breeze, roll up to the Zoo for an up-close animal encounter, explore the Aquarium's underwater wonders, and step back in time at the Railroad Museum. Grab your bike, gather friends, and enjoy the ride!</p>
           <p style={{ marginTop: '4px' }}>© {new Date().getFullYear()} BikeMap</p>
         </div>
       </div>
