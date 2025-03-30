@@ -319,7 +319,8 @@ const MapboxMap = memo(function MapboxMap() {
           top: 0, 
           left: 0, 
           right: 0, 
-          bottom: 0 
+          bottom: 0,
+          zIndex: 500 // Add z-index to ensure map and its controls are visible
         }}
       />
       
@@ -380,8 +381,9 @@ export default function Map() {
       <div style={{ 
         width: '100vw', 
         height: '100vh', 
-        position: 'relative', 
-        overflow: 'hidden' 
+        position: 'relative',
+        // Allow controls to be visible even if they extend beyond the container
+        overflow: 'visible'
       }}>
         <MapboxMap />
       </div>

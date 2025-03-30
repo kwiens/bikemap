@@ -134,7 +134,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       <div 
         style={{
           position: 'fixed',
-          top: 0,
+          top: 100,
           left: 0,
           height: '100%',
           width: '280px',
@@ -276,7 +276,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           textAlign: 'center', 
           color: '#6b7280' 
         }}>
-          <p>Data courtesy of Chattanooga Open Data Portal</p>
+          <p>Discover the Scenic City on two wheels! Whether you’re pedaling past the Tennessee Aquarium for a glimpse of underwater wonders, coasting by the Chattanooga Zoo to see furry friends, or cruising toward the historic Railroad Museum for a step back in time, this map has you covered. From easy-going boardwalks to mountain-bike-ready trails, there’s a loop for every cyclist’s sense of adventure.
+          </p>
           <p style={{ marginTop: '4px' }}>© {new Date().getFullYear()} BikeMap</p>
         </div>
       </div>
