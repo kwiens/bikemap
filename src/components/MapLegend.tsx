@@ -89,7 +89,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   // Log the state on mount
   useEffect(() => {
     console.log('MapLegendProvider mounted with isOpen:', isOpen);
-  }, []);
+  }, [isOpen]);
   
   // Log state changes
   useEffect(() => {
@@ -100,23 +100,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     <>
       {children}
       
-      {/* Debug indicator always visible */}
-      <div 
-        style={{
-          position: 'fixed',
-          bottom: '16px',
-          right: '16px',
-          backgroundColor: 'rgba(0,0,0,0.75)',
-          color: 'white',
-          padding: '8px 12px',
-          borderRadius: '4px',
-          zIndex: 5000,
-          fontFamily: 'monospace',
-          fontSize: '14px'
-        }}
-      >
-        Sidebar: {isOpen ? 'OPEN' : 'CLOSED'}
-      </div>
+
       
       {/* Toggle button */}
       <div 
@@ -311,7 +295,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           color: '#6b7280' 
         }}>
           <h4 style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px' }}>Get Out and Have Fun</h4>
-          <p>Pedal your way through Chattanooga's best spots—feel the river breeze, roll up to the Zoo for an up-close animal encounter, explore the Aquarium's underwater wonders, and step back in time at the Railroad Museum. Grab your bike, gather friends, and enjoy the ride!</p>
+          <p>Pedal your way through Chattanooga&apos;s best spots—feel the river breeze, roll up to the Zoo for an up-close animal encounter, explore the Aquarium&apos;s underwater wonders, and step back in time at the Railroad Museum. Grab your bike, gather friends, and enjoy the ride!</p>
           <p style={{ marginTop: '4px' }}>© {new Date().getFullYear()} BikeMap</p>
         </div>
       </div>

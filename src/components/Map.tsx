@@ -271,7 +271,7 @@ const MapboxMap = memo(function MapboxMap() {
         map.current = null;
       }
     };
-  }, [isUsingDebugLocation]);
+  }, [isUsingDebugLocation, startLocationWatch]);
   
   // Add resize event listener
   useEffect(() => {
@@ -285,7 +285,7 @@ const MapboxMap = memo(function MapboxMap() {
     window.addEventListener('resize', handleResize);
     
     // Listen for sidebar toggle events
-    const handleSidebarToggle = (e: Event) => {
+    const handleSidebarToggle = () => {
       console.log('Handling sidebar toggle event');
       setTimeout(() => {
         if (map.current) {
