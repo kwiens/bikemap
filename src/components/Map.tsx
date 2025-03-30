@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapLegendProvider } from '@/components/MapLegend';
-import { bikeRoutes, mapFeatures, bikeResources } from '@/data/bike_routes';
+import { bikeRoutes, mapFeatures, bikeResources } from '@/data/geo_data';
 
 // Initialize Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1Ijoic3d1bGxlciIsImEiOiJjbThyZTVuMzEwMTZwMmpvdTRzM3JpMGlhIn0.CF5lzLSkkfO-c0qt6a168A';

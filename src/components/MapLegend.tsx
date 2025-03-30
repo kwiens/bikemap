@@ -12,7 +12,7 @@ import {
   faLayerGroup
 } from '@fortawesome/free-solid-svg-icons';
 import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { bikeRoutes, mapFeatures, bikeResources, localResources } from '@/data/bike_routes';
+import { bikeRoutes, mapFeatures, bikeResources, localResources } from '@/data/geo_data';
 import './map-legend.css';
 
 // Define interfaces for various component props
