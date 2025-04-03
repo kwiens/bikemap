@@ -502,4 +502,18 @@
   padding: 2px 8px;
   border-radius: 4px;
   color: var(--color-gray-600);
+}
+
+.loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--color-gray-500);
+  font-style: italic;
+}
+
+.error {
+  padding: 16px;
+  text-align: center;
+  color: var(--color-red-500);
+  font-weight: 500;
 } 

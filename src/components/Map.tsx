@@ -8,9 +8,7 @@ import { MapLegendProvider } from '@/components/MapLegend';
 import { 
   bikeRoutes, 
   mapFeatures, 
-  bikeResources, 
-  bikeRentalLocations,
-  BikeRentalLocation 
+  bikeResources
 } from '@/data/geo_data';
 import { 
   createLocationMarker, 
@@ -18,6 +16,14 @@ import {
   createBikeResourceMarker, 
   createHighlightMarker
 } from '@/components/MapMarkers';
+import { 
+  fetchStationInformation, 
+  fetchStationStatus, 
+  gbfsToBikeRentalLocation,
+  GBFSStationStatus,
+  GBFSStation,
+  BikeRentalLocation
+} from '@/data/gbfs';
 
 // Initialize Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1Ijoic3d1bGxlciIsImEiOiJjbThyZTVuMzEwMTZwMmpvdTRzM3JpMGlhIn0.CF5lzLSkkfO-c0qt6a168A';
@@ -239,7 +245,7 @@ const MapboxMap = memo(function MapboxMap() {
   }, []);
 
   // Handle layer toggle events
-  const handleLayerToggle = useCallback((event: CustomEvent) => {
+  const handleLayerToggle = useCallback(async (event: CustomEvent) => {
     const { layer, visible } = event.detail;
     
     if (layer === 'bikeRentals') {
@@ -247,82 +253,95 @@ const MapboxMap = memo(function MapboxMap() {
       
       if (visible && map.current) {
         // First remove any existing markers to prevent duplicates
-        bikeRentalMarkers.current.forEach(marker => marker.remove());
+        bikeRentalMarkers.current.forEach((marker: mapboxgl.Marker) => marker.remove());
         
-        // Check if we need to recreate the markers if array is empty
-        if (bikeRentalMarkers.current.length === 0) {
-          // Create markers for each rental location
-          const createMarkers = async () => {
-            const markerPromises = bikeRentalLocations.map(async (location) => {
-              if (!map.current) return null;
-              const coordinates = await geocodeAddress(location.address);
-              if (!coordinates) return null;
-              
-              // Create element with FontAwesome bike icon
-              const el = document.createElement('div');
-              el.className = 'map-marker rental-marker';
-              
-              // Create icon container
-              const icon = document.createElement('div');
-              icon.className = 'marker-icon';
-              
-              // Create icon element
-              const iconElement = document.createElement('i');
-              iconElement.className = 'fas fa-bicycle';
-              iconElement.style.color = '#9333EA';
-              iconElement.style.fontSize = '22px';
-              iconElement.style.position = 'relative';
-              
-              // Assemble the elements
-              icon.appendChild(iconElement);
-              el.appendChild(icon);
-              
-              const popup = new mapboxgl.Popup({ 
-                offset: 25,
-                closeButton: true,
-                closeOnClick: false,
-                className: 'custom-popup'
-              }).setHTML(`
-                <div class="map-popup">
-                  <h3>${location.name}</h3>
-                  <p>${location.description}</p>
-                  <p class="address">
-                    <strong>Address:</strong> 
-                    <a href="https://maps.google.com/?q=${location.address}" target="_blank" rel="noopener noreferrer">
-                      ${location.address}
-                    </a>
-                  </p>
-                  <p><strong>Type:</strong> ${location.rentalType}</p>
-                  <p><strong>Price:</strong> ${location.price}</p>
-                  <p><strong>Hours:</strong> ${location.hours}</p>
-                </div>
-              `);
+        try {
+          // Fetch station information and status
+          const [stations, statuses] = await Promise.all([
+            fetchStationInformation(),
+            fetchStationStatus()
+          ]);
 
-              const marker = new mapboxgl.Marker({
-                element: el,
-                anchor: 'bottom'
-              })
-                .setLngLat(coordinates)
-                .setPopup(popup);
-
-              if (map.current) {
-                marker.addTo(map.current);
-              }
-              return marker;
-            });
-
-            const markers = await Promise.all(markerPromises);
-            bikeRentalMarkers.current = markers.filter((marker): marker is mapboxgl.Marker => marker !== null);
-          };
-
-          createMarkers();
-        } else {
-          // Add existing markers back to the map
-          bikeRentalMarkers.current.forEach(marker => {
-            if (map.current) {
-              marker.addTo(map.current);
-            }
+          // In the handleLayerToggle function, update the statusMap creation
+          const statusMap: { [key: string]: GBFSStationStatus } = {};
+          statuses.forEach(status => {
+            statusMap[status.station_id] = status;
           });
+
+          // Convert GBFS stations to our format and create markers
+          const rentalLocations = stations.map(station => 
+            gbfsToBikeRentalLocation(station, statusMap[station.station_id])
+          );
+
+          // Create markers for each rental location
+          const markerPromises = rentalLocations.map(async (location: BikeRentalLocation) => {
+            if (!map.current) return null;
+            
+            // Create element with FontAwesome bike icon
+            const el = document.createElement('div');
+            el.className = 'map-marker rental-marker';
+            
+            // Create icon container
+            const icon = document.createElement('div');
+            icon.className = 'marker-icon';
+            
+            // Create icon element
+            const iconElement = document.createElement('i');
+            iconElement.className = 'fas fa-bicycle';
+            iconElement.style.color = '#9333EA';
+            iconElement.style.fontSize = '22px';
+            iconElement.style.position = 'relative';
+            
+            // Assemble the elements
+            icon.appendChild(iconElement);
+            el.appendChild(icon);
+            
+            // Create popup HTML with rental-specific information
+            const popupHTML = `
+              <div class="map-popup">
+                <h3>${location.name}</h3>
+                <p>${location.description}</p>
+                <p class="address">
+                  <strong>Address:</strong> 
+                  <a href="https://maps.google.com/?q=${location.address}" target="_blank" rel="noopener noreferrer">
+                    ${location.address}
+                  </a>
+                </p>
+                <p><strong>Type:</strong> ${location.rentalType}</p>
+                <p><strong>Price:</strong> ${location.price}</p>
+                <p><strong>Hours:</strong> ${location.hours}</p>
+                ${location.availableBikes !== undefined ? `<p><strong>Available Bikes:</strong> ${location.availableBikes}</p>` : ''}
+                ${location.availableDocks !== undefined ? `<p><strong>Available Docks:</strong> ${location.availableDocks}</p>` : ''}
+                ${location.isChargingStation ? '<p><strong>Charging Station Available</strong></p>' : ''}
+              </div>
+            `;
+            
+            // Create popup
+            const popup = new mapboxgl.Popup({ 
+              offset: 25,
+              closeButton: true,
+              closeOnClick: false,
+              className: 'custom-popup'
+            }).setHTML(popupHTML);
+
+            const marker = new mapboxgl.Marker({
+              element: el,
+              anchor: 'bottom'
+            });
+            
+            marker.setLngLat([location.longitude, location.latitude]);
+            marker.setPopup(popup);
+            
+            return marker;
+          });
+          
+          const rentalMarkers = await Promise.all(markerPromises);
+          bikeRentalMarkers.current = rentalMarkers.filter((marker): marker is mapboxgl.Marker => marker !== null);
+          
+          // Add markers to map
+          bikeRentalMarkers.current.forEach((marker: mapboxgl.Marker) => marker.addTo(map.current!));
+        } catch (error) {
+          console.error('Error fetching bike rental data:', error);
         }
       } else if (!visible) {
         // Remove markers from map but keep them in the array
@@ -463,8 +482,11 @@ const MapboxMap = memo(function MapboxMap() {
       }
 
       // Check if this location is a bike rental - show the markers if they're not already shown
-      const isBikeRental = bikeRentalLocations.some(
-        rental => rental.address === location.address
+      const isBikeRental = bikeRentalMarkers.current.some(
+        marker => {
+          const markerLngLat = marker.getLngLat();
+          return markerLngLat.lng === coordinates![0] && markerLngLat.lat === coordinates![1];
+        }
       );
       
       if (isBikeRental && !showBikeRentals) {
@@ -645,8 +667,6 @@ const MapboxMap = memo(function MapboxMap() {
             startLocationWatch();
           }
           
-          // Initialize attraction and bike resource markers (but don't display yet)
-          
           // Clear existing marker arrays before initialization
           attractionMarkers.current = [];
           bikeResourceMarkers.current = [];
@@ -661,63 +681,6 @@ const MapboxMap = memo(function MapboxMap() {
           bikeResourceMarkers.current = bikeResources.map(resource => 
             createBikeResourceMarker(resource)
           );
-          
-          // Pre-create bike rental markers using React components
-          const rentalMarkerPromises = bikeRentalLocations.map(async (location) => {
-            if (!map.current) return null;
-            const coordinates = await geocodeAddress(location.address);
-            if (!coordinates) return null;
-            
-            // Create element with FontAwesome bike icon
-            const el = document.createElement('div');
-            el.className = 'map-marker rental-marker';
-            
-            // Create icon container
-            const icon = document.createElement('div');
-            icon.className = 'marker-icon';
-            
-            // Create icon element
-            const iconElement = document.createElement('i');
-            iconElement.className = 'fas fa-bicycle';
-            iconElement.style.color = '#9333EA';
-            iconElement.style.fontSize = '22px';
-            iconElement.style.position = 'relative';
-            
-            // Assemble the elements
-            icon.appendChild(iconElement);
-            el.appendChild(icon);
-            
-            const popup = new mapboxgl.Popup({ 
-              offset: 25,
-              closeButton: true,
-              closeOnClick: false,
-              className: 'custom-popup'
-            }).setHTML(`
-              <div class="map-popup">
-                <h3>${location.name}</h3>
-                <p>${location.description}</p>
-                <p class="address">
-                  <strong>Address:</strong> 
-                  <a href="https://maps.google.com/?q=${location.address}" target="_blank" rel="noopener noreferrer">
-                    ${location.address}
-                  </a>
-                </p>
-                <p><strong>Type:</strong> ${location.rentalType}</p>
-                <p><strong>Price:</strong> ${location.price}</p>
-                <p><strong>Hours:</strong> ${location.hours}</p>
-              </div>
-            `);
-
-            return new mapboxgl.Marker({
-              element: el,
-              anchor: 'bottom'
-            })
-              .setLngLat(coordinates)
-              .setPopup(popup);
-          });
-          
-          const rentalMarkers = await Promise.all(rentalMarkerPromises);
-          bikeRentalMarkers.current = rentalMarkers.filter((marker): marker is mapboxgl.Marker => marker !== null);
           
           // Add error handler
           newMap.on('error', (event: { error: Error }) => {
