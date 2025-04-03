@@ -12,7 +12,7 @@ import {
   faLayerGroup
 } from '@fortawesome/free-solid-svg-icons';
 import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { bikeRoutes, mapFeatures, bikeResources, localResources } from '@/data/geo_data';
+import { bikeRoutes, mapFeatures, bikeResources, localResources, bikeRentalLocations } from '@/data/geo_data';
 import './map-legend.css';
 
 // Define interfaces for various component props
@@ -29,8 +29,10 @@ interface BikeRoutesProps {
 interface MapLayersProps {
   showAttractions: boolean;
   showBikeResources: boolean;
+  showBikeRentals: boolean;
   onToggleAttractions: () => void;
   onToggleBikeResources: () => void;
+  onToggleBikeRentals: () => void;
 }
 
 interface LocationProps {
@@ -103,7 +105,14 @@ const BikeRoutes: React.FC<BikeRoutesProps> = ({ selectedRoute, onRouteSelect })
 );
 
 // MapLayers Component
-const MapLayers: React.FC<MapLayersProps> = ({ showAttractions, showBikeResources, onToggleAttractions, onToggleBikeResources }) => (
+const MapLayers: React.FC<MapLayersProps> = ({ 
+  showAttractions, 
+  showBikeResources, 
+  showBikeRentals,
+  onToggleAttractions, 
+  onToggleBikeResources,
+  onToggleBikeRentals 
+}) => (
   <div className="section-container">
     <h3 className="section-title">
       Map Layers
@@ -137,6 +146,21 @@ const MapLayers: React.FC<MapLayersProps> = ({ showAttractions, showBikeResource
           <span className="layer-name">Bike Resources</span>
         </div>
         <ToggleSwitch isActive={showBikeResources} />
+      </div>
+
+      {/* Bike Rentals Layer Toggle */}
+      <div 
+        onClick={onToggleBikeRentals}
+        className="layer-toggle"
+      >
+        <div className="card-header">
+          <FontAwesomeIcon 
+            icon={faBicycle} 
+            className="layer-icon" 
+          />
+          <span className="layer-name">Bike Rentals</span>
+        </div>
+        <ToggleSwitch isActive={showBikeRentals} />
       </div>
     </div>
   </div>
@@ -216,6 +240,48 @@ const BikeResourcesList: React.FC<BikeResourcesListProps> = ({ show, onCenterLoc
   </div>
 );
 
+// BikeRentalList Component
+const BikeRentalList: React.FC<{ show: boolean; onCenterLocation: (location: LocationProps) => void }> = ({ show, onCenterLocation }) => (
+  <div className={`section-container ${!show ? 'hidden' : ''}`}>
+    <h3 className="section-title">
+      Bike Rentals
+    </h3>
+    <div className="section-items">
+      {bikeRentalLocations.map((location) => (
+        <div 
+          key={location.name} 
+          className="card card-purple"
+          onClick={() => onCenterLocation(location)}
+        >
+          <div className="card-header">
+            <div className="card-icon-container card-icon-purple">
+              <FontAwesomeIcon 
+                icon={location.icon} 
+                className="card-icon icon-purple" 
+              />
+            </div>
+            <span className="card-title">{location.name}</span>
+          </div>
+          <div className="card-description card-description-flex">
+            <span className="description-text">{location.description}</span>
+            <div className="location-arrow-container-purple">
+              <FontAwesomeIcon 
+                icon={faLocationArrow} 
+                className="location-arrow-icon" 
+              />
+            </div>
+          </div>
+          <div className="card-details">
+            <span className="detail-item">{location.rentalType}</span>
+            <span className="detail-item">{location.price}</span>
+            <span className="detail-item">{location.hours}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 // Link Component
 const ExternalLink: React.FC<ExternalLinkProps> = ({ href, children }) => (
   <a 
@@ -287,6 +353,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
+  const [showBikeRentals, setShowBikeRentals] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
   
@@ -366,6 +433,20 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [showBikeResources]);
 
+  // Function to toggle bike rentals layer
+  const toggleBikeRentalsLayer = useCallback(() => {
+    const newValue = !showBikeRentals;
+    setShowBikeRentals(newValue);
+    
+    // Dispatch event for map to show or hide bike rentals
+    window.dispatchEvent(new CustomEvent('layer-toggle', { 
+      detail: { 
+        layer: 'bikeRentals', 
+        visible: newValue 
+      } 
+    }));
+  }, [showBikeRentals]);
+
   // Function to center map on a specific location
   const centerOnLocation = useCallback((location: { latitude: number; longitude: number; name: string; }) => {
     // Dispatch event for map to center and show pin
@@ -429,8 +510,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             <MapLayers 
               showAttractions={showAttractions}
               showBikeResources={showBikeResources}
+              showBikeRentals={showBikeRentals}
               onToggleAttractions={toggleAttractionLayer}
               onToggleBikeResources={toggleBikeResourcesLayer}
+              onToggleBikeRentals={toggleBikeRentalsLayer}
             />
 
             <AttractionsList 
@@ -440,6 +523,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
             <BikeResourcesList 
               show={showBikeResources} 
+              onCenterLocation={centerOnLocation} 
+            />
+
+            <BikeRentalList 
+              show={showBikeRentals} 
               onCenterLocation={centerOnLocation} 
             />
 

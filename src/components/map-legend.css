@@ -461,4 +461,45 @@
     width: 100%;
     max-width: 320px;
   }
+}
+
+.icon-purple {
+  color: var(--color-purple-primary);
+}
+
+.card-purple {
+  border-color: var(--color-purple-light);
+}
+
+.card-purple:hover {
+  background-color: var(--color-purple-transparent);
+  border-color: var(--color-purple-primary);
+}
+
+.location-arrow-container-purple {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 4px;
+  background-color: var(--color-purple-light);
+  color: var(--color-purple-primary);
+  margin-left: 8px;
+}
+
+.card-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  margin-left: 40px;
+  font-size: 12px;
+  color: var(--color-gray-500);
+}
+
+.detail-item {
+  background-color: var(--color-gray-100);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--color-gray-600);
 } 

@@ -185,4 +185,161 @@ export const localResources: LocalResource[] = [
     icon: faBicycle,
     color: '#6B7280'
   }
+];
+
+export interface BikeRentalLocation {
+  name: string;
+  description: string;
+  address: string;
+  icon: IconDefinition;
+  rentalType: string;
+  price: string;
+  hours: string;
+}
+
+export const bikeRentalLocations: BikeRentalLocation[] = [
+  {
+    name: 'Bike Chattanooga',
+    description: 'Main bike rental shop offering various types of bikes',
+    address: '510-518 Georgia Ave, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Full Service Shop',
+    price: 'Varies by rental type',
+    hours: 'Mon-Sat: 9am-5pm'
+  },
+  {
+    name: 'McCallie Ave & Lindsay St Station',
+    description: 'Bike share station',
+    address: '701-799 Lindsay St, Chattanooga, TN 37403',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Department of Transportation',
+    description: 'Government office with bike share station',
+    address: '1250 Market St #3030, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Pine St & W 6th St Station',
+    description: 'Bike share station',
+    address: '610 Pine St, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Broad St & W 8th St Station',
+    description: 'Bike share station',
+    address: '735-799 Broad St, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Broad St & W 6th St Station',
+    description: 'Bike share station',
+    address: '600-644 Broad St, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Market St & E 4th St Station',
+    description: 'Bike share station',
+    address: '320-334 Market St, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Carter St & W 12th St',
+    description: 'Bike share station',
+    address: '1101-1199 Carter St, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Market St & W 12th St Station',
+    description: 'Bike share station',
+    address: '1101-1189 Market St, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Broad St & W 10th St Station',
+    description: 'Bike share station',
+    address: '1001 Broad St, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Main St & Rossville Ave Station',
+    description: 'Bike share station',
+    address: '200-218 E Main St, Chattanooga, TN 37408',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Market St & ML King Blvd Station',
+    description: 'Bike share station',
+    address: 'Market St & ML King Blvd, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'North Market Station',
+    description: 'Bike share station',
+    address: '415 N Market St, Chattanooga, TN 37405',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Riverfront Parkway Bike Share',
+    description: 'Bike share station along the riverfront',
+    address: 'Riverfront Pkwy, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  },
+  {
+    name: 'Bike Chattanooga Station',
+    description: 'Temporarily closed',
+    address: '345 Broad St, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Closed',
+    hours: 'Temporarily Closed'
+  },
+  {
+    name: 'The Edwin Hotel Station',
+    description: 'Bike share station at The Edwin Hotel',
+    address: '801 Pine St, Chattanooga, TN 37402',
+    icon: faBicycle,
+    rentalType: 'Bike Share Station',
+    price: 'Pay per ride',
+    hours: '24/7'
+  }
 ]; 

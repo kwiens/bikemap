@@ -1,5 +1,5 @@
 import mapboxgl from 'mapbox-gl';
-import { MapFeature, BikeResource } from '@/data/geo_data';
+import { MapFeature, BikeResource, BikeRentalLocation } from '@/data/geo_data';
 
 // Helper function to ensure FontAwesome is loaded
 const ensureFontAwesomeLoaded = () => {
@@ -172,4 +172,49 @@ export function createHighlightMarker(
     element: el,
     anchor: 'center'
   }).setLngLat([longitude, latitude]);
+}
+
+// Helper function to create bike rental marker using direct DOM manipulation
+export function createBikeRentalMarker(location: BikeRentalLocation): mapboxgl.Marker {
+  // Get icon class
+  let iconClass = 'fa-bicycle';
+  if (location.icon) {
+    switch (location.icon.iconName) {
+      case 'bicycle': iconClass = 'fa-bicycle'; break;
+      default: iconClass = 'fa-bicycle';
+    }
+  }
+  
+  // Create element
+  const el = createMarkerElement('map-marker rental-marker', iconClass, '#9333ea');
+  
+  // Create popup HTML with rental-specific information
+  const popupHTML = `
+    <div class="map-popup">
+      <h3>${location.name}</h3>
+      <p>${location.description}</p>
+      <p class="address">
+        <strong>Address:</strong> 
+        <a href="https://maps.google.com/?q=${location.address}" target="_blank" rel="noopener noreferrer">
+          ${location.address}
+        </a>
+      </p>
+      <p><strong>Type:</strong> ${location.rentalType}</p>
+      <p><strong>Price:</strong> ${location.price}</p>
+      <p><strong>Hours:</strong> ${location.hours}</p>
+    </div>
+  `;
+  
+  // Create popup
+  const popup = new mapboxgl.Popup({ 
+    offset: 25,
+    closeButton: true,
+    closeOnClick: false,
+    className: 'custom-popup'
+  }).setHTML(popupHTML);
+  
+  // Create and return marker
+  return new mapboxgl.Marker(el)
+    .setLngLat([0, 0]) // We'll set the coordinates after geocoding
+    .setPopup(popup);
 } 
