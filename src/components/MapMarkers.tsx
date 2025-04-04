@@ -76,6 +76,8 @@ export function createAttractionMarker(feature: MapFeature): mapboxgl.Marker {
       case 'train': iconClass = 'fa-train'; break;
       case 'gamepad': iconClass = 'fa-gamepad'; break;
       case 'hiking': iconClass = 'fa-hiking'; break;
+      case 'horse-head': iconClass = 'fa-horse-head'; break;
+      case 'palette': iconClass = 'fa-palette'; break;
       // Special handling for Outdoor Chattanooga
       default:
         // Check if the name matches to ensure we get the right icon

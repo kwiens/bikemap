@@ -1,4 +1,3 @@
-import { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import { 
   faRoute, 
   faFish, 
@@ -13,7 +12,9 @@ import {
   faHandsHelping,
   faTree,
   faHorseHead,
-  faInfoCircle
+  faInfoCircle,
+  faPalette, 
+  IconDefinition 
 } from '@fortawesome/free-solid-svg-icons';
 import { BikeRentalLocation } from './gbfs';
 
@@ -33,25 +34,43 @@ export const bikeRoutes: BikeRoute[] = [
   {
     id: 'riverwalk-loop-v3',
     name: 'Riverwalk Loop',
-    color: '#5562EE',
+    color: '#2563EB',
     description: 'Explore the riverwalk and visit the aquarium',
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0
   },
   {
-    id: 'the-zoo-loop-v2',
+    id: 'zoo-loop-v2-full',
     name: 'Zoo Loop',
-    color: '#EE4D24',
+    color: '#DC2626',
     description: 'Fun route through the university to visit the zoo and a nearby park',
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0
   },
   {
-    id: 'River',
-    name: 'Other Loop',
-    color: '#34D399',
+    id: 'riverwalk-grnwy-shpfl-561m6f',
+    name: 'Riverwalk Greenway Trail',
+    color: '#059669',
+    description: 'Fun route through the university to visit the zoo and a nearby park',
+    icon: faRoute,
+    defaultWidth: 8,
+    opacity: 1.0
+  },
+  {
+    id: 'South_Chick_GreenWay',
+    name: 'South Chickamauga Creek',
+    color: '#7C3AED',
+    description: 'A new bike route to explore',
+    icon: faRoute,
+    defaultWidth: 8,
+    opacity: 1.0
+  },
+  {
+    id: 'Chatt_TPL_Trails',
+    name: 'Local Greenways',
+    color: '#16A34A',
     description: 'A new bike route to explore',
     icon: faRoute,
     defaultWidth: 8,
@@ -125,6 +144,14 @@ export const mapFeatures: MapFeature[] = [
     latitude: 35.0042,
     longitude: -85.3622,
     icon: faHorseHead,
+  },
+  {
+    name: "Hunter Museum of American Art",
+    description: "Art museum featuring works from the Hudson River School, American Impressionism, early modernism, and contemporary art. Offers tours and live performances.",
+    address: "10 Bluff View Ave, Chattanooga, TN 37403",
+    latitude: 35.0558333,
+    longitude: -85.3061111,
+    icon: faPalette,
   },
 ];
 

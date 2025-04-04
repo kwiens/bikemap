@@ -21,7 +21,6 @@ import {
   fetchStationStatus, 
   gbfsToBikeRentalLocation,
   GBFSStationStatus,
-  GBFSStation,
   BikeRentalLocation
 } from '@/data/gbfs';
 
@@ -407,7 +406,7 @@ const MapboxMap = memo(function MapboxMap() {
     if (visible) {
       bikeRoutes.forEach(route => {
         if (map.current) {
-          map.current.setPaintProperty(route.id, 'line-opacity', 0.2);
+          map.current.setPaintProperty(route.id, 'line-opacity', 0.1);
         }
       });
       
@@ -583,7 +582,7 @@ const MapboxMap = memo(function MapboxMap() {
           
           const newMap = new mapboxgl.Map({
             container: mapContainer.current!,
-            style: 'mapbox://styles/swuller/cm8re9zyp004q01qkek8pdrsk',
+            style: 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt',
             center: DEBUG_LOCATION, // Default to Chattanooga
             zoom: 14.89,
             pitch: -22.4,
@@ -599,6 +598,11 @@ const MapboxMap = memo(function MapboxMap() {
           // Wait for map to load
           await new Promise<void>((resolve) => {
             newMap.on('load', () => {
+              // Log all available layers
+              const style = newMap.getStyle();
+              if (style && style.layers) {
+                console.log('Available Map Layers:', style.layers);
+              }
               resolve();
             });
           });

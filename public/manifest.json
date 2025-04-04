@@ -3,9 +3,9 @@
   "short_name": "Bike Map",
   "description": "Paths and routes for cyclists in Chattanooga, TN",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#ffffff",
-  "theme_color": "#34d399",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/apple-touch-icon.svg",

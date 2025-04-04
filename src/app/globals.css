@@ -12,27 +12,29 @@
 
 html, 
 body {
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
+  position: fixed;
 }
 
 /* Next.js app wrapper */
 body > div,
 #__next,
 #root {
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
+  position: fixed;
 }
 
 /* Map container styles */
 .map-wrapper {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 
