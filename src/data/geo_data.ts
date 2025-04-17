@@ -32,7 +32,7 @@ export interface BikeRoute {
 
 export const bikeRoutes: BikeRoute[] = [
   {
-    id: 'riverwalk-loop-v3',
+    id: 'riverwalk-loop-v3-public',
     name: 'Riverwalk Loop',
     color: '#2563EB',
     description: 'Explore the riverwalk and visit the aquarium',
@@ -41,7 +41,7 @@ export const bikeRoutes: BikeRoute[] = [
     opacity: 1.0
   },
   {
-    id: 'zoo-loop-v2-full',
+    id: 'zoo-loop-v2-full-public',
     name: 'Zoo Loop',
     color: '#DC2626',
     description: 'Fun route through the university to visit the zoo and a nearby park',
@@ -50,7 +50,7 @@ export const bikeRoutes: BikeRoute[] = [
     opacity: 1.0
   },
   {
-    id: 'riverwalk-grnwy-shpfl-561m6f',
+    id: 'Riverwalk_trail-test-public',
     name: 'Riverwalk Greenway Trail',
     color: '#059669',
     description: 'Fun route through the university to visit the zoo and a nearby park',
@@ -59,7 +59,7 @@ export const bikeRoutes: BikeRoute[] = [
     opacity: 1.0
   },
   {
-    id: 'South_Chick_GreenWay',
+    id: 'South_Chick_GreenWay-public',
     name: 'South Chickamauga Creek',
     color: '#7C3AED',
     description: 'A new bike route to explore',
@@ -68,14 +68,14 @@ export const bikeRoutes: BikeRoute[] = [
     opacity: 1.0
   },
   {
-    id: 'Chatt_TPL_Trails',
+    id: 'Chatt_TPL_Trails-public',
     name: 'Local Greenways',
     color: '#16A34A',
     description: 'A new bike route to explore',
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0
-  }
+  },
 ];
 
 // Map Features Interface and Data
