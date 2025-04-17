@@ -74,7 +74,7 @@
   position: fixed;
   top: 100px;
   left: 0;
-  height: 100%;
+  height: calc(100% - 100px);
   width: 280px;
   background-color: var(--color-white);
   box-shadow: 2px 0 5px var(--shadow-medium);
