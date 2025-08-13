@@ -76,6 +76,15 @@ export const bikeRoutes: BikeRoute[] = [
     defaultWidth: 8,
     opacity: 1.0
   },
+  {
+    id: 'cherokeeloop',
+    name: 'Cherokee Loop',
+    color: '#fbef05ff',
+    description: 'Route into Red Bank',
+    icon: faRoute,
+    defaultWidth: 8,
+    opacity: 1.0
+  },
 ];
 
 // Map Features Interface and Data
@@ -152,6 +161,14 @@ export const mapFeatures: MapFeature[] = [
     latitude: 35.0558333,
     longitude: -85.3061111,
     icon: faPalette,
+  },
+  {
+    name: "White Oak Bike Box",
+    description: "A distribution point for WhitE Oak Bicycle Co-op",
+    address: "812 E 12th St Ste 114, Chattanooga, TN 37403",
+    latitude: 35.037326,
+    longitude: -85.298949,
+    icon: faTree,
   },
 ];
 
