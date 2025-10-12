@@ -71,7 +71,6 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ isActive }) => (
 const SidebarHeader = () => (
   <div className="sidebar-header">
     <h2 className="sidebar-header-title">
-      <FontAwesomeIcon icon={faMap} className="sidebar-header-icon" />
       <span>Chattanooga Bike Map</span>
     </h2>
   </div>
