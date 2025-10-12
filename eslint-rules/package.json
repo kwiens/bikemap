@@ -1,0 +1,13 @@
+{
+  "name": "eslint-plugin-fixbot",
+  "version": "1.0.0",
+  "description": "Custom ESLint rules for the Fixbot project",
+  "main": "index.js",
+  "keywords": [
+    "eslint",
+    "plugin",
+    "fixbot"
+  ],
+  "author": "Fixbot Team",
+  "license": "MIT"
+}
