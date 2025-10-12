@@ -4,11 +4,11 @@
   --color-blue-primary: #3b82f6;
   --color-blue-dark: #2563eb;
   --color-blue-light: #EBF4FF;
-  
+
   /* Secondary colors */
   --color-green-primary: #34d399;
   --color-green-light: #ECFDF5;
-  
+
   /* Additional accent colors */
   --color-red-primary: #EF4444;
   --color-red-light: #FEE2E2;
@@ -16,7 +16,7 @@
   --color-yellow-light: #FEF3C7;
   --color-purple-primary: #8B5CF6;
   --color-purple-light: #EDE9FE;
-  
+
   /* Neutral colors */
   --color-white: #ffffff;
   --color-gray-50: #f8f9fa;
@@ -26,14 +26,14 @@
   --color-gray-600: #4b5563;
   --color-gray-700: #374151;
   --color-gray-800: #F3F4F6;
-  
+
   /* Transparency values */
   --color-blue-transparent: rgba(37, 99, 235, 0.05);
   --color-blue-transparent-border: rgba(37, 99, 235, 0.3);
   --color-blue-transparent-bg: rgba(37, 99, 235, 0.1);
   --color-green-transparent: rgba(52, 211, 153, 0.05);
   --color-green-transparent-border: rgba(52, 211, 153, 0.3);
-  
+
   /* Shadow colors */
   --shadow-light: rgba(0, 0, 0, 0.05);
   --shadow-medium: rgba(0, 0, 0, 0.1);
@@ -469,6 +469,13 @@
   }
 }
 
+/* Desktop responsiveness */
+@media (min-width: 769px) {
+  .sidebar-header {
+    padding-left: 60px;
+  }
+}
+
 .icon-purple {
   color: var(--color-purple-primary);
 }
@@ -522,4 +529,4 @@
   text-align: center;
   color: var(--color-red-500);
   font-weight: 500;
-} 
+}
