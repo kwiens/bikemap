@@ -73,6 +73,13 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Create location marker
   function initializeLocationMarker() {
+    // Options to request frequent, high-accuracy GPS updates
+    const gpsOptions = {
+      enableHighAccuracy: true,  // Use GPS instead of WiFi/cell tower
+      maximumAge: 0,              // Don't use cached positions
+      timeout: 5000               // 5 second timeout per update
+    };
+    
     // Store the watch ID for proper cleanup
     const id = navigator.geolocation.watchPosition((position) => {
       if (!map.current) { return; }
@@ -93,7 +100,8 @@ const MapboxMap = memo(function MapboxMap() {
         locationMarker.current.remove();
         locationMarker.current = null;
       }
-    });
+    },
+    gpsOptions);  // Pass options to request frequent updates
     
     // Store it so we can clear it on cleanup
     watchId.current = id;
@@ -605,6 +613,30 @@ const MapboxMap = memo(function MapboxMap() {
             });
           }
           
+          // Add click handlers to route layers
+          bikeRoutes.forEach(route => {
+            // Make route layer clickable
+            newMap.on('click', route.id, (e) => {
+              // Prevent default map click behavior
+              e.preventDefault();
+              
+              // Dispatch route-select event (same as clicking in legend)
+              window.dispatchEvent(new CustomEvent('route-select', { 
+                detail: { routeId: route.id } 
+              }));
+            });
+            
+            // Change cursor to pointer when hovering over route
+            newMap.on('mouseenter', route.id, () => {
+              newMap.getCanvas().style.cursor = 'pointer';
+            });
+            
+            // Change cursor back when leaving route
+            newMap.on('mouseleave', route.id, () => {
+              newMap.getCanvas().style.cursor = '';
+            });
+          });
+          
           // Force a resize to ensure proper display
           setTimeout(() => {
             if (map.current) map.current.resize();
@@ -769,7 +801,7 @@ const MapboxMap = memo(function MapboxMap() {
           essential: true,
           duration: 1000
         });
-      }, 250);
+      }, 500);
     } else {
       // When disabled: stop tracking
       if (locationWatch.current) {
