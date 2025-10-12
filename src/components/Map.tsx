@@ -60,8 +60,8 @@ const MapboxMap = memo(function MapboxMap() {
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const watchId = useRef<number | null>(null);
-  let watchingLocation = false;
-  let locationWatch: NodeJS.Timeout | undefined;
+  const locationWatch = useRef<NodeJS.Timeout | undefined>(undefined);
+  const [watchingLocation, setWatchingLocation] = useState(false);
 
   // Track markers for attractions and bike resources
   const attractionMarkers = useRef<mapboxgl.Marker[]>([]);
@@ -73,43 +73,47 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Create location marker
   function initializeLocationMarker() {
-    navigator.geolocation.watchPosition((position) => {
+    // Store the watch ID for proper cleanup
+    const id = navigator.geolocation.watchPosition((position) => {
       if(!map.current) { return; }
 
       if(!locationMarker.current) {
+        // First time: create marker but DON'T auto-center (user must click tracking button)
         locationMarker.current = createLocationMarker(position.coords.longitude, position.coords.latitude);
         locationMarker.current.addTo(map.current);
-        map.current.flyTo({
-          center: [position.coords.longitude, position.coords.latitude],
-          zoom: 15,
-          essential: true,
-          duration: 1000
-        });
+        // Note: NOT calling flyTo here - user can manually enable tracking if desired
       } else {
+        // Subsequent updates: just move the marker, don't re-center the map
         locationMarker.current?.setLngLat({lng: position.coords.longitude, lat: position.coords.latitude});
       }
     },
     (positionError) => {
-      console.error(positionError);
+      //console.log(positionError);
       if(locationMarker.current) {
         locationMarker.current.remove();
         locationMarker.current = null;
       }
     });
+    
+    // Store it so we can clear it on cleanup
+    watchId.current = id;
   };
 
   function initializeGestureWatch() {
     if(!map.current) { return; }
 
-    map.current.on('click', () => {
-      setLocationWatch(false);
-    });
-    map.current.on('touch', () => {
-      setLocationWatch(false);
-    });
-    map.current.on('touchend', () => {
-      setLocationWatch(false);
-    });
+    // When user interacts with map, disable location tracking
+    const disableTracking = () => {
+      setWatchingLocation(false);
+      if (locationWatch.current) {
+        clearInterval(locationWatch.current);
+        locationWatch.current = undefined;
+      }
+    };
+
+    map.current.on('click', disableTracking);
+    map.current.on('touch', disableTracking);
+    map.current.on('touchend', disableTracking);
   }
 
   // Handle route selection events - outside the map initialization
@@ -642,6 +646,11 @@ const MapboxMap = memo(function MapboxMap() {
         navigator.geolocation.clearWatch(watchId.current);
       }
       
+      if (locationWatch.current) {
+        clearInterval(locationWatch.current);
+        locationWatch.current = undefined;
+      }
+      
       // Clean up all markers before removing the map
       if (locationMarker.current) {
         locationMarker.current.remove();
@@ -667,7 +676,7 @@ const MapboxMap = memo(function MapboxMap() {
         map.current = null;
       }
     };
-  });
+  }, []); // Empty dependency array - only run once on mount
   
   // Add resize event listener
   useEffect(() => {
@@ -728,34 +737,51 @@ const MapboxMap = memo(function MapboxMap() {
         navigator.geolocation.clearWatch(watchId.current);
         watchId.current = null;
       }
+      
+      if (locationWatch.current) {
+        clearInterval(locationWatch.current);
+        locationWatch.current = undefined;
+      }
     };
   }, []);
 
   const setLocationWatch = (value: boolean) => {
-    watchingLocation = value;
+    setWatchingLocation(value);
 
     if(value) {
-      locationWatch = setInterval(() => {
-        if(!map.current) { return; }
-
-        const lat = locationMarker.current?.getLngLat().lat;
-        const lng = locationMarker.current?.getLngLat().lng;
-
-        if(!lat || !lng) { return; }
-
+      // When enabled: immediately center on current location, then track continuously
+      if (map.current && locationMarker.current) {
+        const lngLat = locationMarker.current.getLngLat();
         map.current.flyTo({
-          center: [lng, lat],
+          center: [lngLat.lng, lngLat.lat],
+          zoom: 15,
+          essential: true,
+          duration: 1000
+        });
+      }
+
+      // Then continuously track position
+      locationWatch.current = setInterval(() => {
+        if(!map.current || !locationMarker.current) { return; }
+
+        const lngLat = locationMarker.current.getLngLat();
+        map.current.flyTo({
+          center: [lngLat.lng, lngLat.lat],
           zoom: 15,
           essential: true,
           duration: 1000
         });
       }, 500);
     } else {
-      clearInterval(locationWatch);
+      // When disabled: stop tracking
+      if (locationWatch.current) {
+        clearInterval(locationWatch.current);
+        locationWatch.current = undefined;
+      }
     }
   };
 
-  // Toggle between real and debug location
+  // Toggle location tracking
   const toggleWatchLocation = () => {
     setLocationWatch(!watchingLocation);
   };
