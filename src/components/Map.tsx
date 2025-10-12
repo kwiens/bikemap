@@ -70,6 +70,8 @@ const MapboxMap = memo(function MapboxMap() {
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastFadingOut, setToastFadingOut] = useState(false);
 
   // Create location marker
   function initializeLocationMarker() {
@@ -132,6 +134,15 @@ const MapboxMap = memo(function MapboxMap() {
     
     const { routeId } = event.detail;
     
+    // Find the selected route to get its name
+    const selectedRoute = bikeRoutes.find(route => route.id === routeId);
+    
+    // Show toast with route name
+    if (selectedRoute) {
+      setToastMessage(selectedRoute.name);
+      setToastFadingOut(false); // Reset fade-out state for new toast
+    }
+    
     // Update opacities for all routes
     bikeRoutes.forEach(route => {
       if (map.current) {
@@ -146,9 +157,6 @@ const MapboxMap = memo(function MapboxMap() {
         }
       }
     });
-
-    // Find the selected route and its bounds
-    const selectedRoute = bikeRoutes.find(route => route.id === routeId);
     
     if (selectedRoute?.bounds) {
       const bounds = selectedRoute.bounds;
@@ -482,6 +490,27 @@ const MapboxMap = memo(function MapboxMap() {
       }
     }
   }, [showAttractions, showBikeResources, showBikeRentals]);
+
+  // Auto-dismiss toast after 3 seconds with fade-out
+  useEffect(() => {
+    if (toastMessage && !toastFadingOut) {
+      // After 2.7 seconds, start fade-out animation (300ms before removal)
+      const fadeOutTimer = setTimeout(() => {
+        setToastFadingOut(true);
+      }, 2700);
+      
+      // After 3 seconds total, remove the toast
+      const removeTimer = setTimeout(() => {
+        setToastMessage(null);
+        setToastFadingOut(false);
+      }, 3000);
+      
+      return () => {
+        clearTimeout(fadeOutTimer);
+        clearTimeout(removeTimer);
+      };
+    }
+  }, [toastMessage, toastFadingOut]);
 
   // Set up event listeners for map layers and location centering
   useEffect(() => {
@@ -819,6 +848,13 @@ const MapboxMap = memo(function MapboxMap() {
   return (
     <>
       <div ref={mapContainer} className="map-container" />
+      
+      {/* Route selection toast */}
+      {toastMessage && (
+        <div className={`route-toast ${toastFadingOut ? 'fade-out' : ''}`}>
+          {toastMessage}
+        </div>
+      )}
       
       {/* Debug mode toggle */}
       {DEBUG_LOCATION && (
