@@ -1,4 +1,4 @@
-import { IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import { faBicycle } from '@fortawesome/free-solid-svg-icons';
 
 // GBFS Station Information Types
@@ -33,7 +33,10 @@ export interface GBFSResponse<T> {
 }
 
 // Convert GBFS station to our BikeRentalLocation format
-export function gbfsToBikeRentalLocation(station: GBFSStation, status?: GBFSStationStatus): BikeRentalLocation {
+export function gbfsToBikeRentalLocation(
+  station: GBFSStation,
+  status?: GBFSStationStatus,
+): BikeRentalLocation {
   return {
     name: station.name,
     description: `Bike share station with ${station.capacity} docks${station.is_charging_station ? ' and charging capabilities' : ''}`,
@@ -47,13 +50,15 @@ export function gbfsToBikeRentalLocation(station: GBFSStation, status?: GBFSStat
     capacity: station.capacity,
     availableBikes: status?.num_bikes_available,
     availableDocks: status?.num_docks_available,
-    isChargingStation: station.is_charging_station || false
+    isChargingStation: station.is_charging_station || false,
   };
 }
 
 // Fetch station information from GBFS API
 export async function fetchStationInformation(): Promise<GBFSStation[]> {
-  const response = await fetch('https://chattanooga.publicbikesystem.net/customer/ube/gbfs/v1/en/station_information');
+  const response = await fetch(
+    'https://chattanooga.publicbikesystem.net/customer/ube/gbfs/v1/en/station_information',
+  );
   if (!response.ok) {
     throw new Error('Failed to fetch station information');
   }
@@ -63,7 +68,9 @@ export async function fetchStationInformation(): Promise<GBFSStation[]> {
 
 // Fetch station status from GBFS API
 export async function fetchStationStatus(): Promise<GBFSStationStatus[]> {
-  const response = await fetch('https://chattanooga.publicbikesystem.net/customer/ube/gbfs/v1/en/station_status');
+  const response = await fetch(
+    'https://chattanooga.publicbikesystem.net/customer/ube/gbfs/v1/en/station_status',
+  );
   if (!response.ok) {
     throw new Error('Failed to fetch station status');
   }
@@ -86,4 +93,4 @@ export interface BikeRentalLocation {
   availableBikes?: number;
   availableDocks?: number;
   isChargingStation: boolean;
-} 
+}
