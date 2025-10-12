@@ -1,0 +1,13 @@
+{
+  "name": "eslint-plugin-bikemap",
+  "version": "1.0.0",
+  "description": "Custom ESLint rules for the Bikemap project",
+  "main": "index.js",
+  "keywords": [
+    "eslint",
+    "plugin",
+    "bikemap"
+  ],
+  "author": "Bikemap Team",
+  "license": "MIT"
+}

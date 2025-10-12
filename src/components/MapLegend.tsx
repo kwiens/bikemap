@@ -3,16 +3,26 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-import { 
-  faMapMarkerAlt, 
+import {
+  faMapMarkerAlt,
   faTimes,
   faLocationArrow,
   faBicycle,
-  faLayerGroup
+  faLayerGroup,
 } from '@fortawesome/free-solid-svg-icons';
-import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { bikeRoutes, mapFeatures, bikeResources, localResources, BikeRentalLocation } from '@/data/geo_data';
-import { fetchStationInformation, fetchStationStatus, gbfsToBikeRentalLocation } from '@/data/gbfs';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import {
+  bikeRoutes,
+  mapFeatures,
+  bikeResources,
+  localResources,
+  type BikeRentalLocation,
+} from '@/data/geo_data';
+import {
+  fetchStationInformation,
+  fetchStationStatus,
+  gbfsToBikeRentalLocation,
+} from '@/data/gbfs';
 import './map-legend.css';
 
 // Define interfaces for various component props
@@ -61,8 +71,12 @@ interface ExternalLinkProps {
 
 // Toggle Switch Component
 const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ isActive }) => (
-  <div className={`toggle-switch ${isActive ? 'toggle-switch-active' : 'toggle-switch-inactive'}`}>
-    <div className={`toggle-switch-handle ${isActive ? 'toggle-switch-handle-active' : 'toggle-switch-handle-inactive'}`} />
+  <div
+    className={`toggle-switch ${isActive ? 'toggle-switch-active' : 'toggle-switch-inactive'}`}
+  >
+    <div
+      className={`toggle-switch-handle ${isActive ? 'toggle-switch-handle-active' : 'toggle-switch-handle-inactive'}`}
+    />
   </div>
 );
 
@@ -76,16 +90,25 @@ const SidebarHeader = () => (
 );
 
 // BikeRoutes Component
-const BikeRoutes: React.FC<BikeRoutesProps> = ({ selectedRoute, onRouteSelect }) => (
+const BikeRoutes: React.FC<BikeRoutesProps> = ({
+  selectedRoute,
+  onRouteSelect,
+}) => (
   <div className="section-container">
-    <h3 className="section-title">
-      Pick a Loop
-    </h3>
+    <h3 className="section-title">Pick a Loop</h3>
     <div className="section-items">
       {bikeRoutes.map((route) => (
-        <div 
-          key={route.id} 
+        <div
+          key={route.id}
           onClick={() => onRouteSelect(route.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onRouteSelect(route.id);
+            }
+          }}
+          role="button"
+          tabIndex={0}
           className={`route-item ${selectedRoute === route.id ? 'route-item-selected' : ''}`}
         >
           <div className="card-header">
@@ -95,9 +118,7 @@ const BikeRoutes: React.FC<BikeRoutesProps> = ({ selectedRoute, onRouteSelect })
             />
             <span className="route-name">{route.name}</span>
           </div>
-          <div className="route-description">
-            {route.description}
-          </div>
+          <div className="route-description">{route.description}</div>
         </div>
       ))}
     </div>
@@ -105,59 +126,72 @@ const BikeRoutes: React.FC<BikeRoutesProps> = ({ selectedRoute, onRouteSelect })
 );
 
 // MapLayers Component
-const MapLayers: React.FC<MapLayersProps> = ({ 
-  showAttractions, 
-  showBikeResources, 
+const MapLayers: React.FC<MapLayersProps> = ({
+  showAttractions,
+  showBikeResources,
   showBikeRentals,
-  onToggleAttractions, 
+  onToggleAttractions,
   onToggleBikeResources,
-  onToggleBikeRentals 
+  onToggleBikeRentals,
 }) => (
   <div className="section-container">
-    <h3 className="section-title">
-      Map Layers
-    </h3>
+    <h3 className="section-title">Map Layers</h3>
     <div className="section-items">
       {/* Attractions Layer Toggle */}
-      <div 
+      <div
         onClick={onToggleAttractions}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleAttractions();
+          }
+        }}
+        role="button"
+        tabIndex={0}
         className="layer-toggle"
       >
         <div className="card-header">
-          <FontAwesomeIcon 
-            icon={faMapMarkerAlt} 
-            className="layer-icon" 
-          />
+          <FontAwesomeIcon icon={faMapMarkerAlt} className="layer-icon" />
           <span className="layer-name">Attractions</span>
         </div>
         <ToggleSwitch isActive={showAttractions} />
       </div>
 
       {/* Bike Resources Layer Toggle */}
-      <div 
+      <div
         onClick={onToggleBikeResources}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleBikeResources();
+          }
+        }}
+        role="button"
+        tabIndex={0}
         className="layer-toggle"
       >
         <div className="card-header">
-          <FontAwesomeIcon 
-            icon={faBicycle} 
-            className="layer-icon" 
-          />
+          <FontAwesomeIcon icon={faBicycle} className="layer-icon" />
           <span className="layer-name">Bike Resources</span>
         </div>
         <ToggleSwitch isActive={showBikeResources} />
       </div>
 
       {/* Bike Rentals Layer Toggle */}
-      <div 
+      <div
         onClick={onToggleBikeRentals}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggleBikeRentals();
+          }
+        }}
+        role="button"
+        tabIndex={0}
         className="layer-toggle"
       >
         <div className="card-header">
-          <FontAwesomeIcon 
-            icon={faBicycle} 
-            className="layer-icon" 
-          />
+          <FontAwesomeIcon icon={faBicycle} className="layer-icon" />
           <span className="layer-name">Bike Rentals</span>
         </div>
         <ToggleSwitch isActive={showBikeRentals} />
@@ -167,23 +201,32 @@ const MapLayers: React.FC<MapLayersProps> = ({
 );
 
 // AttractionsList Component
-const AttractionsList: React.FC<AttractionsListProps> = ({ show, onCenterLocation }) => (
+const AttractionsList: React.FC<AttractionsListProps> = ({
+  show,
+  onCenterLocation,
+}) => (
   <div className={`section-container ${!show ? 'hidden' : ''}`}>
-    <h3 className="section-title">
-      Attractions
-    </h3>
+    <h3 className="section-title">Attractions</h3>
     <div className="section-items">
       {mapFeatures.map((location) => (
-        <div 
-          key={location.name} 
+        <div
+          key={location.name}
           className="card"
           onClick={() => onCenterLocation(location)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onCenterLocation(location);
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
           <div className="card-header">
             <div className="card-icon-container card-icon-blue">
-              <FontAwesomeIcon 
-                icon={location.icon} 
-                className="card-icon icon-blue" 
+              <FontAwesomeIcon
+                icon={location.icon}
+                className="card-icon icon-blue"
               />
             </div>
             <span className="card-title">{location.name}</span>
@@ -191,9 +234,9 @@ const AttractionsList: React.FC<AttractionsListProps> = ({ show, onCenterLocatio
           <div className="card-description card-description-flex">
             <span className="description-text">{location.description}</span>
             <div className="location-arrow-container-blue">
-              <FontAwesomeIcon 
-                icon={faLocationArrow} 
-                className="location-arrow-icon" 
+              <FontAwesomeIcon
+                icon={faLocationArrow}
+                className="location-arrow-icon"
               />
             </div>
           </div>
@@ -204,23 +247,32 @@ const AttractionsList: React.FC<AttractionsListProps> = ({ show, onCenterLocatio
 );
 
 // BikeResourcesList Component
-const BikeResourcesList: React.FC<BikeResourcesListProps> = ({ show, onCenterLocation }) => (
+const BikeResourcesList: React.FC<BikeResourcesListProps> = ({
+  show,
+  onCenterLocation,
+}) => (
   <div className={`section-container ${!show ? 'hidden' : ''}`}>
-    <h3 className="section-title">
-      Bike Resources
-    </h3>
+    <h3 className="section-title">Bike Resources</h3>
     <div className="section-items">
       {bikeResources.map((location) => (
-        <div 
-          key={location.name} 
+        <div
+          key={location.name}
           className="card card-green"
           onClick={() => onCenterLocation(location)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onCenterLocation(location);
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
           <div className="card-header">
             <div className="card-icon-container card-icon-green">
-              <FontAwesomeIcon 
-                icon={location.icon} 
-                className="card-icon icon-green" 
+              <FontAwesomeIcon
+                icon={location.icon}
+                className="card-icon icon-green"
               />
             </div>
             <span className="card-title">{location.name}</span>
@@ -228,9 +280,9 @@ const BikeResourcesList: React.FC<BikeResourcesListProps> = ({ show, onCenterLoc
           <div className="card-description card-description-flex">
             <span className="description-text">{location.description}</span>
             <div className="location-arrow-container-green">
-              <FontAwesomeIcon 
-                icon={faLocationArrow} 
-                className="location-arrow-icon" 
+              <FontAwesomeIcon
+                icon={faLocationArrow}
+                className="location-arrow-icon"
               />
             </div>
           </div>
@@ -241,8 +293,13 @@ const BikeResourcesList: React.FC<BikeResourcesListProps> = ({ show, onCenterLoc
 );
 
 // BikeRentalList Component
-const BikeRentalList: React.FC<{ show: boolean; onCenterLocation: (location: LocationProps) => void }> = ({ show, onCenterLocation }) => {
-  const [rentalLocations, setRentalLocations] = useState<BikeRentalLocation[]>([]);
+const BikeRentalList: React.FC<{
+  show: boolean;
+  onCenterLocation: (location: LocationProps) => void;
+}> = ({ show, onCenterLocation }) => {
+  const [rentalLocations, setRentalLocations] = useState<BikeRentalLocation[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -253,12 +310,14 @@ const BikeRentalList: React.FC<{ show: boolean; onCenterLocation: (location: Loc
       try {
         const [stations, statuses] = await Promise.all([
           fetchStationInformation(),
-          fetchStationStatus()
+          fetchStationStatus(),
         ]);
 
-        const statusMap = new Map(statuses.map(status => [status.station_id, status]));
-        const locations = stations.map(station => 
-          gbfsToBikeRentalLocation(station, statusMap.get(station.station_id))
+        const statusMap = new Map(
+          statuses.map((status) => [status.station_id, status]),
+        );
+        const locations = stations.map((station) =>
+          gbfsToBikeRentalLocation(station, statusMap.get(station.station_id)),
         );
         setRentalLocations(locations);
       } catch (err) {
@@ -276,24 +335,32 @@ const BikeRentalList: React.FC<{ show: boolean; onCenterLocation: (location: Loc
 
   return (
     <div className={`section-container ${!show ? 'hidden' : ''}`}>
-      <h3 className="section-title">
-        Bike Rentals
-      </h3>
-      {isLoading && <div className="loading">Loading bike rental locations...</div>}
+      <h3 className="section-title">Bike Rentals</h3>
+      {isLoading && (
+        <div className="loading">Loading bike rental locations...</div>
+      )}
       {error && <div className="error">{error}</div>}
       {!isLoading && !error && (
         <div className="section-items">
           {rentalLocations.map((location) => (
-            <div 
-              key={location.name} 
+            <div
+              key={location.name}
               className="card card-purple"
               onClick={() => onCenterLocation(location)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onCenterLocation(location);
+                }
+              }}
+              role="button"
+              tabIndex={0}
             >
               <div className="card-header">
                 <div className="card-icon-container card-icon-purple">
-                  <FontAwesomeIcon 
-                    icon={location.icon} 
-                    className="card-icon icon-purple" 
+                  <FontAwesomeIcon
+                    icon={location.icon}
+                    className="card-icon icon-purple"
                   />
                 </div>
                 <span className="card-title">{location.name}</span>
@@ -301,9 +368,9 @@ const BikeRentalList: React.FC<{ show: boolean; onCenterLocation: (location: Loc
               <div className="card-description card-description-flex">
                 <span className="description-text">{location.description}</span>
                 <div className="location-arrow-container-purple">
-                  <FontAwesomeIcon 
-                    icon={faLocationArrow} 
-                    className="location-arrow-icon" 
+                  <FontAwesomeIcon
+                    icon={faLocationArrow}
+                    className="location-arrow-icon"
                   />
                 </div>
               </div>
@@ -312,10 +379,14 @@ const BikeRentalList: React.FC<{ show: boolean; onCenterLocation: (location: Loc
                 <span className="detail-item">{location.price}</span>
                 <span className="detail-item">{location.hours}</span>
                 {location.availableBikes !== undefined && (
-                  <span className="detail-item">Bikes: {location.availableBikes}</span>
+                  <span className="detail-item">
+                    Bikes: {location.availableBikes}
+                  </span>
                 )}
                 {location.availableDocks !== undefined && (
-                  <span className="detail-item">Docks: {location.availableDocks}</span>
+                  <span className="detail-item">
+                    Docks: {location.availableDocks}
+                  </span>
                 )}
                 {location.isChargingStation && (
                   <span className="detail-item">Charging Available</span>
@@ -331,9 +402,9 @@ const BikeRentalList: React.FC<{ show: boolean; onCenterLocation: (location: Loc
 
 // Link Component
 const ExternalLink: React.FC<ExternalLinkProps> = ({ href, children }) => (
-  <a 
+  <a
     href={href}
-    target="_blank" 
+    target="_blank"
     rel="noopener noreferrer"
     className="external-link"
   >
@@ -342,7 +413,11 @@ const ExternalLink: React.FC<ExternalLinkProps> = ({ href, children }) => (
 );
 
 // Helper function to render description with inline link
-const renderDescriptionWithLink = (description: string, url: string, linkText: string) => {
+const renderDescriptionWithLink = (
+  description: string,
+  url: string,
+  linkText: string,
+) => {
   const parts = description.split(linkText);
   if (parts.length === 2) {
     return (
@@ -359,22 +434,14 @@ const renderDescriptionWithLink = (description: string, url: string, linkText: s
 // InformationSection Component
 const InformationSection = () => (
   <div className="section-container">
-    <h3 className="section-title">
-      Information
-    </h3>
+    <h3 className="section-title">Information</h3>
     <div className="section-items">
       {localResources.map((resource) => (
-        <div 
-          key={resource.name}
-          className="card"
-        >
+        <div key={resource.name} className="card">
           <div className="card-header">
-            <div 
-              className="card-icon-container"
-              data-color={resource.color}
-            >
-              <FontAwesomeIcon 
-                icon={resource.icon} 
+            <div className="card-icon-container" data-color={resource.color}>
+              <FontAwesomeIcon
+                icon={resource.icon}
                 className="card-icon"
                 data-color={resource.color}
               />
@@ -382,13 +449,25 @@ const InformationSection = () => (
             <span className="card-title">{resource.name}</span>
           </div>
           <div className="card-description">
-            {renderDescriptionWithLink(resource.description, resource.url, resource.description.includes('iFixit') ? 'iFixit' : resource.name)}
+            {renderDescriptionWithLink(
+              resource.description,
+              resource.url,
+              resource.description.includes('iFixit')
+                ? 'iFixit'
+                : resource.name,
+            )}
           </div>
-          {resource.secondaryDescription && resource.secondaryUrl && resource.secondaryLinkText && (
-            <div className="card-description">
-              {renderDescriptionWithLink(resource.secondaryDescription, resource.secondaryUrl, resource.secondaryLinkText)}
-            </div>
-          )}
+          {resource.secondaryDescription &&
+            resource.secondaryUrl &&
+            resource.secondaryLinkText && (
+              <div className="card-description">
+                {renderDescriptionWithLink(
+                  resource.secondaryDescription,
+                  resource.secondaryUrl,
+                  resource.secondaryLinkText,
+                )}
+              </div>
+            )}
         </div>
       ))}
     </div>
@@ -399,7 +478,12 @@ const InformationSection = () => (
 const Footer = () => (
   <div className="footer">
     <h4 className="footer-title">Get Out and Have Fun</h4>
-    <p>Pedal your way through Chattanooga&apos;s best spots—feel the river breeze, roll up to the Zoo for an up-close animal encounter, explore the Aquarium&apos;s underwater wonders, and step back in time at the Railroad Museum. Grab your bike, gather friends, and enjoy the ride!</p>
+    <p>
+      Pedal your way through Chattanooga&apos;s best spots—feel the river
+      breeze, roll up to the Zoo for an up-close animal encounter, explore the
+      Aquarium&apos;s underwater wonders, and step back in time at the Railroad
+      Museum. Grab your bike, gather friends, and enjoy the ride!
+    </p>
     <p>© {new Date().getFullYear()} BikeMap</p>
   </div>
 );
@@ -415,28 +499,36 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [showBikeRentals, setShowBikeRentals] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
-  
+
   const toggle = useCallback(() => {
     setIsOpen(!isOpen);
-    
+
     // Dispatch event for map resizing
-    window.dispatchEvent(new CustomEvent('sidebar-toggle', { 
-      detail: { isOpen: !isOpen } 
-    }));
+    window.dispatchEvent(
+      new CustomEvent('sidebar-toggle', {
+        detail: { isOpen: !isOpen },
+      }),
+    );
   }, [isOpen]);
 
   // Handle clicks outside the sidebar
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       // Only handle clicks on mobile (screen width <= 768px)
-      if (window.innerWidth > 768) return;
-      
+      if (window.innerWidth > 768) {
+        return;
+      }
+
       // Don't close if clicking the toggle button
-      if (toggleButtonRef.current?.contains(event.target as Node)) return;
-      
+      if (toggleButtonRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
       // Don't close if clicking inside the sidebar
-      if (sidebarRef.current?.contains(event.target as Node)) return;
-      
+      if (sidebarRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
       // Close the sidebar if clicking outside
       if (isOpen) {
         toggle();
@@ -450,76 +542,92 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   }, [isOpen, toggle]);
 
   // Function to handle route selection
-  const handleRouteSelect = useCallback((routeId: string) => {
-    setSelectedRoute(routeId);
-    
-    // Dispatch event for map to update route opacity
-    window.dispatchEvent(new CustomEvent('route-select', { 
-      detail: { routeId } 
-    }));
+  const handleRouteSelect = useCallback(
+    (routeId: string) => {
+      setSelectedRoute(routeId);
 
-    // Close sidebar on mobile after selection
-    if (window.innerWidth <= 768 && isOpen) {
-      toggle();
-    }
-  }, [isOpen, toggle]);
+      // Dispatch event for map to update route opacity
+      window.dispatchEvent(
+        new CustomEvent('route-select', {
+          detail: { routeId },
+        }),
+      );
+
+      // Close sidebar on mobile after selection
+      if (window.innerWidth <= 768 && isOpen) {
+        toggle();
+      }
+    },
+    [isOpen, toggle],
+  );
 
   // Function to toggle attraction layer
   const toggleAttractionLayer = useCallback(() => {
     const newValue = !showAttractions;
     setShowAttractions(newValue);
-    
+
     // Dispatch event for map to show or hide attractions
-    window.dispatchEvent(new CustomEvent('layer-toggle', { 
-      detail: { 
-        layer: 'attractions', 
-        visible: newValue 
-      } 
-    }));
+    window.dispatchEvent(
+      new CustomEvent('layer-toggle', {
+        detail: {
+          layer: 'attractions',
+          visible: newValue,
+        },
+      }),
+    );
   }, [showAttractions]);
 
   // Function to toggle bike resources layer
   const toggleBikeResourcesLayer = useCallback(() => {
     const newValue = !showBikeResources;
     setShowBikeResources(newValue);
-    
+
     // Dispatch event for map to show or hide bike resources
-    window.dispatchEvent(new CustomEvent('layer-toggle', { 
-      detail: { 
-        layer: 'bikeResources', 
-        visible: newValue 
-      } 
-    }));
+    window.dispatchEvent(
+      new CustomEvent('layer-toggle', {
+        detail: {
+          layer: 'bikeResources',
+          visible: newValue,
+        },
+      }),
+    );
   }, [showBikeResources]);
 
   // Function to toggle bike rentals layer
   const toggleBikeRentalsLayer = useCallback(() => {
     const newValue = !showBikeRentals;
     setShowBikeRentals(newValue);
-    
+
     // Dispatch event for map to show or hide bike rentals
-    window.dispatchEvent(new CustomEvent('layer-toggle', { 
-      detail: { 
-        layer: 'bikeRentals', 
-        visible: newValue 
-      } 
-    }));
+    window.dispatchEvent(
+      new CustomEvent('layer-toggle', {
+        detail: {
+          layer: 'bikeRentals',
+          visible: newValue,
+        },
+      }),
+    );
   }, [showBikeRentals]);
 
   // Function to center map on a specific location
-  const centerOnLocation = useCallback((location: LocationProps) => {
-    // Dispatch event for map to center and show pin
-    window.dispatchEvent(new CustomEvent('center-location', { 
-      detail: { 
-        location: location 
-      } 
-    }));
+  const centerOnLocation = useCallback(
+    (location: LocationProps) => {
+      // Dispatch event for map to center and show pin
+      window.dispatchEvent(
+        new CustomEvent('center-location', {
+          detail: {
+            location: location,
+          },
+        }),
+      );
 
-    // Close sidebar on mobile after selection
-    if (window.innerWidth <= 768 && isOpen) {
-      toggle();
-    }
-  }, [isOpen, toggle]);
+      // Close sidebar on mobile after selection
+      if (window.innerWidth <= 768 && isOpen) {
+        toggle();
+      }
+    },
+    [isOpen, toggle],
+  );
 
   // Listen for route-deselect event
   useEffect(() => {
@@ -528,7 +636,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     };
 
     window.addEventListener('route-deselect', handleRouteDeselect);
-    
+
     return () => {
       window.removeEventListener('route-deselect', handleRouteDeselect);
     };
@@ -537,36 +645,37 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
-      
+
       {/* Toggle button */}
       <div className="toggle-button-container">
-        <button 
+        <button
           ref={toggleButtonRef}
           onClick={toggle}
           className="toggle-button"
+          type="button"
         >
-          <FontAwesomeIcon 
-            icon={isOpen ? faTimes : faLayerGroup} 
+          <FontAwesomeIcon
+            icon={isOpen ? faTimes : faLayerGroup}
             className="toggle-button-icon"
           />
         </button>
       </div>
-      
+
       {/* Sidebar - always in DOM but transforms off-screen when closed */}
-      <div 
+      <div
         ref={sidebarRef}
         className={`sidebar-container ${isOpen ? 'sidebar-visible' : 'sidebar-hidden'}`}
       >
         <SidebarHeader />
-        
+
         <div className="sidebar-content">
           <div className="sidebar-inner-content">
-            <BikeRoutes 
-              selectedRoute={selectedRoute} 
-              onRouteSelect={handleRouteSelect} 
+            <BikeRoutes
+              selectedRoute={selectedRoute}
+              onRouteSelect={handleRouteSelect}
             />
 
-            <MapLayers 
+            <MapLayers
               showAttractions={showAttractions}
               showBikeResources={showBikeResources}
               showBikeRentals={showBikeRentals}
@@ -575,19 +684,19 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
               onToggleBikeRentals={toggleBikeRentalsLayer}
             />
 
-            <AttractionsList 
-              show={showAttractions} 
-              onCenterLocation={centerOnLocation} 
+            <AttractionsList
+              show={showAttractions}
+              onCenterLocation={centerOnLocation}
             />
 
-            <BikeResourcesList 
-              show={showBikeResources} 
-              onCenterLocation={centerOnLocation} 
+            <BikeResourcesList
+              show={showBikeResources}
+              onCenterLocation={centerOnLocation}
             />
 
-            <BikeRentalList 
-              show={showBikeRentals} 
-              onCenterLocation={centerOnLocation} 
+            <BikeRentalList
+              show={showBikeRentals}
+              onCenterLocation={centerOnLocation}
             />
 
             <InformationSection />
