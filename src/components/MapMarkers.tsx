@@ -12,11 +12,8 @@ const ensureFontAwesomeLoaded = () => {
     link.id = 'fontawesome-css';
     link.rel = 'stylesheet';
     link.href =
-      'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css';
-    link.integrity =
-      'sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==';
+      'https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/css/all.min.css';
     link.crossOrigin = 'anonymous';
-    link.referrerPolicy = 'no-referrer';
     document.head.appendChild(link);
   }
 };
@@ -74,50 +71,12 @@ function createPopupHTML(
 
 // Helper function to create attraction marker using direct DOM manipulation
 export function createAttractionMarker(feature: MapFeature): mapboxgl.Marker {
-  // Get icon class
+  // Get icon class - default to map marker
   let iconClass = 'fa-map-marker-alt';
 
-  // Log the icon information to help debug
-  console.log(`Icon for ${feature.name}:`, feature.icon?.iconName);
-
-  if (feature.icon) {
-    // Extract iconName from the FontAwesome icon object
-    const iconName = feature.icon.iconName;
-
-    switch (iconName) {
-      case 'fish':
-        iconClass = 'fa-fish';
-        break;
-      case 'paw':
-        iconClass = 'fa-paw';
-        break;
-      case 'train':
-        iconClass = 'fa-train';
-        break;
-      case 'gamepad':
-        iconClass = 'fa-gamepad';
-        break;
-      case 'hiking':
-        iconClass = 'fa-hiking';
-        break;
-      case 'horse':
-        iconClass = 'fa-horse';
-        break;
-      case 'horse-head':
-        iconClass = 'fa-horse-head';
-        break;
-      case 'palette':
-        iconClass = 'fa-palette';
-        break;
-      // Special handling for Outdoor Chattanooga
-      default:
-        // Check if the name matches to ensure we get the right icon
-        if (feature.name === 'Outdoor Chattanooga') {
-          iconClass = 'fa-hiking';
-        } else {
-          iconClass = 'fa-map-marker-alt';
-        }
-    }
+  if (feature.icon?.iconName) {
+    // Automatically construct the FontAwesome class from the icon name
+    iconClass = `fa-${feature.icon.iconName}`;
   }
 
   // Create element
@@ -147,31 +106,12 @@ export function createAttractionMarker(feature: MapFeature): mapboxgl.Marker {
 export function createBikeResourceMarker(
   resource: BikeResource,
 ): mapboxgl.Marker {
-  // Get icon class
+  // Get icon class - default to bicycle
   let iconClass = 'fa-bicycle';
-  if (resource.icon) {
-    switch (resource.icon.iconName) {
-      case 'bicycle':
-        iconClass = 'fa-bicycle';
-        break;
-      case 'mountain':
-        iconClass = 'fa-mountain';
-        break;
-      case 'road':
-        iconClass = 'fa-road';
-        break;
-      case 'bolt':
-        iconClass = 'fa-bolt';
-        break;
-      case 'hands-helping':
-        iconClass = 'fa-hands-helping';
-        break;
-      case 'horse':
-        iconClass = 'fa-horse';
-        break;
-      default:
-        iconClass = 'fa-bicycle';
-    }
+
+  if (resource.icon?.iconName) {
+    // Automatically construct the FontAwesome class from the icon name
+    iconClass = `fa-${resource.icon.iconName}`;
   }
 
   // Create element
@@ -239,16 +179,12 @@ export function createHighlightMarker(
 export function createBikeRentalMarker(
   location: BikeRentalLocation,
 ): mapboxgl.Marker {
-  // Get icon class
+  // Get icon class - default to bicycle
   let iconClass = 'fa-bicycle';
-  if (location.icon) {
-    switch (location.icon.iconName) {
-      case 'bicycle':
-        iconClass = 'fa-bicycle';
-        break;
-      default:
-        iconClass = 'fa-bicycle';
-    }
+
+  if (location.icon?.iconName) {
+    // Automatically construct the FontAwesome class from the icon name
+    iconClass = `fa-${location.icon.iconName}`;
   }
 
   // Create element
