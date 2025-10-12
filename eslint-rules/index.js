@@ -10,9 +10,9 @@ module.exports = {
   },
   configs: {
     recommended: {
-      plugins: ['fixbot'],
+      plugins: ['bikemap'],
       rules: {
-        'fixbot/no-config-env-in-sentry-edge': 'error',
+        'bikemap/no-config-env-in-sentry-edge': 'error',
       },
     },
   },

@@ -1,13 +1,13 @@
 {
-  "name": "eslint-plugin-fixbot",
+  "name": "eslint-plugin-bikemap",
   "version": "1.0.0",
-  "description": "Custom ESLint rules for the Fixbot project",
+  "description": "Custom ESLint rules for the Bikemap project",
   "main": "index.js",
   "keywords": [
     "eslint",
     "plugin",
-    "fixbot"
+    "bikemap"
   ],
-  "author": "Fixbot Team",
+  "author": "Bikemap Team",
   "license": "MIT"
 }
