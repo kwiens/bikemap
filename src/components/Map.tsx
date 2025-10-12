@@ -87,7 +87,7 @@ const MapboxMap = memo(function MapboxMap() {
         locationMarker.current?.setLngLat({lng: position.coords.longitude, lat: position.coords.latitude});
       }
     },
-    (positionError) => {
+    () => {
       //console.log(positionError);
       if(locationMarker.current) {
         locationMarker.current.remove();

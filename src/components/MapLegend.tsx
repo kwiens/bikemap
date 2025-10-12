@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { 
-  faMap, 
   faMapMarkerAlt, 
   faTimes,
   faLocationArrow,
