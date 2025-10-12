@@ -28,6 +28,7 @@
   align-items: center;
   justify-content: center;
   background-color: white;
+  transition: background-color 0.2s ease;
 
   &.active {
     background-color: rgb(165, 240, 255);;
