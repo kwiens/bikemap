@@ -81,7 +81,7 @@ export const bikeRoutes: BikeRoute[] = [
   {
     id: 'cherokeeloop',
     name: 'Cherokee Loop',
-    color: '#fbef05ff',
+    color: '#fbef05',
     description: 'Route into Red Bank',
     icon: faRoute,
     defaultWidth: 8,
