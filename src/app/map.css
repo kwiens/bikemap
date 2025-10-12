@@ -31,7 +31,15 @@
   transition: background-color 0.2s ease;
 
   &.active {
-    background-color: rgb(165, 240, 255);;
+    background-color: rgb(165, 240, 255);
+  }
+
+  &:active {
+    background-color: #e5e5e5;
+  }
+
+  &.active:active {
+    background-color: rgb(145, 220, 235);
   }
 
   svg {

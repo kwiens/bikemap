@@ -57,10 +57,15 @@
   align-items: center;
   justify-content: center;
   border: none;
+  transition: background-color 0.15s ease;
 }
 
 .toggle-button:hover {
   background-color: var(--color-gray-50);
+}
+
+.toggle-button:active {
+  background-color: #e5e5e5;
 }
 
 .toggle-button-icon {
