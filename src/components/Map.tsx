@@ -749,25 +749,23 @@ const MapboxMap = memo(function MapboxMap() {
     setWatchingLocation(value);
 
     if(value) {
-      // When enabled: immediately center on current location, then track continuously
+      // When enabled: immediately center on current location (preserving zoom)
       if (map.current && locationMarker.current) {
         const lngLat = locationMarker.current.getLngLat();
         map.current.flyTo({
           center: [lngLat.lng, lngLat.lat],
-          zoom: 15,
           essential: true,
           duration: 1000
         });
       }
 
-      // Then continuously track position
+      // Then continuously track position (preserving zoom)
       locationWatch.current = setInterval(() => {
         if(!map.current || !locationMarker.current) { return; }
 
         const lngLat = locationMarker.current.getLngLat();
         map.current.flyTo({
           center: [lngLat.lng, lngLat.lat],
-          zoom: 15,
           essential: true,
           duration: 1000
         });
