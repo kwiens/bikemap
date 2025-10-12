@@ -63,7 +63,7 @@ function createPopupHTML(
       <h3>${name}</h3>
       <p>${description}</p>
       <p class="address">
-        <strong>Address:</strong> 
+        <strong>Address:</strong>
         <a href="https://maps.google.com/?q=${address}" target="_blank" rel="noopener noreferrer">
           ${address}
         </a>
@@ -99,6 +99,9 @@ export function createAttractionMarker(feature: MapFeature): mapboxgl.Marker {
         break;
       case 'hiking':
         iconClass = 'fa-hiking';
+        break;
+      case 'horse':
+        iconClass = 'fa-horse';
         break;
       case 'horse-head':
         iconClass = 'fa-horse-head';
@@ -162,6 +165,9 @@ export function createBikeResourceMarker(
         break;
       case 'hands-helping':
         iconClass = 'fa-hands-helping';
+        break;
+      case 'horse':
+        iconClass = 'fa-horse';
         break;
       default:
         iconClass = 'fa-bicycle';
@@ -258,7 +264,7 @@ export function createBikeRentalMarker(
       <h3>${location.name}</h3>
       <p>${location.description}</p>
       <p class="address">
-        <strong>Address:</strong> 
+        <strong>Address:</strong>
         <a href="https://maps.google.com/?q=${location.address}" target="_blank" rel="noopener noreferrer">
           ${location.address}
         </a>

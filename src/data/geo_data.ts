@@ -14,6 +14,7 @@ import {
   faHorseHead,
   faInfoCircle,
   faPalette,
+  faHorse,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import type { BikeRentalLocation } from './gbfs';
@@ -123,8 +124,8 @@ export const mapFeatures: MapFeature[] = [
     description:
       'Step back in time on nostalgic train rides and explore vintage locomotives at the Railroad Museum.',
     address: '4119 Cromwell Road, Chattanooga, TN 37421',
-    latitude: 35.0657,
-    longitude: -85.2031,
+    latitude: 35.0671239,
+    longitude: -85.2062965,
     icon: faTrain,
   },
   {
@@ -141,9 +142,18 @@ export const mapFeatures: MapFeature[] = [
     description:
       'Your go-to resource for outdoor adventure and recreation in Chattanooga.',
     address: '200 River Street, Chattanooga, TN 37405',
-    latitude: 35.061111,
-    longitude: -85.306389,
+    latitude: 35.0611726,
+    longitude: -85.3069177,
     icon: faHiking,
+  },
+  {
+    name: 'Coolidge Carousel',
+    description:
+      'A classic carousel in a historic carousel house. Perfect for families.',
+    address: '150 River Street, Chattanooga, TN 37405',
+    latitude: 35.061099,
+    longitude: -85.3072955,
+    icon: faHorse,
   },
   {
     name: "Stringer's Ridge",
@@ -159,8 +169,8 @@ export const mapFeatures: MapFeature[] = [
     description:
       'Discover over 300 acres of natural beauty featuring walking trails, native plants, and wildlife exhibits.',
     address: '400 Garden Road, Chattanooga, TN 37419',
-    latitude: 35.0042,
-    longitude: -85.3622,
+    latitude: 35.0110238,
+    longitude: -85.3666888,
     icon: faHorseHead,
   },
   {
@@ -171,14 +181,6 @@ export const mapFeatures: MapFeature[] = [
     latitude: 35.0558333,
     longitude: -85.3061111,
     icon: faPalette,
-  },
-  {
-    name: 'White Oak Bike Box',
-    description: 'A distribution point for WhitE Oak Bicycle Co-op',
-    address: '812 E 12th St Ste 114, Chattanooga, TN 37403',
-    latitude: 35.037326,
-    longitude: -85.298949,
-    icon: faTree,
   },
 ];
 
