@@ -70,14 +70,23 @@ const MapboxMap = memo(function MapboxMap() {
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastFadingOut, setToastFadingOut] = useState(false);
 
   // Create location marker
   function initializeLocationMarker() {
+    // Options to request frequent, high-accuracy GPS updates
+    const gpsOptions = {
+      enableHighAccuracy: true,  // Use GPS instead of WiFi/cell tower
+      maximumAge: 0,              // Don't use cached positions
+      timeout: 5000               // 5 second timeout per update
+    };
+    
     // Store the watch ID for proper cleanup
     const id = navigator.geolocation.watchPosition((position) => {
-      if(!map.current) { return; }
+      if (!map.current) { return; }
 
-      if(!locationMarker.current) {
+      if (!locationMarker.current) {
         // First time: create marker but DON'T auto-center (user must click tracking button)
         locationMarker.current = createLocationMarker(position.coords.longitude, position.coords.latitude);
         locationMarker.current.addTo(map.current);
@@ -93,7 +102,8 @@ const MapboxMap = memo(function MapboxMap() {
         locationMarker.current.remove();
         locationMarker.current = null;
       }
-    });
+    },
+    gpsOptions);  // Pass options to request frequent updates
     
     // Store it so we can clear it on cleanup
     watchId.current = id;
@@ -124,6 +134,15 @@ const MapboxMap = memo(function MapboxMap() {
     
     const { routeId } = event.detail;
     
+    // Find the selected route to get its name
+    const selectedRoute = bikeRoutes.find(route => route.id === routeId);
+    
+    // Show toast with route name
+    if (selectedRoute) {
+      setToastMessage(selectedRoute.name);
+      setToastFadingOut(false); // Reset fade-out state for new toast
+    }
+    
     // Update opacities for all routes
     bikeRoutes.forEach(route => {
       if (map.current) {
@@ -138,9 +157,6 @@ const MapboxMap = memo(function MapboxMap() {
         }
       }
     });
-
-    // Find the selected route and its bounds
-    const selectedRoute = bikeRoutes.find(route => route.id === routeId);
     
     if (selectedRoute?.bounds) {
       const bounds = selectedRoute.bounds;
@@ -475,6 +491,27 @@ const MapboxMap = memo(function MapboxMap() {
     }
   }, [showAttractions, showBikeResources, showBikeRentals]);
 
+  // Auto-dismiss toast after 3 seconds with fade-out
+  useEffect(() => {
+    if (toastMessage && !toastFadingOut) {
+      // After 2.7 seconds, start fade-out animation (300ms before removal)
+      const fadeOutTimer = setTimeout(() => {
+        setToastFadingOut(true);
+      }, 2700);
+      
+      // After 3 seconds total, remove the toast
+      const removeTimer = setTimeout(() => {
+        setToastMessage(null);
+        setToastFadingOut(false);
+      }, 3000);
+      
+      return () => {
+        clearTimeout(fadeOutTimer);
+        clearTimeout(removeTimer);
+      };
+    }
+  }, [toastMessage, toastFadingOut]);
+
   // Set up event listeners for map layers and location centering
   useEffect(() => {
     // Create stable wrapper functions that don't change between renders
@@ -604,6 +641,30 @@ const MapboxMap = memo(function MapboxMap() {
               }
             });
           }
+          
+          // Add click handlers to route layers
+          bikeRoutes.forEach(route => {
+            // Make route layer clickable
+            newMap.on('click', route.id, (e) => {
+              // Prevent default map click behavior
+              e.preventDefault();
+              
+              // Dispatch route-select event (same as clicking in legend)
+              window.dispatchEvent(new CustomEvent('route-select', { 
+                detail: { routeId: route.id } 
+              }));
+            });
+            
+            // Change cursor to pointer when hovering over route
+            newMap.on('mouseenter', route.id, () => {
+              newMap.getCanvas().style.cursor = 'pointer';
+            });
+            
+            // Change cursor back when leaving route
+            newMap.on('mouseleave', route.id, () => {
+              newMap.getCanvas().style.cursor = '';
+            });
+          });
           
           // Force a resize to ensure proper display
           setTimeout(() => {
@@ -748,7 +809,7 @@ const MapboxMap = memo(function MapboxMap() {
   const setLocationWatch = (value: boolean) => {
     setWatchingLocation(value);
 
-    if(value) {
+    if (value) {
       // When enabled: immediately center on current location (preserving zoom)
       if (map.current && locationMarker.current) {
         const lngLat = locationMarker.current.getLngLat();
@@ -761,7 +822,7 @@ const MapboxMap = memo(function MapboxMap() {
 
       // Then continuously track position (preserving zoom)
       locationWatch.current = setInterval(() => {
-        if(!map.current || !locationMarker.current) { return; }
+        if (!map.current || !locationMarker.current) { return; }
 
         const lngLat = locationMarker.current.getLngLat();
         map.current.flyTo({
@@ -787,6 +848,13 @@ const MapboxMap = memo(function MapboxMap() {
   return (
     <>
       <div ref={mapContainer} className="map-container" />
+      
+      {/* Route selection toast */}
+      {toastMessage && (
+        <div className={`route-toast ${toastFadingOut ? 'fade-out' : ''}`}>
+          {toastMessage}
+        </div>
+      )}
       
       {/* Debug mode toggle */}
       {DEBUG_LOCATION && (
