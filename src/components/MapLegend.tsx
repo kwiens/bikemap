@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { 
-  faMap, 
   faMapMarkerAlt, 
   faTimes,
   faLocationArrow,
@@ -71,7 +70,6 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ isActive }) => (
 const SidebarHeader = () => (
   <div className="sidebar-header">
     <h2 className="sidebar-header-title">
-      <FontAwesomeIcon icon={faMap} className="sidebar-header-icon" />
       <span>Chattanooga Bike Map</span>
     </h2>
   </div>
@@ -343,6 +341,21 @@ const ExternalLink: React.FC<ExternalLinkProps> = ({ href, children }) => (
   </a>
 );
 
+// Helper function to render description with inline link
+const renderDescriptionWithLink = (description: string, url: string, linkText: string) => {
+  const parts = description.split(linkText);
+  if (parts.length === 2) {
+    return (
+      <>
+        {parts[0]}
+        <ExternalLink href={url}>{linkText}</ExternalLink>
+        {parts[1]}
+      </>
+    );
+  }
+  return description;
+};
+
 // InformationSection Component
 const InformationSection = () => (
   <div className="section-container">
@@ -369,16 +382,13 @@ const InformationSection = () => (
             <span className="card-title">{resource.name}</span>
           </div>
           <div className="card-description">
-            {resource.description.includes('iFixit') ? (
-              <>
-                This map is a guide to the best bike routes in Chattanooga. Made with ❤️ by <ExternalLink href={resource.url}>iFixit</ExternalLink>, the free repair guide for every thing.
-              </>
-            ) : (
-              <>
-                <ExternalLink href={resource.url}>{resource.name}</ExternalLink> - {resource.description}
-              </>
-            )}
+            {renderDescriptionWithLink(resource.description, resource.url, resource.description.includes('iFixit') ? 'iFixit' : resource.name)}
           </div>
+          {resource.secondaryDescription && resource.secondaryUrl && resource.secondaryLinkText && (
+            <div className="card-description">
+              {renderDescriptionWithLink(resource.secondaryDescription, resource.secondaryUrl, resource.secondaryLinkText)}
+            </div>
+          )}
         </div>
       ))}
     </div>

@@ -11,7 +11,7 @@ import {
   bikeResources
 } from '@/data/geo_data';
 import { 
-  createLocationMarker, 
+  createLocationMarker,
   createAttractionMarker, 
   createBikeResourceMarker, 
   createHighlightMarker
@@ -60,7 +60,9 @@ const MapboxMap = memo(function MapboxMap() {
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const watchId = useRef<number | null>(null);
-  const [isUsingDebugLocation, setIsUsingDebugLocation] = useState(false);
+  const locationWatch = useRef<NodeJS.Timeout | undefined>(undefined);
+  const [watchingLocation, setWatchingLocation] = useState(false);
+
   // Track markers for attractions and bike resources
   const attractionMarkers = useRef<mapboxgl.Marker[]>([]);
   const bikeResourceMarkers = useRef<mapboxgl.Marker[]>([]);
@@ -70,104 +72,49 @@ const MapboxMap = memo(function MapboxMap() {
   const [showBikeRentals, setShowBikeRentals] = useState(false);
 
   // Create location marker
-  const createLocationMarkerHandler = useCallback((longitude: number, latitude: number) => {
-    if (!map.current) return;
-    
-    // Don't create duplicate markers
-    if (locationMarker.current) {
-      locationMarker.current.setLngLat([longitude, latitude]);
-      return;
-    }
-    
-    // Create marker using the React component
-    locationMarker.current = createLocationMarker(longitude, latitude);
-    
-    // Add to map
-    if (map.current) {
-      locationMarker.current.addTo(map.current);
-    }
-  }, []);
+  function initializeLocationMarker() {
+    // Store the watch ID for proper cleanup
+    const id = navigator.geolocation.watchPosition((position) => {
+      if(!map.current) { return; }
 
-  // Start watching user location
-  const startLocationWatch = useCallback(() => {
-    // Skip if debug location is being used
-    if (DEBUG_LOCATION && isUsingDebugLocation) {
-      return;
-    }
-    
-    if (!map.current) return;
-    
-    // Check if geolocation is available
-    if (!navigator.geolocation) {
-      return;
-    }
-    
-    // Options for geolocation - using battery-friendly settings
-    const options = {
-      enableHighAccuracy: false, // Less battery usage
-      timeout: 10000,           // 10-second timeout
-      maximumAge: 60000         // Accept cached positions up to 1 minute old
-    };
-    
-    // Function to handle location updates
-    const handleLocationUpdate = (position: GeolocationPosition) => {
-      const { longitude, latitude } = position.coords;
-      
-      // Create or update marker
-      createLocationMarkerHandler(longitude, latitude);
-      
-      // Center map on first location fix if not already moving
-      if (map.current && !map.current.isMoving()) {
-        map.current.flyTo({
-          center: [longitude, latitude],
-          zoom: 15,
-          essential: true
-        });
+      if(!locationMarker.current) {
+        // First time: create marker but DON'T auto-center (user must click tracking button)
+        locationMarker.current = createLocationMarker(position.coords.longitude, position.coords.latitude);
+        locationMarker.current.addTo(map.current);
+        // Note: NOT calling flyTo here - user can manually enable tracking if desired
+      } else {
+        // Subsequent updates: just move the marker, don't re-center the map
+        locationMarker.current?.setLngLat({lng: position.coords.longitude, lat: position.coords.latitude});
       }
-    };
-    
-    // Function to handle location errors
-    const handleLocationError = (error: GeolocationPositionError) => {
-      // Try to get a single position update as fallback
-      if (error.code === error.TIMEOUT) {
-        navigator.geolocation.getCurrentPosition(
-          handleLocationUpdate, 
-          handleLocationError, 
-          options
-        );
+    },
+    () => {
+      //console.log(positionError);
+      if(locationMarker.current) {
+        locationMarker.current.remove();
+        locationMarker.current = null;
       }
-    };
+    });
     
-    // Start watching position
-    watchId.current = navigator.geolocation.watchPosition(
-      handleLocationUpdate,
-      handleLocationError,
-      options
-    );
-    
-    // Return cleanup function
-    return () => {
-      if (watchId.current !== null) {
-        navigator.geolocation.clearWatch(watchId.current);
-        watchId.current = null;
-      }
-    };
-  }, [isUsingDebugLocation, createLocationMarkerHandler]);
+    // Store it so we can clear it on cleanup
+    watchId.current = id;
+  };
 
-  // Simulate location updates when using debug location
-  useEffect(() => {
-    if (DEBUG_LOCATION && map.current && isUsingDebugLocation) {
-      // Create the location marker with debug coordinates
-      createLocationMarkerHandler(DEBUG_LOCATION[0], DEBUG_LOCATION[1]);
-      
-      // Center map on debug location
-      map.current.flyTo({
-        center: DEBUG_LOCATION,
-        zoom: 15,
-        essential: true
-      });
-    }
-  }, [isUsingDebugLocation, createLocationMarkerHandler]);
+  function initializeGestureWatch() {
+    if(!map.current) { return; }
+
+    // When user interacts with map, disable location tracking
+    const disableTracking = () => {
+      setWatchingLocation(false);
+      if (locationWatch.current) {
+        clearInterval(locationWatch.current);
+        locationWatch.current = undefined;
+      }
+    };
+
+    map.current.on('click', disableTracking);
+    map.current.on('touch', disableTracking);
+    map.current.on('touchend', disableTracking);
+  }
 
   // Handle route selection events - outside the map initialization
   const handleRouteSelect = useCallback((event: CustomEvent) => {
@@ -662,14 +609,9 @@ const MapboxMap = memo(function MapboxMap() {
           setTimeout(() => {
             if (map.current) map.current.resize();
           }, 100);
-          
-          // If using debug location, create marker
-          if (DEBUG_LOCATION && isUsingDebugLocation) {
-            createLocationMarkerHandler(DEBUG_LOCATION[0], DEBUG_LOCATION[1]);
-          } else {
-            // Otherwise start real location tracking
-            startLocationWatch();
-          }
+
+          initializeLocationMarker();
+          initializeGestureWatch();
           
           // Clear existing marker arrays before initialization
           attractionMarkers.current = [];
@@ -704,6 +646,11 @@ const MapboxMap = memo(function MapboxMap() {
         navigator.geolocation.clearWatch(watchId.current);
       }
       
+      if (locationWatch.current) {
+        clearInterval(locationWatch.current);
+        locationWatch.current = undefined;
+      }
+      
       // Clean up all markers before removing the map
       if (locationMarker.current) {
         locationMarker.current.remove();
@@ -729,7 +676,7 @@ const MapboxMap = memo(function MapboxMap() {
         map.current = null;
       }
     };
-  }, [isUsingDebugLocation, startLocationWatch, createLocationMarkerHandler]);
+  }, []); // Empty dependency array - only run once on mount
   
   // Add resize event listener
   useEffect(() => {
@@ -790,12 +737,51 @@ const MapboxMap = memo(function MapboxMap() {
         navigator.geolocation.clearWatch(watchId.current);
         watchId.current = null;
       }
+      
+      if (locationWatch.current) {
+        clearInterval(locationWatch.current);
+        locationWatch.current = undefined;
+      }
     };
   }, []);
 
-  // Toggle between real and debug location
-  const toggleDebugLocation = () => {
-    setIsUsingDebugLocation(prev => !prev);
+  const setLocationWatch = (value: boolean) => {
+    setWatchingLocation(value);
+
+    if(value) {
+      // When enabled: immediately center on current location (preserving zoom)
+      if (map.current && locationMarker.current) {
+        const lngLat = locationMarker.current.getLngLat();
+        map.current.flyTo({
+          center: [lngLat.lng, lngLat.lat],
+          essential: true,
+          duration: 1000
+        });
+      }
+
+      // Then continuously track position (preserving zoom)
+      locationWatch.current = setInterval(() => {
+        if(!map.current || !locationMarker.current) { return; }
+
+        const lngLat = locationMarker.current.getLngLat();
+        map.current.flyTo({
+          center: [lngLat.lng, lngLat.lat],
+          essential: true,
+          duration: 1000
+        });
+      }, 500);
+    } else {
+      // When disabled: stop tracking
+      if (locationWatch.current) {
+        clearInterval(locationWatch.current);
+        locationWatch.current = undefined;
+      }
+    }
+  };
+
+  // Toggle location tracking
+  const toggleWatchLocation = () => {
+    setLocationWatch(!watchingLocation);
   };
 
   return (
@@ -805,10 +791,10 @@ const MapboxMap = memo(function MapboxMap() {
       {/* Debug mode toggle */}
       {DEBUG_LOCATION && (
         <div 
-          onClick={toggleDebugLocation}
-          className={`debug-location-toggle ${isUsingDebugLocation ? 'active' : 'inactive'}`}
+          onClick={toggleWatchLocation}
+          className={`location-watch-toggle ${watchingLocation ? 'active' : 'inactive'}`}
         >
-          {isUsingDebugLocation ? 'Using Debug Location' : 'Using Real Location'}
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" preserveAspectRatio="xMidYMid meet" fill="#000000"><g id="SVGRepo_bgCarrier"></g><g id="SVGRepo_tracerCarrier"></g><g id="SVGRepo_iconCarrier"><path d="M87.13 0a2.386 2.386 0 0 0-.64.088a2.386 2.386 0 0 0-.883.463L11.34 62.373a2.386 2.386 0 0 0 1.619 4.219l37.959-1.479l17.697 33.614a2.386 2.386 0 0 0 4.465-.707L89.486 2.79A2.386 2.386 0 0 0 87.131 0z" fill="#000000"></path></g></svg>
         </div>
       )}
     </>

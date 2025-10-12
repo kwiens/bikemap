@@ -72,9 +72,9 @@
 /* Sidebar Styles */
 .sidebar-container {
   position: fixed;
-  top: 100px;
+  top: 0;
   left: 0;
-  height: calc(100% - 100px);
+  height: 100%;
   width: 280px;
   background-color: var(--color-white);
   box-shadow: 2px 0 5px var(--shadow-medium);
@@ -85,7 +85,7 @@
 
 .sidebar-content {
   overflow-y: auto;
-  height: calc(100% - 56px);
+  height: calc(100% - 79px);
 }
 
 .sidebar-inner-content {
@@ -94,9 +94,9 @@
 
 .sidebar-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  padding: 12px 16px;
+  padding: 23.5px 16px;
   border-bottom: 1px solid var(--color-gray-100);
   background-color: var(--color-gray-50);
 }
@@ -460,6 +460,7 @@
   .sidebar-container {
     width: 100%;
     max-width: 320px;
+    height: 100%;
   }
 }
 
