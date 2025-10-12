@@ -75,9 +75,9 @@ const MapboxMap = memo(function MapboxMap() {
   function initializeLocationMarker() {
     // Store the watch ID for proper cleanup
     const id = navigator.geolocation.watchPosition((position) => {
-      if(!map.current) { return; }
+      if (!map.current) { return; }
 
-      if(!locationMarker.current) {
+      if (!locationMarker.current) {
         // First time: create marker but DON'T auto-center (user must click tracking button)
         locationMarker.current = createLocationMarker(position.coords.longitude, position.coords.latitude);
         locationMarker.current.addTo(map.current);
@@ -748,7 +748,7 @@ const MapboxMap = memo(function MapboxMap() {
   const setLocationWatch = (value: boolean) => {
     setWatchingLocation(value);
 
-    if(value) {
+    if (value) {
       // When enabled: immediately center on current location (preserving zoom)
       if (map.current && locationMarker.current) {
         const lngLat = locationMarker.current.getLngLat();
@@ -761,7 +761,7 @@ const MapboxMap = memo(function MapboxMap() {
 
       // Then continuously track position (preserving zoom)
       locationWatch.current = setInterval(() => {
-        if(!map.current || !locationMarker.current) { return; }
+        if (!map.current || !locationMarker.current) { return; }
 
         const lngLat = locationMarker.current.getLngLat();
         map.current.flyTo({
@@ -769,7 +769,7 @@ const MapboxMap = memo(function MapboxMap() {
           essential: true,
           duration: 1000
         });
-      }, 500);
+      }, 250);
     } else {
       // When disabled: stop tracking
       if (locationWatch.current) {
