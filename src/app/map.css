@@ -57,8 +57,8 @@
 /* Debug Mode Toggle */
 .location-watch-toggle {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  bottom: 5px;
+  right: 5px;
   width: 40px;
   height: 40px;
   padding: 6px 12px;
@@ -260,4 +260,4 @@
 
 .map-popup a:hover {
   text-decoration: underline;
-} 
+}
