@@ -6,7 +6,7 @@ import type {
 } from '@/data/geo_data';
 
 // Helper function to ensure FontAwesome is loaded
-const ensureFontAwesomeLoaded = () => {
+export const ensureFontAwesomeLoaded = () => {
   if (!document.getElementById('fontawesome-css')) {
     const link = document.createElement('link');
     link.id = 'fontawesome-css';
@@ -20,6 +20,53 @@ const ensureFontAwesomeLoaded = () => {
 
 // Run once on module load to ensure FontAwesome is loaded
 ensureFontAwesomeLoaded();
+
+// Marker Manager class for managing collections of markers
+export class MarkerManager {
+  private markers: mapboxgl.Marker[] = [];
+
+  add(marker: mapboxgl.Marker, map: mapboxgl.Map): void {
+    this.markers.push(marker);
+    marker.addTo(map);
+  }
+
+  show(map: mapboxgl.Map): void {
+    this.markers.forEach((m) => {
+      m.addTo(map);
+    });
+  }
+
+  hide(): void {
+    this.markers.forEach((m) => {
+      m.remove();
+    });
+  }
+
+  clear(): void {
+    this.hide();
+    this.markers = [];
+  }
+
+  findByCoordinates(lng: number, lat: number): mapboxgl.Marker | undefined {
+    return this.markers.find((m) => {
+      const pos = m.getLngLat();
+      return pos.lng === lng && pos.lat === lat;
+    });
+  }
+
+  getMarkers(): mapboxgl.Marker[] {
+    return this.markers;
+  }
+
+  setMarkers(markers: mapboxgl.Marker[]): void {
+    this.clear();
+    this.markers = markers;
+  }
+
+  get length(): number {
+    return this.markers.length;
+  }
+}
 
 // Create marker DOM elements directly
 function createMarkerElement(
@@ -191,7 +238,7 @@ export function createBikeRentalMarker(
   const el = createMarkerElement(
     'map-marker rental-marker',
     iconClass,
-    '#9333ea',
+    '#9333EA',
   );
 
   // Create popup HTML with rental-specific information
@@ -208,6 +255,9 @@ export function createBikeRentalMarker(
       <p><strong>Type:</strong> ${location.rentalType}</p>
       <p><strong>Price:</strong> ${location.price}</p>
       <p><strong>Hours:</strong> ${location.hours}</p>
+      ${location.availableBikes !== undefined ? `<p><strong>Available Bikes:</strong> ${location.availableBikes}</p>` : ''}
+      ${location.availableDocks !== undefined ? `<p><strong>Available Docks:</strong> ${location.availableDocks}</p>` : ''}
+      ${location.isChargingStation ? '<p><strong>Charging Station Available</strong></p>' : ''}
     </div>
   `;
 
@@ -220,7 +270,10 @@ export function createBikeRentalMarker(
   }).setHTML(popupHTML);
 
   // Create and return marker
-  return new mapboxgl.Marker(el)
-    .setLngLat([0, 0]) // We'll set the coordinates after geocoding
+  return new mapboxgl.Marker({
+    element: el,
+    anchor: 'bottom',
+  })
+    .setLngLat([location.longitude, location.latitude])
     .setPopup(popup);
 }
