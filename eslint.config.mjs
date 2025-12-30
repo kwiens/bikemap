@@ -26,6 +26,20 @@ const eslintConfig = [
     ],
   },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  {
+    settings: {
+      'import/resolver': {
+        typescript: {
+          alwaysTryTypes: true,
+        },
+      },
+    },
+  },
+  ...compat.extends(
+    'plugin:import/recommended',
+    'plugin:import/typescript',
+    'prettier',
+  ),
 ];
 
 export default eslintConfig;
