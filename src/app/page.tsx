@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import dynamic from 'next/dynamic';
 import '@/app/map.css';
 import React from 'react';
+import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
 
 // Dynamically import the Map component with no SSR since Mapbox requires window
 const BikeMap = dynamic(() => import('@/components/Map'), {
@@ -16,20 +17,10 @@ const BikeMap = dynamic(() => import('@/components/Map'), {
 });
 
 export default function Home(): ReactElement {
-  // Add useEffect to handle beforeinstallprompt event
-  React.useEffect(() => {
-    // This event fires when the app can be installed as a PWA
-    window.addEventListener('beforeinstallprompt', (e) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault();
-      // For debugging only - you can remove this in production
-      console.log('App is installable as PWA');
-    });
-  }, []);
-
   return (
     <main className="w-screen h-screen overflow-hidden absolute inset-0 m-0 p-0">
       <BikeMap />
+      <PwaInstallPrompt />
     </main>
   );
 }
