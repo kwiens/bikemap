@@ -9,11 +9,11 @@
 - `public`: static assets served as-is.
 
 ## Build, Test, and Development Commands
-- `npm run dev`: start the local Next.js dev server at `http://localhost:3000`.
-- `npm run build`: produce the production build.
-- `npm run start`: run the production server from the build output.
-- `npm run lint`: run ESLint plus Biome lint + format checks (fails on warnings).
-- `npm run lint:fix`: auto-fix lint issues and format code.
+- `pnpm dev`: start the local Next.js dev server at `http://localhost:3000`.
+- `pnpm build`: produce the production build.
+- `pnpm start`: run the production server from the build output.
+- `pnpm lint`: run ESLint plus Biome lint + format checks (fails on warnings).
+- `pnpm lint:fix`: auto-fix lint issues and format code.
 
 ## Coding Style & Naming Conventions
 - TypeScript + React with Next.js App Router.
@@ -41,7 +41,7 @@
 ## Commit & Pull Request Guidelines
 - Commit messages follow short, imperative sentence case (e.g., “Update packages…”).
 - Pull requests should include a clear description, linked issues, and screenshots for UI changes.
-- Ensure `npm run lint` passes before requesting review.
+- Ensure `pnpm lint` passes before requesting review.
 
 ## Configuration & Secrets
 - Mapbox credentials belong in `.env.local`; see `.env.example` for required keys.
