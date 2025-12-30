@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Chattanooga Bike Map',
+  title: 'Bike Chatt',
   description: 'Paths and routes for cyclists in Chattanooga, TN',
+  alternates: {
+    canonical: 'https://bikechatt.com',
+  },
   icons: {
     icon: [
       { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
@@ -45,7 +48,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#22c55e" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Bike Map" />
+        <meta name="apple-mobile-web-app-title" content="Bike Chatt" />
         <meta
           name="apple-mobile-web-app-status-bar-style"
           content="black-translucent"

@@ -1,6 +1,6 @@
 {
-  "name": "Chattanooga Bike Map",
-  "short_name": "Bike Map",
+  "name": "Bike Chatt",
+  "short_name": "Bike Chatt",
   "description": "Paths and routes for cyclists in Chattanooga, TN",
   "start_url": "/",
   "display": "fullscreen",
