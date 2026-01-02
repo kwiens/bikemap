@@ -84,7 +84,7 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ isActive }) => (
 const SidebarHeader = () => (
   <div className="sidebar-header">
     <h2 className="sidebar-header-title">
-      <span>Chattanooga Bike Map</span>
+      <span>Bike Chatt</span>
     </h2>
   </div>
 );

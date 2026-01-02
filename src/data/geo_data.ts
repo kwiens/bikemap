@@ -290,7 +290,7 @@ export const localResources: LocalResource[] = [
     name: 'Chattanooga City Bike Rentals',
     description:
       'Chattanooga City Bike Rentals: Find 24-7 bike rentals throughout the city.',
-    url: 'https://www.chattanooga.gov/bike-map',
+    url: 'https://bikechatt.com',
     icon: faBicycle,
     color: '#6B7280',
   },

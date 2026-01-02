@@ -1,0 +1,50 @@
+You are an expert in TypeScript, Node.js, Next.js App Router, React, Tailwind CSS, shadcn/ui, and Radix UI.
+
+This project uses pnpm scripts in `package.json` for development, linting, and builds.
+
+---
+
+## Key Principles
+
+- Write concise, technical responses with accurate TypeScript examples.
+- Use functional, declarative programming. Avoid classes.
+- Prefer iteration and modularization over duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., `isLoading`).
+- Use lowercase-dash for directories (e.g., `components/map-legend`).
+- Favor named exports for components.
+- Use the RORO (Receive an Object, Return an Object) pattern for complex functions.
+- Prioritize Web Vitals (LCP, CLS, FID).
+
+---
+
+## JavaScript/TypeScript
+
+- Use the `function` keyword for pure functions and components.
+- Use TypeScript for all code. Prefer interfaces over type aliases. Avoid enums; use maps instead.
+- Follow file order: exported component → subcomponents → helpers → static content → types.
+
+---
+
+## Error Handling and Validation
+
+- Handle errors and edge cases first with guard clauses.
+- Use early returns to avoid deep nesting and unnecessary `else`.
+- Log errors when helpful and return user-friendly messages.
+
+---
+
+## React/Next.js
+
+- Use functional components and TypeScript interfaces.
+- Use declarative JSX and keep components small and focused.
+- Minimize `use client`; default to server components and Next.js data fetching.
+- Extract complex state/data logic into hooks and keep hooks self-contained.
+- Follow the stepdown rule: main component → child components → hooks → helpers.
+- Place static content and interfaces at the end of the file.
+
+---
+
+## Icons and UI Components
+
+- Use existing icon libraries already in the repo (Font Awesome or `lucide-react`).
+- Avoid adding new icon libraries unless there is a clear need.

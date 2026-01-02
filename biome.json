@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.2.5/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
   "files": {
     "ignoreUnknown": false,
     "includes": [
@@ -44,8 +44,10 @@
         },
         "useSemanticElements": "off",
         "noSvgWithoutTitle": "off",
+        "useMediaCaption": "off",
         "noAutofocus": "off",
         "noStaticElementInteractions": "warn",
+        "useKeyWithClickEvents": "off",
         "useValidAutocomplete": "warn"
       },
       "complexity": {
@@ -72,7 +74,7 @@
         "useExponentiationOperator": "off",
         "noUnusedTemplateLiteral": "off",
         "noUselessElse": "off",
-        "useBlockStatements": "error",
+        "useBlockStatements": "off",
         "useArrayLiterals": "warn"
       },
       "suspicious": {
