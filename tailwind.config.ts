@@ -30,6 +30,9 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        // App brand colors
+        'app-primary': '#c3f44d',
+        'app-secondary': '#1a434e',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

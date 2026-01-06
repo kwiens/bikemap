@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================================================
+   App Brand Colors
+   Primary: #c3f44d (lime green) - used for theme color, app install frame
+   Secondary: #1a434e (dark blue) - used as secondary UI accent
+   ============================================================================= */
+:root {
+  --app-color-primary: #c3f44d;
+  --app-color-secondary: #1a434e;
+}
+
 /* Reset and base styles */
 * {
   box-sizing: border-box;
@@ -10,7 +20,7 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 
-html, 
+html,
 body {
   height: 100%;
   width: 100%;

@@ -13,6 +13,7 @@ const eslintConfig = [
   {
     ignores: [
       '.next/**',
+      '.next/**/*',
       'node_modules/**',
       'out/**',
       'build/**',
@@ -23,6 +24,7 @@ const eslintConfig = [
       '*.config.ts',
       '*.config.mjs',
       'eslint-rules/**',
+      'next-env.d.ts', // Next.js generated file
     ],
   },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
