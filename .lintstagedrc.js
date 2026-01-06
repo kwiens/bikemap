@@ -1,6 +1,6 @@
 module.exports = {
   '*.{js,jsx,ts,tsx}': [
-    'eslint --fix --max-warnings 0',
+    'eslint --fix --no-warn-ignored --max-warnings 0',
     'biome lint --write --unsafe',
     'biome format --write',
   ],
