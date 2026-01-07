@@ -1,7 +1,7 @@
 import sharp from 'sharp';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,12 +12,7 @@ const assetsDir = join(publicDir, 'assets');
 // Ensure assets directory exists
 mkdirSync(assetsDir, { recursive: true });
 
-async function generateIcon(
-  svgPath,
-  outputPath,
-  size,
-  options = {}
-) {
+async function generateIcon(svgPath, outputPath, size, options = {}) {
   try {
     const svgBuffer = readFileSync(svgPath);
     const pngBuffer = await sharp(svgBuffer)
@@ -43,33 +38,18 @@ async function main() {
   console.log('Generating icons from SVG logos...\n');
 
   // Generate favicon (32x32) from white logo
-  await generateIcon(
-    whiteLogo,
-    join(assetsDir, 'favicon.png'),
-    32,
-    { background: { r: 255, g: 255, b: 255, alpha: 1 } }
-  );
+  await generateIcon(whiteLogo, join(assetsDir, 'favicon.png'), 32, {
+    background: { r: 255, g: 255, b: 255, alpha: 1 },
+  });
 
   // Generate icon-192 (192x192) from primary logo
-  await generateIcon(
-    primaryLogo,
-    join(assetsDir, 'icon-192.png'),
-    192
-  );
+  await generateIcon(primaryLogo, join(assetsDir, 'icon-192.png'), 192);
 
   // Generate icon-512 (512x512) from primary logo
-  await generateIcon(
-    primaryLogo,
-    join(assetsDir, 'icon-512.png'),
-    512
-  );
+  await generateIcon(primaryLogo, join(assetsDir, 'icon-512.png'), 512);
 
   // Generate apple-touch-icon (180x180) from primary logo
-  await generateIcon(
-    primaryLogo,
-    join(assetsDir, 'apple-touch-icon.png'),
-    180
-  );
+  await generateIcon(primaryLogo, join(assetsDir, 'apple-touch-icon.png'), 180);
 
   // Also copy to public root for app references
   const filesToCopy = [
