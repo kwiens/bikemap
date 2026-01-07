@@ -2,7 +2,10 @@
 
 An interactive map showcasing bike routes, bike share stations, attractions, and bike resources in Chattanooga, TN. Built with love by [iFixit](https://www.ifixit.com) for the Chattanooga cycling community.
 
-![Chattanooga Bike Map](public/og-image.png)
+<p align="center">
+  <img src="public/screenshot-splash.png" alt="Chattanooga Bike Map - Main View" width="45%">
+  <img src="public/screenshot-route.png" alt="Route Selection View" width="45%">
+</p>
 
 ## Features
 
