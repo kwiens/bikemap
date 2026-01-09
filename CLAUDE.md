@@ -13,6 +13,20 @@ pnpm lint         # Run ESLint + Biome lint + Biome format checks
 pnpm lint:fix     # Auto-fix linting/formatting issues
 ```
 
+## Git & GitHub
+
+Use `gh` CLI for GitHub operations:
+
+```bash
+gh pr create --title "Title" --body "Description"  # Create PR
+gh pr view [number]                                 # View PR details
+gh pr edit [number] --body "New description"        # Edit PR
+gh pr merge [number]                                # Merge PR
+gh pr list                                          # List open PRs
+gh issue list                                       # List issues
+gh issue view [number]                              # View issue details
+```
+
 ## Architecture
 
 This is a Next.js 15 App Router application displaying an interactive Mapbox map of Chattanooga bike routes and resources.
