@@ -70,6 +70,21 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isOpen, toggle]);
 
+  // Listen for route-select events from the map (when user clicks on a route in the map)
+  useEffect(() => {
+    const handleMapRouteSelect = (event: Event) => {
+      const customEvent = event as CustomEvent<{ routeId: string }>;
+      const { routeId } = customEvent.detail;
+      // Only update state, don't dispatch another event (map already handles the visual update)
+      setSelectedRoute(routeId);
+    };
+
+    window.addEventListener('route-select', handleMapRouteSelect);
+    return () => {
+      window.removeEventListener('route-select', handleMapRouteSelect);
+    };
+  }, []);
+
   // Function to handle route selection
   const handleRouteSelect = useCallback(
     (routeId: string) => {
