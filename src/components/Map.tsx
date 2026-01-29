@@ -15,6 +15,7 @@ import {
   ensureFontAwesomeLoaded,
   MarkerManager,
 } from '@/components/MapMarkers';
+import { useToast, useMapResize } from '@/hooks';
 import {
   fetchStationInformation,
   fetchStationStatus,
@@ -27,14 +28,11 @@ import {
   calculateZoomForBounds,
   calculateRouteBounds,
   findLocationInArray,
-} from '@/utils/utils';
+} from '@/utils/map';
+import { mapConfig } from '@/config/map.config';
 
-// Initialize Mapbox access token
-mapboxgl.accessToken =
-  'pk.eyJ1Ijoic3d1bGxlciIsImEiOiJjbThyZTVuMzEwMTZwMmpvdTRzM3JpMGlhIn0.CF5lzLSkkfO-c0qt6a168A';
-
-// Debug location coordinates - set to null to use real location
-const DEBUG_LOCATION: [number, number] = [-85.306739, 35.059623]; // Outdoor Chattanooga
+// Initialize Mapbox access token from config
+mapboxgl.accessToken = mapConfig.mapbox.accessToken;
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
@@ -52,8 +50,14 @@ const MapboxMap = memo(function MapboxMap() {
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [toastFadingOut, setToastFadingOut] = useState(false);
+
+  // Use custom hooks
+  const {
+    message: toastMessage,
+    isFadingOut: toastFadingOut,
+    showToast,
+  } = useToast();
+  useMapResize({ map });
 
   // Create location marker
   function initializeLocationMarker() {
@@ -121,59 +125,61 @@ const MapboxMap = memo(function MapboxMap() {
   }
 
   // Handle route selection events - outside the map initialization
-  const handleRouteSelect = useCallback((event: CustomEvent) => {
-    if (!map.current) {
-      return;
-    }
-
-    const { routeId } = event.detail;
-
-    // Find the selected route to get its name
-    const selectedRoute = bikeRoutes.find((route) => route.id === routeId);
-
-    // Show toast with route name
-    if (selectedRoute) {
-      setToastMessage(selectedRoute.name);
-      setToastFadingOut(false); // Reset fade-out state for new toast
-    }
-
-    // Update opacities for all routes
-    updateRouteOpacity(map.current, bikeRoutes, routeId, {
-      selected: 0.8,
-      unselected: 0.2,
-    });
-
-    if (selectedRoute?.bounds) {
-      const bounds = selectedRoute.bounds;
-
-      try {
-        // Calculate the center of the bounds
-        const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
-        const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
-
-        // Calculate zoom level based on bounds and device type
-        const isMobile = window.innerWidth <= 768;
-        const zoom = calculateZoomForBounds(bounds, isMobile);
-
-        // Use flyTo which tends to be more reliable
-        map.current.flyTo({
-          center: [centerLng, centerLat],
-          zoom: zoom,
-          essential: true,
-          duration: 1000,
-        });
-
-        // Force a resize to ensure the map is rendered properly
-        setTimeout(() => {
-          if (map.current) {
-            map.current.resize();
-          }
-        }, 100);
-      } catch (error) {
-        console.error('Error flying to route:', error);
+  const handleRouteSelect = useCallback(
+    (event: CustomEvent) => {
+      if (!map.current) {
+        return;
       }
-    }
-  }, []);
+
+      const { routeId } = event.detail;
+
+      // Find the selected route to get its name
+      const selectedRoute = bikeRoutes.find((route) => route.id === routeId);
+
+      // Show toast with route name
+      if (selectedRoute) {
+        showToast(selectedRoute.name);
+      }
+
+      // Update opacities for all routes
+      updateRouteOpacity(map.current, bikeRoutes, routeId, {
+        selected: 0.8,
+        unselected: 0.2,
+      });
+
+      if (selectedRoute?.bounds) {
+        const bounds = selectedRoute.bounds;
+
+        try {
+          // Calculate the center of the bounds
+          const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
+          const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
+
+          // Calculate zoom level based on bounds and device type
+          const isMobile = window.innerWidth <= 768;
+          const zoom = calculateZoomForBounds(bounds, isMobile);
+
+          // Use flyTo which tends to be more reliable
+          map.current.flyTo({
+            center: [centerLng, centerLat],
+            zoom: zoom,
+            essential: true,
+            duration: 1000,
+          });
+
+          // Force a resize to ensure the map is rendered properly
+          setTimeout(() => {
+            if (map.current) {
+              map.current.resize();
+            }
+          }, 100);
+        } catch (error) {
+          console.error('Error flying to route:', error);
+        }
+      }
+    },
+    [showToast],
+  );
 
   // Handle layer toggle events
   const handleLayerToggle = useCallback(async (event: CustomEvent) => {
@@ -391,27 +397,6 @@ const MapboxMap = memo(function MapboxMap() {
     [showAttractions, showBikeResources, showBikeRentals],
   );
 
-  // Auto-dismiss toast after 3 seconds with fade-out
-  useEffect(() => {
-    if (toastMessage && !toastFadingOut) {
-      // After 2.7 seconds, start fade-out animation (300ms before removal)
-      const fadeOutTimer = setTimeout(() => {
-        setToastFadingOut(true);
-      }, 2700);
-
-      // After 3 seconds total, remove the toast
-      const removeTimer = setTimeout(() => {
-        setToastMessage(null);
-        setToastFadingOut(false);
-      }, 3000);
-
-      return () => {
-        clearTimeout(fadeOutTimer);
-        clearTimeout(removeTimer);
-      };
-    }
-  }, [toastMessage, toastFadingOut]);
-
   // Set up event listeners for map layers and location centering
   useEffect(() => {
     // Create stable wrapper functions that don't change between renders
@@ -457,11 +442,11 @@ const MapboxMap = memo(function MapboxMap() {
 
           const newMap = new mapboxgl.Map({
             container: mapContainer.current as HTMLElement,
-            style: 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt',
-            center: DEBUG_LOCATION, // Default to Chattanooga
-            zoom: 14.89,
-            pitch: -22.4,
-            bearing: 11,
+            style: mapConfig.mapbox.styleUrl,
+            center: mapConfig.defaultView.center,
+            zoom: mapConfig.defaultView.zoom,
+            pitch: mapConfig.defaultView.pitch,
+            bearing: mapConfig.defaultView.bearing,
             antialias: true,
           });
 
@@ -604,67 +589,6 @@ const MapboxMap = memo(function MapboxMap() {
     };
   }, []); // Empty dependency array - only run once on mount
 
-  // Add resize event listener
-  useEffect(() => {
-    const handleResize = () => {
-      if (map.current) {
-        map.current.resize();
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    // Listen for sidebar toggle events
-    const handleSidebarToggle = () => {
-      setTimeout(() => {
-        if (map.current) {
-          map.current.resize();
-        }
-      }, 300); // Longer delay to wait for transition
-    };
-
-    window.addEventListener('sidebar-toggle', handleSidebarToggle);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('sidebar-toggle', handleSidebarToggle);
-    };
-  }, []);
-
-  // Add cleanup for component unmount
-  useEffect(() => {
-    // Capture refs for cleanup
-    const attractionMarkersRef = attractionMarkers.current;
-    const bikeResourceMarkersRef = bikeResourceMarkers.current;
-    const bikeRentalMarkersRef = bikeRentalMarkers.current;
-
-    return () => {
-      // Clean up all markers before unmounting
-      if (locationMarker.current) {
-        locationMarker.current.remove();
-      }
-
-      attractionMarkersRef.clear();
-      bikeResourceMarkersRef.clear();
-      bikeRentalMarkersRef.clear();
-
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-
-      if (watchId.current !== null) {
-        navigator.geolocation.clearWatch(watchId.current);
-        watchId.current = null;
-      }
-
-      if (locationWatch.current) {
-        clearInterval(locationWatch.current);
-        locationWatch.current = undefined;
-      }
-    };
-  }, []);
-
   const setLocationWatch = (value: boolean) => {
     setWatchingLocation(value);
 
@@ -717,8 +641,8 @@ const MapboxMap = memo(function MapboxMap() {
         </div>
       )}
 
-      {/* Debug mode toggle */}
-      {DEBUG_LOCATION && (
+      {/* Location tracking toggle */}
+      {mapConfig.debug.showLocationTracker && (
         <div
           onClick={toggleWatchLocation}
           onKeyDown={(e) => {

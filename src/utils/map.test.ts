@@ -6,7 +6,7 @@ import {
   calculateRouteBounds,
   findLocationInArray,
   findMarkerByCoordinates,
-} from './utils';
+} from './map';
 import type { BikeRoute } from '@/data/geo_data';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type mapboxgl from 'mapbox-gl';
