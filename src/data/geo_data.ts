@@ -192,18 +192,18 @@ export const mapFeatures: MapFeature[] = [
     icon: faBicycle,
   },
   {
-    name: 'South Chattanooga Community Center',
+    name: 'South Chattanooga Community Center Bicycle Traffic Garden',
     description:
-      'Community center offering recreational programs, sports facilities, and gathering spaces for the South Chattanooga neighborhood.',
+      'Practice cycling skills at a community center offering recreational programs, sports facilities, and gathering spaces.',
     address: 'South Chattanooga, TN 37408',
     latitude: 35.0093301,
     longitude: -85.3224917,
     icon: faHandsHelping,
   },
   {
-    name: 'Pioneer Frontier Park',
+    name: 'Pioneer Frontier Park Traffic Garden',
     description:
-      'A scenic park with open green spaces, playgrounds, and trails perfect for a family bike ride.',
+      'A scenic park with a traffic garden, open green spaces, playgrounds, and trails perfect for a family bike ride.',
     address: 'East Brainerd, TN 37421',
     latitude: 34.9957601,
     longitude: -85.2424457,
