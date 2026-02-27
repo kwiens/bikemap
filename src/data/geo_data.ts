@@ -227,8 +227,8 @@ export const bikeResources: BikeResource[] = [
     description:
       "Chattanooga's premium electric bike shop specializing in sales, rentals, and services for electric bicycles.",
     address: '1404 McCallie Avenue, Suite 102, Chattanooga, TN 37404',
-    latitude: 35.0375,
-    longitude: -85.2845,
+    latitude: 35.03825275443797,
+    longitude: -85.28125452877657,
     icon: faBolt,
   },
   {
