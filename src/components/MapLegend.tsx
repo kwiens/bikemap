@@ -105,53 +105,53 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     [isOpen, toggle],
   );
 
-  // Function to toggle attraction layer
-  const toggleAttractionLayer = useCallback(() => {
-    const newValue = !showAttractions;
-    setShowAttractions(newValue);
+  // Helper to toggle a layer with radio-button behavior:
+  // turning one layer ON turns the other two OFF
+  const toggleLayer = useCallback(
+    (layer: 'attractions' | 'bikeResources' | 'bikeRentals') => {
+      const stateMap = {
+        attractions: showAttractions,
+        bikeResources: showBikeResources,
+        bikeRentals: showBikeRentals,
+      };
+      const setterMap = {
+        attractions: setShowAttractions,
+        bikeResources: setShowBikeResources,
+        bikeRentals: setShowBikeRentals,
+      };
 
-    // Dispatch event for map to show or hide attractions
-    window.dispatchEvent(
-      new CustomEvent('layer-toggle', {
-        detail: {
-          layer: 'attractions',
-          visible: newValue,
-        },
-      }),
-    );
-  }, [showAttractions]);
+      const turningOn = !stateMap[layer];
 
-  // Function to toggle bike resources layer
-  const toggleBikeResourcesLayer = useCallback(() => {
-    const newValue = !showBikeResources;
-    setShowBikeResources(newValue);
+      // Update state and dispatch events for all layers
+      for (const key of Object.keys(stateMap) as Array<keyof typeof stateMap>) {
+        const newValue = key === layer ? turningOn : false;
+        if (stateMap[key] !== newValue) {
+          setterMap[key](newValue);
+          window.dispatchEvent(
+            new CustomEvent('layer-toggle', {
+              detail: { layer: key, visible: newValue },
+            }),
+          );
+        }
+      }
+    },
+    [showAttractions, showBikeResources, showBikeRentals],
+  );
 
-    // Dispatch event for map to show or hide bike resources
-    window.dispatchEvent(
-      new CustomEvent('layer-toggle', {
-        detail: {
-          layer: 'bikeResources',
-          visible: newValue,
-        },
-      }),
-    );
-  }, [showBikeResources]);
+  const toggleAttractionLayer = useCallback(
+    () => toggleLayer('attractions'),
+    [toggleLayer],
+  );
 
-  // Function to toggle bike rentals layer
-  const toggleBikeRentalsLayer = useCallback(() => {
-    const newValue = !showBikeRentals;
-    setShowBikeRentals(newValue);
+  const toggleBikeResourcesLayer = useCallback(
+    () => toggleLayer('bikeResources'),
+    [toggleLayer],
+  );
 
-    // Dispatch event for map to show or hide bike rentals
-    window.dispatchEvent(
-      new CustomEvent('layer-toggle', {
-        detail: {
-          layer: 'bikeRentals',
-          visible: newValue,
-        },
-      }),
-    );
-  }, [showBikeRentals]);
+  const toggleBikeRentalsLayer = useCallback(
+    () => toggleLayer('bikeRentals'),
+    [toggleLayer],
+  );
 
   // Function to center map on a specific location
   const centerOnLocation = useCallback(

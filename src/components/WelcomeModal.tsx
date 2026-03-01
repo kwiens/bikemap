@@ -22,10 +22,10 @@ export function WelcomeModal() {
   }, []);
 
   const dismiss = () => {
+    localStorage.setItem(STORAGE_KEY, '1');
     setExiting(true);
     setTimeout(() => {
       setVisible(false);
-      localStorage.setItem(STORAGE_KEY, '1');
     }, 400);
   };
 
