@@ -1,0 +1,187 @@
+/* Welcome Modal - sits above mapbox (z-index 1500) and all UI */
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 20px;
+}
+
+.welcome-enter {
+  animation: welcome-fade-in 0.4s ease-out;
+}
+
+.welcome-exit {
+  animation: welcome-fade-out 0.4s ease-in forwards;
+}
+
+@keyframes welcome-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes welcome-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Card container */
+.welcome-content {
+  background: #fff;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 400px;
+  padding: 40px 28px 32px;
+  text-align: center;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+  animation: welcome-slide-up 0.45s ease-out;
+}
+
+.welcome-exit .welcome-content {
+  animation: welcome-slide-down 0.35s ease-in forwards;
+}
+
+@keyframes welcome-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes welcome-slide-down {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(30px) scale(0.97);
+  }
+}
+
+/* Header */
+.welcome-header {
+  margin-bottom: 32px;
+}
+
+.welcome-bike-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #c3f44d;
+  color: #1a434e;
+  font-size: 32px;
+  margin-bottom: 16px;
+}
+
+.welcome-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a434e;
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
+}
+
+.welcome-subtitle {
+  font-size: 17px;
+  color: #6b7280;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* Feature list */
+.welcome-features {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 32px;
+  text-align: left;
+}
+
+.welcome-feature {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.welcome-feature-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 20px;
+}
+
+.welcome-feature-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.welcome-feature-text strong {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a434e;
+}
+
+.welcome-feature-text span {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.3;
+}
+
+/* CTA button */
+.welcome-cta {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  background: #c3f44d;
+  color: #1a434e;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+  letter-spacing: -0.3px;
+}
+
+.welcome-cta:hover {
+  background: #b4e63e;
+}
+
+.welcome-cta:active {
+  transform: scale(0.97);
+  background: #a5d730;
+}
+
+/* Dismiss hint */
+.welcome-dismiss-hint {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: #9ca3af;
+}
