@@ -15,7 +15,6 @@ import {
   faInfoCircle,
   faPalette,
   faHorse,
-  faBuilding,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import type { BikeRentalLocation } from './gbfs';
@@ -186,26 +185,26 @@ export const mapFeatures: MapFeature[] = [
   {
     name: 'Red Bank Bicycle Traffic Garden',
     description:
-      'A fun, safe space to practice bike skills and learn traffic rules—perfect for kids and families.',
-    address: 'Red Bank, Chattanooga, TN',
+      'A miniature streetscape where kids and families can practice cycling skills and learn road safety in a fun, car-free environment.',
+    address: 'Red Bank, TN 37415',
     latitude: 35.1402265,
     longitude: -85.2792273,
     icon: faBicycle,
   },
   {
-    name: 'South Chattanooga Community Center',
+    name: 'South Chattanooga Community Center Bicycle Traffic Garden',
     description:
-      'Community center offering recreation programs and a great starting point for neighborhood rides.',
-    address: 'South Chattanooga, TN',
+      'Practice cycling skills at a community center offering recreational programs, sports facilities, and gathering spaces.',
+    address: 'South Chattanooga, TN 37408',
     latitude: 35.0093301,
     longitude: -85.3224917,
-    icon: faBuilding,
+    icon: faHandsHelping,
   },
   {
-    name: 'Pioneer Frontier Park',
+    name: 'Pioneer Frontier Park Traffic Garden',
     description:
-      'Explore this scenic park with trails and open spaces—a great destination for a family bike ride.',
-    address: 'East Ridge, TN',
+      'A scenic park with a traffic garden, open green spaces, playgrounds, and trails perfect for a family bike ride.',
+    address: 'East Brainerd, TN 37421',
     latitude: 34.9957601,
     longitude: -85.2424457,
     icon: faTree,
