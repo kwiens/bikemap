@@ -46,7 +46,10 @@ describe('BikeRoutes', () => {
     const route1Button = screen
       .getByText('Test Route 1')
       .closest('[role="button"]');
-    fireEvent.click(route1Button!);
+
+    expect(route1Button).not.toBeNull();
+
+    fireEvent.click(route1Button);
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
   });
@@ -61,7 +64,10 @@ describe('BikeRoutes', () => {
     const route2Button = screen
       .getByText('Test Route 2')
       .closest('[role="button"]');
-    fireEvent.keyDown(route2Button!, { key: 'Enter' });
+
+    expect(route2Button).not.toBeNull();
+
+    fireEvent.keyDown(route2Button, { key: 'Enter' });
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-2');
   });
@@ -76,7 +82,10 @@ describe('BikeRoutes', () => {
     const route1Button = screen
       .getByText('Test Route 1')
       .closest('[role="button"]');
-    fireEvent.keyDown(route1Button!, { key: ' ' });
+
+    expect(route1Button).not.toBeNull();
+
+    fireEvent.keyDown(route1Button, { key: ' ' });
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
   });
