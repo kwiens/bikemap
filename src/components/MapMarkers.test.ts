@@ -63,7 +63,14 @@ function asMarker(marker: MockMarker): mapboxgl.Marker {
 
 vi.mock('mapbox-gl', () => ({
   default: {
-    Marker: vi.fn().mockImplementation(() => makeMarker(0, 0)),
+    Marker: vi.fn().mockImplementation(() => ({
+      getLngLat: vi.fn().mockReturnValue({ lng: 0, lat: 0 }),
+      getPopup: vi.fn(),
+      openPopup: vi.fn(),
+      togglePopup: vi.fn(),
+      addTo: vi.fn().mockReturnThis(),
+      remove: vi.fn(),
+    })),
     Popup: vi.fn(),
     accessToken: '',
   },

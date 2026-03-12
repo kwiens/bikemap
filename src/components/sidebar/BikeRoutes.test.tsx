@@ -43,11 +43,9 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route1Button = screen
-      .getByText('Test Route 1')
-      .closest('[role="button"]');
-
-    expect(route1Button).not.toBeNull();
+    const route1Button = screen.getByRole('button', {
+      name: /test route 1/i,
+    });
 
     fireEvent.click(route1Button);
 
@@ -61,11 +59,9 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route2Button = screen
-      .getByText('Test Route 2')
-      .closest('[role="button"]');
-
-    expect(route2Button).not.toBeNull();
+    const route2Button = screen.getByRole('button', {
+      name: /test route 2/i,
+    });
 
     fireEvent.keyDown(route2Button, { key: 'Enter' });
 
@@ -79,11 +75,9 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route1Button = screen
-      .getByText('Test Route 1')
-      .closest('[role="button"]');
-
-    expect(route1Button).not.toBeNull();
+    const route1Button = screen.getByRole('button', {
+      name: /test route 1/i,
+    });
 
     fireEvent.keyDown(route1Button, { key: ' ' });
 
@@ -97,12 +91,12 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute="route-1" onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route1Button = screen
-      .getByText('Test Route 1')
-      .closest('[role="button"]');
-    const route2Button = screen
-      .getByText('Test Route 2')
-      .closest('[role="button"]');
+    const route1Button = screen.getByRole('button', {
+      name: /test route 1/i,
+    });
+    const route2Button = screen.getByRole('button', {
+      name: /test route 2/i,
+    });
 
     expect(route1Button).toHaveClass('route-item-selected');
     expect(route2Button).not.toHaveClass('route-item-selected');
