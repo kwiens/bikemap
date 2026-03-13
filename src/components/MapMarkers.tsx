@@ -101,6 +101,7 @@ function createPopupHTML(
   name: string,
   description: string,
   address: string,
+  extra?: string,
 ): string {
   return `
     <div class="map-popup">
@@ -112,6 +113,7 @@ function createPopupHTML(
           ${address}
         </a>
       </p>
+      ${extra ?? ''}
     </div>
   `;
 }
@@ -241,25 +243,23 @@ export function createBikeRentalMarker(
     '#9333EA',
   );
 
-  // Create popup HTML with rental-specific information
-  const popupHTML = `
-    <div class="map-popup">
-      <h3>${location.name}</h3>
-      <p>${location.description}</p>
-      <p class="address">
-        <strong>Address:</strong>
-        <a href="https://maps.google.com/?q=${location.address}" target="_blank" rel="noopener noreferrer">
-          ${location.address}
-        </a>
-      </p>
-      <p><strong>Type:</strong> ${location.rentalType}</p>
-      <p><strong>Price:</strong> ${location.price}</p>
-      <p><strong>Hours:</strong> ${location.hours}</p>
-      ${location.availableBikes !== undefined ? `<p><strong>Available Bikes:</strong> ${location.availableBikes}</p>` : ''}
-      ${location.availableDocks !== undefined ? `<p><strong>Available Docks:</strong> ${location.availableDocks}</p>` : ''}
-      ${location.isChargingStation ? '<p><strong>Charging Station Available</strong></p>' : ''}
-    </div>
-  `;
+  // Build rental-specific details
+  const rentalDetails = [
+    `<p><strong>Type:</strong> ${location.rentalType}</p>`,
+    `<p><strong>Price:</strong> ${location.price}</p>`,
+    `<p><strong>Hours:</strong> ${location.hours}</p>`,
+    location.availableBikes !== undefined
+      ? `<p><strong>Available Bikes:</strong> ${location.availableBikes}</p>`
+      : '',
+    location.availableDocks !== undefined
+      ? `<p><strong>Available Docks:</strong> ${location.availableDocks}</p>`
+      : '',
+    location.isChargingStation
+      ? '<p><strong>Charging Station Available</strong></p>'
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n      ');
 
   // Create popup
   const popup = new mapboxgl.Popup({
@@ -267,7 +267,14 @@ export function createBikeRentalMarker(
     closeButton: true,
     closeOnClick: false,
     className: 'custom-popup',
-  }).setHTML(popupHTML);
+  }).setHTML(
+    createPopupHTML(
+      location.name,
+      location.description,
+      location.address,
+      rentalDetails,
+    ),
+  );
 
   // Create and return marker
   return new mapboxgl.Marker({

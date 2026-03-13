@@ -36,7 +36,6 @@ export function calculateZoomForBounds(
 
 export function calculateRouteBounds(
   map: mapboxgl.Map,
-  _route: BikeRoute,
   layer: mapboxgl.AnyLayer,
 ): mapboxgl.LngLatBounds | null {
   const sourceId = layer.source;

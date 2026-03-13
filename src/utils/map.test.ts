@@ -345,16 +345,6 @@ describe('Mapbox Geo Integration', () => {
         ]),
       } as unknown as mapboxgl.Map;
 
-      const mockRoute = {
-        id: 'test-route',
-        name: 'Test Route',
-        color: '#FF0000',
-        description: 'Test',
-        icon: {} as IconDefinition,
-        defaultWidth: 8,
-        opacity: 1.0,
-      };
-
       const mockLayer = {
         id: 'test-route',
         type: 'line',
@@ -362,7 +352,7 @@ describe('Mapbox Geo Integration', () => {
         'source-layer': 'test-layer',
       } as mapboxgl.AnyLayer;
 
-      const bounds = calculateRouteBounds(mockMap, mockRoute, mockLayer);
+      const bounds = calculateRouteBounds(mockMap, mockLayer);
 
       expect(bounds).not.toBeNull();
       expect(mockMap.querySourceFeatures).toHaveBeenCalledWith('test-source', {
@@ -391,16 +381,6 @@ describe('Mapbox Geo Integration', () => {
         ]),
       } as unknown as mapboxgl.Map;
 
-      const mockRoute = {
-        id: 'test-route',
-        name: 'Test Route',
-        color: '#FF0000',
-        description: 'Test',
-        icon: {} as IconDefinition,
-        defaultWidth: 8,
-        opacity: 1.0,
-      };
-
       const mockLayer = {
         id: 'test-route',
         type: 'line',
@@ -408,7 +388,7 @@ describe('Mapbox Geo Integration', () => {
         'source-layer': 'test-layer',
       } as mapboxgl.AnyLayer;
 
-      const bounds = calculateRouteBounds(mockMap, mockRoute, mockLayer);
+      const bounds = calculateRouteBounds(mockMap, mockLayer);
 
       expect(bounds).not.toBeNull();
     });
@@ -416,22 +396,12 @@ describe('Mapbox Geo Integration', () => {
     it('should return null when layer has no source', () => {
       const mockMap = {} as mapboxgl.Map;
 
-      const mockRoute = {
-        id: 'test-route',
-        name: 'Test Route',
-        color: '#FF0000',
-        description: 'Test',
-        icon: {} as IconDefinition,
-        defaultWidth: 8,
-        opacity: 1.0,
-      };
-
       const mockLayer = {
         id: 'test-route',
         type: 'line',
       } as mapboxgl.AnyLayer;
 
-      const bounds = calculateRouteBounds(mockMap, mockRoute, mockLayer);
+      const bounds = calculateRouteBounds(mockMap, mockLayer);
 
       expect(bounds).toBeNull();
     });
@@ -441,16 +411,6 @@ describe('Mapbox Geo Integration', () => {
         querySourceFeatures: vi.fn().mockReturnValue([]),
       } as unknown as mapboxgl.Map;
 
-      const mockRoute = {
-        id: 'test-route',
-        name: 'Test Route',
-        color: '#FF0000',
-        description: 'Test',
-        icon: {} as IconDefinition,
-        defaultWidth: 8,
-        opacity: 1.0,
-      };
-
       const mockLayer = {
         id: 'test-route',
         type: 'line',
@@ -458,7 +418,7 @@ describe('Mapbox Geo Integration', () => {
         'source-layer': 'test-layer',
       } as mapboxgl.AnyLayer;
 
-      const bounds = calculateRouteBounds(mockMap, mockRoute, mockLayer);
+      const bounds = calculateRouteBounds(mockMap, mockLayer);
 
       expect(bounds).toBeNull();
     });

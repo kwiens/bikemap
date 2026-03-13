@@ -34,6 +34,11 @@ import { mapConfig } from '@/config/map.config';
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
 
+// Route opacity presets
+const OPACITY_HIGHLIGHT = { selected: 0.8, unselected: 0.2 };
+const OPACITY_DIM = { selected: 0.1, unselected: 0.1 };
+const OPACITY_INITIAL = 0.2;
+
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -142,10 +147,7 @@ const MapboxMap = memo(function MapboxMap() {
       }
 
       // Update opacities for all routes
-      updateRouteOpacity(map.current, bikeRoutes, routeId, {
-        selected: 0.8,
-        unselected: 0.2,
-      });
+      updateRouteOpacity(map.current, bikeRoutes, routeId, OPACITY_HIGHLIGHT);
 
       if (selectedRoute?.bounds) {
         const bounds = selectedRoute.bounds;
@@ -268,10 +270,7 @@ const MapboxMap = memo(function MapboxMap() {
 
     // Reset route opacity and dispatch event when any layer is toggled on
     if (visible) {
-      updateRouteOpacity(map.current, bikeRoutes, null, {
-        selected: 0.1,
-        unselected: 0.1,
-      });
+      updateRouteOpacity(map.current, bikeRoutes, null, OPACITY_DIM);
 
       // Dispatch event to notify the MapLegend component
       window.dispatchEvent(new CustomEvent('route-deselect'));
@@ -480,10 +479,14 @@ const MapboxMap = memo(function MapboxMap() {
                     route.defaultWidth,
                   );
                   newMap.setPaintProperty(layer.id, 'line-color', route.color);
-                  newMap.setPaintProperty(layer.id, 'line-opacity', 0.2); // Start with low opacity
+                  newMap.setPaintProperty(
+                    layer.id,
+                    'line-opacity',
+                    OPACITY_INITIAL,
+                  );
 
                   // Calculate and store route bounds
-                  const bounds = calculateRouteBounds(newMap, route, layer);
+                  const bounds = calculateRouteBounds(newMap, layer);
                   if (bounds) {
                     route.bounds = bounds;
                   }
