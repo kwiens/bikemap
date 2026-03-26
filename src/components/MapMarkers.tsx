@@ -62,20 +62,11 @@ export class MarkerManager {
   }
 
   openPopupFor(marker: mapboxgl.Marker): void {
-    if (this.activeMarker && this.activeMarker !== marker) {
-      this.activeMarker.getPopup()?.remove();
-    }
-
     if (marker.getPopup()?.isOpen()) {
-      this.activeMarker = marker;
       return;
     }
 
-    this.activeMarker = marker;
-
-    if (!marker.getPopup()?.isOpen()) {
-      marker.togglePopup();
-    }
+    marker.togglePopup();
   }
 
   setMarkers(markers: mapboxgl.Marker[]): void {

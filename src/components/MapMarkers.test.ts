@@ -119,12 +119,18 @@ describe('MarkerManager', () => {
     });
 
     it('closes the previously active popup before opening the new one', () => {
-      const previousPopup = makePopup(true);
+      const previousPopup = makePopup(false);
+      const nextPopup = makePopup(false);
       const previousMarker = {
         ...makeMarker(1, 2),
         getPopup: vi.fn().mockReturnValue(previousPopup),
+        togglePopup: vi.fn(() => previousPopup.trigger('open')),
       } satisfies MockMarker;
-      const nextMarker = makeMarker(3, 4);
+      const nextMarker = {
+        ...makeMarker(3, 4),
+        getPopup: vi.fn().mockReturnValue(nextPopup),
+        togglePopup: vi.fn(() => nextPopup.trigger('open')),
+      } satisfies MockMarker;
 
       manager.setMarkers([asMarker(previousMarker), asMarker(nextMarker)]);
 
@@ -173,18 +179,25 @@ describe('MarkerManager', () => {
     });
 
     it('clears active marker when clear() is called', () => {
-      const popup = makePopup(true);
+      const popup = makePopup(false);
       const marker = {
         ...makeMarker(1, 2),
         getPopup: vi.fn().mockReturnValue(popup),
+        togglePopup: vi.fn(() => popup.trigger('open')),
       } satisfies MockMarker;
-      const nextMarker = makeMarker(3, 4);
+      const nextPopup = makePopup(false);
+      const nextMarker = {
+        ...makeMarker(3, 4),
+        getPopup: vi.fn().mockReturnValue(nextPopup),
+        togglePopup: vi.fn(() => nextPopup.trigger('open')),
+      } satisfies MockMarker;
 
       manager.setMarkers([asMarker(marker), asMarker(nextMarker)]);
       manager.openPopupFor(asMarker(marker));
       manager.clear();
       manager.setMarkers([asMarker(nextMarker)]);
 
+      // After clear(), opening a new popup should not try to close the old one
       expect(() => manager.openPopupFor(asMarker(nextMarker))).not.toThrow();
       expect(popup.remove).not.toHaveBeenCalled();
     });
