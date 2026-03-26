@@ -28,6 +28,7 @@ import {
   calculateZoomForBounds,
   calculateRouteBounds,
   findLocationInArray,
+  createArrowSdfImage,
 } from '@/utils/map';
 import { mapConfig } from '@/config/map.config';
 
@@ -469,6 +470,11 @@ const MapboxMap = memo(function MapboxMap() {
 
           // Set initial line width for specific layers
           const style = newMap.getStyle();
+
+          // Register SDF arrow image for route direction indicators
+          const arrowImage = createArrowSdfImage(20);
+          newMap.addImage('route-direction-arrow', arrowImage, { sdf: true });
+
           if (style?.layers) {
             style.layers.forEach((layer) => {
               if (layer.type === 'line') {
@@ -486,6 +492,34 @@ const MapboxMap = memo(function MapboxMap() {
                   const bounds = calculateRouteBounds(newMap, route, layer);
                   if (bounds) {
                     route.bounds = bounds;
+                  }
+
+                  // Add directional arrow symbol layer
+                  const sourceId = layer.source as string;
+                  const sourceLayer = (layer as Record<string, unknown>)[
+                    'source-layer'
+                  ] as string;
+                  if (sourceId && sourceLayer && !route.hideArrows) {
+                    newMap.addLayer({
+                      id: `${route.id}-arrows`,
+                      type: 'symbol',
+                      source: sourceId,
+                      'source-layer': sourceLayer,
+                      layout: {
+                        'symbol-placement': 'line',
+                        'symbol-spacing': 160,
+                        'icon-image': 'route-direction-arrow',
+                        'icon-size': 1.2,
+                        'icon-rotate': route.reverseDirection ? 180 : 0,
+                        'icon-rotation-alignment': 'map',
+                        'icon-allow-overlap': true,
+                        'icon-ignore-placement': true,
+                      },
+                      paint: {
+                        'icon-color': route.color,
+                        'icon-opacity': 0.2,
+                      },
+                    });
                   }
                 }
               }

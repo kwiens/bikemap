@@ -28,6 +28,8 @@ export interface BikeRoute {
   icon: IconDefinition; // Route icon
   defaultWidth: number; // Default line width
   opacity: number; // Line opacity (0-1)
+  reverseDirection?: boolean; // Flip arrow direction on this route
+  hideArrows?: boolean; // Don't show directional arrows on this route
   bounds?: mapboxgl.LngLatBounds; // Optional bounds of the route
 }
 
@@ -40,6 +42,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    reverseDirection: true,
   },
   {
     id: 'zoo-loop-v2-full-public',
@@ -69,6 +72,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    hideArrows: true,
   },
   {
     id: 'Chatt_TPL_Trails-public',
@@ -78,11 +82,12 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    hideArrows: true,
   },
   {
     id: 'cherokeeloop',
     name: 'Cherokee Loop',
-    color: '#fbef05',
+    color: '#F97316',
     description: 'Route into Red Bank. Moderate traffic.',
     icon: faRoute,
     defaultWidth: 8,

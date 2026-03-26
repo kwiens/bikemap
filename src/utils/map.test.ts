@@ -6,6 +6,8 @@ import {
   calculateRouteBounds,
   findLocationInArray,
   findMarkerByCoordinates,
+  createArrowSdfImage,
+  removeOverlappingSegments,
 } from './map';
 import type { BikeRoute } from '@/data/geo_data';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
@@ -14,6 +16,151 @@ import type mapboxgl from 'mapbox-gl';
 describe('Mapbox Geo Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('createArrowSdfImage', () => {
+    it('should return ImageData with correct dimensions', () => {
+      const mockImageData = {
+        width: 20,
+        height: 20,
+        data: new Uint8ClampedArray(20 * 20 * 4),
+      };
+      const mockCtx = {
+        clearRect: vi.fn(),
+        strokeStyle: '',
+        lineWidth: 0,
+        lineCap: '',
+        lineJoin: '',
+        beginPath: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        stroke: vi.fn(),
+        getImageData: vi.fn().mockReturnValue(mockImageData),
+      };
+      const mockCanvas = {
+        width: 0,
+        height: 0,
+        getContext: vi.fn().mockReturnValue(mockCtx),
+      };
+      vi.spyOn(document, 'createElement').mockReturnValue(
+        mockCanvas as unknown as HTMLElement,
+      );
+
+      const result = createArrowSdfImage(20);
+
+      expect(result.width).toBe(20);
+      expect(result.height).toBe(20);
+      expect(mockCanvas.getContext).toHaveBeenCalledWith('2d');
+      expect(mockCtx.stroke).toHaveBeenCalled();
+
+      vi.restoreAllMocks();
+    });
+
+    it('should use custom size parameter', () => {
+      const mockImageData = {
+        width: 32,
+        height: 32,
+        data: new Uint8ClampedArray(32 * 32 * 4),
+      };
+      const mockCtx = {
+        clearRect: vi.fn(),
+        strokeStyle: '',
+        lineWidth: 0,
+        lineCap: '',
+        lineJoin: '',
+        beginPath: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        stroke: vi.fn(),
+        getImageData: vi.fn().mockReturnValue(mockImageData),
+      };
+      const mockCanvas = {
+        width: 0,
+        height: 0,
+        getContext: vi.fn().mockReturnValue(mockCtx),
+      };
+      vi.spyOn(document, 'createElement').mockReturnValue(
+        mockCanvas as unknown as HTMLElement,
+      );
+
+      const result = createArrowSdfImage(32);
+
+      expect(result.width).toBe(32);
+      expect(result.height).toBe(32);
+      expect(mockCanvas.width).toBe(32);
+      expect(mockCanvas.height).toBe(32);
+
+      vi.restoreAllMocks();
+    });
+  });
+
+  describe('removeOverlappingSegments', () => {
+    it('should keep non-overlapping segments unchanged', () => {
+      const features: GeoJSON.Feature[] = [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.3, 35.0],
+              [-85.31, 35.01],
+              [-85.32, 35.02],
+            ],
+          },
+        },
+      ];
+
+      const result = removeOverlappingSegments(features);
+      expect(result).toHaveLength(1);
+      expect(result[0].geometry.coordinates).toHaveLength(3);
+    });
+
+    it('should remove portions where two segments overlap', () => {
+      // Two segments that share a middle section
+      const features: GeoJSON.Feature[] = [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.3, 35.0],
+              [-85.31, 35.01], // overlapping
+              [-85.32, 35.02],
+            ],
+          },
+        },
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.34, 35.04],
+              [-85.31, 35.01], // overlapping
+              [-85.35, 35.05],
+            ],
+          },
+        },
+      ];
+
+      const result = removeOverlappingSegments(features);
+      // Overlapping coordinates should be removed, leaving only non-overlapping runs
+      for (const feature of result) {
+        for (const coord of feature.geometry.coordinates) {
+          // No coordinate should be near the overlapping point
+          const nearOverlap =
+            Math.abs(coord[0] - -85.31) < 0.001 &&
+            Math.abs(coord[1] - 35.01) < 0.001;
+          expect(nearOverlap).toBe(false);
+        }
+      }
+    });
+
+    it('should return empty array for empty input', () => {
+      expect(removeOverlappingSegments([])).toHaveLength(0);
+    });
   });
 
   describe('geocodeAddress', () => {
@@ -136,6 +283,7 @@ describe('Mapbox Geo Integration', () => {
     it('should update opacity for selected and unselected routes', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(true),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -179,8 +327,18 @@ describe('Mapbox Geo Integration', () => {
         0.2,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        'route1-arrows',
+        'icon-opacity',
+        0.2,
+      );
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route2',
         'line-opacity',
+        0.8,
+      );
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        'route2-arrows',
+        'icon-opacity',
         0.8,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
@@ -188,12 +346,54 @@ describe('Mapbox Geo Integration', () => {
         'line-opacity',
         0.2,
       );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(3);
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        'route3-arrows',
+        'icon-opacity',
+        0.2,
+      );
+      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(6);
+    });
+
+    it('should skip arrow layers that do not exist', () => {
+      const mockMap = {
+        setPaintProperty: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(undefined),
+      } as unknown as mapboxgl.Map;
+
+      const routes: BikeRoute[] = [
+        {
+          id: 'route1',
+          name: 'Route 1',
+          color: '#FF0000',
+          description: 'Test route 1',
+          icon: {} as IconDefinition,
+          defaultWidth: 8,
+          opacity: 1.0,
+        },
+      ];
+
+      updateRouteOpacity(mockMap, routes, 'route1', {
+        selected: 0.8,
+        unselected: 0.2,
+      });
+
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        'route1',
+        'line-opacity',
+        0.8,
+      );
+      expect(mockMap.setPaintProperty).not.toHaveBeenCalledWith(
+        'route1-arrows',
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(1);
     });
 
     it('should set all routes to unselected when selectedId is null', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(true),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -228,10 +428,21 @@ describe('Mapbox Geo Integration', () => {
         0.1,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        'route1-arrows',
+        'icon-opacity',
+        0.1,
+      );
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route2',
         'line-opacity',
         0.1,
       );
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        'route2-arrows',
+        'icon-opacity',
+        0.1,
+      );
+      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(4);
     });
 
     it('should handle errors when setting paint property', () => {
@@ -239,6 +450,7 @@ describe('Mapbox Geo Integration', () => {
         setPaintProperty: vi.fn().mockImplementation(() => {
           throw new Error('Layer not found');
         }),
+        getLayer: vi.fn().mockReturnValue(undefined),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
