@@ -43,10 +43,11 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route1Button = screen
-      .getByText('Test Route 1')
-      .closest('[role="button"]');
-    fireEvent.click(route1Button!);
+    const route1Button = screen.getByRole('button', {
+      name: /test route 1/i,
+    });
+
+    fireEvent.click(route1Button);
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
   });
@@ -58,10 +59,11 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route2Button = screen
-      .getByText('Test Route 2')
-      .closest('[role="button"]');
-    fireEvent.keyDown(route2Button!, { key: 'Enter' });
+    const route2Button = screen.getByRole('button', {
+      name: /test route 2/i,
+    });
+
+    fireEvent.keyDown(route2Button, { key: 'Enter' });
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-2');
   });
@@ -73,10 +75,11 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route1Button = screen
-      .getByText('Test Route 1')
-      .closest('[role="button"]');
-    fireEvent.keyDown(route1Button!, { key: ' ' });
+    const route1Button = screen.getByRole('button', {
+      name: /test route 1/i,
+    });
+
+    fireEvent.keyDown(route1Button, { key: ' ' });
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
   });
@@ -88,12 +91,12 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute="route-1" onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route1Button = screen
-      .getByText('Test Route 1')
-      .closest('[role="button"]');
-    const route2Button = screen
-      .getByText('Test Route 2')
-      .closest('[role="button"]');
+    const route1Button = screen.getByRole('button', {
+      name: /test route 1/i,
+    });
+    const route2Button = screen.getByRole('button', {
+      name: /test route 2/i,
+    });
 
     expect(route1Button).toHaveClass('route-item-selected');
     expect(route2Button).not.toHaveClass('route-item-selected');

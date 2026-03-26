@@ -5,7 +5,6 @@ import {
   calculateZoomForBounds,
   calculateRouteBounds,
   findLocationInArray,
-  findMarkerByCoordinates,
 } from './map';
 import type { BikeRoute } from '@/data/geo_data';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
@@ -508,56 +507,6 @@ describe('Mapbox Geo Integration', () => {
       );
 
       expect(result).toEqual(locations[0]);
-    });
-  });
-
-  describe('findMarkerByCoordinates', () => {
-    it('should find marker by exact coordinates', () => {
-      const mockMarkers = [
-        {
-          getLngLat: () => ({ lng: -85.3097, lat: 35.0456 }),
-        },
-        {
-          getLngLat: () => ({ lng: -85.3197, lat: 35.0556 }),
-        },
-      ] as mapboxgl.Marker[];
-
-      const result = findMarkerByCoordinates(mockMarkers, [-85.3197, 35.0556]);
-
-      expect(result).toBe(mockMarkers[1]);
-    });
-
-    it('should return undefined when marker not found', () => {
-      const mockMarkers = [
-        {
-          getLngLat: () => ({ lng: -85.3097, lat: 35.0456 }),
-        },
-      ] as mapboxgl.Marker[];
-
-      const result = findMarkerByCoordinates(mockMarkers, [-85.9999, 35.9999]);
-
-      expect(result).toBeUndefined();
-    });
-
-    it('should work with empty array', () => {
-      const result = findMarkerByCoordinates([], [-85.3097, 35.0456]);
-
-      expect(result).toBeUndefined();
-    });
-
-    it('should handle multiple markers with same coordinates', () => {
-      const mockMarkers = [
-        {
-          getLngLat: () => ({ lng: -85.3097, lat: 35.0456 }),
-        },
-        {
-          getLngLat: () => ({ lng: -85.3097, lat: 35.0456 }),
-        },
-      ] as mapboxgl.Marker[];
-
-      const result = findMarkerByCoordinates(mockMarkers, [-85.3097, 35.0456]);
-
-      expect(result).toBe(mockMarkers[0]);
     });
   });
 });

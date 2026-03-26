@@ -369,7 +369,7 @@ const MapboxMap = memo(function MapboxMap() {
             coordinates[1],
           );
           if (attractionMarker) {
-            attractionMarker.togglePopup();
+            attractionMarkers.current.openPopupFor(attractionMarker);
           }
         }
 
@@ -379,7 +379,7 @@ const MapboxMap = memo(function MapboxMap() {
             coordinates[1],
           );
           if (bikeMarker) {
-            bikeMarker.togglePopup();
+            bikeResourceMarkers.current.openPopupFor(bikeMarker);
           }
         }
 
@@ -389,7 +389,7 @@ const MapboxMap = memo(function MapboxMap() {
             coordinates[1],
           );
           if (rentalMarker) {
-            rentalMarker.togglePopup();
+            bikeRentalMarkers.current.openPopupFor(rentalMarker);
           }
         }
       }

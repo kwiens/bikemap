@@ -90,16 +90,6 @@ export function findLocationInArray<
   );
 }
 
-export function findMarkerByCoordinates(
-  markers: mapboxgl.Marker[],
-  coordinates: [number, number],
-): mapboxgl.Marker | undefined {
-  return markers.find((marker) => {
-    const pos = marker.getLngLat();
-    return pos.lng === coordinates[0] && pos.lat === coordinates[1];
-  });
-}
-
 // Geocoding utility
 export async function geocodeAddress(
   address: string,
