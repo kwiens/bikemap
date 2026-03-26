@@ -11,7 +11,6 @@ interface MockPopup {
 interface MockMarker {
   getLngLat: ReturnType<typeof vi.fn>;
   getPopup: ReturnType<typeof vi.fn>;
-  openPopup: ReturnType<typeof vi.fn>;
   togglePopup: ReturnType<typeof vi.fn>;
   addTo: ReturnType<typeof vi.fn>;
   remove: ReturnType<typeof vi.fn>;
@@ -44,18 +43,16 @@ const makePopup = (open = false): MockPopup => {
   };
 };
 
-const makeMarker = (
-  lng: number,
-  lat: number,
-  popupOpen = false,
-): MockMarker => ({
-  getLngLat: vi.fn().mockReturnValue({ lng, lat }),
-  getPopup: vi.fn().mockReturnValue(makePopup(popupOpen)),
-  openPopup: vi.fn(),
-  togglePopup: vi.fn(),
-  addTo: vi.fn().mockReturnThis(),
-  remove: vi.fn(),
-});
+const makeMarker = (lng: number, lat: number): MockMarker => {
+  const popup = makePopup();
+  return {
+    getLngLat: vi.fn().mockReturnValue({ lng, lat }),
+    getPopup: vi.fn().mockReturnValue(popup),
+    togglePopup: vi.fn(() => popup.trigger('open')),
+    addTo: vi.fn().mockReturnThis(),
+    remove: vi.fn(),
+  };
+};
 
 function asMarker(marker: MockMarker): mapboxgl.Marker {
   return marker as unknown as mapboxgl.Marker;
@@ -66,7 +63,6 @@ vi.mock('mapbox-gl', () => ({
     Marker: vi.fn().mockImplementation(() => ({
       getLngLat: vi.fn().mockReturnValue({ lng: 0, lat: 0 }),
       getPopup: vi.fn(),
-      openPopup: vi.fn(),
       togglePopup: vi.fn(),
       addTo: vi.fn().mockReturnThis(),
       remove: vi.fn(),
@@ -119,18 +115,9 @@ describe('MarkerManager', () => {
     });
 
     it('closes the previously active popup before opening the new one', () => {
-      const previousPopup = makePopup(false);
-      const nextPopup = makePopup(false);
-      const previousMarker = {
-        ...makeMarker(1, 2),
-        getPopup: vi.fn().mockReturnValue(previousPopup),
-        togglePopup: vi.fn(() => previousPopup.trigger('open')),
-      } satisfies MockMarker;
-      const nextMarker = {
-        ...makeMarker(3, 4),
-        getPopup: vi.fn().mockReturnValue(nextPopup),
-        togglePopup: vi.fn(() => nextPopup.trigger('open')),
-      } satisfies MockMarker;
+      const previousMarker = makeMarker(1, 2);
+      const nextMarker = makeMarker(3, 4);
+      const previousPopup = previousMarker.getPopup() as MockPopup;
 
       manager.setMarkers([asMarker(previousMarker), asMarker(nextMarker)]);
 
@@ -142,16 +129,10 @@ describe('MarkerManager', () => {
     });
 
     it('closes the previous popup when a new marker popup opens directly', () => {
-      const previousPopup = makePopup(true);
-      const nextPopup = makePopup(false);
-      const previousMarker = {
-        ...makeMarker(1, 2),
-        getPopup: vi.fn().mockReturnValue(previousPopup),
-      } satisfies MockMarker;
-      const nextMarker = {
-        ...makeMarker(3, 4),
-        getPopup: vi.fn().mockReturnValue(nextPopup),
-      } satisfies MockMarker;
+      const previousMarker = makeMarker(1, 2);
+      const nextMarker = makeMarker(3, 4);
+      const previousPopup = previousMarker.getPopup() as MockPopup;
+      const nextPopup = nextMarker.getPopup() as MockPopup;
 
       manager.setMarkers([asMarker(previousMarker), asMarker(nextMarker)]);
 
@@ -162,12 +143,8 @@ describe('MarkerManager', () => {
     });
 
     it('does not close the popup when the same marker is selected again', () => {
-      const popup = makePopup(false);
-      const marker = {
-        ...makeMarker(1, 2),
-        getPopup: vi.fn().mockReturnValue(popup),
-        togglePopup: vi.fn(() => popup.trigger('open')),
-      } satisfies MockMarker;
+      const marker = makeMarker(1, 2);
+      const popup = marker.getPopup() as MockPopup;
 
       manager.setMarkers([asMarker(marker)]);
 
@@ -179,18 +156,9 @@ describe('MarkerManager', () => {
     });
 
     it('clears active marker when clear() is called', () => {
-      const popup = makePopup(false);
-      const marker = {
-        ...makeMarker(1, 2),
-        getPopup: vi.fn().mockReturnValue(popup),
-        togglePopup: vi.fn(() => popup.trigger('open')),
-      } satisfies MockMarker;
-      const nextPopup = makePopup(false);
-      const nextMarker = {
-        ...makeMarker(3, 4),
-        getPopup: vi.fn().mockReturnValue(nextPopup),
-        togglePopup: vi.fn(() => nextPopup.trigger('open')),
-      } satisfies MockMarker;
+      const marker = makeMarker(1, 2);
+      const popup = marker.getPopup() as MockPopup;
+      const nextMarker = makeMarker(3, 4);
 
       manager.setMarkers([asMarker(marker), asMarker(nextMarker)]);
       manager.openPopupFor(asMarker(marker));
