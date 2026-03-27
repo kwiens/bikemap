@@ -21,6 +21,7 @@ import {
   ensureFontAwesomeLoaded,
   MarkerManager,
 } from '@/components/MapMarkers';
+import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
 import { useToast, useMapResize } from '@/hooks';
 import {
   fetchStationInformation,
@@ -836,6 +837,8 @@ const MapboxMap = memo(function MapboxMap() {
           {toastMessage}
         </div>
       )}
+
+      <ElevationProfile />
 
       {/* Location tracking toggle */}
       {mapConfig.debug.showLocationTracker && (

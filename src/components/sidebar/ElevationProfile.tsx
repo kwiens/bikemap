@@ -3,10 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 
-interface ElevationProfileProps {
-  trailName: string;
-}
-
 function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -22,13 +18,43 @@ const CHART_PADDING_TOP = 4;
 const CHART_PADDING_BOTTOM = 4;
 const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 
-export function ElevationProfile({ trailName }: ElevationProfileProps) {
+export function ElevationProfile() {
+  const [trailName, setTrailName] = useState<string | null>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const [chartWidth, setChartWidth] = useState(248);
+  const [chartWidth, setChartWidth] = useState(800);
 
+  // Listen for trail selection events
   useEffect(() => {
+    const handleTrailSelect = (e: Event) => {
+      const { trailName: name } = (e as CustomEvent).detail;
+      setTrailName(name);
+    };
+    const handleTrailDeselect = () => {
+      setTrailName(null);
+    };
+    const handleRouteSelect = () => {
+      setTrailName(null);
+    };
+
+    window.addEventListener('trail-select', handleTrailSelect);
+    window.addEventListener('trail-deselect', handleTrailDeselect);
+    window.addEventListener('route-select', handleRouteSelect);
+
+    return () => {
+      window.removeEventListener('trail-select', handleTrailSelect);
+      window.removeEventListener('trail-deselect', handleTrailDeselect);
+      window.removeEventListener('route-select', handleRouteSelect);
+    };
+  }, []);
+
+  // Fetch profile when trail changes
+  useEffect(() => {
+    if (!trailName) {
+      setProfile(null);
+      return;
+    }
     setLoading(true);
     setProfile(null);
     setHoverIndex(null);
@@ -52,7 +78,6 @@ export function ElevationProfile({ trailName }: ElevationProfileProps) {
       const maxDist = profile.profile[profile.profile.length - 1][0];
       const targetDist = fraction * maxDist;
 
-      // Binary search for nearest point
       let lo = 0;
       let hi = profile.profile.length - 1;
       while (lo < hi) {
@@ -80,11 +105,7 @@ export function ElevationProfile({ trailName }: ElevationProfileProps) {
     );
   }, []);
 
-  if (loading) {
-    return <div className="elevation-loading">Loading elevation...</div>;
-  }
-
-  if (!profile || profile.profile.length < 2) {
+  if (!trailName || loading || !profile || profile.profile.length < 2) {
     return null;
   }
 
@@ -98,7 +119,6 @@ export function ElevationProfile({ trailName }: ElevationProfileProps) {
     PLOT_HEIGHT -
     ((e - profile.min) / yRange) * PLOT_HEIGHT;
 
-  // Build SVG paths
   const lineSegments = points
     .map(
       (p, i) =>
@@ -109,7 +129,26 @@ export function ElevationProfile({ trailName }: ElevationProfileProps) {
   const areaPath = `${lineSegments} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
 
   return (
-    <div className="elevation-profile">
+    <div className="elevation-overlay">
+      <div className="elevation-overlay-header">
+        <span className="elevation-overlay-title">{trailName}</span>
+        <div className="elevation-stats">
+          <span>{(maxDist / 5280).toFixed(1)} mi</span>
+          <span>
+            {'\u2191'}
+            {profile.gain.toLocaleString()} ft
+          </span>
+          <span>
+            {'\u2193'}
+            {profile.loss.toLocaleString()} ft
+          </span>
+          <span>
+            {profile.min.toLocaleString()}&ndash;{profile.max.toLocaleString()}{' '}
+            ft
+          </span>
+        </div>
+      </div>
+
       <svg
         viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
         className="elevation-chart"
@@ -166,20 +205,6 @@ export function ElevationProfile({ trailName }: ElevationProfileProps) {
         {hoverIndex !== null
           ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${points[hoverIndex][1].toLocaleString()} ft`
           : '\u00A0'}
-      </div>
-
-      <div className="elevation-stats">
-        <span>
-          {'\u2191'}
-          {profile.gain.toLocaleString()} ft
-        </span>
-        <span>
-          {'\u2193'}
-          {profile.loss.toLocaleString()} ft
-        </span>
-        <span>
-          {profile.min.toLocaleString()}&ndash;{profile.max.toLocaleString()} ft
-        </span>
       </div>
     </div>
   );

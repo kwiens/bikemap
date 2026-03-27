@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { sorbaTrails, regionFor } from '@/data/geo_data';
 import type { MountainBikeTrailsProps } from './types';
-import { ElevationProfile } from './ElevationProfile';
 
 function groupTrailsByRegionAndArea() {
   const grouped = new Map<string, Map<string, typeof sorbaTrails>>();
@@ -175,9 +174,6 @@ export function MountainBikeTrails({
                                   </span>
                                 ) : null}
                               </div>
-                              {selectedTrail === trail.trailName && (
-                                <ElevationProfile trailName={trail.trailName} />
-                              )}
                             </div>
                           ))}
                       </React.Fragment>

@@ -487,18 +487,55 @@
   flex-shrink: 0;
 }
 
-/* Elevation profile styles */
-.elevation-profile {
-  padding: 8px 0;
-  margin: 0 0 4px;
+/* Elevation profile overlay */
+.elevation-overlay {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  padding: 10px 16px 6px;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.elevation-overlay-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.elevation-overlay-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.elevation-overlay .elevation-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--color-gray-500);
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .elevation-chart {
   width: 100%;
-  height: 100px;
+  height: 15vh;
+  min-height: 80px;
+  max-height: 160px;
   cursor: crosshair;
   border-radius: 4px;
-  background-color: var(--color-gray-50);
+  background-color: rgba(249, 250, 251, 0.6);
 }
 
 .elevation-tooltip {
@@ -509,20 +546,26 @@
   min-height: 16px;
 }
 
-.elevation-stats {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  color: var(--color-gray-500);
-  padding: 4px 0 0;
-}
+@media (prefers-color-scheme: dark) {
+  .elevation-overlay {
+    background: rgba(31, 41, 55, 0.95);
+  }
 
-.elevation-loading {
-  font-size: 11px;
-  color: var(--color-gray-500);
-  font-style: italic;
-  padding: 8px 0;
-  text-align: center;
+  .elevation-overlay-title {
+    color: var(--color-gray-200);
+  }
+
+  .elevation-overlay .elevation-stats {
+    color: var(--color-gray-400);
+  }
+
+  .elevation-chart {
+    background-color: rgba(55, 65, 81, 0.4);
+  }
+
+  .elevation-tooltip {
+    color: var(--color-gray-400);
+  }
 }
 
 /* Layer toggle styles */
