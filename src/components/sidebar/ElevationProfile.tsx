@@ -8,6 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
+import { bikeRoutes } from '@/data/geo_data';
 import { slugify } from '@/utils/string';
 import { MAP_EVENTS } from '@/events';
 
@@ -108,14 +109,21 @@ export function ElevationProfile() {
       setTrailName(name);
     };
     const handleTrailDeselect = () => setTrailName(null);
-    const handleRouteSelect = () => setTrailName(null);
+    const handleRouteSelect = (e: Event) => {
+      const { routeId } = (e as CustomEvent).detail;
+      const route = bikeRoutes.find((r) => r.id === routeId);
+      setTrailName(route?.name ?? null);
+    };
     const handleSidebarToggle = (e: Event) => {
       setSidebarOpen((e as CustomEvent).detail.isOpen);
     };
 
+    const handleRouteDeselect = () => setTrailName(null);
+
     window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
     window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
+    window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
     window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
 
     return () => {
@@ -125,6 +133,10 @@ export function ElevationProfile() {
         handleTrailDeselect,
       );
       window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
+      window.removeEventListener(
+        MAP_EVENTS.ROUTE_DESELECT,
+        handleRouteDeselect,
+      );
       window.removeEventListener(
         MAP_EVENTS.SIDEBAR_TOGGLE,
         handleSidebarToggle,
