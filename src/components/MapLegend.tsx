@@ -34,16 +34,17 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+
   const toggle = useCallback(() => {
-    setIsOpen((prev) => {
-      const next = !prev;
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
-          detail: { isOpen: next },
-        }),
-      );
-      return next;
-    });
+    const next = !isOpenRef.current;
+    setIsOpen(next);
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
+        detail: { isOpen: next },
+      }),
+    );
   }, []);
 
   // Handle clicks/taps outside the sidebar (mobile only)
