@@ -7,6 +7,11 @@ import {
   GODSEY_SOURCE_LAYER,
   regionFor,
 } from '@/data/geo_data';
+import {
+  TRAIL_METADATA,
+  RATING_COLORS,
+  UNRATED_COLOR,
+} from '@/data/trail-metadata';
 
 // Route utilities
 export function updateRouteOpacity(
@@ -200,53 +205,44 @@ interface TrailLayerConfig {
   layerId: string;
   sourceLayer: string;
   trailProp: string; // feature property containing the trail name
-  colorExpression: mapboxgl.Expression;
-  // Maps raw feature property values to our trailName values (if different)
-  nameMap?: Record<string, string>;
+  // If the tileset has a 'rating' property, use it directly for colors.
+  // Otherwise set to false and colors are derived from TRAIL_METADATA.
+  hasRatingProp: boolean;
 }
+
+// Build a color expression from TRAIL_METADATA for layers without a rating property
+function buildMetadataColorExpression(trailProp: string): mapboxgl.Expression {
+  const entries: (string | mapboxgl.Expression)[] = [
+    'match',
+    ['get', trailProp],
+  ];
+  for (const [rawName, meta] of Object.entries(TRAIL_METADATA)) {
+    entries.push(rawName);
+    entries.push(RATING_COLORS[meta.rating] ?? UNRATED_COLOR);
+  }
+  entries.push(UNRATED_COLOR);
+  return entries as mapboxgl.Expression;
+}
+
+const RATING_COLOR_EXPRESSION: mapboxgl.Expression = [
+  'match',
+  ['get', 'rating'],
+  ...Object.entries(RATING_COLORS).flat(),
+  UNRATED_COLOR,
+];
 
 const TRAIL_LAYERS: TrailLayerConfig[] = [
   {
     layerId: MTN_BIKE_LAYER_ID,
     sourceLayer: MTN_BIKE_SOURCE_LAYER,
     trailProp: 'Trail',
-    colorExpression: [
-      'match',
-      ['get', 'rating'],
-      'easy',
-      '#16A34A',
-      'intermediate',
-      '#2563EB',
-      'advanced',
-      '#374151',
-      'expert',
-      '#000000',
-      '#6B7280',
-    ],
+    hasRatingProp: true,
   },
   {
     layerId: GODSEY_LAYER_ID,
     sourceLayer: GODSEY_SOURCE_LAYER,
     trailProp: 'Name',
-    nameMap: {
-      'Green as built': 'Godsey Ridge Green',
-      'Blue as built 1': 'Godsey Ridge Blue 1',
-      'Blue as built 2': 'Godsey Ridge Blue 2',
-      Exper_Spur_As_built_21626: 'Godsey Ridge Expert Spur',
-      Expert_As_Built_1: 'Godsey Ridge Expert 1',
-      Expert_As_Built_2: 'Godsey Ridge Expert 2',
-    },
-    colorExpression: [
-      'match',
-      ['get', 'Name'],
-      'Green as built',
-      '#16A34A',
-      'Blue as built 1',
-      '#2563EB',
-      'Blue as built 2',
-      '#2563EB',
-      '#000000',
-    ],
+    hasRatingProp: false,
   },
 ];
 
@@ -266,7 +262,10 @@ export function initMtnBikeColors(map: mapboxgl.Map): void {
   for (const cfg of TRAIL_LAYERS) {
     try {
       if (map.getLayer(cfg.layerId)) {
-        map.setPaintProperty(cfg.layerId, 'line-color', cfg.colorExpression);
+        const colorExpr = cfg.hasRatingProp
+          ? RATING_COLOR_EXPRESSION
+          : buildMetadataColorExpression(cfg.trailProp);
+        map.setPaintProperty(cfg.layerId, 'line-color', colorExpr);
       }
     } catch {
       // Layer may not exist yet
@@ -350,11 +349,11 @@ function setTrailOpacity(
   selectedTrailName: string | null,
 ): void {
   const prop = cfg.trailProp;
-  // If this layer uses a nameMap, find the raw feature value for the selected trail
+  // For layers using metadata mapping, find the raw feature value
   let matchValue = selectedTrailName;
-  if (selectedTrailName && cfg.nameMap) {
-    const entry = Object.entries(cfg.nameMap).find(
-      ([, v]) => v === selectedTrailName,
+  if (selectedTrailName && !cfg.hasRatingProp) {
+    const entry = Object.entries(TRAIL_METADATA).find(
+      ([, meta]) => meta.displayName === selectedTrailName,
     );
     matchValue = entry ? entry[0] : selectedTrailName;
   }
@@ -451,9 +450,9 @@ export function highlightMtnBikeArea(
 
     // Map our trail names to raw feature property values
     const rawNames = matchedTrails.map((t) => {
-      if (cfg.nameMap) {
-        const entry = Object.entries(cfg.nameMap).find(
-          ([, v]) => v === t.trailName,
+      if (!cfg.hasRatingProp) {
+        const entry = Object.entries(TRAIL_METADATA).find(
+          ([, meta]) => meta.displayName === t.trailName,
         );
         return entry ? entry[0] : t.trailName;
       }

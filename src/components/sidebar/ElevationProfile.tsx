@@ -102,22 +102,30 @@ export function ElevationProfile() {
   const [chartWidth, setChartWidth] = useState(800);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const svgRef = useRef<SVGSVGElement>(null);
+  // Track whether current profile is from a route or trail selection
+  const sourceRef = useRef<'trail' | 'route' | null>(null);
 
   useEffect(() => {
     const handleTrailSelect = (e: Event) => {
       const { trailName: name } = (e as CustomEvent).detail;
+      sourceRef.current = 'trail';
       setTrailName(name);
     };
     const handleRouteSelect = (e: Event) => {
       const { routeId } = (e as CustomEvent).detail;
       const route = bikeRoutes.find((r) => r.id === routeId);
+      sourceRef.current = 'route';
       setTrailName(route?.name ?? null);
+    };
+    const handleRouteDeselect = () => {
+      if (sourceRef.current === 'route') {
+        sourceRef.current = null;
+        setTrailName(null);
+      }
     };
     const handleSidebarToggle = (e: Event) => {
       setSidebarOpen((e as CustomEvent).detail.isOpen);
     };
-
-    const handleRouteDeselect = () => setTrailName(null);
 
     window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);

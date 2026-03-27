@@ -43,6 +43,7 @@ import {
 } from '@/utils/map';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
+import { TRAIL_METADATA } from '@/data/trail-metadata';
 
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
@@ -705,7 +706,8 @@ const MapboxMap = memo(function MapboxMap() {
                 e.preventDefault();
                 const rawName = e.features?.[0]?.properties?.[cfg.trailProp];
                 if (!rawName) return;
-                const trailName = cfg.nameMap?.[rawName] ?? rawName;
+                const meta = TRAIL_METADATA[rawName];
+                const trailName = meta?.displayName ?? rawName;
                 window.dispatchEvent(
                   new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
                     detail: { trailName },
