@@ -274,7 +274,7 @@ export function initSorbaLayers(map: mapboxgl.Map): void {
   // Set the main trail layer to round caps/joins and thinner default
   map.setLayoutProperty(SORBA_LAYER_ID, 'line-cap', 'round');
   map.setLayoutProperty(SORBA_LAYER_ID, 'line-join', 'round');
-  map.setLayoutProperty(SORBA_LAYER_ID, 'line-round-limit', 0.5);
+  map.setLayoutProperty(SORBA_LAYER_ID, 'line-round-limit', 0.1);
 }
 
 export function updateSorbaOpacity(
