@@ -538,7 +538,10 @@
 
 @media (max-width: 768px) {
   .elevation-overlay {
-    left: 16px;
+    left: 8px;
+    right: 8px;
+    bottom: 60px;
+    padding: 8px 8px 4px;
   }
 }
 
@@ -578,14 +581,14 @@
   justify-content: space-between;
   padding: 2px 0;
   flex-shrink: 0;
-  width: 52px;
+  width: 42px;
 }
 
 .elevation-y-label {
   font-size: 9px;
   color: var(--color-gray-400);
   text-align: right;
-  padding-right: 6px;
+  padding-right: 4px;
   line-height: 1;
 }
 
