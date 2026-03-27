@@ -528,6 +528,10 @@
   pointer-events: auto;
 }
 
+.elevation-overlay-full {
+  left: 16px;
+}
+
 @media (max-width: 768px) {
   .elevation-overlay {
     left: 16px;

@@ -74,6 +74,7 @@ export function ElevationProfile() {
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     const handleTrailSelect = (e: Event) => {
@@ -82,15 +83,20 @@ export function ElevationProfile() {
     };
     const handleTrailDeselect = () => setTrailName(null);
     const handleRouteSelect = () => setTrailName(null);
+    const handleSidebarToggle = (e: Event) => {
+      setSidebarOpen((e as CustomEvent).detail.isOpen);
+    };
 
     window.addEventListener('trail-select', handleTrailSelect);
     window.addEventListener('trail-deselect', handleTrailDeselect);
     window.addEventListener('route-select', handleRouteSelect);
+    window.addEventListener('sidebar-toggle', handleSidebarToggle);
 
     return () => {
       window.removeEventListener('trail-select', handleTrailSelect);
       window.removeEventListener('trail-deselect', handleTrailDeselect);
       window.removeEventListener('route-select', handleRouteSelect);
+      window.removeEventListener('sidebar-toggle', handleSidebarToggle);
     };
   }, []);
 
@@ -207,7 +213,9 @@ export function ElevationProfile() {
   });
 
   return (
-    <div className="elevation-overlay">
+    <div
+      className={`elevation-overlay ${sidebarOpen ? '' : 'elevation-overlay-full'}`}
+    >
       <div className="elevation-overlay-header">
         <span className="elevation-overlay-title">{trailName}</span>
         <div className="elevation-stats">
