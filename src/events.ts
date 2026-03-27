@@ -9,4 +9,6 @@ export const MAP_EVENTS = {
   CENTER_LOCATION: 'center-location',
   SIDEBAR_TOGGLE: 'sidebar-toggle',
   ELEVATION_HOVER: 'elevation-hover',
+  LOCATION_UPDATE: 'location-update',
+  RIDE_STYLE_CHOSEN: 'ride-style-chosen',
 } as const;

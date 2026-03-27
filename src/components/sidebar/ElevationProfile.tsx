@@ -94,16 +94,49 @@ export function downsampleStops(
 // Profile data cache to avoid refetching on revisit
 const profileCache = new Map<string, ElevationProfileData>();
 
+// Find the closest profile point to a given lng/lat using squared Euclidean distance
+// (with latitude correction for longitude scaling)
+function findClosestProfileIndex(
+  points: [number, number, number, number][],
+  lng: number,
+  lat: number,
+): number | null {
+  if (points.length === 0) return null;
+
+  // Approximate longitude scaling at this latitude
+  const cosLat = Math.cos((lat * Math.PI) / 180);
+  let bestIdx = 0;
+  let bestDist = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < points.length; i++) {
+    const dlng = (points[i][2] - lng) * cosLat;
+    const dlat = points[i][3] - lat;
+    const d = dlng * dlng + dlat * dlat;
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i;
+    }
+  }
+
+  // Only show if within ~200 meters (~0.002 degrees)
+  if (bestDist > 0.002 * 0.002) return null;
+
+  return bestIdx;
+}
+
 export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [locationIndex, setLocationIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const svgRef = useRef<SVGSVGElement>(null);
   // Track whether current profile is from a route or trail selection
   const sourceRef = useRef<'trail' | 'route' | null>(null);
+  // Keep profile in a ref so location handler always sees latest
+  const profileRef = useRef<ElevationProfileData | null>(null);
 
   useEffect(() => {
     const handleTrailSelect = (e: Event) => {
@@ -151,22 +184,45 @@ export function ElevationProfile() {
     };
   }, []);
 
+  // Listen for GPS location updates and find closest point on trail
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { lng, lat } = (e as CustomEvent).detail;
+      if (!profileRef.current) {
+        setLocationIndex(null);
+        return;
+      }
+      const idx = findClosestProfileIndex(profileRef.current.profile, lng, lat);
+      setLocationIndex(idx);
+    };
+
+    window.addEventListener(MAP_EVENTS.LOCATION_UPDATE, handler);
+    return () =>
+      window.removeEventListener(MAP_EVENTS.LOCATION_UPDATE, handler);
+  }, []);
+
   useEffect(() => {
     if (!trailName) {
       setProfile(null);
+      profileRef.current = null;
+      setLocationIndex(null);
       return;
     }
 
     const cached = profileCache.get(trailName);
     if (cached) {
       setProfile(cached);
+      profileRef.current = cached;
       setHoverIndex(null);
+      setLocationIndex(null);
       return;
     }
 
     setLoading(true);
     setProfile(null);
+    profileRef.current = null;
     setHoverIndex(null);
+    setLocationIndex(null);
 
     const controller = new AbortController();
     const slug = slugify(trailName);
@@ -178,6 +234,7 @@ export function ElevationProfile() {
       .then((data: ElevationProfileData) => {
         profileCache.set(trailName, data);
         setProfile(data);
+        profileRef.current = data;
         setLoading(false);
       })
       .catch((err) => {
@@ -300,6 +357,14 @@ export function ElevationProfile() {
             onTouchMove={handleTouch}
             onTouchEnd={clearHover}
           />
+          {locationIndex !== null && (
+            <LocationIndicator
+              points={points}
+              profile={profile}
+              chartWidth={chartWidth}
+              locationIndex={locationIndex}
+            />
+          )}
           {hoverIndex !== null && (
             <HoverIndicator
               points={points}
@@ -489,5 +554,48 @@ function HoverIndicator({
         vectorEffect="non-scaling-stroke"
       />
     </svg>
+  );
+}
+
+// Shows the user's current GPS position on the elevation chart
+function LocationIndicator({
+  points,
+  profile,
+  chartWidth,
+  locationIndex,
+}: {
+  points: [number, number, number, number][];
+  profile: ElevationProfileData;
+  chartWidth: number;
+  locationIndex: number;
+}) {
+  const maxDist = points[points.length - 1][0];
+  const yRange = profile.max - profile.min || 1;
+  const x = (points[locationIndex][0] / maxDist) * chartWidth;
+  const y =
+    CHART_PADDING_TOP +
+    PLOT_HEIGHT -
+    ((points[locationIndex][1] - profile.min) / yRange) * PLOT_HEIGHT;
+
+  // Convert from viewBox coordinates to percentage positions
+  const leftPct = (x / chartWidth) * 100;
+  const topPct = (y / CHART_HEIGHT) * 100;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: `${leftPct}%`,
+        top: `${topPct}%`,
+        width: 18,
+        height: 18,
+        borderRadius: '50%',
+        backgroundColor: '#4285F4',
+        border: '2px solid white',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+        transform: 'translate(-50%, -50%)',
+        pointerEvents: 'none',
+      }}
+    />
   );
 }

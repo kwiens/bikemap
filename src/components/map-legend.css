@@ -157,6 +157,57 @@
   gap: 8px;
 }
 
+/* Trail search */
+.trail-search {
+  position: relative;
+}
+
+.trail-search-input {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1a434e;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.trail-search-input:focus {
+  border-color: #c3f44d;
+  box-shadow: 0 0 0 2px rgba(195, 244, 77, 0.3);
+}
+
+.trail-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.trail-search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.trail-search-clear:hover {
+  color: #6b7280;
+}
+
+.trail-search-empty {
+  padding: 12px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
 /* Toggle Switch Styles */
 .toggle-switch {
   width: 40px;

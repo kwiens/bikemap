@@ -280,8 +280,8 @@ describe('Mapbox Geo Integration', () => {
 
       const zoom = calculateZoomForBounds(mockBounds, true);
 
-      expect(zoom).toBeGreaterThanOrEqual(11);
-      expect(zoom).toBeLessThanOrEqual(15);
+      expect(zoom).toBeGreaterThanOrEqual(12);
+      expect(zoom).toBeLessThanOrEqual(16);
     });
 
     it('should calculate zoom for desktop device', () => {
@@ -294,8 +294,8 @@ describe('Mapbox Geo Integration', () => {
 
       const zoom = calculateZoomForBounds(mockBounds, false);
 
-      expect(zoom).toBeGreaterThanOrEqual(13);
-      expect(zoom).toBeLessThanOrEqual(17);
+      expect(zoom).toBeGreaterThanOrEqual(14);
+      expect(zoom).toBeLessThanOrEqual(18);
     });
 
     it('should return higher zoom for smaller bounds', () => {
@@ -330,8 +330,8 @@ describe('Mapbox Geo Integration', () => {
       const mobileZoom = calculateZoomForBounds(hugeBounds, true);
       const desktopZoom = calculateZoomForBounds(hugeBounds, false);
 
-      expect(mobileZoom).toBe(11);
-      expect(desktopZoom).toBe(13);
+      expect(mobileZoom).toBe(12);
+      expect(desktopZoom).toBe(14);
     });
   });
 
@@ -561,7 +561,7 @@ describe('flyToBounds', () => {
       .calls[0][0];
     const mobileZoom = callArgs.zoom;
 
-    // Mobile zoom uses calculateZoomForBounds(bounds, true) which uses Math.max(11, 15 - maxDiff * 100)
+    // Mobile zoom uses calculateZoomForBounds(bounds, true) which uses Math.max(12, 16 - maxDiff * 100)
     const expectedZoom = calculateZoomForBounds(mockBounds, true);
     expect(mobileZoom).toBe(expectedZoom);
   });
@@ -582,7 +582,7 @@ describe('flyToBounds', () => {
       .calls[0][0];
     const desktopZoom = callArgs.zoom;
 
-    // Desktop zoom uses calculateZoomForBounds(bounds, false) which uses Math.max(13, 17 - maxDiff * 100)
+    // Desktop zoom uses calculateZoomForBounds(bounds, false) which uses Math.max(14, 18 - maxDiff * 100)
     const expectedZoom = calculateZoomForBounds(mockBounds, false);
     expect(desktopZoom).toBe(expectedZoom);
   });

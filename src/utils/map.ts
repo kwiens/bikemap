@@ -58,8 +58,8 @@ export function calculateZoomForBounds(
   const maxDiff = Math.max(latDiff, lngDiff);
 
   return isMobile
-    ? Math.max(11, 15 - maxDiff * 100)
-    : Math.max(13, 17 - maxDiff * 100);
+    ? Math.max(12, 16 - maxDiff * 100)
+    : Math.max(14, 18 - maxDiff * 100);
 }
 
 export function flyToBounds(

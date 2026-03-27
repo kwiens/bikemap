@@ -55,6 +55,7 @@ const MapboxMap = memo(function MapboxMap() {
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const watchId = useRef<number | null>(null);
   const locationWatch = useRef<NodeJS.Timeout | undefined>(undefined);
+  const wakeLock = useRef<WakeLockSentinel | null>(null);
   const [watchingLocation, setWatchingLocation] = useState(false);
 
   // Track markers for attractions and bike resources
@@ -104,6 +105,16 @@ const MapboxMap = memo(function MapboxMap() {
             lat: position.coords.latitude,
           });
         }
+
+        // Broadcast location for elevation profile tracking
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.LOCATION_UPDATE, {
+            detail: {
+              lng: position.coords.longitude,
+              lat: position.coords.latitude,
+            },
+          }),
+        );
       },
       () => {
         if (locationMarker.current) {
@@ -715,6 +726,17 @@ const MapboxMap = memo(function MapboxMap() {
           initializeLocationMarker();
           initializeGestureWatch();
 
+          // Debug: click map to simulate GPS location
+          if (mapConfig.debug.simulateLocation) {
+            newMap.on('click', (e) => {
+              window.dispatchEvent(
+                new CustomEvent(MAP_EVENTS.LOCATION_UPDATE, {
+                  detail: { lng: e.lngLat.lng, lat: e.lngLat.lat },
+                }),
+              );
+            });
+          }
+
           // Clear existing marker managers before initialization
           attractionMarkers.current.clear();
           bikeResourceMarkers.current.clear();
@@ -760,6 +782,12 @@ const MapboxMap = memo(function MapboxMap() {
         locationWatch.current = undefined;
       }
 
+      // Release wake lock
+      if (wakeLock.current) {
+        wakeLock.current.release();
+        wakeLock.current = null;
+      }
+
       // Clean up all markers before removing the map
       if (locationMarker.current) {
         locationMarker.current.remove();
@@ -780,6 +808,16 @@ const MapboxMap = memo(function MapboxMap() {
     setWatchingLocation(value);
 
     if (value) {
+      // Keep screen awake while tracking
+      if ('wakeLock' in navigator) {
+        navigator.wakeLock
+          .request('screen')
+          .then((lock) => {
+            wakeLock.current = lock;
+          })
+          .catch(() => {});
+      }
+
       // When enabled: immediately center on current location (preserving zoom)
       if (map.current && locationMarker.current) {
         const lngLat = locationMarker.current.getLngLat();
@@ -808,6 +846,11 @@ const MapboxMap = memo(function MapboxMap() {
       if (locationWatch.current) {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
+      }
+      // Release wake lock
+      if (wakeLock.current) {
+        wakeLock.current.release();
+        wakeLock.current = null;
       }
     }
   };

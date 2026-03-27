@@ -17,6 +17,7 @@ import {
   Footer,
   type LocationProps,
 } from './sidebar';
+import { getRideStyle } from './WelcomeModal';
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
@@ -24,8 +25,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
-    'routes',
+  const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(() =>
+    getRideStyle() === 'mountain' ? 'trails' : 'routes',
   );
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
@@ -95,6 +96,18 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleMapTrailSelect);
     };
+  }, []);
+
+  // Listen for ride style chosen from welcome modal
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { style } = (e as CustomEvent).detail;
+      setActiveSection(style === 'mountain' ? 'trails' : 'routes');
+    };
+
+    window.addEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
+    return () =>
+      window.removeEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
   }, []);
 
   // Function to handle route selection
@@ -290,36 +303,40 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
               onToggle={() => setActiveSection('routes')}
             />
 
+            {activeSection === 'routes' && (
+              <>
+                <MapLayers
+                  showAttractions={showAttractions}
+                  showBikeResources={showBikeResources}
+                  showBikeRentals={showBikeRentals}
+                  onToggleAttractions={toggleAttractionLayer}
+                  onToggleBikeResources={toggleBikeResourcesLayer}
+                  onToggleBikeRentals={toggleBikeRentalsLayer}
+                />
+
+                <AttractionsList
+                  show={showAttractions}
+                  onCenterLocation={centerOnLocation}
+                />
+
+                <BikeResourcesList
+                  show={showBikeResources}
+                  onCenterLocation={centerOnLocation}
+                />
+
+                <BikeRentalList
+                  show={showBikeRentals}
+                  onCenterLocation={centerOnLocation}
+                />
+              </>
+            )}
+
             <MountainBikeTrails
               selectedTrail={selectedTrail}
               onTrailSelect={handleTrailSelect}
               onAreaSelect={handleAreaSelect}
               isExpanded={activeSection === 'trails'}
               onToggle={() => setActiveSection('trails')}
-            />
-
-            <MapLayers
-              showAttractions={showAttractions}
-              showBikeResources={showBikeResources}
-              showBikeRentals={showBikeRentals}
-              onToggleAttractions={toggleAttractionLayer}
-              onToggleBikeResources={toggleBikeResourcesLayer}
-              onToggleBikeRentals={toggleBikeRentalsLayer}
-            />
-
-            <AttractionsList
-              show={showAttractions}
-              onCenterLocation={centerOnLocation}
-            />
-
-            <BikeResourcesList
-              show={showBikeResources}
-              onCenterLocation={centerOnLocation}
-            />
-
-            <BikeRentalList
-              show={showBikeRentals}
-              onCenterLocation={centerOnLocation}
             />
 
             <InformationSection />
