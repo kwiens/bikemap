@@ -57,14 +57,14 @@
 .location-watch-toggle {
   position: absolute;
   top: 10px;
-  right: 56px;
+  right: 10px;
   width: 40px;
   height: 40px;
   padding: 6px 12px;
   border-radius: 50px;
   cursor: pointer;
   font-size: 12px;
-  z-index: 900;
+  z-index: 1600;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   color: white;
   display: flex;

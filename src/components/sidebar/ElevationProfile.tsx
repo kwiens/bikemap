@@ -113,12 +113,11 @@ export function ElevationProfile() {
       .catch(() => setLoading(false));
   }, [trailName]);
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<SVGSVGElement>) => {
+  const updateHoverFromX = useCallback(
+    (clientX: number, rect: DOMRect) => {
       if (!profile || profile.profile.length === 0) return;
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const fraction = x / rect.width;
+      const x = clientX - rect.left;
+      const fraction = Math.max(0, Math.min(1, x / rect.width));
       const maxDist = profile.profile[profile.profile.length - 1][0];
       const targetDist = fraction * maxDist;
 
@@ -142,7 +141,32 @@ export function ElevationProfile() {
     [profile],
   );
 
-  const handleMouseLeave = useCallback(() => {
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      updateHoverFromX(e.clientX, e.currentTarget.getBoundingClientRect());
+    },
+    [updateHoverFromX],
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<SVGSVGElement>) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      updateHoverFromX(touch.clientX, e.currentTarget.getBoundingClientRect());
+    },
+    [updateHoverFromX],
+  );
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent<SVGSVGElement>) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      updateHoverFromX(touch.clientX, e.currentTarget.getBoundingClientRect());
+    },
+    [updateHoverFromX],
+  );
+
+  const clearHover = useCallback(() => {
     setHoverIndex(null);
     window.dispatchEvent(
       new CustomEvent('elevation-hover', { detail: { lng: null, lat: null } }),
@@ -206,7 +230,10 @@ export function ElevationProfile() {
           viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
           className="elevation-chart"
           onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
+          onMouseLeave={clearHover}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={clearHover}
           preserveAspectRatio="none"
           ref={(el) => {
             if (el) {

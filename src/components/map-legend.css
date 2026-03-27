@@ -588,6 +588,7 @@
   max-height: 160px;
   cursor: crosshair;
   border-radius: 4px;
+  touch-action: none;
 }
 
 .elevation-tooltip {
