@@ -8,6 +8,7 @@ import './map-legend.css';
 import {
   SidebarHeader,
   BikeRoutes,
+  MountainBikeTrails,
   MapLayers,
   AttractionsList,
   BikeResourcesList,
@@ -22,6 +23,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   // Track state in this parent component
   const [isOpen, setIsOpen] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
+  const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
+    'routes',
+  );
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
@@ -77,6 +82,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       const { routeId } = customEvent.detail;
       // Only update state, don't dispatch another event (map already handles the visual update)
       setSelectedRoute(routeId);
+      setSelectedTrail(null);
     };
 
     window.addEventListener('route-select', handleMapRouteSelect);
@@ -85,10 +91,26 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Listen for trail-select events from the map (when user clicks on a SORBA trail)
+  useEffect(() => {
+    const handleMapTrailSelect = (event: Event) => {
+      const customEvent = event as CustomEvent<{ trailName: string }>;
+      const { trailName } = customEvent.detail;
+      setSelectedTrail(trailName);
+      setSelectedRoute(null);
+    };
+
+    window.addEventListener('trail-select', handleMapTrailSelect);
+    return () => {
+      window.removeEventListener('trail-select', handleMapTrailSelect);
+    };
+  }, []);
+
   // Function to handle route selection
   const handleRouteSelect = useCallback(
     (routeId: string) => {
       setSelectedRoute(routeId);
+      setSelectedTrail(null);
 
       // Dispatch event for map to update route opacity
       window.dispatchEvent(
@@ -96,8 +118,51 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           detail: { routeId },
         }),
       );
+      window.dispatchEvent(new CustomEvent('trail-deselect'));
 
       // Close sidebar on mobile after selection
+      if (window.innerWidth <= 768 && isOpen) {
+        toggle();
+      }
+    },
+    [isOpen, toggle],
+  );
+
+  // Function to handle trail selection
+  const handleTrailSelect = useCallback(
+    (trailName: string) => {
+      setSelectedTrail(trailName);
+      setSelectedRoute(null);
+
+      window.dispatchEvent(
+        new CustomEvent('trail-select', {
+          detail: { trailName },
+        }),
+      );
+      window.dispatchEvent(new CustomEvent('route-deselect'));
+
+      // Close sidebar on mobile after selection
+      if (window.innerWidth <= 768 && isOpen) {
+        toggle();
+      }
+    },
+    [isOpen, toggle],
+  );
+
+  // Function to handle area (rec area heading) selection
+  const handleAreaSelect = useCallback(
+    (areaName: string) => {
+      setSelectedTrail(null);
+      setSelectedRoute(null);
+
+      window.dispatchEvent(
+        new CustomEvent('area-select', {
+          detail: { areaName },
+        }),
+      );
+      window.dispatchEvent(new CustomEvent('route-deselect'));
+      window.dispatchEvent(new CustomEvent('trail-deselect'));
+
       if (window.innerWidth <= 768 && isOpen) {
         toggle();
       }
@@ -186,6 +251,19 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Listen for trail-deselect event
+  useEffect(() => {
+    const handleTrailDeselect = () => {
+      setSelectedTrail(null);
+    };
+
+    window.addEventListener('trail-deselect', handleTrailDeselect);
+
+    return () => {
+      window.removeEventListener('trail-deselect', handleTrailDeselect);
+    };
+  }, []);
+
   return (
     <>
       {children}
@@ -217,6 +295,16 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             <BikeRoutes
               selectedRoute={selectedRoute}
               onRouteSelect={handleRouteSelect}
+              isExpanded={activeSection === 'routes'}
+              onToggle={() => setActiveSection('routes')}
+            />
+
+            <MountainBikeTrails
+              selectedTrail={selectedTrail}
+              onTrailSelect={handleTrailSelect}
+              onAreaSelect={handleAreaSelect}
+              isExpanded={activeSection === 'trails'}
+              onToggle={() => setActiveSection('trails')}
             />
 
             <MapLayers

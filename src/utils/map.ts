@@ -234,7 +234,6 @@ export function highlightSorbaArea(
     .filter((t) => t.recArea === areaName)
     .map((t) => t.trailName);
 
-  // Use match expression: ['match', ['get', 'Trail'], [...names], highlightVal, defaultVal]
   const opacityExpr: mapboxgl.Expression = [
     'match',
     ['get', 'Trail'],

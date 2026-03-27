@@ -132,6 +132,25 @@
   color: var(--color-gray-600);
 }
 
+.section-title-clickable {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+
+.section-title-clickable:hover {
+  color: var(--color-blue-dark);
+}
+
+.section-title-chevron {
+  font-size: 10px;
+  margin-right: 6px;
+  display: inline-block;
+  width: 14px;
+  flex-shrink: 0;
+}
+
 .section-items {
   display: flex;
   flex-direction: column;
@@ -385,6 +404,109 @@
   color: var(--color-gray-500);
   margin-top: 4px;
   margin-left: 28px;
+}
+
+/* Mountain bike trail styles */
+.region-heading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-gray-700);
+  padding: 10px 0 4px;
+}
+
+.region-clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 10px 4px 4px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.region-clickable:hover {
+  background-color: var(--color-blue-transparent);
+  color: var(--color-blue-dark);
+}
+
+.region-chevron {
+  font-size: 9px;
+  margin-right: 5px;
+  display: inline-block;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.region-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-gray-400);
+}
+
+.rec-area-heading {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-gray-500);
+  letter-spacing: 0.05em;
+  padding: 8px 0 4px;
+}
+
+.rec-area-clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 8px 4px 4px 16px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.rec-area-clickable:hover {
+  background-color: var(--color-blue-transparent);
+  color: var(--color-blue-dark);
+}
+
+.rec-area-chevron {
+  font-size: 8px;
+  margin-right: 4px;
+  display: inline-block;
+  width: 10px;
+}
+
+.rec-area-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-gray-400);
+}
+
+.trail-rating {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: auto;
+  text-transform: capitalize;
+}
+
+.trail-rating-easy {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.trail-rating-intermediate {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.trail-rating-advanced {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.trail-rating-expert {
+  background-color: #1f2937;
+  color: #f9fafb;
 }
 
 /* Layer toggle styles */

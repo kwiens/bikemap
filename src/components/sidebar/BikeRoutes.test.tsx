@@ -26,7 +26,12 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     expect(screen.getByText('Pick a Loop')).toBeInTheDocument();
@@ -40,13 +45,18 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const route1Button = screen
       .getByText('Test Route 1')
       .closest('[role="button"]');
-    fireEvent.click(route1Button!);
+    fireEvent.click(route1Button as Element);
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
   });
@@ -55,13 +65,18 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const route2Button = screen
       .getByText('Test Route 2')
       .closest('[role="button"]');
-    fireEvent.keyDown(route2Button!, { key: 'Enter' });
+    fireEvent.keyDown(route2Button as Element, { key: 'Enter' });
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-2');
   });
@@ -70,13 +85,18 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const route1Button = screen
       .getByText('Test Route 1')
       .closest('[role="button"]');
-    fireEvent.keyDown(route1Button!, { key: ' ' });
+    fireEvent.keyDown(route1Button as Element, { key: ' ' });
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
   });
@@ -85,7 +105,12 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute="route-1" onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute="route-1"
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const route1Button = screen
@@ -103,7 +128,12 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const colorIndicators = document.querySelectorAll('.route-color-indicator');
