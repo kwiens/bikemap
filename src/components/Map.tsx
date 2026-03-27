@@ -558,6 +558,9 @@ const MapboxMap = memo(function MapboxMap() {
           // Ensure FontAwesome is loaded
           ensureFontAwesomeLoaded();
 
+          // Expose map for console debugging (e.g. querying tileset features)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any).__map = null;
           const newMap = new mapboxgl.Map({
             container: mapContainer.current as HTMLElement,
             style: mapConfig.mapbox.styleUrl,
@@ -569,6 +572,8 @@ const MapboxMap = memo(function MapboxMap() {
           });
 
           map.current = newMap;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any).__map = newMap;
 
           // Add basic controls
           newMap.addControl(new mapboxgl.NavigationControl());
@@ -661,6 +666,26 @@ const MapboxMap = memo(function MapboxMap() {
             newMap.on('mouseleave', route.id, () => {
               newMap.getCanvas().style.cursor = '';
             });
+          });
+
+          // Log trail names as tiles load (for discovering new trails)
+          const seenTrails = new Set<string>();
+          newMap.on('moveend', () => {
+            const features = newMap.querySourceFeatures('composite', {
+              sourceLayer: 'SORBA_Regional_Trails-1oj4dx',
+            });
+            const newNames: string[] = [];
+            for (const f of features) {
+              const name = f.properties?.Trail;
+              if (name && !seenTrails.has(name)) {
+                seenTrails.add(name);
+                newNames.push(name);
+              }
+            }
+            if (newNames.length > 0) {
+              console.log('New trails found:', newNames.sort());
+              console.log('All trails seen:', [...seenTrails].sort());
+            }
           });
 
           // Initialize mountain bike trail layer
