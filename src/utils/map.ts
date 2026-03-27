@@ -3,6 +3,8 @@ import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import {
   MTN_BIKE_LAYER_ID,
   MTN_BIKE_SOURCE_LAYER,
+  GODSEY_LAYER_ID,
+  GODSEY_SOURCE_LAYER,
   regionFor,
 } from '@/data/geo_data';
 
@@ -192,182 +194,245 @@ export function getAreaBounds(
   return hasCoords ? bounds : null;
 }
 
-// Data-driven color expression for mountain bike trails by difficulty rating
-const MTN_BIKE_COLOR_EXPRESSION: mapboxgl.Expression = [
-  'match',
-  ['get', 'rating'],
-  'easy',
-  '#16A34A',
-  'intermediate',
-  '#2563EB',
-  'advanced',
-  '#374151',
-  'expert',
-  '#000000',
-  '#6B7280', // unrated fallback
+// Trail layer configuration — each entry represents a Mapbox layer
+// containing mountain bike trails with its own property names
+interface TrailLayerConfig {
+  layerId: string;
+  sourceLayer: string;
+  trailProp: string; // feature property containing the trail name
+  colorExpression: mapboxgl.Expression;
+  // Maps raw feature property values to our trailName values (if different)
+  nameMap?: Record<string, string>;
+}
+
+const TRAIL_LAYERS: TrailLayerConfig[] = [
+  {
+    layerId: MTN_BIKE_LAYER_ID,
+    sourceLayer: MTN_BIKE_SOURCE_LAYER,
+    trailProp: 'Trail',
+    colorExpression: [
+      'match',
+      ['get', 'rating'],
+      'easy',
+      '#16A34A',
+      'intermediate',
+      '#2563EB',
+      'advanced',
+      '#374151',
+      'expert',
+      '#000000',
+      '#6B7280',
+    ],
+  },
+  {
+    layerId: GODSEY_LAYER_ID,
+    sourceLayer: GODSEY_SOURCE_LAYER,
+    trailProp: 'Name',
+    nameMap: {
+      'Green as built': 'Godsey Ridge Green',
+      'Blue as built 1': 'Godsey Ridge Blue 1',
+      'Blue as built 2': 'Godsey Ridge Blue 2',
+      Exper_Spur_As_built_21626: 'Godsey Ridge Expert Spur',
+      Expert_As_Built_1: 'Godsey Ridge Expert 1',
+      Expert_As_Built_2: 'Godsey Ridge Expert 2',
+    },
+    colorExpression: [
+      'match',
+      ['get', 'Name'],
+      'Green as built',
+      '#16A34A',
+      'Blue as built 1',
+      '#2563EB',
+      'Blue as built 2',
+      '#2563EB',
+      '#000000',
+    ],
+  },
 ];
 
-const MTN_BIKE_CASING_ID = 'SORBA Regional Trails Casing';
-const MTN_BIKE_GLOW_ID = 'SORBA Regional Trails Glow';
-export const MTN_BIKE_HIT_ID = 'SORBA Regional Trails Hit';
+function casingId(layerId: string): string {
+  return `${layerId} Casing`;
+}
+function glowId(layerId: string): string {
+  return `${layerId} Glow`;
+}
+function hitId(layerId: string): string {
+  return `${layerId} Hit`;
+}
+
+export { TRAIL_LAYERS };
 
 export function initMtnBikeColors(map: mapboxgl.Map): void {
-  try {
-    map.setPaintProperty(
-      MTN_BIKE_LAYER_ID,
-      'line-color',
-      MTN_BIKE_COLOR_EXPRESSION,
-    );
-  } catch {
-    // Mountain bike layer may not exist yet
+  for (const cfg of TRAIL_LAYERS) {
+    try {
+      if (map.getLayer(cfg.layerId)) {
+        map.setPaintProperty(cfg.layerId, 'line-color', cfg.colorExpression);
+      }
+    } catch {
+      // Layer may not exist yet
+    }
   }
 }
 
 export function initMtnBikeLayers(map: mapboxgl.Map): void {
-  const layer = map.getLayer(MTN_BIKE_LAYER_ID) as
-    | mapboxgl.LayerSpecification
-    | undefined;
-  if (!layer) return;
+  for (const cfg of TRAIL_LAYERS) {
+    const layer = map.getLayer(cfg.layerId) as
+      | mapboxgl.LayerSpecification
+      | undefined;
+    if (!layer) continue;
 
-  const source = (layer as { source?: string }).source ?? 'composite';
+    const source = (layer as { source?: string }).source ?? 'composite';
+    const cId = casingId(cfg.layerId);
+    const gId = glowId(cfg.layerId);
+    const hId = hitId(cfg.layerId);
 
-  // White casing layer — drawn beneath the trail line
-  if (!map.getLayer(MTN_BIKE_CASING_ID)) {
-    map.addLayer(
-      {
-        id: MTN_BIKE_CASING_ID,
+    if (!map.getLayer(cId)) {
+      map.addLayer(
+        {
+          id: cId,
+          type: 'line',
+          source,
+          'source-layer': cfg.sourceLayer,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 5,
+            'line-opacity': 0.25,
+          },
+        },
+        cfg.layerId,
+      );
+    }
+
+    if (!map.getLayer(gId)) {
+      map.addLayer(
+        {
+          id: gId,
+          type: 'line',
+          source,
+          'source-layer': cfg.sourceLayer,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 0,
+            'line-opacity': 0,
+            'line-blur': 10,
+          },
+        },
+        cId,
+      );
+    }
+
+    if (!map.getLayer(hId)) {
+      map.addLayer({
+        id: hId,
         type: 'line',
         source,
-        'source-layer': MTN_BIKE_SOURCE_LAYER,
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round',
-        },
+        'source-layer': cfg.sourceLayer,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#ffffff',
-          'line-width': 5,
-          'line-opacity': 0.25,
-        },
-      },
-      MTN_BIKE_LAYER_ID,
-    );
-  }
-
-  // Selection glow layer — wide white blur behind selected trail
-  if (!map.getLayer(MTN_BIKE_GLOW_ID)) {
-    map.addLayer(
-      {
-        id: MTN_BIKE_GLOW_ID,
-        type: 'line',
-        source,
-        'source-layer': MTN_BIKE_SOURCE_LAYER,
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round',
-        },
-        paint: {
-          'line-color': '#ffffff',
-          'line-width': 0,
+          'line-color': 'rgba(0,0,0,0)',
+          'line-width': 20,
           'line-opacity': 0,
-          'line-blur': 10,
         },
-      },
-      MTN_BIKE_CASING_ID,
+      });
+    }
+
+    map.setLayoutProperty(cfg.layerId, 'line-cap', 'round');
+    map.setLayoutProperty(cfg.layerId, 'line-join', 'round');
+    map.setLayoutProperty(cfg.layerId, 'line-round-limit', 0.1);
+  }
+}
+
+function setTrailOpacity(
+  map: mapboxgl.Map,
+  cfg: TrailLayerConfig,
+  selectedTrailName: string | null,
+): void {
+  const prop = cfg.trailProp;
+  // If this layer uses a nameMap, find the raw feature value for the selected trail
+  let matchValue = selectedTrailName;
+  if (selectedTrailName && cfg.nameMap) {
+    const entry = Object.entries(cfg.nameMap).find(
+      ([, v]) => v === selectedTrailName,
     );
+    matchValue = entry ? entry[0] : selectedTrailName;
   }
 
-  // Invisible wide hit-test layer for easier tapping
-  if (!map.getLayer(MTN_BIKE_HIT_ID)) {
-    map.addLayer({
-      id: MTN_BIKE_HIT_ID,
-      type: 'line',
-      source,
-      'source-layer': MTN_BIKE_SOURCE_LAYER,
-      layout: {
-        'line-cap': 'round',
-        'line-join': 'round',
-      },
-      paint: {
-        'line-color': 'rgba(0,0,0,0)',
-        'line-width': 20,
-        'line-opacity': 0,
-      },
-    });
-  }
+  const cId = casingId(cfg.layerId);
+  const gId = glowId(cfg.layerId);
 
-  // Set the main trail layer to round caps/joins and thinner default
-  map.setLayoutProperty(MTN_BIKE_LAYER_ID, 'line-cap', 'round');
-  map.setLayoutProperty(MTN_BIKE_LAYER_ID, 'line-join', 'round');
-  map.setLayoutProperty(MTN_BIKE_LAYER_ID, 'line-round-limit', 0.1);
+  if (selectedTrailName) {
+    map.setPaintProperty(cfg.layerId, 'line-opacity', [
+      'case',
+      ['==', ['get', prop], matchValue],
+      0.9,
+      0.15,
+    ]);
+    map.setPaintProperty(cfg.layerId, 'line-width', [
+      'case',
+      ['==', ['get', prop], matchValue],
+      4,
+      2,
+    ]);
+
+    if (map.getLayer(cId)) {
+      map.setPaintProperty(cId, 'line-opacity', [
+        'case',
+        ['==', ['get', prop], matchValue],
+        0.9,
+        0.25,
+      ]);
+      map.setPaintProperty(cId, 'line-width', [
+        'case',
+        ['==', ['get', prop], matchValue],
+        6,
+        4,
+      ]);
+    }
+
+    if (map.getLayer(gId)) {
+      map.setPaintProperty(gId, 'line-opacity', [
+        'case',
+        ['==', ['get', prop], matchValue],
+        0.7,
+        0,
+      ]);
+      map.setPaintProperty(gId, 'line-width', [
+        'case',
+        ['==', ['get', prop], matchValue],
+        24,
+        0,
+      ]);
+    }
+  } else {
+    map.setPaintProperty(cfg.layerId, 'line-opacity', 0.15);
+    map.setPaintProperty(cfg.layerId, 'line-width', 2);
+
+    if (map.getLayer(cId)) {
+      map.setPaintProperty(cId, 'line-opacity', 0.25);
+      map.setPaintProperty(cId, 'line-width', 4);
+    }
+
+    if (map.getLayer(gId)) {
+      map.setPaintProperty(gId, 'line-opacity', 0);
+      map.setPaintProperty(gId, 'line-width', 0);
+    }
+  }
 }
 
 export function updateMtnBikeOpacity(
   map: mapboxgl.Map,
   selectedTrailName: string | null,
 ): void {
-  try {
-    if (selectedTrailName) {
-      // Main trail line
-      map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-opacity', [
-        'case',
-        ['==', ['get', 'Trail'], selectedTrailName],
-        0.9,
-        0.15,
-      ]);
-      map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-width', [
-        'case',
-        ['==', ['get', 'Trail'], selectedTrailName],
-        4,
-        2,
-      ]);
-
-      // White casing
-      if (map.getLayer(MTN_BIKE_CASING_ID)) {
-        map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-opacity', [
-          'case',
-          ['==', ['get', 'Trail'], selectedTrailName],
-          0.9,
-          0.25,
-        ]);
-        map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-width', [
-          'case',
-          ['==', ['get', 'Trail'], selectedTrailName],
-          6,
-          4,
-        ]);
+  for (const cfg of TRAIL_LAYERS) {
+    try {
+      if (map.getLayer(cfg.layerId)) {
+        setTrailOpacity(map, cfg, selectedTrailName);
       }
-
-      // Selection glow
-      if (map.getLayer(MTN_BIKE_GLOW_ID)) {
-        map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-opacity', [
-          'case',
-          ['==', ['get', 'Trail'], selectedTrailName],
-          0.7,
-          0,
-        ]);
-        map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-width', [
-          'case',
-          ['==', ['get', 'Trail'], selectedTrailName],
-          24,
-          0,
-        ]);
-      }
-    } else {
-      map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-opacity', 0.15);
-      map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-width', 2);
-
-      if (map.getLayer(MTN_BIKE_CASING_ID)) {
-        map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-opacity', 0.25);
-        map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-width', 4);
-      }
-
-      if (map.getLayer(MTN_BIKE_GLOW_ID)) {
-        map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-opacity', 0);
-        map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-width', 0);
-      }
+    } catch {
+      // Layer may not exist yet
     }
-  } catch {
-    // Mountain bike layer may not exist yet
   }
 }
 
@@ -376,51 +441,68 @@ export function highlightMtnBikeArea(
   trails: MountainBikeTrail[],
   areaName: string,
 ): void {
-  const trailNames = trails
-    .filter((t) => t.recArea === areaName || regionFor(t.recArea) === areaName)
-    .map((t) => t.trailName);
+  const matchedTrails = trails.filter(
+    (t) => t.recArea === areaName || regionFor(t.recArea) === areaName,
+  );
+  if (matchedTrails.length === 0) return;
 
-  if (trailNames.length === 0) return;
+  for (const cfg of TRAIL_LAYERS) {
+    if (!map.getLayer(cfg.layerId)) continue;
 
-  try {
-    map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-opacity', [
-      'match',
-      ['get', 'Trail'],
-      trailNames,
-      0.9,
-      0.1,
-    ]);
-    map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-width', [
-      'match',
-      ['get', 'Trail'],
-      trailNames,
-      3,
-      2,
-    ]);
+    // Map our trail names to raw feature property values
+    const rawNames = matchedTrails.map((t) => {
+      if (cfg.nameMap) {
+        const entry = Object.entries(cfg.nameMap).find(
+          ([, v]) => v === t.trailName,
+        );
+        return entry ? entry[0] : t.trailName;
+      }
+      return t.trailName;
+    });
 
-    if (map.getLayer(MTN_BIKE_CASING_ID)) {
-      map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-opacity', [
+    const cId = casingId(cfg.layerId);
+    const gId = glowId(cfg.layerId);
+
+    try {
+      map.setPaintProperty(cfg.layerId, 'line-opacity', [
         'match',
-        ['get', 'Trail'],
-        trailNames,
-        0.6,
+        ['get', cfg.trailProp],
+        rawNames,
+        0.9,
         0.1,
       ]);
-      map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-width', [
+      map.setPaintProperty(cfg.layerId, 'line-width', [
         'match',
-        ['get', 'Trail'],
-        trailNames,
-        5,
-        4,
+        ['get', cfg.trailProp],
+        rawNames,
+        3,
+        2,
       ]);
-    }
 
-    if (map.getLayer(MTN_BIKE_GLOW_ID)) {
-      map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-opacity', 0);
-      map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-width', 0);
+      if (map.getLayer(cId)) {
+        map.setPaintProperty(cId, 'line-opacity', [
+          'match',
+          ['get', cfg.trailProp],
+          rawNames,
+          0.6,
+          0.1,
+        ]);
+        map.setPaintProperty(cId, 'line-width', [
+          'match',
+          ['get', cfg.trailProp],
+          rawNames,
+          5,
+          4,
+        ]);
+      }
+
+      if (map.getLayer(gId)) {
+        map.setPaintProperty(gId, 'line-opacity', 0);
+        map.setPaintProperty(gId, 'line-width', 0);
+      }
+    } catch (error) {
+      console.error('Error highlighting mountain bike area:', error);
     }
-  } catch (error) {
-    console.error('Error highlighting mountain bike area:', error);
   }
 }
 

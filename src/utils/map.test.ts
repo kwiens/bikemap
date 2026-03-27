@@ -652,26 +652,26 @@ describe('updateMtnBikeOpacity', () => {
   });
 
   it('should handle missing casing and glow layers gracefully', () => {
+    const mainLayers = new Set([
+      'SORBA Regional Trails',
+      'Godsey Ridge Trails',
+    ]);
     const mockMap = {
       setPaintProperty: vi.fn(),
-      getLayer: vi.fn().mockReturnValue(undefined),
+      getLayer: vi.fn((id: string) =>
+        mainLayers.has(id) ? { id } : undefined,
+      ),
     } as unknown as mapboxgl.Map;
 
-    // Should not throw when getLayer returns undefined for casing/glow
     expect(() => {
       updateMtnBikeOpacity(mockMap, 'Five Points');
     }).not.toThrow();
 
-    // Only the main layer calls should happen (line-opacity + line-width)
-    expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(2);
+    // 2 properties per main layer, 2 layers = 4 calls (no casing/glow)
+    expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(4);
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       'SORBA Regional Trails',
       'line-opacity',
-      expect.anything(),
-    );
-    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails',
-      'line-width',
       expect.anything(),
     );
   });

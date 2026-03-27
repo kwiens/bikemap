@@ -8,8 +8,6 @@ import {
   mapFeatures,
   bikeResources,
   mountainBikeTrails,
-  MTN_BIKE_LAYER_ID,
-  GODSEY_LAYER_ID,
 } from '@/data/geo_data';
 import {
   createLocationMarker,
@@ -41,7 +39,7 @@ import {
   highlightMtnBikeArea,
   initMtnBikeColors,
   initMtnBikeLayers,
-  MTN_BIKE_HIT_ID,
+  TRAIL_LAYERS,
 } from '@/utils/map';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
@@ -689,72 +687,40 @@ const MapboxMap = memo(function MapboxMap() {
             }
           });
 
-          // Initialize mountain bike trail layer
-          if (newMap.getLayer(MTN_BIKE_LAYER_ID)) {
-            newMap.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-opacity', 0.15);
-            newMap.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-width', 2);
-            initMtnBikeColors(newMap);
-            initMtnBikeLayers(newMap);
-            initTrailBoundsFromDefaults(mountainBikeTrails);
+          // Initialize all mountain bike trail layers
+          initMtnBikeColors(newMap);
+          initMtnBikeLayers(newMap);
+          initTrailBoundsFromDefaults(mountainBikeTrails);
 
-            // Click handler on wide hit-test layer for easier tapping
-            newMap.on('click', MTN_BIKE_HIT_ID, (e) => {
-              e.preventDefault();
-              const trailName = e.features?.[0]?.properties?.Trail;
-              if (trailName) {
+          for (const cfg of TRAIL_LAYERS) {
+            if (!newMap.getLayer(cfg.layerId)) continue;
+
+            newMap.setPaintProperty(cfg.layerId, 'line-opacity', 0.15);
+            newMap.setPaintProperty(cfg.layerId, 'line-width', 2);
+
+            // Click handler on hit-test layer for easier tapping
+            const hId = `${cfg.layerId} Hit`;
+            if (newMap.getLayer(hId)) {
+              newMap.on('click', hId, (e) => {
+                e.preventDefault();
+                const rawName = e.features?.[0]?.properties?.[cfg.trailProp];
+                if (!rawName) return;
+                const trailName = cfg.nameMap?.[rawName] ?? rawName;
                 window.dispatchEvent(
                   new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
                     detail: { trailName },
                   }),
                 );
-              }
-            });
+              });
 
-            newMap.on('mouseenter', MTN_BIKE_HIT_ID, () => {
-              newMap.getCanvas().style.cursor = 'pointer';
-            });
+              newMap.on('mouseenter', hId, () => {
+                newMap.getCanvas().style.cursor = 'pointer';
+              });
 
-            newMap.on('mouseleave', MTN_BIKE_HIT_ID, () => {
-              newMap.getCanvas().style.cursor = '';
-            });
-          }
-
-          // Initialize Godsey Ridge trail layer
-          if (newMap.getLayer(GODSEY_LAYER_ID)) {
-            const godseyNameMap: Record<string, string> = {
-              'Green as built': 'Godsey Ridge Green',
-              'Blue as built 1': 'Godsey Ridge Blue 1',
-              'Blue as built 2': 'Godsey Ridge Blue 2',
-              Exper_Spur_As_built_21626: 'Godsey Ridge Expert Spur',
-              Expert_As_Built_1: 'Godsey Ridge Expert 1',
-              Expert_As_Built_2: 'Godsey Ridge Expert 2',
-            };
-
-            newMap.setLayoutProperty(GODSEY_LAYER_ID, 'line-cap', 'round');
-            newMap.setLayoutProperty(GODSEY_LAYER_ID, 'line-join', 'round');
-            newMap.setPaintProperty(GODSEY_LAYER_ID, 'line-width', 3);
-            newMap.setPaintProperty(GODSEY_LAYER_ID, 'line-opacity', 0.8);
-
-            newMap.on('click', GODSEY_LAYER_ID, (e) => {
-              e.preventDefault();
-              const rawName = e.features?.[0]?.properties?.Name;
-              const trailName = rawName ? godseyNameMap[rawName] : null;
-              if (trailName) {
-                window.dispatchEvent(
-                  new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-                    detail: { trailName },
-                  }),
-                );
-              }
-            });
-
-            newMap.on('mouseenter', GODSEY_LAYER_ID, () => {
-              newMap.getCanvas().style.cursor = 'pointer';
-            });
-
-            newMap.on('mouseleave', GODSEY_LAYER_ID, () => {
-              newMap.getCanvas().style.cursor = '';
-            });
+              newMap.on('mouseleave', hId, () => {
+                newMap.getCanvas().style.cursor = '';
+              });
+            }
           }
 
           // Force a resize to ensure proper display
