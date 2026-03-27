@@ -813,7 +813,11 @@ const MapboxMap = memo(function MapboxMap() {
         navigator.wakeLock
           .request('screen')
           .then((lock) => {
-            wakeLock.current = lock;
+            if (locationWatch.current !== undefined) {
+              wakeLock.current = lock;
+            } else {
+              lock.release();
+            }
           })
           .catch(() => {});
       }

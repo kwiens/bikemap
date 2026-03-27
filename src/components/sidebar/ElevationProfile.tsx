@@ -193,7 +193,7 @@ export function ElevationProfile() {
         return;
       }
       const idx = findClosestProfileIndex(profileRef.current.profile, lng, lat);
-      setLocationIndex(idx);
+      setLocationIndex((prev) => (prev === idx ? prev : idx));
     };
 
     window.addEventListener(MAP_EVENTS.LOCATION_UPDATE, handler);
@@ -505,6 +505,23 @@ const ElevationSvg = React.memo(function ElevationSvg({
   );
 });
 
+function profilePointToXY(
+  points: [number, number, number, number][],
+  index: number,
+  profile: ElevationProfileData,
+  chartWidth: number,
+): { x: number; y: number } {
+  const maxDist = points[points.length - 1][0];
+  const yRange = profile.max - profile.min || 1;
+  return {
+    x: (points[index][0] / maxDist) * chartWidth,
+    y:
+      CHART_PADDING_TOP +
+      PLOT_HEIGHT -
+      ((points[index][1] - profile.min) / yRange) * PLOT_HEIGHT,
+  };
+}
+
 // Lightweight hover overlay — renders on every mouse move without rebuilding paths
 function HoverIndicator({
   points,
@@ -519,13 +536,7 @@ function HoverIndicator({
   chartWidth: number;
   hoverIndex: number;
 }) {
-  const maxDist = points[points.length - 1][0];
-  const yRange = profile.max - profile.min || 1;
-  const x = (points[hoverIndex][0] / maxDist) * chartWidth;
-  const y =
-    CHART_PADDING_TOP +
-    PLOT_HEIGHT -
-    ((points[hoverIndex][1] - profile.min) / yRange) * PLOT_HEIGHT;
+  const { x, y } = profilePointToXY(points, hoverIndex, profile, chartWidth);
 
   return (
     <svg
@@ -569,15 +580,7 @@ function LocationIndicator({
   chartWidth: number;
   locationIndex: number;
 }) {
-  const maxDist = points[points.length - 1][0];
-  const yRange = profile.max - profile.min || 1;
-  const x = (points[locationIndex][0] / maxDist) * chartWidth;
-  const y =
-    CHART_PADDING_TOP +
-    PLOT_HEIGHT -
-    ((points[locationIndex][1] - profile.min) / yRange) * PLOT_HEIGHT;
-
-  // Convert from viewBox coordinates to percentage positions
+  const { x, y } = profilePointToXY(points, locationIndex, profile, chartWidth);
   const leftPct = (x / chartWidth) * 100;
   const topPct = (y / CHART_HEIGHT) * 100;
 
