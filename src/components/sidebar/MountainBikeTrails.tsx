@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { sorbaTrails, regionFor } from '@/data/geo_data';
 import type { MountainBikeTrailsProps } from './types';
 
@@ -48,6 +48,22 @@ export function MountainBikeTrails({
     new Set(),
   );
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
+
+  // Auto-expand region and area when a trail is selected
+  useEffect(() => {
+    if (!selectedTrail) return;
+    const trail = sorbaTrails.find((t) => t.trailName === selectedTrail);
+    if (!trail) return;
+    const region = regionFor(trail.recArea);
+    setExpandedRegions((prev) => {
+      if (prev.has(region)) return prev;
+      return new Set(prev).add(region);
+    });
+    setExpandedAreas((prev) => {
+      if (prev.has(trail.recArea)) return prev;
+      return new Set(prev).add(trail.recArea);
+    });
+  }, [selectedTrail]);
 
   function handleAreaClick(area: string) {
     toggleSet(setExpandedAreas, area);
