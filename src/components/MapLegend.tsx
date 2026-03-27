@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
-import './map-legend.css';
 
 import {
   SidebarHeader,
@@ -129,48 +128,33 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Function to handle trail selection
-  const handleTrailSelect = useCallback(
-    (trailName: string) => {
-      setSelectedTrail(trailName);
-      setSelectedRoute(null);
+  const handleTrailSelect = useCallback((trailName: string) => {
+    setSelectedTrail(trailName);
+    setSelectedRoute(null);
 
-      window.dispatchEvent(
-        new CustomEvent('trail-select', {
-          detail: { trailName },
-        }),
-      );
-      window.dispatchEvent(new CustomEvent('route-deselect'));
-
-      // Close sidebar on mobile after selection
-      if (window.innerWidth <= 768 && isOpen) {
-        toggle();
-      }
-    },
-    [isOpen, toggle],
-  );
+    window.dispatchEvent(
+      new CustomEvent('trail-select', {
+        detail: { trailName },
+      }),
+    );
+    window.dispatchEvent(new CustomEvent('route-deselect'));
+  }, []);
 
   // Function to handle area (rec area heading) selection
-  const handleAreaSelect = useCallback(
-    (areaName: string) => {
-      setSelectedTrail(null);
-      setSelectedRoute(null);
+  const handleAreaSelect = useCallback((areaName: string) => {
+    setSelectedTrail(null);
+    setSelectedRoute(null);
 
-      // Deselect first — trail-deselect resets SORBA opacity,
-      // so it must fire before area-select sets the highlight
-      window.dispatchEvent(new CustomEvent('route-deselect'));
-      window.dispatchEvent(new CustomEvent('trail-deselect'));
-      window.dispatchEvent(
-        new CustomEvent('area-select', {
-          detail: { areaName },
-        }),
-      );
-
-      if (window.innerWidth <= 768 && isOpen) {
-        toggle();
-      }
-    },
-    [isOpen, toggle],
-  );
+    // Deselect first — trail-deselect resets SORBA opacity,
+    // so it must fire before area-select sets the highlight
+    window.dispatchEvent(new CustomEvent('route-deselect'));
+    window.dispatchEvent(new CustomEvent('trail-deselect'));
+    window.dispatchEvent(
+      new CustomEvent('area-select', {
+        detail: { areaName },
+      }),
+    );
+  }, []);
 
   // Helper to toggle a layer with radio-button behavior:
   // turning one layer ON turns the other two OFF

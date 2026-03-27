@@ -184,7 +184,14 @@ export function ElevationProfile() {
     [profile],
   );
 
+  // On mobile, hide elevation pane when sidebar is open
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
   if (!trailName || loading || !profile || profile.profile.length < 2) {
+    return null;
+  }
+
+  if (isMobile && sidebarOpen) {
     return null;
   }
 

@@ -150,7 +150,7 @@ export function MountainBikeTrails({
                               }}
                               role="button"
                               tabIndex={0}
-                              className={`route-item ${selectedTrail === trail.trailName ? 'route-item-selected' : ''}`}
+                              className={`route-item ${selectedTrail === trail.trailName ? 'route-item-selected' : ''} ${selectedTrail && selectedTrail !== trail.trailName ? 'route-item-faded' : ''}`}
                             >
                               <div className="card-header">
                                 <div

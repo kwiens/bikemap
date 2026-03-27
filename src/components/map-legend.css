@@ -389,6 +389,10 @@
   border-color: var(--color-blue-primary);
 }
 
+.route-item-faded {
+  opacity: 0.45;
+}
+
 .route-color-indicator {
   width: 16px;
   height: 16px;
