@@ -51,6 +51,23 @@ export function calculateZoomForBounds(
     : Math.max(13, 17 - maxDiff * 100);
 }
 
+export function flyToBounds(
+  map: mapboxgl.Map,
+  bounds: mapboxgl.LngLatBounds,
+): void {
+  const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
+  const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
+  const isMobile = window.innerWidth <= 768;
+  const zoom = calculateZoomForBounds(bounds, isMobile);
+
+  map.flyTo({
+    center: [centerLng, centerLat],
+    zoom,
+    essential: true,
+    duration: 1000,
+  });
+}
+
 export function calculateRouteBounds(
   map: mapboxgl.Map,
   _route: BikeRoute,

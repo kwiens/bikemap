@@ -30,7 +30,7 @@ import {
 import {
   geocodeAddress,
   updateRouteOpacity,
-  calculateZoomForBounds,
+  flyToBounds,
   calculateRouteBounds,
   findLocationInArray,
   calculateTrailBounds,
@@ -162,34 +162,7 @@ const MapboxMap = memo(function MapboxMap() {
       updateSorbaOpacity(map.current, null);
 
       if (selectedRoute?.bounds) {
-        const bounds = selectedRoute.bounds;
-
-        try {
-          // Calculate the center of the bounds
-          const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
-          const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
-
-          // Calculate zoom level based on bounds and device type
-          const isMobile = window.innerWidth <= 768;
-          const zoom = calculateZoomForBounds(bounds, isMobile);
-
-          // Use flyTo which tends to be more reliable
-          map.current.flyTo({
-            center: [centerLng, centerLat],
-            zoom: zoom,
-            essential: true,
-            duration: 1000,
-          });
-
-          // Force a resize to ensure the map is rendered properly
-          setTimeout(() => {
-            if (map.current) {
-              map.current.resize();
-            }
-          }, 100);
-        } catch (error) {
-          console.error('Error flying to route:', error);
-        }
+        flyToBounds(map.current, selectedRoute.bounds);
       }
     },
     [showToast],
@@ -221,22 +194,7 @@ const MapboxMap = memo(function MapboxMap() {
       }
 
       if (trail?.bounds) {
-        const bounds = trail.bounds;
-        try {
-          const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
-          const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
-          const isMobile = window.innerWidth <= 768;
-          const zoom = calculateZoomForBounds(bounds, isMobile);
-
-          map.current.flyTo({
-            center: [centerLng, centerLat],
-            zoom,
-            essential: true,
-            duration: 1000,
-          });
-        } catch (error) {
-          console.error('Error flying to trail:', error);
-        }
+        flyToBounds(map.current, trail.bounds);
       }
     },
     [showToast],
@@ -265,21 +223,7 @@ const MapboxMap = memo(function MapboxMap() {
       highlightSorbaArea(map.current, sorbaTrails, areaName);
 
       if (bounds) {
-        try {
-          const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
-          const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
-          const isMobile = window.innerWidth <= 768;
-          const zoom = calculateZoomForBounds(bounds, isMobile);
-
-          map.current.flyTo({
-            center: [centerLng, centerLat],
-            zoom,
-            essential: true,
-            duration: 1000,
-          });
-        } catch (error) {
-          console.error('Error flying to area:', error);
-        }
+        flyToBounds(map.current, bounds);
       }
     },
     [showToast],
@@ -626,11 +570,6 @@ const MapboxMap = memo(function MapboxMap() {
           // Wait for map to load
           await new Promise<void>((resolve) => {
             newMap.on('load', () => {
-              // Log all available layers
-              const style = newMap.getStyle();
-              if (style?.layers) {
-                console.log('Available Map Layers:', style.layers);
-              }
               resolve();
             });
           });

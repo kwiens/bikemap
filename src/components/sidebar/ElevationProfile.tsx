@@ -1,6 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 
 function slugify(name: string): string {
@@ -20,6 +26,7 @@ const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 
 const GRADE_YELLOW = 12;
 const GRADE_RED = 25;
+const MAX_GRADIENT_STOPS = 200;
 
 function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
@@ -68,6 +75,32 @@ function computeGradeColors(
   return smoothed.map((g) => gradeToColor(g));
 }
 
+function downsampleStops(
+  points: [number, number, number, number][],
+  colors: string[],
+  maxDist: number,
+): { offset: number; color: string }[] {
+  if (points.length <= MAX_GRADIENT_STOPS) {
+    return colors.map((color, i) => ({
+      offset: maxDist > 0 ? points[i][0] / maxDist : 0,
+      color,
+    }));
+  }
+  const step = (points.length - 1) / (MAX_GRADIENT_STOPS - 1);
+  const stops: { offset: number; color: string }[] = [];
+  for (let i = 0; i < MAX_GRADIENT_STOPS; i++) {
+    const idx = Math.round(i * step);
+    stops.push({
+      offset: maxDist > 0 ? points[idx][0] / maxDist : 0,
+      color: colors[idx],
+    });
+  }
+  return stops;
+}
+
+// Profile data cache to avoid refetching on revisit
+const profileCache = new Map<string, ElevationProfileData>();
+
 export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
@@ -75,6 +108,7 @@ export function ElevationProfile() {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     const handleTrailSelect = (e: Event) => {
@@ -105,19 +139,49 @@ export function ElevationProfile() {
       setProfile(null);
       return;
     }
+
+    const cached = profileCache.get(trailName);
+    if (cached) {
+      setProfile(cached);
+      setHoverIndex(null);
+      return;
+    }
+
     setLoading(true);
     setProfile(null);
     setHoverIndex(null);
 
+    const controller = new AbortController();
     const slug = slugify(trailName);
-    fetch(`/data/elevation/${slug}.json`)
-      .then((r) => r.json())
+    fetch(`/data/elevation/${slug}.json`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: ElevationProfileData) => {
+        profileCache.set(trailName, data);
         setProfile(data);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        if (err.name !== 'AbortError') setLoading(false);
+      });
+
+    return () => controller.abort();
   }, [trailName]);
+
+  // Measure chart width via ResizeObserver
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (w > 0) setChartWidth(w);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [profile]);
 
   const updateHoverFromX = useCallback(
     (clientX: number, rect: DOMRect) => {
@@ -154,16 +218,7 @@ export function ElevationProfile() {
     [updateHoverFromX],
   );
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent<SVGSVGElement>) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      updateHoverFromX(touch.clientX, e.currentTarget.getBoundingClientRect());
-    },
-    [updateHoverFromX],
-  );
-
-  const handleTouchStart = useCallback(
+  const handleTouch = useCallback(
     (e: React.TouchEvent<SVGSVGElement>) => {
       e.preventDefault();
       const touch = e.touches[0];
@@ -184,40 +239,16 @@ export function ElevationProfile() {
     [profile],
   );
 
-  // On mobile, hide elevation pane when sidebar is open
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-
   if (!trailName || loading || !profile || profile.profile.length < 2) {
     return null;
   }
 
-  if (isMobile && sidebarOpen) {
+  if (window.innerWidth <= 768 && sidebarOpen) {
     return null;
   }
 
   const points = profile.profile;
   const maxDist = points[points.length - 1][0];
-  const yRange = profile.max - profile.min || 1;
-
-  const xScale = (d: number) => (d / maxDist) * chartWidth;
-  const yScale = (e: number) =>
-    CHART_PADDING_TOP +
-    PLOT_HEIGHT -
-    ((e - profile.min) / yRange) * PLOT_HEIGHT;
-
-  const linePath = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? 'M' : 'L'}${xScale(p[0]).toFixed(1)} ${yScale(p[1]).toFixed(1)}`,
-    )
-    .join(' ');
-
-  const areaPath = `${linePath} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
-
-  const gradientStops = gradeColors.map((color, i) => {
-    const offset = maxDist > 0 ? points[i][0] / maxDist : 0;
-    return { offset, color };
-  });
 
   return (
     <div
@@ -241,105 +272,19 @@ export function ElevationProfile() {
           </span>
         </div>
 
-        <svg
-          viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-          className="elevation-chart"
+        <ElevationSvg
+          points={points}
+          gradeColors={gradeColors}
+          profile={profile}
+          chartWidth={chartWidth}
+          hoverIndex={hoverIndex}
+          svgRef={svgRef}
           onMouseMove={handleMouseMove}
           onMouseLeave={clearHover}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
+          onTouchStart={handleTouch}
+          onTouchMove={handleTouch}
           onTouchEnd={clearHover}
-          preserveAspectRatio="none"
-          ref={(el) => {
-            if (el) {
-              const w = el.getBoundingClientRect().width;
-              if (w > 0 && w !== chartWidth) setChartWidth(w);
-            }
-          }}
-        >
-          <defs>
-            <linearGradient
-              id="grade-stroke"
-              x1="0"
-              y1="0"
-              x2="1"
-              y2="0"
-              gradientUnits="objectBoundingBox"
-            >
-              {gradientStops.map((s) => (
-                <stop
-                  key={s.offset}
-                  offset={`${(s.offset * 100).toFixed(2)}%`}
-                  stopColor={s.color}
-                />
-              ))}
-            </linearGradient>
-            <linearGradient
-              id="grade-fill"
-              x1="0"
-              y1="0"
-              x2="1"
-              y2="0"
-              gradientUnits="objectBoundingBox"
-            >
-              {gradientStops.map((s) => (
-                <stop
-                  key={s.offset}
-                  offset={`${(s.offset * 100).toFixed(2)}%`}
-                  stopColor={s.color}
-                  stopOpacity="0.2"
-                />
-              ))}
-            </linearGradient>
-          </defs>
-
-          {/* Max elevation reference line */}
-          <line
-            x1="0"
-            y1={CHART_PADDING_TOP}
-            x2={chartWidth}
-            y2={CHART_PADDING_TOP}
-            stroke="#9ca3af"
-            strokeWidth="1"
-            strokeDasharray="4,4"
-            vectorEffect="non-scaling-stroke"
-          />
-
-          <path d={areaPath} fill="url(#grade-fill)" />
-          <path
-            d={linePath}
-            fill="none"
-            stroke="url(#grade-stroke)"
-            strokeWidth="3"
-            vectorEffect="non-scaling-stroke"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {hoverIndex !== null && (
-            <>
-              <line
-                x1={xScale(points[hoverIndex][0])}
-                y1={CHART_PADDING_TOP}
-                x2={xScale(points[hoverIndex][0])}
-                y2={CHART_HEIGHT - CHART_PADDING_BOTTOM}
-                stroke="#6b7280"
-                strokeWidth="1"
-                strokeDasharray="3,3"
-                vectorEffect="non-scaling-stroke"
-              />
-              <circle
-                cx={xScale(points[hoverIndex][0])}
-                cy={yScale(points[hoverIndex][1])}
-                r="4"
-                fill={gradeColors[hoverIndex] || '#22c55e'}
-                stroke="white"
-                strokeWidth="1.5"
-                vectorEffect="non-scaling-stroke"
-              />
-            </>
-          )}
-        </svg>
+        />
       </div>
 
       <div className="elevation-tooltip">
@@ -350,3 +295,146 @@ export function ElevationProfile() {
     </div>
   );
 }
+
+// Memoized SVG to avoid rebuilding paths on every hover
+const ElevationSvg = React.memo(function ElevationSvg({
+  points,
+  gradeColors,
+  profile,
+  chartWidth,
+  hoverIndex,
+  svgRef,
+  onMouseMove,
+  onMouseLeave,
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd,
+}: {
+  points: [number, number, number, number][];
+  gradeColors: string[];
+  profile: ElevationProfileData;
+  chartWidth: number;
+  hoverIndex: number | null;
+  svgRef: React.RefObject<SVGSVGElement | null>;
+  onMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+  onMouseLeave: () => void;
+  onTouchStart: (e: React.TouchEvent<SVGSVGElement>) => void;
+  onTouchMove: (e: React.TouchEvent<SVGSVGElement>) => void;
+  onTouchEnd: () => void;
+}) {
+  const maxDist = points[points.length - 1][0];
+  const yRange = profile.max - profile.min || 1;
+
+  const xScale = (d: number) => (d / maxDist) * chartWidth;
+  const yScale = (e: number) =>
+    CHART_PADDING_TOP +
+    PLOT_HEIGHT -
+    ((e - profile.min) / yRange) * PLOT_HEIGHT;
+
+  const linePath = points
+    .map(
+      (p, i) =>
+        `${i === 0 ? 'M' : 'L'}${xScale(p[0]).toFixed(1)} ${yScale(p[1]).toFixed(1)}`,
+    )
+    .join(' ');
+
+  const areaPath = `${linePath} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
+
+  const gradientStops = downsampleStops(points, gradeColors, maxDist);
+
+  return (
+    <svg
+      viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
+      className="elevation-chart"
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      preserveAspectRatio="none"
+      ref={svgRef}
+    >
+      <defs>
+        <linearGradient
+          id="grade-stroke"
+          x1="0"
+          y1="0"
+          x2="1"
+          y2="0"
+          gradientUnits="objectBoundingBox"
+        >
+          {gradientStops.map((s) => (
+            <stop
+              key={s.offset}
+              offset={`${(s.offset * 100).toFixed(2)}%`}
+              stopColor={s.color}
+            />
+          ))}
+        </linearGradient>
+        <linearGradient
+          id="grade-fill"
+          x1="0"
+          y1="0"
+          x2="1"
+          y2="0"
+          gradientUnits="objectBoundingBox"
+        >
+          {gradientStops.map((s) => (
+            <stop
+              key={s.offset}
+              offset={`${(s.offset * 100).toFixed(2)}%`}
+              stopColor={s.color}
+              stopOpacity="0.2"
+            />
+          ))}
+        </linearGradient>
+      </defs>
+
+      <line
+        x1="0"
+        y1={CHART_PADDING_TOP}
+        x2={chartWidth}
+        y2={CHART_PADDING_TOP}
+        stroke="#9ca3af"
+        strokeWidth="1"
+        strokeDasharray="4,4"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path d={areaPath} fill="url(#grade-fill)" />
+      <path
+        d={linePath}
+        fill="none"
+        stroke="url(#grade-stroke)"
+        strokeWidth="3"
+        vectorEffect="non-scaling-stroke"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {hoverIndex !== null && (
+        <>
+          <line
+            x1={xScale(points[hoverIndex][0])}
+            y1={CHART_PADDING_TOP}
+            x2={xScale(points[hoverIndex][0])}
+            y2={CHART_HEIGHT - CHART_PADDING_BOTTOM}
+            stroke="#6b7280"
+            strokeWidth="1"
+            strokeDasharray="3,3"
+            vectorEffect="non-scaling-stroke"
+          />
+          <circle
+            cx={xScale(points[hoverIndex][0])}
+            cy={yScale(points[hoverIndex][1])}
+            r="4"
+            fill={gradeColors[hoverIndex] || '#22c55e'}
+            stroke="white"
+            strokeWidth="1.5"
+            vectorEffect="non-scaling-stroke"
+          />
+        </>
+      )}
+    </svg>
+  );
+});
