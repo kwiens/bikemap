@@ -97,6 +97,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       const { trailName } = customEvent.detail;
       setSelectedTrail(trailName);
       setSelectedRoute(null);
+      setActiveSection('trails');
     };
 
     window.addEventListener('trail-select', handleMapTrailSelect);
