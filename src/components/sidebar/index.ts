@@ -3,6 +3,7 @@ export { ToggleSwitch } from './ToggleSwitch';
 export { SidebarHeader } from './SidebarHeader';
 export { BikeRoutes } from './BikeRoutes';
 export { MountainBikeTrails } from './MountainBikeTrails';
+export { ElevationProfile } from './ElevationProfile';
 export { MapLayers } from './MapLayers';
 export { AttractionsList } from './AttractionsList';
 export { BikeResourcesList } from './BikeResourcesList';
