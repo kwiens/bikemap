@@ -225,17 +225,25 @@ export function updateSorbaOpacity(
   }
 }
 
-export function highlightSorbaArea(map: mapboxgl.Map, areaName: string): void {
+export function highlightSorbaArea(
+  map: mapboxgl.Map,
+  trails: MountainBikeTrail[],
+  areaName: string,
+): void {
+  const trailNames = trails
+    .filter((t) => t.recArea === areaName)
+    .map((t) => t.trailName);
+
   try {
     map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', [
       'case',
-      ['==', ['get', 'Rec_Area'], areaName],
+      ['in', ['get', 'Trail'], ['literal', trailNames]],
       0.9,
       0.1,
     ]);
     map.setPaintProperty(SORBA_LAYER_ID, 'line-width', [
       'case',
-      ['==', ['get', 'Rec_Area'], areaName],
+      ['in', ['get', 'Trail'], ['literal', trailNames]],
       4,
       2,
     ]);

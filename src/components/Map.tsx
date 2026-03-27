@@ -261,7 +261,7 @@ const MapboxMap = memo(function MapboxMap() {
         selected: 0.1,
         unselected: 0.1,
       });
-      highlightSorbaArea(map.current, areaName);
+      highlightSorbaArea(map.current, sorbaTrails, areaName);
 
       if (bounds) {
         try {
