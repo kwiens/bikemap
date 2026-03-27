@@ -44,33 +44,21 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     );
   }, [isOpen]);
 
-  // Handle clicks outside the sidebar
+  // Handle clicks/taps outside the sidebar (mobile only)
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Only handle clicks on mobile (screen width <= 768px)
-      if (window.innerWidth > 768) {
-        return;
-      }
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (window.innerWidth > 768) return;
+      if (!isOpen) return;
+      if (toggleButtonRef.current?.contains(event.target as Node)) return;
+      if (sidebarRef.current?.contains(event.target as Node)) return;
 
-      // Don't close if clicking the toggle button
-      if (toggleButtonRef.current?.contains(event.target as Node)) {
-        return;
-      }
-
-      // Don't close if clicking inside the sidebar
-      if (sidebarRef.current?.contains(event.target as Node)) {
-        return;
-      }
-
-      // Close the sidebar if clicking outside
-      if (isOpen) {
-        toggle();
-      }
+      toggle();
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    // Use capture phase so we see the event before it reaches sidebar children
+    document.addEventListener('pointerdown', handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('pointerdown', handleClickOutside);
     };
   }, [isOpen, toggle]);
 
