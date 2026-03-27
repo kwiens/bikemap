@@ -24,8 +24,10 @@ ensureFontAwesomeLoaded();
 // Marker Manager class for managing collections of markers
 export class MarkerManager {
   private markers: mapboxgl.Marker[] = [];
+  private activeMarker: mapboxgl.Marker | null = null;
 
   add(marker: mapboxgl.Marker, map: mapboxgl.Map): void {
+    this.attachPopupHandlers(marker);
     this.markers.push(marker);
     marker.addTo(map);
   }
@@ -45,6 +47,7 @@ export class MarkerManager {
   clear(): void {
     this.hide();
     this.markers = [];
+    this.activeMarker = null;
   }
 
   findByCoordinates(lng: number, lat: number): mapboxgl.Marker | undefined {
@@ -58,13 +61,46 @@ export class MarkerManager {
     return this.markers;
   }
 
+  openPopupFor(marker: mapboxgl.Marker): void {
+    if (marker.getPopup()?.isOpen()) {
+      return;
+    }
+
+    marker.togglePopup();
+  }
+
   setMarkers(markers: mapboxgl.Marker[]): void {
     this.clear();
     this.markers = markers;
+    this.markers.forEach((marker) => {
+      this.attachPopupHandlers(marker);
+    });
   }
 
   get length(): number {
     return this.markers.length;
+  }
+
+  private attachPopupHandlers(marker: mapboxgl.Marker): void {
+    const popup = marker.getPopup();
+
+    if (!popup) {
+      return;
+    }
+
+    popup.on('open', () => {
+      if (this.activeMarker && this.activeMarker !== marker) {
+        this.activeMarker.getPopup()?.remove();
+      }
+
+      this.activeMarker = marker;
+    });
+
+    popup.on('close', () => {
+      if (this.activeMarker === marker) {
+        this.activeMarker = null;
+      }
+    });
   }
 }
 
