@@ -97,6 +97,12 @@ The app uses custom DOM events (`window.dispatchEvent`) for component communicat
 
 Routes are styled via Mapbox Studio (referenced by layer IDs like `riverwalk-loop-v3-public`). Route bounds are calculated from layer features at runtime to enable zoom-to-fit.
 
+### SORBA Mountain Bike Trails
+
+The SORBA Regional Trails layer is a single Mapbox layer (`SORBA Regional Trails`, source layer `SORBA_Regional_Trails-1oj4dx`) containing 220+ trails identified by the `Trail` feature property. Trail data is defined in `src/data/geo_data.ts` with precalculated `defaultBounds` for zoom-to-fit and `distance` in miles.
+
+When trails are added or modified in the Mapbox tileset, run `scripts/add_trail_bounds.py` to recalculate bounding boxes and distances. The script takes raw coordinate data extracted from the Mapbox layer via Chrome DevTools console (see the script header for the extraction snippet) and computes both `defaultBounds` and `distance` fields in `geo_data.ts`.
+
 ## Code Style
 
 - Do not include "Co-Authored-By: Claude" in commit messages

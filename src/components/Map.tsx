@@ -5,7 +5,13 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/app/map.css';
 import { MapLegendProvider } from '@/components/MapLegend';
-import { bikeRoutes, mapFeatures, bikeResources } from '@/data/geo_data';
+import {
+  bikeRoutes,
+  mapFeatures,
+  bikeResources,
+  sorbaTrails,
+  SORBA_LAYER_ID,
+} from '@/data/geo_data';
 import {
   createLocationMarker,
   createAttractionMarker,
@@ -28,6 +34,12 @@ import {
   calculateZoomForBounds,
   calculateRouteBounds,
   findLocationInArray,
+  calculateTrailBounds,
+  initTrailBoundsFromDefaults,
+  getAreaBounds,
+  updateSorbaOpacity,
+  highlightSorbaArea,
+  initSorbaColors,
 } from '@/utils/map';
 import { mapConfig } from '@/config/map.config';
 
@@ -141,11 +153,12 @@ const MapboxMap = memo(function MapboxMap() {
         showToast(selectedRoute.name);
       }
 
-      // Update opacities for all routes
+      // Update opacities for all routes and reset SORBA
       updateRouteOpacity(map.current, bikeRoutes, routeId, {
         selected: 0.8,
         unselected: 0.2,
       });
+      updateSorbaOpacity(map.current, null);
 
       if (selectedRoute?.bounds) {
         const bounds = selectedRoute.bounds;
@@ -175,6 +188,103 @@ const MapboxMap = memo(function MapboxMap() {
           }, 100);
         } catch (error) {
           console.error('Error flying to route:', error);
+        }
+      }
+    },
+    [showToast],
+  );
+
+  // Handle trail selection events
+  const handleTrailSelect = useCallback(
+    (event: CustomEvent) => {
+      if (!map.current) return;
+
+      const { trailName } = event.detail;
+      const trail = sorbaTrails.find((t) => t.trailName === trailName);
+
+      if (trail) {
+        showToast(trail.displayName);
+      }
+
+      // Dim bike routes and highlight the selected trail
+      updateRouteOpacity(map.current, bikeRoutes, null, {
+        selected: 0.1,
+        unselected: 0.1,
+      });
+      updateSorbaOpacity(map.current, trailName);
+
+      // Calculate bounds lazily if not yet available
+      if (trail && !trail.bounds) {
+        trail.bounds =
+          calculateTrailBounds(map.current, trailName) ?? undefined;
+      }
+
+      if (trail?.bounds) {
+        const bounds = trail.bounds;
+        try {
+          const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
+          const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
+          const isMobile = window.innerWidth <= 768;
+          const zoom = calculateZoomForBounds(bounds, isMobile);
+
+          map.current.flyTo({
+            center: [centerLng, centerLat],
+            zoom,
+            essential: true,
+            duration: 1000,
+          });
+        } catch (error) {
+          console.error('Error flying to trail:', error);
+        }
+      }
+    },
+    [showToast],
+  );
+
+  const handleTrailDeselect = useCallback(() => {
+    if (!map.current) return;
+    updateSorbaOpacity(map.current, null);
+  }, []);
+
+  // Handle area (rec area heading) selection — zoom to area bounds
+  const handleAreaSelect = useCallback(
+    (event: CustomEvent) => {
+      if (!map.current) return;
+
+      const { areaName } = event.detail;
+      const bounds = getAreaBounds(sorbaTrails, areaName);
+
+      showToast(areaName);
+
+      // Dim bike routes, show all SORBA trails
+      updateRouteOpacity(map.current, bikeRoutes, null, {
+        selected: 0.1,
+        unselected: 0.1,
+      });
+      updateSorbaOpacity(map.current, null);
+      // Brighten all trails slightly so area is visible
+      try {
+        map.current.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', 0.4);
+        map.current.setPaintProperty(SORBA_LAYER_ID, 'line-width', 3);
+      } catch {
+        // layer may not exist
+      }
+
+      if (bounds) {
+        try {
+          const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
+          const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
+          const isMobile = window.innerWidth <= 768;
+          const zoom = calculateZoomForBounds(bounds, isMobile);
+
+          map.current.flyTo({
+            center: [centerLng, centerLat],
+            zoom,
+            essential: true,
+            duration: 1000,
+          });
+        } catch (error) {
+          console.error('Error flying to area:', error);
         }
       }
     },
@@ -427,6 +537,32 @@ const MapboxMap = memo(function MapboxMap() {
     };
   }, [handleRouteSelect]);
 
+  // Set up trail-select and trail-deselect event listeners
+  useEffect(() => {
+    const trailSelectHandler = (e: Event) =>
+      handleTrailSelect(e as CustomEvent);
+    const trailDeselectHandler = () => handleTrailDeselect();
+
+    window.addEventListener('trail-select', trailSelectHandler);
+    window.addEventListener('trail-deselect', trailDeselectHandler);
+
+    return () => {
+      window.removeEventListener('trail-select', trailSelectHandler);
+      window.removeEventListener('trail-deselect', trailDeselectHandler);
+    };
+  }, [handleTrailSelect, handleTrailDeselect]);
+
+  // Set up area-select event listener
+  useEffect(() => {
+    const areaSelectHandler = (e: Event) => handleAreaSelect(e as CustomEvent);
+
+    window.addEventListener('area-select', areaSelectHandler);
+
+    return () => {
+      window.removeEventListener('area-select', areaSelectHandler);
+    };
+  }, [handleAreaSelect]);
+
   // Initialize map on component mount
   useEffect(() => {
     if (map.current) {
@@ -517,6 +653,35 @@ const MapboxMap = memo(function MapboxMap() {
               newMap.getCanvas().style.cursor = '';
             });
           });
+
+          // Initialize SORBA trail layer
+          if (newMap.getLayer(SORBA_LAYER_ID)) {
+            newMap.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', 0.15);
+            newMap.setPaintProperty(SORBA_LAYER_ID, 'line-width', 3);
+            initSorbaColors(newMap);
+            initTrailBoundsFromDefaults(sorbaTrails);
+
+            // Click handler for SORBA trails
+            newMap.on('click', SORBA_LAYER_ID, (e) => {
+              e.preventDefault();
+              const trailName = e.features?.[0]?.properties?.Trail;
+              if (trailName) {
+                window.dispatchEvent(
+                  new CustomEvent('trail-select', {
+                    detail: { trailName },
+                  }),
+                );
+              }
+            });
+
+            newMap.on('mouseenter', SORBA_LAYER_ID, () => {
+              newMap.getCanvas().style.cursor = 'pointer';
+            });
+
+            newMap.on('mouseleave', SORBA_LAYER_ID, () => {
+              newMap.getCanvas().style.cursor = '';
+            });
+          }
 
           // Force a resize to ensure proper display
           setTimeout(() => {

@@ -1,5 +1,6 @@
 import mapboxgl from 'mapbox-gl';
-import type { BikeRoute } from '@/data/geo_data';
+import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
+import { SORBA_LAYER_ID, SORBA_SOURCE_LAYER } from '@/data/geo_data';
 
 // Route utilities
 export function updateRouteOpacity(
@@ -98,6 +99,130 @@ export function findMarkerByCoordinates(
     const pos = marker.getLngLat();
     return pos.lng === coordinates[0] && pos.lat === coordinates[1];
   });
+}
+
+// SORBA trail utilities
+export function calculateTrailBounds(
+  map: mapboxgl.Map,
+  trailName: string,
+): mapboxgl.LngLatBounds | null {
+  const features = map.querySourceFeatures('composite', {
+    sourceLayer: SORBA_SOURCE_LAYER,
+    filter: ['==', ['get', 'Trail'], trailName],
+  });
+
+  if (features.length === 0) return null;
+
+  const bounds = new mapboxgl.LngLatBounds();
+  for (const feature of features) {
+    if (feature.geometry.type === 'LineString') {
+      for (const coord of feature.geometry.coordinates) {
+        bounds.extend(coord as [number, number]);
+      }
+    } else if (feature.geometry.type === 'MultiLineString') {
+      for (const line of feature.geometry.coordinates) {
+        for (const coord of line) {
+          bounds.extend(coord as [number, number]);
+        }
+      }
+    }
+  }
+
+  if (bounds.getNorth() !== undefined && bounds.getSouth() !== undefined) {
+    return bounds;
+  }
+  return null;
+}
+
+export function initTrailBoundsFromDefaults(trails: MountainBikeTrail[]): void {
+  for (const trail of trails) {
+    if (!trail.bounds && trail.defaultBounds) {
+      const [swLng, swLat, neLng, neLat] = trail.defaultBounds;
+      trail.bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+    }
+  }
+}
+
+export function getAreaBounds(
+  trails: MountainBikeTrail[],
+  areaName: string,
+): mapboxgl.LngLatBounds | null {
+  const bounds = new mapboxgl.LngLatBounds();
+  let hasCoords = false;
+  for (const trail of trails) {
+    if (trail.recArea !== areaName) continue;
+    if (trail.bounds) {
+      bounds.extend(trail.bounds);
+      hasCoords = true;
+    } else if (trail.defaultBounds) {
+      const [swLng, swLat, neLng, neLat] = trail.defaultBounds;
+      bounds.extend([swLng, swLat]);
+      bounds.extend([neLng, neLat]);
+      hasCoords = true;
+    }
+  }
+  return hasCoords ? bounds : null;
+}
+
+export function calculateAllTrailBounds(
+  map: mapboxgl.Map,
+  trails: MountainBikeTrail[],
+): void {
+  for (const trail of trails) {
+    if (!trail.bounds) {
+      trail.bounds = calculateTrailBounds(map, trail.trailName) ?? undefined;
+    }
+  }
+}
+
+// Data-driven color expression for SORBA trails based on difficulty rating
+const SORBA_COLOR_EXPRESSION: mapboxgl.Expression = [
+  'match',
+  ['get', 'rating'],
+  'easy',
+  '#16A34A',
+  'intermediate',
+  '#2563EB',
+  'advanced',
+  '#DC2626',
+  'expert',
+  '#1F2937',
+  '#6B7280', // unrated fallback
+];
+
+export function initSorbaColors(map: mapboxgl.Map): void {
+  try {
+    map.setPaintProperty(SORBA_LAYER_ID, 'line-color', SORBA_COLOR_EXPRESSION);
+  } catch {
+    // SORBA layer may not exist yet
+  }
+}
+
+export function updateSorbaOpacity(
+  map: mapboxgl.Map,
+  selectedTrailName: string | null,
+): void {
+  try {
+    if (selectedTrailName) {
+      map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', [
+        'case',
+        ['==', ['get', 'Trail'], selectedTrailName],
+        0.9,
+        0.15,
+      ]);
+      map.setPaintProperty(SORBA_LAYER_ID, 'line-width', [
+        'case',
+        ['==', ['get', 'Trail'], selectedTrailName],
+        6,
+        3,
+      ]);
+    } else {
+      map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', 0.15);
+      map.setPaintProperty(SORBA_LAYER_ID, 'line-width', 3);
+    }
+  } catch {
+    // SORBA layer may not exist yet
+  }
 }
 
 // Geocoding utility
