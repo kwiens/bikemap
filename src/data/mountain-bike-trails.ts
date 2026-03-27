@@ -8,6 +8,9 @@ import {
 export const MTN_BIKE_LAYER_ID = 'SORBA Regional Trails';
 export const MTN_BIKE_SOURCE_LAYER = 'SORBA_Regional_Trails-1oj4dx';
 
+export const GODSEY_LAYER_ID = 'Godsey Ridge Trails';
+export const GODSEY_SOURCE_LAYER = 'LineStrings';
+
 // Mountain Bike Trails Interface and Data
 export interface MountainBikeTrail {
   trailName: string; // Trail property value from Mapbox features

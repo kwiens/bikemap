@@ -9,6 +9,7 @@ import {
   bikeResources,
   mountainBikeTrails,
   MTN_BIKE_LAYER_ID,
+  GODSEY_LAYER_ID,
 } from '@/data/geo_data';
 import {
   createLocationMarker,
@@ -714,6 +715,44 @@ const MapboxMap = memo(function MapboxMap() {
             });
 
             newMap.on('mouseleave', MTN_BIKE_HIT_ID, () => {
+              newMap.getCanvas().style.cursor = '';
+            });
+          }
+
+          // Initialize Godsey Ridge trail layer
+          if (newMap.getLayer(GODSEY_LAYER_ID)) {
+            const godseyNameMap: Record<string, string> = {
+              'Green as built': 'Godsey Ridge Green',
+              'Blue as built 1': 'Godsey Ridge Blue 1',
+              'Blue as built 2': 'Godsey Ridge Blue 2',
+              Exper_Spur_As_built_21626: 'Godsey Ridge Expert Spur',
+              Expert_As_Built_1: 'Godsey Ridge Expert 1',
+              Expert_As_Built_2: 'Godsey Ridge Expert 2',
+            };
+
+            newMap.setLayoutProperty(GODSEY_LAYER_ID, 'line-cap', 'round');
+            newMap.setLayoutProperty(GODSEY_LAYER_ID, 'line-join', 'round');
+            newMap.setPaintProperty(GODSEY_LAYER_ID, 'line-width', 3);
+            newMap.setPaintProperty(GODSEY_LAYER_ID, 'line-opacity', 0.8);
+
+            newMap.on('click', GODSEY_LAYER_ID, (e) => {
+              e.preventDefault();
+              const rawName = e.features?.[0]?.properties?.Name;
+              const trailName = rawName ? godseyNameMap[rawName] : null;
+              if (trailName) {
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
+                    detail: { trailName },
+                  }),
+                );
+              }
+            });
+
+            newMap.on('mouseenter', GODSEY_LAYER_ID, () => {
+              newMap.getCanvas().style.cursor = 'pointer';
+            });
+
+            newMap.on('mouseleave', GODSEY_LAYER_ID, () => {
               newMap.getCanvas().style.cursor = '';
             });
           }

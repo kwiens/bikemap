@@ -5,6 +5,8 @@ export { bikeRoutes } from './bike-routes';
 export {
   MTN_BIKE_LAYER_ID,
   MTN_BIKE_SOURCE_LAYER,
+  GODSEY_LAYER_ID,
+  GODSEY_SOURCE_LAYER,
   mountainBikeTrails,
   regionFor,
 } from './mountain-bike-trails';

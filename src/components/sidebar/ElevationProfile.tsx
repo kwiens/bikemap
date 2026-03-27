@@ -108,7 +108,6 @@ export function ElevationProfile() {
       const { trailName: name } = (e as CustomEvent).detail;
       setTrailName(name);
     };
-    const handleTrailDeselect = () => setTrailName(null);
     const handleRouteSelect = (e: Event) => {
       const { routeId } = (e as CustomEvent).detail;
       const route = bikeRoutes.find((r) => r.id === routeId);
@@ -121,17 +120,12 @@ export function ElevationProfile() {
     const handleRouteDeselect = () => setTrailName(null);
 
     window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
-    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
     window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
     window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
 
     return () => {
       window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
-      window.removeEventListener(
-        MAP_EVENTS.TRAIL_DESELECT,
-        handleTrailDeselect,
-      );
       window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
       window.removeEventListener(
         MAP_EVENTS.ROUTE_DESELECT,
