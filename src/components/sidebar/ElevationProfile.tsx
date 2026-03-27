@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 
 function slugify(name: string): string {
@@ -18,6 +18,62 @@ const CHART_PADDING_TOP = 4;
 const CHART_PADDING_BOTTOM = 4;
 const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 
+// Grade-to-color mapping: green (flat) → yellow (moderate) → red (steep)
+// Uses absolute grade so both climbs and descents show intensity.
+const GRADE_YELLOW = 12; // 12% grade → transition from green to yellow
+const GRADE_RED = 25; // 25%+ grade → fully red
+
+function gradeToColor(grade: number): string {
+  const g = Math.min(Math.abs(grade), GRADE_RED);
+  if (g <= GRADE_YELLOW) {
+    // Green to yellow
+    const t = g / GRADE_YELLOW;
+    const r = Math.round(34 + t * (234 - 34));
+    const green = Math.round(197 + t * (179 - 197));
+    const b = Math.round(94 + t * (8 - 94));
+    return `rgb(${r},${green},${b})`;
+  }
+  // Yellow to red
+  const t = (g - GRADE_YELLOW) / (GRADE_RED - GRADE_YELLOW);
+  const r = Math.round(234 + t * (239 - 234));
+  const green = Math.round(179 - t * 179);
+  const b = Math.round(8 + t * (68 - 8));
+  return `rgb(${r},${green},${b})`;
+}
+
+function computeGradeColors(
+  points: [number, number, number, number][],
+): string[] {
+  if (points.length < 2) return points.map(() => gradeToColor(0));
+
+  // Compute raw grades
+  const rawGrades: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i][0] - points[i - 1][0];
+    const dy = points[i][1] - points[i - 1][1];
+    rawGrades.push(dx > 0 ? (dy / dx) * 100 : 0);
+  }
+
+  // Smooth with 5-point moving average for clean gradients
+  const smoothed: number[] = [];
+  const WINDOW = 2;
+  for (let i = 0; i < rawGrades.length; i++) {
+    let sum = 0;
+    let count = 0;
+    for (
+      let j = Math.max(0, i - WINDOW);
+      j <= Math.min(rawGrades.length - 1, i + WINDOW);
+      j++
+    ) {
+      sum += rawGrades[j];
+      count++;
+    }
+    smoothed.push(sum / count);
+  }
+
+  return smoothed.map((g) => gradeToColor(g));
+}
+
 export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
@@ -25,18 +81,13 @@ export function ElevationProfile() {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
 
-  // Listen for trail selection events
   useEffect(() => {
     const handleTrailSelect = (e: Event) => {
       const { trailName: name } = (e as CustomEvent).detail;
       setTrailName(name);
     };
-    const handleTrailDeselect = () => {
-      setTrailName(null);
-    };
-    const handleRouteSelect = () => {
-      setTrailName(null);
-    };
+    const handleTrailDeselect = () => setTrailName(null);
+    const handleRouteSelect = () => setTrailName(null);
 
     window.addEventListener('trail-select', handleTrailSelect);
     window.addEventListener('trail-deselect', handleTrailDeselect);
@@ -49,7 +100,6 @@ export function ElevationProfile() {
     };
   }, []);
 
-  // Fetch profile when trail changes
   useEffect(() => {
     if (!trailName) {
       setProfile(null);
@@ -105,6 +155,11 @@ export function ElevationProfile() {
     );
   }, []);
 
+  const gradeColors = useMemo(
+    () => (profile ? computeGradeColors(profile.profile) : []),
+    [profile],
+  );
+
   if (!trailName || loading || !profile || profile.profile.length < 2) {
     return null;
   }
@@ -119,14 +174,20 @@ export function ElevationProfile() {
     PLOT_HEIGHT -
     ((e - profile.min) / yRange) * PLOT_HEIGHT;
 
-  const lineSegments = points
+  const linePath = points
     .map(
       (p, i) =>
         `${i === 0 ? 'M' : 'L'}${xScale(p[0]).toFixed(1)} ${yScale(p[1]).toFixed(1)}`,
     )
     .join(' ');
 
-  const areaPath = `${lineSegments} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
+  const areaPath = `${linePath} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
+
+  // Build gradient stops from grade colors
+  const gradientStops = gradeColors.map((color, i) => {
+    const offset = maxDist > 0 ? points[i][0] / maxDist : 0;
+    return { offset, color };
+  });
 
   return (
     <div className="elevation-overlay">
@@ -164,18 +225,36 @@ export function ElevationProfile() {
       >
         <defs>
           <linearGradient id="elev-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
+            <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#94a3b8" stopOpacity="0.03" />
+          </linearGradient>
+          <linearGradient
+            id="grade-stroke"
+            x1="0"
+            y1="0"
+            x2="1"
+            y2="0"
+            gradientUnits="objectBoundingBox"
+          >
+            {gradientStops.map((s) => (
+              <stop
+                key={s.offset}
+                offset={`${(s.offset * 100).toFixed(2)}%`}
+                stopColor={s.color}
+              />
+            ))}
           </linearGradient>
         </defs>
 
         <path d={areaPath} fill="url(#elev-fill)" />
         <path
-          d={lineSegments}
+          d={linePath}
           fill="none"
-          stroke="#3b82f6"
-          strokeWidth="1.5"
+          stroke="url(#grade-stroke)"
+          strokeWidth="3"
           vectorEffect="non-scaling-stroke"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
 
         {hoverIndex !== null && (
@@ -193,8 +272,10 @@ export function ElevationProfile() {
             <circle
               cx={xScale(points[hoverIndex][0])}
               cy={yScale(points[hoverIndex][1])}
-              r="3"
-              fill="#3b82f6"
+              r="4"
+              fill={gradeColors[hoverIndex] || '#22c55e'}
+              stroke="white"
+              strokeWidth="1.5"
               vectorEffect="non-scaling-stroke"
             />
           </>
