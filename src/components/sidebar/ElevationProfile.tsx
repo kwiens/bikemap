@@ -113,6 +113,11 @@ export function ElevationProfile() {
     };
     const handleRouteSelect = (e: Event) => {
       const { routeId } = (e as CustomEvent).detail;
+      if (routeId === 'Chatt_TPL_Trails-public') {
+        sourceRef.current = null;
+        setTrailName(null);
+        return;
+      }
       const route = bikeRoutes.find((r) => r.id === routeId);
       sourceRef.current = 'route';
       setTrailName(route?.name ?? null);
