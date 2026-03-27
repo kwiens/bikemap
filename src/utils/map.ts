@@ -225,6 +225,25 @@ export function updateSorbaOpacity(
   }
 }
 
+export function highlightSorbaArea(map: mapboxgl.Map, areaName: string): void {
+  try {
+    map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', [
+      'case',
+      ['==', ['get', 'Rec_Area'], areaName],
+      0.9,
+      0.1,
+    ]);
+    map.setPaintProperty(SORBA_LAYER_ID, 'line-width', [
+      'case',
+      ['==', ['get', 'Rec_Area'], areaName],
+      4,
+      2,
+    ]);
+  } catch {
+    // SORBA layer may not exist yet
+  }
+}
+
 // Geocoding utility
 export async function geocodeAddress(
   address: string,

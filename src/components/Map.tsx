@@ -256,19 +256,12 @@ const MapboxMap = memo(function MapboxMap() {
 
       showToast(areaName);
 
-      // Dim bike routes, show all SORBA trails
+      // Dim bike routes, highlight trails in selected area
       updateRouteOpacity(map.current, bikeRoutes, null, {
         selected: 0.1,
         unselected: 0.1,
       });
-      updateSorbaOpacity(map.current, null);
-      // Brighten all trails slightly so area is visible
-      try {
-        map.current.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', 0.4);
-        map.current.setPaintProperty(SORBA_LAYER_ID, 'line-width', 3);
-      } catch {
-        // layer may not exist
-      }
+      highlightSorbaArea(map.current, areaName);
 
       if (bounds) {
         try {
