@@ -518,15 +518,20 @@
 .elevation-overlay {
   position: absolute;
   bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80%;
+  left: 296px;
+  right: 16px;
   background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   padding: 10px 16px 6px;
   z-index: 1000;
   pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+  .elevation-overlay {
+    left: 16px;
+  }
 }
 
 .elevation-overlay-header {
