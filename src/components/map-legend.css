@@ -480,33 +480,11 @@
   color: var(--color-gray-400);
 }
 
-.trail-rating {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 8px;
+.trail-distance {
+  font-size: 11px;
+  color: var(--color-gray-500);
   margin-left: auto;
-  text-transform: capitalize;
-}
-
-.trail-rating-easy {
-  background-color: #dcfce7;
-  color: #166534;
-}
-
-.trail-rating-intermediate {
-  background-color: #dbeafe;
-  color: #1e40af;
-}
-
-.trail-rating-advanced {
-  background-color: #fee2e2;
-  color: #991b1b;
-}
-
-.trail-rating-expert {
-  background-color: #1f2937;
-  color: #f9fafb;
+  flex-shrink: 0;
 }
 
 /* Layer toggle styles */

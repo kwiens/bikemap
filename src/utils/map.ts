@@ -1,6 +1,6 @@
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
-import { SORBA_LAYER_ID, SORBA_SOURCE_LAYER } from '@/data/geo_data';
+import { SORBA_LAYER_ID, SORBA_SOURCE_LAYER, regionFor } from '@/data/geo_data';
 
 // Route utilities
 export function updateRouteOpacity(
@@ -150,7 +150,8 @@ export function getAreaBounds(
   const bounds = new mapboxgl.LngLatBounds();
   let hasCoords = false;
   for (const trail of trails) {
-    if (trail.recArea !== areaName && trail.region !== areaName) continue;
+    if (trail.recArea !== areaName && regionFor(trail.recArea) !== areaName)
+      continue;
     if (trail.bounds) {
       bounds.extend(trail.bounds);
       hasCoords = true;
@@ -230,9 +231,8 @@ export function highlightSorbaArea(
   trails: MountainBikeTrail[],
   areaName: string,
 ): void {
-  // Match by recArea or region name
   const trailNames = trails
-    .filter((t) => t.recArea === areaName || t.region === areaName)
+    .filter((t) => t.recArea === areaName || regionFor(t.recArea) === areaName)
     .map((t) => t.trailName);
 
   if (trailNames.length === 0) return;
