@@ -45,3 +45,4 @@ yarn-error.log*
 /playwright/.cache/
 .auth/
 .env.test
+scripts/.tile_cache/

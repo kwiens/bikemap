@@ -16,6 +16,14 @@ import gzip, json, math, os, re, struct, sys, time
 from io import BytesIO
 from PIL import Image
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# Session with automatic retries for transient failures
+_session = requests.Session()
+_session.mount('https://', HTTPAdapter(
+    max_retries=Retry(total=5, backoff_factor=0.5,
+                      status_forcelist=[429, 500, 502, 503, 504])))
 
 # --- Constants ---
 
@@ -30,6 +38,7 @@ METERS_TO_FEET = 3.28084
 EARTH_RADIUS_FT = 20902231.0
 OUTPUT_DIR = 'public/data/elevation'
 GEO_DATA_PATH = 'src/data/geo_data.ts'
+TILE_CACHE_DIR = 'scripts/.tile_cache'
 
 # --- Caches ---
 
@@ -233,31 +242,66 @@ def tiles_covering_bbox(bbox, zoom):
 
 
 def fetch_mvt(z, x, y):
-    """Fetch an MVT tile, caching results."""
+    """Fetch an MVT tile with local disk + memory caching."""
     key = (z, x, y)
     if key in mvt_cache:
         return mvt_cache[key]
+
+    # Check disk cache
+    cache_path = os.path.join(TILE_CACHE_DIR, 'mvt', f'{z}_{x}_{y}.mvt')
+    if os.path.exists(cache_path):
+        with open(cache_path, 'rb') as f:
+            data = f.read()
+        if len(data) == 0:
+            mvt_cache[key] = None
+            return None
+        mvt_cache[key] = data
+        return data
+
+    # Fetch from API
     url = (f'https://api.mapbox.com/v4/{MVT_TILESET}'
            f'/{z}/{x}/{y}.mvt?access_token={MAPBOX_TOKEN}')
-    resp = requests.get(url)
+    resp = _session.get(url)
+
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     if resp.status_code == 404:
+        with open(cache_path, 'wb') as f:
+            pass  # empty file marks 404
         mvt_cache[key] = None
         return None
+
     resp.raise_for_status()
+    with open(cache_path, 'wb') as f:
+        f.write(resp.content)
     mvt_cache[key] = resp.content
     return resp.content
 
 
 def fetch_terrain_tile(tile_x, tile_y):
-    """Fetch and cache a terrain-rgb tile at TERRAIN_ZOOM."""
+    """Fetch a terrain-rgb tile with local disk + memory caching."""
     key = (tile_x, tile_y)
     if key in terrain_cache:
         return terrain_cache[key]
+
+    # Check disk cache
+    cache_path = os.path.join(
+        TILE_CACHE_DIR, 'terrain', f'{TERRAIN_ZOOM}_{tile_x}_{tile_y}.png')
+    if os.path.exists(cache_path):
+        img = Image.open(cache_path)
+        terrain_cache[key] = img
+        return img
+
+    # Fetch from API
     url = (f'https://api.mapbox.com/v4/mapbox.terrain-rgb'
            f'/{TERRAIN_ZOOM}/{tile_x}/{tile_y}.pngraw'
            f'?access_token={MAPBOX_TOKEN}')
-    resp = requests.get(url)
+    resp = _session.get(url)
     resp.raise_for_status()
+
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, 'wb') as f:
+        f.write(resp.content)
+
     img = Image.open(BytesIO(resp.content))
     terrain_cache[key] = img
     return img
@@ -322,8 +366,14 @@ def deduplicate_segments(segments):
 def chain_segments(segments):
     """Order segments into a continuous chain by matching endpoints.
 
-    For each unchained segment, find one whose start/end is closest to the
-    current chain's end. Reverse the segment if needed.
+    Checks all four endpoint combinations for each candidate segment:
+      chain tail  -> seg start  (append as-is)
+      chain tail  -> seg end    (append reversed)
+      chain head  -> seg end    (prepend as-is)
+      chain head  -> seg start  (prepend reversed)
+
+    This handles reversed segments in the tileset where two segments
+    share start-start or end-end endpoints.
     """
     if len(segments) <= 1:
         return segments
@@ -336,39 +386,66 @@ def chain_segments(segments):
     # Start with the longest segment
     remaining = list(range(len(segments)))
     remaining.sort(key=lambda i: len(segments[i]), reverse=True)
-    chain = [segments[remaining.pop(0)]]
+
+    # Build a single merged polyline
+    chain = list(segments[remaining.pop(0)])
 
     while remaining:
-        chain_end = chain[-1][-1]
+        chain_head = chain[0]
+        chain_tail = chain[-1]
+
         best_idx = None
         best_dist = float('inf')
+        # action: 'append' or 'prepend', reverse: whether to flip the segment
+        best_action = 'append'
         best_reverse = False
 
         for idx in remaining:
             seg = segments[idx]
-            d_start = dist_deg(chain_end, seg[0])
-            d_end = dist_deg(chain_end, seg[-1])
-            if d_start < best_dist:
-                best_dist = d_start
-                best_idx = idx
-                best_reverse = False
-            if d_end < best_dist:
-                best_dist = d_end
-                best_idx = idx
-                best_reverse = True
+
+            # Append to tail: tail -> seg start
+            d = dist_deg(chain_tail, seg[0])
+            if d < best_dist:
+                best_dist, best_idx = d, idx
+                best_action, best_reverse = 'append', False
+
+            # Append to tail (reversed): tail -> seg end
+            d = dist_deg(chain_tail, seg[-1])
+            if d < best_dist:
+                best_dist, best_idx = d, idx
+                best_action, best_reverse = 'append', True
+
+            # Prepend to head: head -> seg end
+            d = dist_deg(chain_head, seg[-1])
+            if d < best_dist:
+                best_dist, best_idx = d, idx
+                best_action, best_reverse = 'prepend', False
+
+            # Prepend to head (reversed): head -> seg start
+            d = dist_deg(chain_head, seg[0])
+            if d < best_dist:
+                best_dist, best_idx = d, idx
+                best_action, best_reverse = 'prepend', True
 
         seg = segments[best_idx]
         remaining.remove(best_idx)
+
         if best_reverse:
             seg = list(reversed(seg))
 
-        # If close enough, merge into current chain; otherwise start new segment
         if best_dist <= TOLERANCE:
-            chain[-1] = chain[-1] + seg
+            if best_action == 'append':
+                chain.extend(seg)
+            else:
+                chain = seg + chain
         else:
-            chain.append(seg)
+            # Gap too large — append anyway (profile will show the jump)
+            if best_action == 'prepend':
+                chain = seg + chain
+            else:
+                chain.extend(seg)
 
-    return chain
+    return [chain]
 
 
 def interpolate_along_line(coords, step_ft):

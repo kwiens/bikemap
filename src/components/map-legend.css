@@ -494,8 +494,7 @@
   left: 50%;
   transform: translateX(-50%);
   width: 80%;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
+  background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   padding: 10px 16px 6px;
@@ -546,27 +545,6 @@
   min-height: 16px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .elevation-overlay {
-    background: rgba(31, 41, 55, 0.95);
-  }
-
-  .elevation-overlay-title {
-    color: var(--color-gray-200);
-  }
-
-  .elevation-overlay .elevation-stats {
-    color: var(--color-gray-400);
-  }
-
-  .elevation-chart {
-    background-color: rgba(55, 65, 81, 0.4);
-  }
-
-  .elevation-tooltip {
-    color: var(--color-gray-400);
-  }
-}
 
 /* Layer toggle styles */
 .layer-toggle {

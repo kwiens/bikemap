@@ -43,6 +43,12 @@
 - Pull requests should include a clear description, linked issues, and screenshots for UI changes.
 - Ensure `pnpm lint` passes before requesting review.
 
+## Mapbox UI Overlays
+- The Mapbox canvas (`.map-container`) uses `position: absolute` with `z-index: 500` and covers the full viewport. It will obscure any sibling or child elements with a lower z-index.
+- To overlay UI on the map, render elements **inside the `MapboxMap` component's fragment** (the `<>` in its return), as siblings of `.map-container`. Do **not** place overlays in the outer `BikeMap` wrapper — they will be hidden behind the map canvas.
+- Overlay elements must use `z-index: 1000` or higher and `position: absolute` to appear above the map. See `.route-toast` and `.elevation-overlay` in `map.css` / `map-legend.css` for working examples.
+- The sidebar (MapLegend) manages its own stacking context separately and is not affected by this.
+
 ## Configuration & Secrets
 - Mapbox credentials belong in `.env.local`; see `.env.example` for required keys.
 - Never commit secrets or `.env.local` to version control.
