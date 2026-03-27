@@ -395,6 +395,33 @@
   border-radius: 4px;
 }
 
+/* Trail difficulty shape indicators */
+.trail-shape {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.trail-shape-easy {
+  border-radius: 50%;
+}
+
+.trail-shape-intermediate {
+  border-radius: 2px;
+}
+
+.trail-shape-advanced,
+.trail-shape-expert {
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  border-radius: 1px;
+}
+
+.trail-shape-unrated {
+  border-radius: 50%;
+}
+
 .route-name {
   font-weight: 500;
 }

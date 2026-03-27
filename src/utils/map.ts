@@ -201,9 +201,9 @@ const SORBA_COLOR_EXPRESSION: mapboxgl.Expression = [
   'intermediate',
   '#2563EB',
   'advanced',
-  '#DC2626',
+  '#374151',
   'expert',
-  '#1F2937',
+  '#000000',
   '#6B7280', // unrated fallback
 ];
 

@@ -154,7 +154,7 @@ export function MountainBikeTrails({
                             >
                               <div className="card-header">
                                 <div
-                                  className="route-color-indicator"
+                                  className={`trail-shape trail-shape-${trail.rating || 'unrated'}`}
                                   style={{ backgroundColor: trail.color }}
                                 />
                                 <span className="route-name">

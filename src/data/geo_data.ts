@@ -151,8 +151,8 @@ export function regionFor(recArea: string): string {
 // Trail colors by difficulty rating
 const TRAIL_COLOR_EASY = '#16A34A';
 const TRAIL_COLOR_INTERMEDIATE = '#2563EB';
-const TRAIL_COLOR_ADVANCED = '#DC2626';
-const TRAIL_COLOR_EXPERT = '#1F2937';
+const TRAIL_COLOR_ADVANCED = '#374151';
+const TRAIL_COLOR_EXPERT = '#000000';
 const TRAIL_COLOR_UNRATED = '#6B7280';
 const TRAIL_COLOR_GREENWAY = '#059669';
 
