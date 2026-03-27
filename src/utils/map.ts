@@ -264,7 +264,7 @@ export function initSorbaLayers(map: mapboxgl.Map): void {
           'line-color': '#ffffff',
           'line-width': 0,
           'line-opacity': 0,
-          'line-blur': 6,
+          'line-blur': 10,
         },
       },
       SORBA_CASING_ID,
@@ -274,6 +274,7 @@ export function initSorbaLayers(map: mapboxgl.Map): void {
   // Set the main trail layer to round caps/joins and thinner default
   map.setLayoutProperty(SORBA_LAYER_ID, 'line-cap', 'round');
   map.setLayoutProperty(SORBA_LAYER_ID, 'line-join', 'round');
+  map.setLayoutProperty(SORBA_LAYER_ID, 'line-round-limit', 0.5);
 }
 
 export function updateSorbaOpacity(
@@ -317,13 +318,13 @@ export function updateSorbaOpacity(
         map.setPaintProperty(SORBA_GLOW_ID, 'line-opacity', [
           'case',
           ['==', ['get', 'Trail'], selectedTrailName],
-          0.5,
+          0.6,
           0,
         ]);
         map.setPaintProperty(SORBA_GLOW_ID, 'line-width', [
           'case',
           ['==', ['get', 'Trail'], selectedTrailName],
-          16,
+          24,
           0,
         ]);
       }
