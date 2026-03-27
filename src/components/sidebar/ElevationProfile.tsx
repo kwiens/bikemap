@@ -60,10 +60,25 @@ export function ElevationProfile({ trailName }: ElevationProfileProps) {
         if (profile.profile[mid][0] < targetDist) lo = mid + 1;
         else hi = mid;
       }
-      setHoverIndex(Math.max(0, Math.min(lo, profile.profile.length - 1)));
+      const idx = Math.max(0, Math.min(lo, profile.profile.length - 1));
+      setHoverIndex(idx);
+
+      const pt = profile.profile[idx];
+      window.dispatchEvent(
+        new CustomEvent('elevation-hover', {
+          detail: { lng: pt[2], lat: pt[3] },
+        }),
+      );
     },
     [profile],
   );
+
+  const handleMouseLeave = useCallback(() => {
+    setHoverIndex(null);
+    window.dispatchEvent(
+      new CustomEvent('elevation-hover', { detail: { lng: null, lat: null } }),
+    );
+  }, []);
 
   if (loading) {
     return <div className="elevation-loading">Loading elevation...</div>;
@@ -99,7 +114,7 @@ export function ElevationProfile({ trailName }: ElevationProfileProps) {
         viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
         className="elevation-chart"
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoverIndex(null)}
+        onMouseLeave={handleMouseLeave}
         preserveAspectRatio="none"
         ref={(el) => {
           if (el) {

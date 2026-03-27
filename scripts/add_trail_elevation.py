@@ -481,7 +481,7 @@ def generate_profile(trail_name, segments):
                 dist = haversine_ft(prev_coord[0], prev_coord[1], lng, lat)
                 cumulative += dist
 
-            profile.append([round(cumulative), elev])
+            profile.append([round(cumulative), elev, round(lng, 6), round(lat, 6)])
             min_elev = min(min_elev, elev)
             max_elev = max(max_elev, elev)
 

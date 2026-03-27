@@ -556,6 +556,44 @@ const MapboxMap = memo(function MapboxMap() {
     };
   }, [handleAreaSelect]);
 
+  // Elevation profile hover marker
+  useEffect(() => {
+    let marker: mapboxgl.Marker | null = null;
+
+    const el = document.createElement('div');
+    el.style.width = '12px';
+    el.style.height = '12px';
+    el.style.borderRadius = '50%';
+    el.style.backgroundColor = '#3b82f6';
+    el.style.border = '2px solid white';
+    el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.4)';
+
+    const handler = (e: Event) => {
+      const { lng, lat } = (e as CustomEvent).detail;
+      if (lng === null || lat === null) {
+        if (marker) {
+          marker.remove();
+          marker = null;
+        }
+        return;
+      }
+      if (!map.current) return;
+      if (!marker) {
+        marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([lng, lat])
+          .addTo(map.current);
+      } else {
+        marker.setLngLat([lng, lat]);
+      }
+    };
+
+    window.addEventListener('elevation-hover', handler);
+    return () => {
+      window.removeEventListener('elevation-hover', handler);
+      if (marker) marker.remove();
+    };
+  }, []);
+
   // Initialize map on component mount
   useEffect(() => {
     if (map.current) {

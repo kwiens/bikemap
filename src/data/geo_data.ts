@@ -118,7 +118,7 @@ export interface ElevationProfile {
   loss: number;
   min: number;
   max: number;
-  profile: [number, number][]; // [cumulative_distance_ft, elevation_ft]
+  profile: [number, number, number, number][]; // [distance_ft, elevation_ft, lng, lat]
 }
 
 // Maps recArea to its geographic region
