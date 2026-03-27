@@ -155,13 +155,15 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       setSelectedTrail(null);
       setSelectedRoute(null);
 
+      // Deselect first — trail-deselect resets SORBA opacity,
+      // so it must fire before area-select sets the highlight
+      window.dispatchEvent(new CustomEvent('route-deselect'));
+      window.dispatchEvent(new CustomEvent('trail-deselect'));
       window.dispatchEvent(
         new CustomEvent('area-select', {
           detail: { areaName },
         }),
       );
-      window.dispatchEvent(new CustomEvent('route-deselect'));
-      window.dispatchEvent(new CustomEvent('trail-deselect'));
 
       if (window.innerWidth <= 768 && isOpen) {
         toggle();
