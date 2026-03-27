@@ -122,4 +122,66 @@ describe('MountainBikeTrails', () => {
 
     expect(onAreaSelect).toHaveBeenCalledWith('Region 1');
   });
+
+  it('search filters trails by name', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    const searchInput = screen.getByPlaceholderText('Search trails...');
+    fireEvent.change(searchInput, { target: { value: 'Trail A' } });
+
+    expect(screen.getByText('Trail A')).toBeInTheDocument();
+    expect(screen.queryByText('Trail B')).not.toBeInTheDocument();
+    expect(screen.queryByText('Trail C')).not.toBeInTheDocument();
+  });
+
+  it('search is case insensitive', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    const searchInput = screen.getByPlaceholderText('Search trails...');
+    fireEvent.change(searchInput, { target: { value: 'trail a' } });
+
+    expect(screen.getByText('Trail A')).toBeInTheDocument();
+  });
+
+  it('search matches region name', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    const searchInput = screen.getByPlaceholderText('Search trails...');
+    fireEvent.change(searchInput, { target: { value: 'Region 2' } });
+
+    // Trail D is in Area 3 which maps to Region 2
+    expect(screen.getByText('Trail D')).toBeInTheDocument();
+    expect(screen.queryByText('Trail A')).not.toBeInTheDocument();
+  });
+
+  it('search matches rec area name', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    const searchInput = screen.getByPlaceholderText('Search trails...');
+    fireEvent.change(searchInput, { target: { value: 'Area 2' } });
+
+    expect(screen.getByText('Trail C')).toBeInTheDocument();
+    expect(screen.queryByText('Trail A')).not.toBeInTheDocument();
+  });
+
+  it('shows no trails found for unmatched search', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    const searchInput = screen.getByPlaceholderText('Search trails...');
+    fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
+
+    expect(screen.getByText('No trails found')).toBeInTheDocument();
+  });
+
+  it('empty search shows default grouped view', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    const searchInput = screen.getByPlaceholderText('Search trails...');
+    fireEvent.change(searchInput, { target: { value: 'Trail A' } });
+    fireEvent.change(searchInput, { target: { value: '' } });
+
+    // Regions should be visible again
+    expect(screen.getByText('Region 1')).toBeInTheDocument();
+    expect(screen.getByText('Region 2')).toBeInTheDocument();
+  });
 });

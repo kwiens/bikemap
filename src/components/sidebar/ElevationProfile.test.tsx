@@ -1,34 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { slugify } from '@/utils/string';
 import {
   gradeToColor,
   computeGradeColors,
   downsampleStops,
+  findClosestProfileIndex,
+  profilePointToXY,
 } from './ElevationProfile';
-
-describe('slugify', () => {
-  it('lowercases and replaces spaces with dashes', () => {
-    expect(slugify('Big Forest')).toBe('big-forest');
-  });
-
-  it('strips apostrophes', () => {
-    expect(slugify("Stringer's Ridge")).toBe('stringers-ridge');
-  });
-
-  it('replaces slashes with dashes and collapses them', () => {
-    expect(slugify('Access Road / Old RR Grade')).toBe(
-      'access-road-old-rr-grade',
-    );
-  });
-
-  it('replaces ampersands with dashes', () => {
-    expect(slugify('Trail & Other')).toBe('trail-other');
-  });
-
-  it('collapses multiple spaces and dashes', () => {
-    expect(slugify('foo   bar--baz')).toBe('foo-bar-baz');
-  });
-});
+import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 
 describe('gradeToColor', () => {
   it('returns green for grade 0', () => {
@@ -123,5 +101,81 @@ describe('downsampleStops', () => {
     const stops = downsampleStops(points, colors, maxDist);
     expect(stops[0].offset).toBe(0);
     expect(stops[stops.length - 1].offset).toBeCloseTo(1, 2);
+  });
+});
+
+describe('findClosestProfileIndex', () => {
+  const points: [number, number, number, number][] = [
+    [0, 100, -85.3, 35.0],
+    [100, 110, -85.301, 35.001],
+    [200, 120, -85.302, 35.002],
+    [300, 130, -85.303, 35.003],
+  ];
+
+  it('returns null for empty array', () => {
+    expect(findClosestProfileIndex([], -85.3, 35.0)).toBeNull();
+  });
+
+  it('returns index of closest point', () => {
+    expect(findClosestProfileIndex(points, -85.302, 35.002)).toBe(2);
+  });
+
+  it('returns first point when location is at start', () => {
+    expect(findClosestProfileIndex(points, -85.3, 35.0)).toBe(0);
+  });
+
+  it('returns null when location is too far from trail', () => {
+    // ~1 degree away, well beyond 0.002 threshold
+    expect(findClosestProfileIndex(points, -86.0, 36.0)).toBeNull();
+  });
+
+  it('returns closest even when between two points', () => {
+    // Between point 1 and point 2
+    const idx = findClosestProfileIndex(points, -85.3015, 35.0015);
+    expect(idx).toBe(1);
+  });
+});
+
+describe('profilePointToXY', () => {
+  const points: [number, number, number, number][] = [
+    [0, 100, -85.3, 35.0],
+    [500, 150, -85.301, 35.001],
+    [1000, 200, -85.302, 35.002],
+  ];
+  const profile: ElevationProfileData = {
+    trail: 'Test',
+    distance: 1000,
+    gain: 100,
+    loss: 0,
+    min: 100,
+    max: 200,
+    profile: points,
+  };
+
+  it('returns x proportional to distance', () => {
+    const { x } = profilePointToXY(points, 0, profile, 800);
+    expect(x).toBe(0);
+
+    const { x: xMid } = profilePointToXY(points, 1, profile, 800);
+    expect(xMid).toBe(400);
+
+    const { x: xEnd } = profilePointToXY(points, 2, profile, 800);
+    expect(xEnd).toBe(800);
+  });
+
+  it('returns y inverted (higher elevation = lower y)', () => {
+    const { y: yLow } = profilePointToXY(points, 0, profile, 800);
+    const { y: yHigh } = profilePointToXY(points, 2, profile, 800);
+    expect(yHigh).toBeLessThan(yLow);
+  });
+
+  it('handles min === max (yRange defaults to 1)', () => {
+    const flatProfile: ElevationProfileData = {
+      ...profile,
+      min: 100,
+      max: 100,
+    };
+    const { y } = profilePointToXY(points, 0, flatProfile, 800);
+    expect(Number.isFinite(y)).toBe(true);
   });
 });

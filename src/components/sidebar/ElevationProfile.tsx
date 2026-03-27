@@ -96,7 +96,7 @@ const profileCache = new Map<string, ElevationProfileData>();
 
 // Find the closest profile point to a given lng/lat using squared Euclidean distance
 // (with latitude correction for longitude scaling)
-function findClosestProfileIndex(
+export function findClosestProfileIndex(
   points: [number, number, number, number][],
   lng: number,
   lat: number,
@@ -505,7 +505,7 @@ const ElevationSvg = React.memo(function ElevationSvg({
   );
 });
 
-function profilePointToXY(
+export function profilePointToXY(
   points: [number, number, number, number][],
   index: number,
   profile: ElevationProfileData,
