@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { slugify } from '@/utils/string';
 import {
-  slugify,
   gradeToColor,
   computeGradeColors,
   downsampleStops,

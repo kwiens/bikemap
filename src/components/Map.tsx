@@ -106,7 +106,6 @@ const MapboxMap = memo(function MapboxMap() {
         }
       },
       () => {
-        //console.log(positionError);
         if (locationMarker.current) {
           locationMarker.current.remove();
           locationMarker.current = null;

@@ -35,15 +35,16 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
   const toggle = useCallback(() => {
-    setIsOpen(!isOpen);
-
-    // Dispatch event for map resizing
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
-        detail: { isOpen: !isOpen },
-      }),
-    );
-  }, [isOpen]);
+    setIsOpen((prev) => {
+      const next = !prev;
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
+          detail: { isOpen: next },
+        }),
+      );
+      return next;
+    });
+  }, []);
 
   // Handle clicks/taps outside the sidebar (mobile only)
   useEffect(() => {

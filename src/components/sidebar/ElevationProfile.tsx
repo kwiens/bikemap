@@ -11,8 +11,6 @@ import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { slugify } from '@/utils/string';
 import { MAP_EVENTS } from '@/events';
 
-export { slugify };
-
 const CHART_HEIGHT = 100;
 const CHART_PADDING_TOP = 4;
 const CHART_PADDING_BOTTOM = 4;
@@ -270,19 +268,29 @@ export function ElevationProfile() {
           </span>
         </div>
 
-        <ElevationSvg
-          points={points}
-          gradeColors={gradeColors}
-          profile={profile}
-          chartWidth={chartWidth}
-          hoverIndex={hoverIndex}
-          svgRef={svgRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={clearHover}
-          onTouchStart={handleTouch}
-          onTouchMove={handleTouch}
-          onTouchEnd={clearHover}
-        />
+        <div style={{ position: 'relative' }}>
+          <ElevationSvg
+            points={points}
+            gradeColors={gradeColors}
+            profile={profile}
+            chartWidth={chartWidth}
+            svgRef={svgRef}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={clearHover}
+            onTouchStart={handleTouch}
+            onTouchMove={handleTouch}
+            onTouchEnd={clearHover}
+          />
+          {hoverIndex !== null && (
+            <HoverIndicator
+              points={points}
+              gradeColors={gradeColors}
+              profile={profile}
+              chartWidth={chartWidth}
+              hoverIndex={hoverIndex}
+            />
+          )}
+        </div>
       </div>
 
       <div className="elevation-tooltip">
@@ -294,13 +302,12 @@ export function ElevationProfile() {
   );
 }
 
-// Memoized SVG to avoid rebuilding paths on every hover
+// Memoized SVG — paths and gradients only rebuild when profile/width changes, not on hover
 const ElevationSvg = React.memo(function ElevationSvg({
   points,
   gradeColors,
   profile,
   chartWidth,
-  hoverIndex,
   svgRef,
   onMouseMove,
   onMouseLeave,
@@ -312,7 +319,6 @@ const ElevationSvg = React.memo(function ElevationSvg({
   gradeColors: string[];
   profile: ElevationProfileData;
   chartWidth: number;
-  hoverIndex: number | null;
   svgRef: React.RefObject<SVGSVGElement | null>;
   onMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
   onMouseLeave: () => void;
@@ -351,6 +357,8 @@ const ElevationSvg = React.memo(function ElevationSvg({
       onTouchEnd={onTouchEnd}
       preserveAspectRatio="none"
       ref={svgRef}
+      role="img"
+      aria-label={`Elevation profile for ${profile.trail}`}
     >
       <defs>
         <linearGradient
@@ -409,30 +417,58 @@ const ElevationSvg = React.memo(function ElevationSvg({
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-
-      {hoverIndex !== null && (
-        <>
-          <line
-            x1={xScale(points[hoverIndex][0])}
-            y1={CHART_PADDING_TOP}
-            x2={xScale(points[hoverIndex][0])}
-            y2={CHART_HEIGHT - CHART_PADDING_BOTTOM}
-            stroke="#6b7280"
-            strokeWidth="1"
-            strokeDasharray="3,3"
-            vectorEffect="non-scaling-stroke"
-          />
-          <circle
-            cx={xScale(points[hoverIndex][0])}
-            cy={yScale(points[hoverIndex][1])}
-            r="4"
-            fill={gradeColors[hoverIndex] || '#22c55e'}
-            stroke="white"
-            strokeWidth="1.5"
-            vectorEffect="non-scaling-stroke"
-          />
-        </>
-      )}
     </svg>
   );
 });
+
+// Lightweight hover overlay — renders on every mouse move without rebuilding paths
+function HoverIndicator({
+  points,
+  gradeColors,
+  profile,
+  chartWidth,
+  hoverIndex,
+}: {
+  points: [number, number, number, number][];
+  gradeColors: string[];
+  profile: ElevationProfileData;
+  chartWidth: number;
+  hoverIndex: number;
+}) {
+  const maxDist = points[points.length - 1][0];
+  const yRange = profile.max - profile.min || 1;
+  const x = (points[hoverIndex][0] / maxDist) * chartWidth;
+  const y =
+    CHART_PADDING_TOP +
+    PLOT_HEIGHT -
+    ((points[hoverIndex][1] - profile.min) / yRange) * PLOT_HEIGHT;
+
+  return (
+    <svg
+      viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
+      className="elevation-chart"
+      preserveAspectRatio="none"
+      style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+    >
+      <line
+        x1={x}
+        y1={CHART_PADDING_TOP}
+        x2={x}
+        y2={CHART_HEIGHT - CHART_PADDING_BOTTOM}
+        stroke="#6b7280"
+        strokeWidth="1"
+        strokeDasharray="3,3"
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle
+        cx={x}
+        cy={y}
+        r="4"
+        fill={gradeColors[hoverIndex] || '#22c55e'}
+        stroke="white"
+        strokeWidth="1.5"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}

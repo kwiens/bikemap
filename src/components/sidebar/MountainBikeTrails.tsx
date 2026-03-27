@@ -22,6 +22,13 @@ function groupTrailsByRegionAndArea() {
 
 const regionGroups = groupTrailsByRegionAndArea();
 
+const regionTrailCounts = new Map<string, number>();
+for (const [region, areas] of regionGroups) {
+  let count = 0;
+  for (const trails of areas.values()) count += trails.length;
+  regionTrailCounts.set(region, count);
+}
+
 function toggleSet(
   setter: React.Dispatch<React.SetStateAction<Set<string>>>,
   item: string,
@@ -94,10 +101,7 @@ export function MountainBikeTrails({
         <div className="section-items">
           {[...regionGroups.entries()].map(([region, areas]) => {
             const isRegionExpanded = expandedRegions.has(region);
-            const regionTrailCount = [...areas.values()].reduce(
-              (sum, trails) => sum + trails.length,
-              0,
-            );
+            const regionTrailCount = regionTrailCounts.get(region) ?? 0;
             return (
               <React.Fragment key={region}>
                 <div

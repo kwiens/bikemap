@@ -128,16 +128,6 @@ export function findLocationInArray<
   );
 }
 
-export function findMarkerByCoordinates(
-  markers: mapboxgl.Marker[],
-  coordinates: [number, number],
-): mapboxgl.Marker | undefined {
-  return markers.find((marker) => {
-    const pos = marker.getLngLat();
-    return pos.lng === coordinates[0] && pos.lat === coordinates[1];
-  });
-}
-
 // Mountain bike trail utilities
 export function calculateTrailBounds(
   map: mapboxgl.Map,
@@ -200,17 +190,6 @@ export function getAreaBounds(
     }
   }
   return hasCoords ? bounds : null;
-}
-
-export function calculateAllTrailBounds(
-  map: mapboxgl.Map,
-  trails: MountainBikeTrail[],
-): void {
-  for (const trail of trails) {
-    if (!trail.bounds) {
-      trail.bounds = calculateTrailBounds(map, trail.trailName) ?? undefined;
-    }
-  }
 }
 
 // Data-driven color expression for mountain bike trails by difficulty rating
