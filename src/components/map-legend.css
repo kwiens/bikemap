@@ -543,6 +543,10 @@
     bottom: 60px;
     padding: 8px 8px 4px;
   }
+
+  .elevation-overlay-sidebar-open {
+    display: none;
+  }
 }
 
 .elevation-overlay-header {

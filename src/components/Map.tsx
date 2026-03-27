@@ -43,6 +43,7 @@ import {
   MTN_BIKE_HIT_ID,
 } from '@/utils/map';
 import { mapConfig } from '@/config/map.config';
+import { MAP_EVENTS } from '@/events';
 
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
@@ -322,7 +323,7 @@ const MapboxMap = memo(function MapboxMap() {
       });
 
       // Dispatch event to notify the MapLegend component
-      window.dispatchEvent(new CustomEvent('route-deselect'));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
     }
   }, []);
 
@@ -377,7 +378,7 @@ const MapboxMap = memo(function MapboxMap() {
         if (isAttraction && !showAttractions) {
           // Toggle attractions layer on
           window.dispatchEvent(
-            new CustomEvent('layer-toggle', {
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
               detail: { layer: 'attractions', visible: true },
             }),
           );
@@ -389,7 +390,7 @@ const MapboxMap = memo(function MapboxMap() {
         if (isBikeResource && !showBikeResources) {
           // Toggle bike resources layer on
           window.dispatchEvent(
-            new CustomEvent('layer-toggle', {
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
               detail: { layer: 'bikeResources', visible: true },
             }),
           );
@@ -404,7 +405,7 @@ const MapboxMap = memo(function MapboxMap() {
         if (isBikeRental && !showBikeRentals) {
           // Toggle bike rentals layer on
           window.dispatchEvent(
-            new CustomEvent('layer-toggle', {
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
               detail: { layer: 'bikeRentals', visible: true },
             }),
           );
@@ -453,12 +454,15 @@ const MapboxMap = memo(function MapboxMap() {
     const centerLocationHandler = (e: Event) =>
       handleCenterLocation(e as CustomEvent);
 
-    window.addEventListener('layer-toggle', layerToggleHandler);
-    window.addEventListener('center-location', centerLocationHandler);
+    window.addEventListener(MAP_EVENTS.LAYER_TOGGLE, layerToggleHandler);
+    window.addEventListener(MAP_EVENTS.CENTER_LOCATION, centerLocationHandler);
 
     return () => {
-      window.removeEventListener('layer-toggle', layerToggleHandler);
-      window.removeEventListener('center-location', centerLocationHandler);
+      window.removeEventListener(MAP_EVENTS.LAYER_TOGGLE, layerToggleHandler);
+      window.removeEventListener(
+        MAP_EVENTS.CENTER_LOCATION,
+        centerLocationHandler,
+      );
     };
   }, [handleLayerToggle, handleCenterLocation]);
 
@@ -468,10 +472,10 @@ const MapboxMap = memo(function MapboxMap() {
     const routeSelectHandler = (e: Event) =>
       handleRouteSelect(e as CustomEvent);
 
-    window.addEventListener('route-select', routeSelectHandler);
+    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, routeSelectHandler);
 
     return () => {
-      window.removeEventListener('route-select', routeSelectHandler);
+      window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, routeSelectHandler);
     };
   }, [handleRouteSelect]);
 
@@ -481,12 +485,15 @@ const MapboxMap = memo(function MapboxMap() {
       handleTrailSelect(e as CustomEvent);
     const trailDeselectHandler = () => handleTrailDeselect();
 
-    window.addEventListener('trail-select', trailSelectHandler);
-    window.addEventListener('trail-deselect', trailDeselectHandler);
+    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, trailSelectHandler);
+    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, trailDeselectHandler);
 
     return () => {
-      window.removeEventListener('trail-select', trailSelectHandler);
-      window.removeEventListener('trail-deselect', trailDeselectHandler);
+      window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, trailSelectHandler);
+      window.removeEventListener(
+        MAP_EVENTS.TRAIL_DESELECT,
+        trailDeselectHandler,
+      );
     };
   }, [handleTrailSelect, handleTrailDeselect]);
 
@@ -494,10 +501,10 @@ const MapboxMap = memo(function MapboxMap() {
   useEffect(() => {
     const areaSelectHandler = (e: Event) => handleAreaSelect(e as CustomEvent);
 
-    window.addEventListener('area-select', areaSelectHandler);
+    window.addEventListener(MAP_EVENTS.AREA_SELECT, areaSelectHandler);
 
     return () => {
-      window.removeEventListener('area-select', areaSelectHandler);
+      window.removeEventListener(MAP_EVENTS.AREA_SELECT, areaSelectHandler);
     };
   }, [handleAreaSelect]);
 
@@ -532,9 +539,9 @@ const MapboxMap = memo(function MapboxMap() {
       }
     };
 
-    window.addEventListener('elevation-hover', handler);
+    window.addEventListener(MAP_EVENTS.ELEVATION_HOVER, handler);
     return () => {
-      window.removeEventListener('elevation-hover', handler);
+      window.removeEventListener(MAP_EVENTS.ELEVATION_HOVER, handler);
       if (marker) marker.remove();
     };
   }, []);
@@ -640,7 +647,7 @@ const MapboxMap = memo(function MapboxMap() {
 
               // Dispatch route-select event (same as clicking in legend)
               window.dispatchEvent(
-                new CustomEvent('route-select', {
+                new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
                   detail: { routeId: route.id },
                 }),
               );
@@ -671,7 +678,7 @@ const MapboxMap = memo(function MapboxMap() {
               const trailName = e.features?.[0]?.properties?.Trail;
               if (trailName) {
                 window.dispatchEvent(
-                  new CustomEvent('trail-select', {
+                  new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
                     detail: { trailName },
                   }),
                 );

@@ -8,16 +8,10 @@ import React, {
   useRef,
 } from 'react';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
+import { slugify } from '@/utils/string';
+import { MAP_EVENTS } from '@/events';
 
-export function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/['"]/g, '')
-    .replace(/[/&]/g, '-')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
+export { slugify };
 
 const CHART_HEIGHT = 100;
 const CHART_PADDING_TOP = 4;
@@ -121,16 +115,22 @@ export function ElevationProfile() {
       setSidebarOpen((e as CustomEvent).detail.isOpen);
     };
 
-    window.addEventListener('trail-select', handleTrailSelect);
-    window.addEventListener('trail-deselect', handleTrailDeselect);
-    window.addEventListener('route-select', handleRouteSelect);
-    window.addEventListener('sidebar-toggle', handleSidebarToggle);
+    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
+    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
+    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
+    window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
 
     return () => {
-      window.removeEventListener('trail-select', handleTrailSelect);
-      window.removeEventListener('trail-deselect', handleTrailDeselect);
-      window.removeEventListener('route-select', handleRouteSelect);
-      window.removeEventListener('sidebar-toggle', handleSidebarToggle);
+      window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
+      window.removeEventListener(
+        MAP_EVENTS.TRAIL_DESELECT,
+        handleTrailDeselect,
+      );
+      window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
+      window.removeEventListener(
+        MAP_EVENTS.SIDEBAR_TOGGLE,
+        handleSidebarToggle,
+      );
     };
   }, []);
 
@@ -203,7 +203,7 @@ export function ElevationProfile() {
 
       const pt = profile.profile[idx];
       window.dispatchEvent(
-        new CustomEvent('elevation-hover', {
+        new CustomEvent(MAP_EVENTS.ELEVATION_HOVER, {
           detail: { lng: pt[2], lat: pt[3] },
         }),
       );
@@ -230,7 +230,9 @@ export function ElevationProfile() {
   const clearHover = useCallback(() => {
     setHoverIndex(null);
     window.dispatchEvent(
-      new CustomEvent('elevation-hover', { detail: { lng: null, lat: null } }),
+      new CustomEvent(MAP_EVENTS.ELEVATION_HOVER, {
+        detail: { lng: null, lat: null },
+      }),
     );
   }, []);
 
@@ -243,16 +245,12 @@ export function ElevationProfile() {
     return null;
   }
 
-  if (window.innerWidth <= 768 && sidebarOpen) {
-    return null;
-  }
-
   const points = profile.profile;
   const maxDist = points[points.length - 1][0];
 
   return (
     <div
-      className={`elevation-overlay ${sidebarOpen ? '' : 'elevation-overlay-full'}`}
+      className={`elevation-overlay ${sidebarOpen ? 'elevation-overlay-sidebar-open' : 'elevation-overlay-full'}`}
     >
       <div className="elevation-overlay-header">
         <span className="elevation-overlay-title">{trailName}</span>

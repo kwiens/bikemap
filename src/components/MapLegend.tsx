@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { MAP_EVENTS } from '@/events';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
 
@@ -38,7 +39,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
     // Dispatch event for map resizing
     window.dispatchEvent(
-      new CustomEvent('sidebar-toggle', {
+      new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
         detail: { isOpen: !isOpen },
       }),
     );
@@ -72,9 +73,9 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       setSelectedTrail(null);
     };
 
-    window.addEventListener('route-select', handleMapRouteSelect);
+    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleMapRouteSelect);
     return () => {
-      window.removeEventListener('route-select', handleMapRouteSelect);
+      window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, handleMapRouteSelect);
     };
   }, []);
 
@@ -88,9 +89,9 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       setActiveSection('trails');
     };
 
-    window.addEventListener('trail-select', handleMapTrailSelect);
+    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleMapTrailSelect);
     return () => {
-      window.removeEventListener('trail-select', handleMapTrailSelect);
+      window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleMapTrailSelect);
     };
   }, []);
 
@@ -102,11 +103,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
       // Dispatch event for map to update route opacity
       window.dispatchEvent(
-        new CustomEvent('route-select', {
+        new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
           detail: { routeId },
         }),
       );
-      window.dispatchEvent(new CustomEvent('trail-deselect'));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
 
       // Close sidebar on mobile after selection
       if (window.innerWidth <= 768 && isOpen) {
@@ -123,11 +124,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       setSelectedRoute(null);
 
       window.dispatchEvent(
-        new CustomEvent('trail-select', {
+        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
           detail: { trailName },
         }),
       );
-      window.dispatchEvent(new CustomEvent('route-deselect'));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
 
       if (window.innerWidth <= 768 && isOpen) {
         toggle();
@@ -143,10 +144,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
     // Deselect first — trail-deselect resets mountain bike opacity,
     // so it must fire before area-select sets the highlight
-    window.dispatchEvent(new CustomEvent('route-deselect'));
-    window.dispatchEvent(new CustomEvent('trail-deselect'));
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
     window.dispatchEvent(
-      new CustomEvent('area-select', {
+      new CustomEvent(MAP_EVENTS.AREA_SELECT, {
         detail: { areaName },
       }),
     );
@@ -175,7 +176,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         if (stateMap[key] !== newValue) {
           setterMap[key](newValue);
           window.dispatchEvent(
-            new CustomEvent('layer-toggle', {
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
               detail: { layer: key, visible: newValue },
             }),
           );
@@ -205,7 +206,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     (location: LocationProps) => {
       // Dispatch event for map to center and show pin
       window.dispatchEvent(
-        new CustomEvent('center-location', {
+        new CustomEvent(MAP_EVENTS.CENTER_LOCATION, {
           detail: {
             location: location,
           },
@@ -226,10 +227,13 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       setSelectedRoute(null);
     };
 
-    window.addEventListener('route-deselect', handleRouteDeselect);
+    window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
 
     return () => {
-      window.removeEventListener('route-deselect', handleRouteDeselect);
+      window.removeEventListener(
+        MAP_EVENTS.ROUTE_DESELECT,
+        handleRouteDeselect,
+      );
     };
   }, []);
 
@@ -239,10 +243,13 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       setSelectedTrail(null);
     };
 
-    window.addEventListener('trail-deselect', handleTrailDeselect);
+    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
 
     return () => {
-      window.removeEventListener('trail-deselect', handleTrailDeselect);
+      window.removeEventListener(
+        MAP_EVENTS.TRAIL_DESELECT,
+        handleTrailDeselect,
+      );
     };
   }, []);
 
