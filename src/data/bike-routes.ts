@@ -71,4 +71,14 @@ export const bikeRoutes: BikeRoute[] = [
     defaultWidth: 8,
     opacity: 1.0,
   },
+  {
+    id: 'Moccasin Bend Route',
+    name: 'Moccasin Bend Route',
+    color: '#F97316',
+    description:
+      'Scenic route around Moccasin Bend with river views. No traffic.',
+    icon: faRoute,
+    defaultWidth: 8,
+    opacity: 1.0,
+  },
 ];
