@@ -27,7 +27,18 @@ _session.mount('https://', HTTPAdapter(
 
 # --- Constants ---
 
-MAPBOX_TOKEN = 'MAPBOX_TOKEN_FROM_CONFIG'
+def _read_mapbox_token():
+    """Read the Mapbox access token from map.config.ts."""
+    config_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'config', 'map.config.ts')
+    with open(config_path) as f:
+        content = f.read()
+    match = re.search(r"accessToken:\s*['\"](.+?)['\"]", content)
+    if not match:
+        print("Error: Could not find accessToken in src/config/map.config.ts")
+        sys.exit(1)
+    return match.group(1)
+
+MAPBOX_TOKEN = _read_mapbox_token()
 MVT_TILESET = 'swuller.cnjx44gk'
 TRAIL_BBOX = (-85.48, 34.76, -84.85, 35.21)
 MVT_ZOOM = 12
