@@ -150,7 +150,7 @@ export function getAreaBounds(
   const bounds = new mapboxgl.LngLatBounds();
   let hasCoords = false;
   for (const trail of trails) {
-    if (trail.recArea !== areaName) continue;
+    if (trail.recArea !== areaName && trail.region !== areaName) continue;
     if (trail.bounds) {
       bounds.extend(trail.bounds);
       hasCoords = true;
@@ -230,8 +230,9 @@ export function highlightSorbaArea(
   trails: MountainBikeTrail[],
   areaName: string,
 ): void {
+  // Match by recArea or region name
   const trailNames = trails
-    .filter((t) => t.recArea === areaName)
+    .filter((t) => t.recArea === areaName || t.region === areaName)
     .map((t) => t.trailName);
 
   const opacityExpr: mapboxgl.Expression = [

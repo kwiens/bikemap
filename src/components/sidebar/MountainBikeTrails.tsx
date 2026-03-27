@@ -86,11 +86,15 @@ export function MountainBikeTrails({
               <React.Fragment key={region}>
                 <div
                   className="region-heading region-clickable"
-                  onClick={() => toggleSet(setExpandedRegions, region)}
+                  onClick={() => {
+                    toggleSet(setExpandedRegions, region);
+                    onAreaSelect(region);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       toggleSet(setExpandedRegions, region);
+                      onAreaSelect(region);
                     }
                   }}
                   role="button"
