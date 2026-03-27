@@ -54,15 +54,6 @@ export const bikeRoutes: BikeRoute[] = [
     opacity: 1.0,
   },
   {
-    id: 'Chatt_TPL_Trails-public',
-    name: 'Local Greenways',
-    color: '#16A34A',
-    description: 'Greenways and bike trails throughout the area.',
-    icon: faRoute,
-    defaultWidth: 8,
-    opacity: 1.0,
-  },
-  {
     id: 'cherokeeloop',
     name: 'Cherokee Loop',
     color: '#fbef05',
