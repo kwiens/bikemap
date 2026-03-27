@@ -527,14 +527,35 @@
   flex-shrink: 0;
 }
 
+.elevation-chart-container {
+  display: flex;
+  position: relative;
+}
+
+.elevation-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2px 0;
+  flex-shrink: 0;
+  width: 52px;
+}
+
+.elevation-y-label {
+  font-size: 9px;
+  color: var(--color-gray-400);
+  text-align: right;
+  padding-right: 6px;
+  line-height: 1;
+}
+
 .elevation-chart {
-  width: 100%;
+  flex: 1;
   height: 15vh;
   min-height: 80px;
   max-height: 160px;
   cursor: crosshair;
   border-radius: 4px;
-  background-color: rgba(249, 250, 251, 0.6);
 }
 
 .elevation-tooltip {

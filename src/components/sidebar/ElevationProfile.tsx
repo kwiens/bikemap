@@ -18,22 +18,18 @@ const CHART_PADDING_TOP = 4;
 const CHART_PADDING_BOTTOM = 4;
 const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 
-// Grade-to-color mapping: green (flat) → yellow (moderate) → red (steep)
-// Uses absolute grade so both climbs and descents show intensity.
-const GRADE_YELLOW = 12; // 12% grade → transition from green to yellow
-const GRADE_RED = 25; // 25%+ grade → fully red
+const GRADE_YELLOW = 12;
+const GRADE_RED = 25;
 
 function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
   if (g <= GRADE_YELLOW) {
-    // Green to yellow
     const t = g / GRADE_YELLOW;
     const r = Math.round(34 + t * (234 - 34));
     const green = Math.round(197 + t * (179 - 197));
     const b = Math.round(94 + t * (8 - 94));
     return `rgb(${r},${green},${b})`;
   }
-  // Yellow to red
   const t = (g - GRADE_YELLOW) / (GRADE_RED - GRADE_YELLOW);
   const r = Math.round(234 + t * (239 - 234));
   const green = Math.round(179 - t * 179);
@@ -46,7 +42,6 @@ function computeGradeColors(
 ): string[] {
   if (points.length < 2) return points.map(() => gradeToColor(0));
 
-  // Compute raw grades
   const rawGrades: number[] = [0];
   for (let i = 1; i < points.length; i++) {
     const dx = points[i][0] - points[i - 1][0];
@@ -54,7 +49,6 @@ function computeGradeColors(
     rawGrades.push(dx > 0 ? (dy / dx) * 100 : 0);
   }
 
-  // Smooth with 5-point moving average for clean gradients
   const smoothed: number[] = [];
   const WINDOW = 2;
   for (let i = 0; i < rawGrades.length; i++) {
@@ -183,7 +177,6 @@ export function ElevationProfile() {
 
   const areaPath = `${linePath} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
 
-  // Build gradient stops from grade colors
   const gradientStops = gradeColors.map((color, i) => {
     const offset = maxDist > 0 ? points[i][0] / maxDist : 0;
     return { offset, color };
@@ -195,92 +188,117 @@ export function ElevationProfile() {
         <span className="elevation-overlay-title">{trailName}</span>
         <div className="elevation-stats">
           <span>{(maxDist / 5280).toFixed(1)} mi</span>
-          <span>
-            {'\u2191'}
-            {profile.gain.toLocaleString()} ft
-          </span>
-          <span>
-            {'\u2193'}
-            {profile.loss.toLocaleString()} ft
-          </span>
-          <span>
-            {profile.min.toLocaleString()}&ndash;{profile.max.toLocaleString()}{' '}
-            ft
-          </span>
+          <span>+{profile.gain.toLocaleString()} ft climbing</span>
         </div>
       </div>
 
-      <svg
-        viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-        className="elevation-chart"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        preserveAspectRatio="none"
-        ref={(el) => {
-          if (el) {
-            const w = el.getBoundingClientRect().width;
-            if (w > 0 && w !== chartWidth) setChartWidth(w);
-          }
-        }}
-      >
-        <defs>
-          <linearGradient id="elev-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#94a3b8" stopOpacity="0.03" />
-          </linearGradient>
-          <linearGradient
-            id="grade-stroke"
+      <div className="elevation-chart-container">
+        <div className="elevation-y-axis">
+          <span className="elevation-y-label elevation-y-max">
+            {profile.max.toLocaleString()} ft
+          </span>
+          <span className="elevation-y-label elevation-y-min">
+            {profile.min.toLocaleString()} ft
+          </span>
+        </div>
+
+        <svg
+          viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
+          className="elevation-chart"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          preserveAspectRatio="none"
+          ref={(el) => {
+            if (el) {
+              const w = el.getBoundingClientRect().width;
+              if (w > 0 && w !== chartWidth) setChartWidth(w);
+            }
+          }}
+        >
+          <defs>
+            <linearGradient
+              id="grade-stroke"
+              x1="0"
+              y1="0"
+              x2="1"
+              y2="0"
+              gradientUnits="objectBoundingBox"
+            >
+              {gradientStops.map((s) => (
+                <stop
+                  key={s.offset}
+                  offset={`${(s.offset * 100).toFixed(2)}%`}
+                  stopColor={s.color}
+                />
+              ))}
+            </linearGradient>
+            <linearGradient
+              id="grade-fill"
+              x1="0"
+              y1="0"
+              x2="1"
+              y2="0"
+              gradientUnits="objectBoundingBox"
+            >
+              {gradientStops.map((s) => (
+                <stop
+                  key={s.offset}
+                  offset={`${(s.offset * 100).toFixed(2)}%`}
+                  stopColor={s.color}
+                  stopOpacity="0.2"
+                />
+              ))}
+            </linearGradient>
+          </defs>
+
+          {/* Max elevation reference line */}
+          <line
             x1="0"
-            y1="0"
-            x2="1"
-            y2="0"
-            gradientUnits="objectBoundingBox"
-          >
-            {gradientStops.map((s) => (
-              <stop
-                key={s.offset}
-                offset={`${(s.offset * 100).toFixed(2)}%`}
-                stopColor={s.color}
+            y1={CHART_PADDING_TOP}
+            x2={chartWidth}
+            y2={CHART_PADDING_TOP}
+            stroke="#9ca3af"
+            strokeWidth="1"
+            strokeDasharray="4,4"
+            vectorEffect="non-scaling-stroke"
+          />
+
+          <path d={areaPath} fill="url(#grade-fill)" />
+          <path
+            d={linePath}
+            fill="none"
+            stroke="url(#grade-stroke)"
+            strokeWidth="3"
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {hoverIndex !== null && (
+            <>
+              <line
+                x1={xScale(points[hoverIndex][0])}
+                y1={CHART_PADDING_TOP}
+                x2={xScale(points[hoverIndex][0])}
+                y2={CHART_HEIGHT - CHART_PADDING_BOTTOM}
+                stroke="#6b7280"
+                strokeWidth="1"
+                strokeDasharray="3,3"
+                vectorEffect="non-scaling-stroke"
               />
-            ))}
-          </linearGradient>
-        </defs>
-
-        <path d={areaPath} fill="url(#elev-fill)" />
-        <path
-          d={linePath}
-          fill="none"
-          stroke="url(#grade-stroke)"
-          strokeWidth="3"
-          vectorEffect="non-scaling-stroke"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {hoverIndex !== null && (
-          <>
-            <line
-              x1={xScale(points[hoverIndex][0])}
-              y1={CHART_PADDING_TOP}
-              x2={xScale(points[hoverIndex][0])}
-              y2={CHART_HEIGHT - CHART_PADDING_BOTTOM}
-              stroke="#6b7280"
-              strokeWidth="1"
-              strokeDasharray="3,3"
-              vectorEffect="non-scaling-stroke"
-            />
-            <circle
-              cx={xScale(points[hoverIndex][0])}
-              cy={yScale(points[hoverIndex][1])}
-              r="4"
-              fill={gradeColors[hoverIndex] || '#22c55e'}
-              stroke="white"
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
-            />
-          </>
-        )}
-      </svg>
+              <circle
+                cx={xScale(points[hoverIndex][0])}
+                cy={yScale(points[hoverIndex][1])}
+                r="4"
+                fill={gradeColors[hoverIndex] || '#22c55e'}
+                stroke="white"
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
+              />
+            </>
+          )}
+        </svg>
+      </div>
 
       <div className="elevation-tooltip">
         {hoverIndex !== null
