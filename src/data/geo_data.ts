@@ -3,9 +3,9 @@ export type { BikeRoute } from './bike-routes';
 export { bikeRoutes } from './bike-routes';
 
 export {
-  SORBA_LAYER_ID,
-  SORBA_SOURCE_LAYER,
-  sorbaTrails,
+  MTN_BIKE_LAYER_ID,
+  MTN_BIKE_SOURCE_LAYER,
+  mountainBikeTrails,
   regionFor,
 } from './mountain-bike-trails';
 export type {

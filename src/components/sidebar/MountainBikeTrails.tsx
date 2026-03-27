@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { sorbaTrails, regionFor } from '@/data/geo_data';
+import { mountainBikeTrails, regionFor } from '@/data/geo_data';
 import type { MountainBikeTrailsProps } from './types';
 
 function groupTrailsByRegionAndArea() {
-  const grouped = new Map<string, Map<string, typeof sorbaTrails>>();
-  for (const trail of sorbaTrails) {
+  const grouped = new Map<string, Map<string, typeof mountainBikeTrails>>();
+  for (const trail of mountainBikeTrails) {
     const region = regionFor(trail.recArea);
     const { recArea } = trail;
     if (!grouped.has(region)) {
@@ -52,7 +52,7 @@ export function MountainBikeTrails({
   // Auto-expand region and area when a trail is selected
   useEffect(() => {
     if (!selectedTrail) return;
-    const trail = sorbaTrails.find((t) => t.trailName === selectedTrail);
+    const trail = mountainBikeTrails.find((t) => t.trailName === selectedTrail);
     if (!trail) return;
     const region = regionFor(trail.recArea);
     setExpandedRegions((prev) => {

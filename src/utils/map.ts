@@ -1,6 +1,10 @@
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
-import { SORBA_LAYER_ID, SORBA_SOURCE_LAYER, regionFor } from '@/data/geo_data';
+import {
+  MTN_BIKE_LAYER_ID,
+  MTN_BIKE_SOURCE_LAYER,
+  regionFor,
+} from '@/data/geo_data';
 
 // Route utilities
 export function updateRouteOpacity(
@@ -134,13 +138,13 @@ export function findMarkerByCoordinates(
   });
 }
 
-// SORBA trail utilities
+// Mountain bike trail utilities
 export function calculateTrailBounds(
   map: mapboxgl.Map,
   trailName: string,
 ): mapboxgl.LngLatBounds | null {
   const features = map.querySourceFeatures('composite', {
-    sourceLayer: SORBA_SOURCE_LAYER,
+    sourceLayer: MTN_BIKE_SOURCE_LAYER,
     filter: ['==', ['get', 'Trail'], trailName],
   });
 
@@ -209,8 +213,8 @@ export function calculateAllTrailBounds(
   }
 }
 
-// Data-driven color expression for SORBA trails based on difficulty rating
-const SORBA_COLOR_EXPRESSION: mapboxgl.Expression = [
+// Data-driven color expression for mountain bike trails by difficulty rating
+const MTN_BIKE_COLOR_EXPRESSION: mapboxgl.Expression = [
   'match',
   ['get', 'rating'],
   'easy',
@@ -224,20 +228,24 @@ const SORBA_COLOR_EXPRESSION: mapboxgl.Expression = [
   '#6B7280', // unrated fallback
 ];
 
-const SORBA_CASING_ID = 'SORBA Regional Trails Casing';
-const SORBA_GLOW_ID = 'SORBA Regional Trails Glow';
-export const SORBA_HIT_ID = 'SORBA Regional Trails Hit';
+const MTN_BIKE_CASING_ID = 'SORBA Regional Trails Casing';
+const MTN_BIKE_GLOW_ID = 'SORBA Regional Trails Glow';
+export const MTN_BIKE_HIT_ID = 'SORBA Regional Trails Hit';
 
-export function initSorbaColors(map: mapboxgl.Map): void {
+export function initMtnBikeColors(map: mapboxgl.Map): void {
   try {
-    map.setPaintProperty(SORBA_LAYER_ID, 'line-color', SORBA_COLOR_EXPRESSION);
+    map.setPaintProperty(
+      MTN_BIKE_LAYER_ID,
+      'line-color',
+      MTN_BIKE_COLOR_EXPRESSION,
+    );
   } catch {
-    // SORBA layer may not exist yet
+    // Mountain bike layer may not exist yet
   }
 }
 
-export function initSorbaLayers(map: mapboxgl.Map): void {
-  const layer = map.getLayer(SORBA_LAYER_ID) as
+export function initMtnBikeLayers(map: mapboxgl.Map): void {
+  const layer = map.getLayer(MTN_BIKE_LAYER_ID) as
     | mapboxgl.LayerSpecification
     | undefined;
   if (!layer) return;
@@ -245,13 +253,13 @@ export function initSorbaLayers(map: mapboxgl.Map): void {
   const source = (layer as { source?: string }).source ?? 'composite';
 
   // White casing layer — drawn beneath the trail line
-  if (!map.getLayer(SORBA_CASING_ID)) {
+  if (!map.getLayer(MTN_BIKE_CASING_ID)) {
     map.addLayer(
       {
-        id: SORBA_CASING_ID,
+        id: MTN_BIKE_CASING_ID,
         type: 'line',
         source,
-        'source-layer': SORBA_SOURCE_LAYER,
+        'source-layer': MTN_BIKE_SOURCE_LAYER,
         layout: {
           'line-cap': 'round',
           'line-join': 'round',
@@ -262,18 +270,18 @@ export function initSorbaLayers(map: mapboxgl.Map): void {
           'line-opacity': 0.25,
         },
       },
-      SORBA_LAYER_ID,
+      MTN_BIKE_LAYER_ID,
     );
   }
 
   // Selection glow layer — wide white blur behind selected trail
-  if (!map.getLayer(SORBA_GLOW_ID)) {
+  if (!map.getLayer(MTN_BIKE_GLOW_ID)) {
     map.addLayer(
       {
-        id: SORBA_GLOW_ID,
+        id: MTN_BIKE_GLOW_ID,
         type: 'line',
         source,
-        'source-layer': SORBA_SOURCE_LAYER,
+        'source-layer': MTN_BIKE_SOURCE_LAYER,
         layout: {
           'line-cap': 'round',
           'line-join': 'round',
@@ -285,17 +293,17 @@ export function initSorbaLayers(map: mapboxgl.Map): void {
           'line-blur': 10,
         },
       },
-      SORBA_CASING_ID,
+      MTN_BIKE_CASING_ID,
     );
   }
 
   // Invisible wide hit-test layer for easier tapping
-  if (!map.getLayer(SORBA_HIT_ID)) {
+  if (!map.getLayer(MTN_BIKE_HIT_ID)) {
     map.addLayer({
-      id: SORBA_HIT_ID,
+      id: MTN_BIKE_HIT_ID,
       type: 'line',
       source,
-      'source-layer': SORBA_SOURCE_LAYER,
+      'source-layer': MTN_BIKE_SOURCE_LAYER,
       layout: {
         'line-cap': 'round',
         'line-join': 'round',
@@ -309,25 +317,25 @@ export function initSorbaLayers(map: mapboxgl.Map): void {
   }
 
   // Set the main trail layer to round caps/joins and thinner default
-  map.setLayoutProperty(SORBA_LAYER_ID, 'line-cap', 'round');
-  map.setLayoutProperty(SORBA_LAYER_ID, 'line-join', 'round');
-  map.setLayoutProperty(SORBA_LAYER_ID, 'line-round-limit', 0.1);
+  map.setLayoutProperty(MTN_BIKE_LAYER_ID, 'line-cap', 'round');
+  map.setLayoutProperty(MTN_BIKE_LAYER_ID, 'line-join', 'round');
+  map.setLayoutProperty(MTN_BIKE_LAYER_ID, 'line-round-limit', 0.1);
 }
 
-export function updateSorbaOpacity(
+export function updateMtnBikeOpacity(
   map: mapboxgl.Map,
   selectedTrailName: string | null,
 ): void {
   try {
     if (selectedTrailName) {
       // Main trail line
-      map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', [
+      map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-opacity', [
         'case',
         ['==', ['get', 'Trail'], selectedTrailName],
         0.9,
         0.15,
       ]);
-      map.setPaintProperty(SORBA_LAYER_ID, 'line-width', [
+      map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-width', [
         'case',
         ['==', ['get', 'Trail'], selectedTrailName],
         4,
@@ -335,14 +343,14 @@ export function updateSorbaOpacity(
       ]);
 
       // White casing
-      if (map.getLayer(SORBA_CASING_ID)) {
-        map.setPaintProperty(SORBA_CASING_ID, 'line-opacity', [
+      if (map.getLayer(MTN_BIKE_CASING_ID)) {
+        map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-opacity', [
           'case',
           ['==', ['get', 'Trail'], selectedTrailName],
           0.9,
           0.25,
         ]);
-        map.setPaintProperty(SORBA_CASING_ID, 'line-width', [
+        map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-width', [
           'case',
           ['==', ['get', 'Trail'], selectedTrailName],
           6,
@@ -351,14 +359,14 @@ export function updateSorbaOpacity(
       }
 
       // Selection glow
-      if (map.getLayer(SORBA_GLOW_ID)) {
-        map.setPaintProperty(SORBA_GLOW_ID, 'line-opacity', [
+      if (map.getLayer(MTN_BIKE_GLOW_ID)) {
+        map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-opacity', [
           'case',
           ['==', ['get', 'Trail'], selectedTrailName],
           0.7,
           0,
         ]);
-        map.setPaintProperty(SORBA_GLOW_ID, 'line-width', [
+        map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-width', [
           'case',
           ['==', ['get', 'Trail'], selectedTrailName],
           24,
@@ -366,25 +374,25 @@ export function updateSorbaOpacity(
         ]);
       }
     } else {
-      map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', 0.15);
-      map.setPaintProperty(SORBA_LAYER_ID, 'line-width', 2);
+      map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-opacity', 0.15);
+      map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-width', 2);
 
-      if (map.getLayer(SORBA_CASING_ID)) {
-        map.setPaintProperty(SORBA_CASING_ID, 'line-opacity', 0.25);
-        map.setPaintProperty(SORBA_CASING_ID, 'line-width', 4);
+      if (map.getLayer(MTN_BIKE_CASING_ID)) {
+        map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-opacity', 0.25);
+        map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-width', 4);
       }
 
-      if (map.getLayer(SORBA_GLOW_ID)) {
-        map.setPaintProperty(SORBA_GLOW_ID, 'line-opacity', 0);
-        map.setPaintProperty(SORBA_GLOW_ID, 'line-width', 0);
+      if (map.getLayer(MTN_BIKE_GLOW_ID)) {
+        map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-opacity', 0);
+        map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-width', 0);
       }
     }
   } catch {
-    // SORBA layer may not exist yet
+    // Mountain bike layer may not exist yet
   }
 }
 
-export function highlightSorbaArea(
+export function highlightMtnBikeArea(
   map: mapboxgl.Map,
   trails: MountainBikeTrail[],
   areaName: string,
@@ -396,14 +404,14 @@ export function highlightSorbaArea(
   if (trailNames.length === 0) return;
 
   try {
-    map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', [
+    map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-opacity', [
       'match',
       ['get', 'Trail'],
       trailNames,
       0.9,
       0.1,
     ]);
-    map.setPaintProperty(SORBA_LAYER_ID, 'line-width', [
+    map.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-width', [
       'match',
       ['get', 'Trail'],
       trailNames,
@@ -411,15 +419,15 @@ export function highlightSorbaArea(
       2,
     ]);
 
-    if (map.getLayer(SORBA_CASING_ID)) {
-      map.setPaintProperty(SORBA_CASING_ID, 'line-opacity', [
+    if (map.getLayer(MTN_BIKE_CASING_ID)) {
+      map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-opacity', [
         'match',
         ['get', 'Trail'],
         trailNames,
         0.6,
         0.1,
       ]);
-      map.setPaintProperty(SORBA_CASING_ID, 'line-width', [
+      map.setPaintProperty(MTN_BIKE_CASING_ID, 'line-width', [
         'match',
         ['get', 'Trail'],
         trailNames,
@@ -428,12 +436,12 @@ export function highlightSorbaArea(
       ]);
     }
 
-    if (map.getLayer(SORBA_GLOW_ID)) {
-      map.setPaintProperty(SORBA_GLOW_ID, 'line-opacity', 0);
-      map.setPaintProperty(SORBA_GLOW_ID, 'line-width', 0);
+    if (map.getLayer(MTN_BIKE_GLOW_ID)) {
+      map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-opacity', 0);
+      map.setPaintProperty(MTN_BIKE_GLOW_ID, 'line-width', 0);
     }
   } catch (error) {
-    console.error('Error highlighting SORBA area:', error);
+    console.error('Error highlighting mountain bike area:', error);
   }
 }
 

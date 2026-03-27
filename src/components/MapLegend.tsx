@@ -78,7 +78,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Listen for trail-select events from the map (when user clicks on a SORBA trail)
+  // Listen for trail-select events from the map (when user clicks on a mountain bike trail)
   useEffect(() => {
     const handleMapTrailSelect = (event: Event) => {
       const customEvent = event as CustomEvent<{ trailName: string }>;
@@ -141,7 +141,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     setSelectedTrail(null);
     setSelectedRoute(null);
 
-    // Deselect first — trail-deselect resets SORBA opacity,
+    // Deselect first — trail-deselect resets mountain bike opacity,
     // so it must fire before area-select sets the highlight
     window.dispatchEvent(new CustomEvent('route-deselect'));
     window.dispatchEvent(new CustomEvent('trail-deselect'));

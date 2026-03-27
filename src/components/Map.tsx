@@ -7,8 +7,8 @@ import {
   bikeRoutes,
   mapFeatures,
   bikeResources,
-  sorbaTrails,
-  SORBA_LAYER_ID,
+  mountainBikeTrails,
+  MTN_BIKE_LAYER_ID,
 } from '@/data/geo_data';
 import {
   createLocationMarker,
@@ -36,11 +36,11 @@ import {
   calculateTrailBounds,
   initTrailBoundsFromDefaults,
   getAreaBounds,
-  updateSorbaOpacity,
-  highlightSorbaArea,
-  initSorbaColors,
-  initSorbaLayers,
-  SORBA_HIT_ID,
+  updateMtnBikeOpacity,
+  highlightMtnBikeArea,
+  initMtnBikeColors,
+  initMtnBikeLayers,
+  MTN_BIKE_HIT_ID,
 } from '@/utils/map';
 import { mapConfig } from '@/config/map.config';
 
@@ -154,12 +154,12 @@ const MapboxMap = memo(function MapboxMap() {
         showToast(selectedRoute.name);
       }
 
-      // Update opacities for all routes and reset SORBA
+      // Update opacities for all routes and reset mountain bike trails
       updateRouteOpacity(map.current, bikeRoutes, routeId, {
         selected: 0.8,
         unselected: 0.2,
       });
-      updateSorbaOpacity(map.current, null);
+      updateMtnBikeOpacity(map.current, null);
 
       if (selectedRoute?.bounds) {
         flyToBounds(map.current, selectedRoute.bounds);
@@ -174,7 +174,7 @@ const MapboxMap = memo(function MapboxMap() {
       if (!map.current) return;
 
       const { trailName } = event.detail;
-      const trail = sorbaTrails.find((t) => t.trailName === trailName);
+      const trail = mountainBikeTrails.find((t) => t.trailName === trailName);
 
       if (trail) {
         showToast(trail.displayName);
@@ -185,7 +185,7 @@ const MapboxMap = memo(function MapboxMap() {
         selected: 0.1,
         unselected: 0.1,
       });
-      updateSorbaOpacity(map.current, trailName);
+      updateMtnBikeOpacity(map.current, trailName);
 
       // Calculate bounds lazily if not yet available
       if (trail && !trail.bounds) {
@@ -202,7 +202,7 @@ const MapboxMap = memo(function MapboxMap() {
 
   const handleTrailDeselect = useCallback(() => {
     if (!map.current) return;
-    updateSorbaOpacity(map.current, null);
+    updateMtnBikeOpacity(map.current, null);
   }, []);
 
   // Handle area (rec area heading) selection — zoom to area bounds
@@ -211,7 +211,7 @@ const MapboxMap = memo(function MapboxMap() {
       if (!map.current) return;
 
       const { areaName } = event.detail;
-      const bounds = getAreaBounds(sorbaTrails, areaName);
+      const bounds = getAreaBounds(mountainBikeTrails, areaName);
 
       showToast(areaName);
 
@@ -220,7 +220,7 @@ const MapboxMap = memo(function MapboxMap() {
         selected: 0.1,
         unselected: 0.1,
       });
-      highlightSorbaArea(map.current, sorbaTrails, areaName);
+      highlightMtnBikeArea(map.current, mountainBikeTrails, areaName);
 
       if (bounds) {
         flyToBounds(map.current, bounds);
@@ -657,16 +657,16 @@ const MapboxMap = memo(function MapboxMap() {
             });
           });
 
-          // Initialize SORBA trail layer
-          if (newMap.getLayer(SORBA_LAYER_ID)) {
-            newMap.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', 0.15);
-            newMap.setPaintProperty(SORBA_LAYER_ID, 'line-width', 2);
-            initSorbaColors(newMap);
-            initSorbaLayers(newMap);
-            initTrailBoundsFromDefaults(sorbaTrails);
+          // Initialize mountain bike trail layer
+          if (newMap.getLayer(MTN_BIKE_LAYER_ID)) {
+            newMap.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-opacity', 0.15);
+            newMap.setPaintProperty(MTN_BIKE_LAYER_ID, 'line-width', 2);
+            initMtnBikeColors(newMap);
+            initMtnBikeLayers(newMap);
+            initTrailBoundsFromDefaults(mountainBikeTrails);
 
             // Click handler on wide hit-test layer for easier tapping
-            newMap.on('click', SORBA_HIT_ID, (e) => {
+            newMap.on('click', MTN_BIKE_HIT_ID, (e) => {
               e.preventDefault();
               const trailName = e.features?.[0]?.properties?.Trail;
               if (trailName) {
@@ -678,11 +678,11 @@ const MapboxMap = memo(function MapboxMap() {
               }
             });
 
-            newMap.on('mouseenter', SORBA_HIT_ID, () => {
+            newMap.on('mouseenter', MTN_BIKE_HIT_ID, () => {
               newMap.getCanvas().style.cursor = 'pointer';
             });
 
-            newMap.on('mouseleave', SORBA_HIT_ID, () => {
+            newMap.on('mouseleave', MTN_BIKE_HIT_ID, () => {
               newMap.getCanvas().style.cursor = '';
             });
           }

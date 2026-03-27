@@ -5,8 +5,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 // Mapbox tileset layer identifiers (must match Mapbox Studio names)
-export const SORBA_LAYER_ID = 'SORBA Regional Trails';
-export const SORBA_SOURCE_LAYER = 'SORBA_Regional_Trails-1oj4dx';
+export const MTN_BIKE_LAYER_ID = 'SORBA Regional Trails';
+export const MTN_BIKE_SOURCE_LAYER = 'SORBA_Regional_Trails-1oj4dx';
 
 // Mountain Bike Trails Interface and Data
 export interface MountainBikeTrail {
@@ -79,7 +79,7 @@ function trailColor(rating: string, isGreenway: boolean): string {
   return TRAIL_COLOR_UNRATED;
 }
 
-export const sorbaTrails: MountainBikeTrail[] = [
+export const mountainBikeTrails: MountainBikeTrail[] = [
   // Bauxite Ridge/White Oak Mountain
   {
     trailName: 'Big Forest',
