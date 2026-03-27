@@ -234,21 +234,27 @@ export function highlightSorbaArea(
     .filter((t) => t.recArea === areaName)
     .map((t) => t.trailName);
 
+  // Use match expression: ['match', ['get', 'Trail'], [...names], highlightVal, defaultVal]
+  const opacityExpr: mapboxgl.Expression = [
+    'match',
+    ['get', 'Trail'],
+    trailNames,
+    0.9,
+    0.1,
+  ];
+  const widthExpr: mapboxgl.Expression = [
+    'match',
+    ['get', 'Trail'],
+    trailNames,
+    4,
+    2,
+  ];
+
   try {
-    map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', [
-      'case',
-      ['in', ['get', 'Trail'], ['literal', trailNames]],
-      0.9,
-      0.1,
-    ]);
-    map.setPaintProperty(SORBA_LAYER_ID, 'line-width', [
-      'case',
-      ['in', ['get', 'Trail'], ['literal', trailNames]],
-      4,
-      2,
-    ]);
-  } catch {
-    // SORBA layer may not exist yet
+    map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', opacityExpr);
+    map.setPaintProperty(SORBA_LAYER_ID, 'line-width', widthExpr);
+  } catch (error) {
+    console.error('Error highlighting SORBA area:', error);
   }
 }
 
