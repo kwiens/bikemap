@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 
-function slugify(name: string): string {
+export function slugify(name: string): string {
   return name
     .toLowerCase()
     .replace(/['"]/g, '')
@@ -28,7 +28,7 @@ const GRADE_YELLOW = 12;
 const GRADE_RED = 25;
 const MAX_GRADIENT_STOPS = 200;
 
-function gradeToColor(grade: number): string {
+export function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
   if (g <= GRADE_YELLOW) {
     const t = g / GRADE_YELLOW;
@@ -44,7 +44,7 @@ function gradeToColor(grade: number): string {
   return `rgb(${r},${green},${b})`;
 }
 
-function computeGradeColors(
+export function computeGradeColors(
   points: [number, number, number, number][],
 ): string[] {
   if (points.length < 2) return points.map(() => gradeToColor(0));
@@ -75,7 +75,7 @@ function computeGradeColors(
   return smoothed.map((g) => gradeToColor(g));
 }
 
-function downsampleStops(
+export function downsampleStops(
   points: [number, number, number, number][],
   colors: string[],
   maxDist: number,
