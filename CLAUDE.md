@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Repository Guidelines
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
 
 ## Commands
 
@@ -97,6 +97,19 @@ The app uses custom DOM events (`window.dispatchEvent`) for component communicat
 
 Routes are styled via Mapbox Studio (referenced by layer IDs like `riverwalk-loop-v3-public`). Route bounds are calculated from layer features at runtime to enable zoom-to-fit.
 
+### Mountain Bike Trails
+
+The mountain bike trails layer is a single Mapbox layer (`SORBA Regional Trails`, source layer `SORBA_Regional_Trails-1oj4dx`) containing 220+ trails identified by the `Trail` feature property. Trail data is defined in `src/data/mountain-bike-trails.ts` (re-exported from `src/data/geo_data.ts`) with precalculated `defaultBounds` for zoom-to-fit and `distance` in miles. Code uses `MTN_BIKE_*` constants and `mountainBikeTrails` array — the `SORBA` prefix only appears in Mapbox tileset string values.
+
+When trails are added or modified in the Mapbox tileset, run `scripts/add_trail_bounds.py` to recalculate bounding boxes and distances. The script takes raw coordinate data extracted from the Mapbox layer via Chrome DevTools console (see the script header for the extraction snippet) and computes both `defaultBounds` and `distance` fields in `geo_data.ts`.
+
+### Mapbox UI Overlays
+
+- The Mapbox canvas (`.map-container`) uses `position: absolute` with `z-index: 500` and covers the full viewport. It will obscure any sibling or child elements with a lower z-index.
+- To overlay UI on the map, render elements **inside the `MapboxMap` component's fragment** (the `<>` in its return), as siblings of `.map-container`. Do **not** place overlays in the outer `BikeMap` wrapper — they will be hidden behind the map canvas.
+- Overlay elements must use `z-index: 1000` or higher and `position: absolute` to appear above the map. See `.route-toast` and `.elevation-overlay` in `map.css` / `map-legend.css` for working examples.
+- The sidebar (MapLegend) manages its own stacking context separately and is not affected by this.
+
 ## Code Style
 
 - Do not include "Co-Authored-By: Claude" in commit messages
@@ -134,3 +147,8 @@ Use Chrome DevTools MCP server for visual verification:
 - Click on DOM elements (sidebar buttons work)
 - Dispatch custom events to test event handlers
 - Cannot test direct map layer interactions (requires manual testing)
+
+## Configuration & Secrets
+
+- Mapbox credentials belong in `.env.local`; see `.env.example` for required keys.
+- Never commit secrets or `.env.local` to version control.

@@ -132,10 +132,80 @@
   color: var(--color-gray-600);
 }
 
+.section-title-clickable {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+
+.section-title-clickable:hover {
+  color: var(--color-blue-dark);
+}
+
+.section-title-chevron {
+  font-size: 10px;
+  margin-right: 6px;
+  display: inline-block;
+  width: 14px;
+  flex-shrink: 0;
+}
+
 .section-items {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Trail search */
+.trail-search {
+  position: relative;
+}
+
+.trail-search-input {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1a434e;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.trail-search-input:focus {
+  border-color: #c3f44d;
+  box-shadow: 0 0 0 2px rgba(195, 244, 77, 0.3);
+}
+
+.trail-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.trail-search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.trail-search-clear:hover {
+  color: #6b7280;
+}
+
+.trail-search-empty {
+  padding: 12px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
 }
 
 /* Toggle Switch Styles */
@@ -370,10 +440,41 @@
   border-color: var(--color-blue-primary);
 }
 
+.route-item-faded {
+  opacity: 0.7;
+}
+
 .route-color-indicator {
   width: 16px;
   height: 16px;
   border-radius: 4px;
+}
+
+/* Trail difficulty shape indicators */
+.trail-shape {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.trail-shape-easy {
+  border-radius: 50%;
+}
+
+.trail-shape-intermediate {
+  border-radius: 2px;
+}
+
+.trail-shape-advanced,
+.trail-shape-expert {
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  border-radius: 1px;
+}
+
+.trail-shape-unrated {
+  border-radius: 50%;
 }
 
 .route-name {
@@ -386,6 +487,189 @@
   margin-top: 4px;
   margin-left: 28px;
 }
+
+/* Mountain bike trail styles */
+.region-heading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-gray-700);
+  padding: 10px 0 4px;
+}
+
+.region-clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 10px 4px 4px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.region-clickable:hover {
+  background-color: var(--color-blue-transparent);
+  color: var(--color-blue-dark);
+}
+
+.region-chevron {
+  font-size: 9px;
+  margin-right: 5px;
+  display: inline-block;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.region-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-gray-400);
+}
+
+.rec-area-heading {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-gray-500);
+  letter-spacing: 0.05em;
+  padding: 8px 0 4px;
+}
+
+.rec-area-clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 8px 4px 4px 16px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.rec-area-clickable:hover {
+  background-color: var(--color-blue-transparent);
+  color: var(--color-blue-dark);
+}
+
+.rec-area-chevron {
+  font-size: 8px;
+  margin-right: 4px;
+  display: inline-block;
+  width: 10px;
+}
+
+.rec-area-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-gray-400);
+}
+
+.trail-distance {
+  font-size: 11px;
+  color: var(--color-gray-500);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Elevation profile overlay */
+.elevation-overlay {
+  position: absolute;
+  bottom: 16px;
+  left: 296px;
+  right: 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  padding: 10px 16px 6px;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.elevation-overlay-full {
+  left: 16px;
+}
+
+@media (max-width: 768px) {
+  .elevation-overlay {
+    left: 8px;
+    right: 8px;
+    bottom: 60px;
+    padding: 8px 8px 4px;
+  }
+
+  .elevation-overlay-sidebar-open {
+    display: none;
+  }
+}
+
+.elevation-overlay-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.elevation-overlay-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.elevation-overlay .elevation-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--color-gray-500);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.elevation-chart-container {
+  display: flex;
+  position: relative;
+}
+
+.elevation-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2px 0;
+  flex-shrink: 0;
+  width: 42px;
+}
+
+.elevation-y-label {
+  font-size: 9px;
+  color: var(--color-gray-400);
+  text-align: right;
+  padding-right: 4px;
+  line-height: 1;
+}
+
+.elevation-chart-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.elevation-chart {
+  width: 100%;
+  height: 15vh;
+  min-height: 80px;
+  max-height: 160px;
+  cursor: crosshair;
+  border-radius: 4px;
+  touch-action: none;
+}
+
+.elevation-tooltip {
+  font-size: 11px;
+  color: var(--color-gray-600);
+  text-align: center;
+  padding: 2px 0;
+  min-height: 16px;
+}
+
 
 /* Layer toggle styles */
 .layer-toggle {

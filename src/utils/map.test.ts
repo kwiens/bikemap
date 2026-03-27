@@ -5,8 +5,14 @@ import {
   calculateZoomForBounds,
   calculateRouteBounds,
   findLocationInArray,
+  flyToBounds,
+  updateMtnBikeOpacity,
+  highlightMtnBikeArea,
+  initMtnBikeColors,
+  TRAIL_LAYERS,
 } from './map';
-import type { BikeRoute } from '@/data/geo_data';
+import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
+import { TRAIL_METADATA, RATING_COLORS } from '@/data/trail-metadata';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type mapboxgl from 'mapbox-gl';
 
@@ -135,6 +141,7 @@ describe('Mapbox Geo Integration', () => {
     it('should update opacity for selected and unselected routes', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(undefined),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -193,6 +200,7 @@ describe('Mapbox Geo Integration', () => {
     it('should set all routes to unselected when selectedId is null', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(undefined),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -272,8 +280,8 @@ describe('Mapbox Geo Integration', () => {
 
       const zoom = calculateZoomForBounds(mockBounds, true);
 
-      expect(zoom).toBeGreaterThanOrEqual(11);
-      expect(zoom).toBeLessThanOrEqual(15);
+      expect(zoom).toBeGreaterThanOrEqual(12);
+      expect(zoom).toBeLessThanOrEqual(16);
     });
 
     it('should calculate zoom for desktop device', () => {
@@ -286,8 +294,8 @@ describe('Mapbox Geo Integration', () => {
 
       const zoom = calculateZoomForBounds(mockBounds, false);
 
-      expect(zoom).toBeGreaterThanOrEqual(13);
-      expect(zoom).toBeLessThanOrEqual(17);
+      expect(zoom).toBeGreaterThanOrEqual(14);
+      expect(zoom).toBeLessThanOrEqual(18);
     });
 
     it('should return higher zoom for smaller bounds', () => {
@@ -322,8 +330,8 @@ describe('Mapbox Geo Integration', () => {
       const mobileZoom = calculateZoomForBounds(hugeBounds, true);
       const desktopZoom = calculateZoomForBounds(hugeBounds, false);
 
-      expect(mobileZoom).toBe(11);
-      expect(desktopZoom).toBe(13);
+      expect(mobileZoom).toBe(12);
+      expect(desktopZoom).toBe(14);
     });
   });
 
@@ -508,5 +516,368 @@ describe('Mapbox Geo Integration', () => {
 
       expect(result).toEqual(locations[0]);
     });
+  });
+});
+
+describe('flyToBounds', () => {
+  const mockBounds = {
+    getWest: () => -85.5,
+    getEast: () => -85.0,
+    getNorth: () => 35.2,
+    getSouth: () => 34.8,
+  } as mapboxgl.LngLatBounds;
+
+  it('should call map.flyTo with the center of the bounds', () => {
+    const mockMap = {
+      flyTo: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    Object.defineProperty(window, 'innerWidth', {
+      value: 1024,
+      writable: true,
+    });
+
+    flyToBounds(mockMap, mockBounds);
+
+    expect(mockMap.flyTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        center: [-85.25, 35],
+        essential: true,
+        duration: 1000,
+      }),
+    );
+  });
+
+  it('should use mobile zoom when window.innerWidth <= 768', () => {
+    const mockMap = {
+      flyTo: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    Object.defineProperty(window, 'innerWidth', { value: 400, writable: true });
+
+    flyToBounds(mockMap, mockBounds);
+
+    const callArgs = (mockMap.flyTo as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    const mobileZoom = callArgs.zoom;
+
+    // Mobile zoom uses calculateZoomForBounds(bounds, true) which uses Math.max(12, 16 - maxDiff * 100)
+    const expectedZoom = calculateZoomForBounds(mockBounds, true);
+    expect(mobileZoom).toBe(expectedZoom);
+  });
+
+  it('should use desktop zoom when window.innerWidth > 768', () => {
+    const mockMap = {
+      flyTo: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    Object.defineProperty(window, 'innerWidth', {
+      value: 1024,
+      writable: true,
+    });
+
+    flyToBounds(mockMap, mockBounds);
+
+    const callArgs = (mockMap.flyTo as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    const desktopZoom = callArgs.zoom;
+
+    // Desktop zoom uses calculateZoomForBounds(bounds, false) which uses Math.max(14, 18 - maxDiff * 100)
+    const expectedZoom = calculateZoomForBounds(mockBounds, false);
+    expect(desktopZoom).toBe(expectedZoom);
+  });
+
+  it('should compute center as midpoint of bounds', () => {
+    const mockMap = {
+      flyTo: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    Object.defineProperty(window, 'innerWidth', {
+      value: 1024,
+      writable: true,
+    });
+
+    const asymmetricBounds = {
+      getWest: () => -86.0,
+      getEast: () => -84.0,
+      getNorth: () => 36.0,
+      getSouth: () => 34.0,
+    } as mapboxgl.LngLatBounds;
+
+    flyToBounds(mockMap, asymmetricBounds);
+
+    expect(mockMap.flyTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        center: [-85.0, 35.0],
+      }),
+    );
+  });
+});
+
+describe('updateMtnBikeOpacity', () => {
+  it('should set conditional expressions when a trail is selected', () => {
+    const mockMap = {
+      setPaintProperty: vi.fn(),
+      getLayer: vi.fn().mockReturnValue(true),
+    } as unknown as mapboxgl.Map;
+
+    updateMtnBikeOpacity(mockMap, 'Five Points');
+
+    // Main layer should get case expressions for line-opacity and line-width
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails',
+      'line-opacity',
+      ['case', ['==', ['get', 'Trail'], 'Five Points'], 0.9, 0.15],
+    );
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails',
+      'line-width',
+      ['case', ['==', ['get', 'Trail'], 'Five Points'], 4, 2],
+    );
+  });
+
+  it('should reset to default opacity and width when selectedTrailName is null', () => {
+    const mockMap = {
+      setPaintProperty: vi.fn(),
+      getLayer: vi.fn().mockReturnValue(true),
+    } as unknown as mapboxgl.Map;
+
+    updateMtnBikeOpacity(mockMap, null);
+
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails',
+      'line-opacity',
+      0.15,
+    );
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails',
+      'line-width',
+      2,
+    );
+  });
+
+  it('should handle missing casing and glow layers gracefully', () => {
+    const mainLayers = new Set([
+      'SORBA Regional Trails',
+      'Godsey Ridge Trails',
+    ]);
+    const mockMap = {
+      setPaintProperty: vi.fn(),
+      getLayer: vi.fn((id: string) =>
+        mainLayers.has(id) ? { id } : undefined,
+      ),
+    } as unknown as mapboxgl.Map;
+
+    expect(() => {
+      updateMtnBikeOpacity(mockMap, 'Five Points');
+    }).not.toThrow();
+
+    // 2 properties per main layer, 2 layers = 4 calls (no casing/glow)
+    expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(4);
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails',
+      'line-opacity',
+      expect.anything(),
+    );
+  });
+
+  it('should also update casing and glow layers when they exist and trail is selected', () => {
+    const mockMap = {
+      setPaintProperty: vi.fn(),
+      getLayer: vi.fn().mockReturnValue(true),
+    } as unknown as mapboxgl.Map;
+
+    updateMtnBikeOpacity(mockMap, 'Five Points');
+
+    // Casing layer updates
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails Casing',
+      'line-opacity',
+      expect.anything(),
+    );
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails Casing',
+      'line-width',
+      expect.anything(),
+    );
+
+    // Glow layer updates
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails Glow',
+      'line-opacity',
+      expect.anything(),
+    );
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails Glow',
+      'line-width',
+      expect.anything(),
+    );
+  });
+});
+
+describe('highlightMtnBikeArea', () => {
+  function makeTrail(trailName: string, recArea: string): MountainBikeTrail {
+    return {
+      trailName,
+      displayName: trailName,
+      recArea,
+      rating: 'intermediate',
+      color: '#2563EB',
+      icon: {} as IconDefinition,
+    };
+  }
+
+  it('should highlight trails matching by recArea', () => {
+    const mockMap = {
+      setPaintProperty: vi.fn(),
+      getLayer: vi.fn().mockReturnValue(true),
+    } as unknown as mapboxgl.Map;
+
+    const trails = [
+      makeTrail('Trail A', 'Raccoon Mountain'),
+      makeTrail('Trail B', 'Raccoon Mountain'),
+      makeTrail('Trail C', 'Stringers Ridge'),
+    ];
+
+    highlightMtnBikeArea(mockMap, trails, 'Raccoon Mountain');
+
+    // Should set match expression on main layer with matching trail names
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails',
+      'line-opacity',
+      ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 0.9, 0.1],
+    );
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'SORBA Regional Trails',
+      'line-width',
+      ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 3, 2],
+    );
+  });
+
+  it('should do nothing when no trails match the area', () => {
+    const mockMap = {
+      setPaintProperty: vi.fn(),
+      getLayer: vi.fn().mockReturnValue(true),
+    } as unknown as mapboxgl.Map;
+
+    const trails = [
+      makeTrail('Trail A', 'Raccoon Mountain'),
+      makeTrail('Trail B', 'Stringers Ridge'),
+    ];
+
+    highlightMtnBikeArea(mockMap, trails, 'Nonexistent Area');
+
+    // No setPaintProperty calls for SORBA layers since no trails matched
+    expect(mockMap.setPaintProperty).not.toHaveBeenCalled();
+  });
+});
+
+describe('TRAIL_LAYERS', () => {
+  it('has entries for both SORBA and Godsey Ridge layers', () => {
+    expect(TRAIL_LAYERS.length).toBeGreaterThanOrEqual(2);
+    expect(
+      TRAIL_LAYERS.find((l) => l.layerId === 'SORBA Regional Trails'),
+    ).toBeDefined();
+    expect(
+      TRAIL_LAYERS.find((l) => l.layerId === 'Godsey Ridge Trails'),
+    ).toBeDefined();
+  });
+
+  it('SORBA layer uses rating property directly', () => {
+    const sorba = TRAIL_LAYERS.find(
+      (l) => l.layerId === 'SORBA Regional Trails',
+    );
+    expect(sorba?.hasRatingProp).toBe(true);
+    expect(sorba?.trailProp).toBe('Trail');
+  });
+
+  it('Godsey layer uses metadata for ratings', () => {
+    const godsey = TRAIL_LAYERS.find(
+      (l) => l.layerId === 'Godsey Ridge Trails',
+    );
+    expect(godsey?.hasRatingProp).toBe(false);
+    expect(godsey?.trailProp).toBe('Name');
+  });
+});
+
+describe('TRAIL_METADATA', () => {
+  it('has entries for all Godsey Ridge trails', () => {
+    const godseyNames = [
+      'Green as built',
+      'Blue as built 1',
+      'Blue as built 2',
+      'Exper_Spur_As_built_21626',
+      'Expert_As_Built_1',
+      'Expert_As_Built_2',
+    ];
+    for (const name of godseyNames) {
+      expect(TRAIL_METADATA[name]).toBeDefined();
+      expect(TRAIL_METADATA[name].displayName).toContain('Godsey Ridge');
+    }
+  });
+
+  it('all ratings have corresponding colors', () => {
+    for (const meta of Object.values(TRAIL_METADATA)) {
+      if (meta.rating) {
+        expect(RATING_COLORS[meta.rating]).toBeDefined();
+      }
+    }
+  });
+});
+
+describe('initMtnBikeColors', () => {
+  it('sets line-color on all existing trail layers', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue({ id: 'test' }),
+      setPaintProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    initMtnBikeColors(mockMap);
+
+    // Should set color on each trail layer
+    for (const cfg of TRAIL_LAYERS) {
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        cfg.layerId,
+        'line-color',
+        expect.anything(),
+      );
+    }
+  });
+
+  it('skips layers that do not exist', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue(undefined),
+      setPaintProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    initMtnBikeColors(mockMap);
+
+    expect(mockMap.setPaintProperty).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
+  it('reverse-maps display name to raw feature value for metadata layers', () => {
+    const allLayers = new Set([
+      'SORBA Regional Trails',
+      'Godsey Ridge Trails',
+      'SORBA Regional Trails Casing',
+      'SORBA Regional Trails Glow',
+      'Godsey Ridge Trails Casing',
+      'Godsey Ridge Trails Glow',
+    ]);
+    const mockMap = {
+      setPaintProperty: vi.fn(),
+      getLayer: vi.fn((id: string) => (allLayers.has(id) ? { id } : undefined)),
+    } as unknown as mapboxgl.Map;
+
+    updateMtnBikeOpacity(mockMap, 'Godsey Ridge Green');
+
+    // The Godsey layer should use the raw name 'Green as built' in the expression
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'Godsey Ridge Trails',
+      'line-opacity',
+      ['case', ['==', ['get', 'Name'], 'Green as built'], 0.9, 0.15],
+    );
   });
 });

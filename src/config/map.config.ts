@@ -34,6 +34,7 @@ export interface MapConfig {
   // Debug/development settings
   debug: {
     showLocationTracker: boolean;
+    simulateLocation: boolean;
   };
 }
 
@@ -67,6 +68,7 @@ const chattanoogaConfig: MapConfig = {
 
   debug: {
     showLocationTracker: true,
+    simulateLocation: false,
   },
 };
 

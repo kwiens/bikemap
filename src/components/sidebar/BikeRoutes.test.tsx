@@ -26,7 +26,12 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     expect(screen.getByText('Pick a Loop')).toBeInTheDocument();
@@ -40,7 +45,12 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const route1Button = screen.getByRole('button', {
@@ -56,7 +66,12 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const route2Button = screen.getByRole('button', {
@@ -72,7 +87,12 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const route1Button = screen.getByRole('button', {
@@ -88,7 +108,12 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute="route-1" onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute="route-1"
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const route1Button = screen.getByRole('button', {
@@ -106,7 +131,12 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
+      <BikeRoutes
+        selectedRoute={null}
+        onRouteSelect={mockOnRouteSelect}
+        isExpanded={true}
+        onToggle={vi.fn()}
+      />,
     );
 
     const colorIndicators = document.querySelectorAll('.route-color-indicator');

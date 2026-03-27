@@ -8,6 +8,7 @@ import { bikeRoutes } from '@/data/geo_data';
 import { mapConfig } from '@/config/map.config';
 import { buildSvg } from '@/utils/svg';
 import { buildGpx } from '@/utils/gpx';
+import { slugify } from '@/utils/string';
 
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
 
@@ -24,10 +25,6 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '-');
 }
 
 const buttonStyle: React.CSSProperties = {

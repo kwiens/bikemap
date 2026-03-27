@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
-import '@/app/map.css';
 import { MapLegendProvider } from '@/components/MapLegend';
-import { bikeRoutes, mapFeatures, bikeResources } from '@/data/geo_data';
+import {
+  bikeRoutes,
+  mapFeatures,
+  bikeResources,
+  mountainBikeTrails,
+} from '@/data/geo_data';
 import {
   createLocationMarker,
   createAttractionMarker,
@@ -15,6 +18,7 @@ import {
   ensureFontAwesomeLoaded,
   MarkerManager,
 } from '@/components/MapMarkers';
+import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
 import { useToast, useMapResize } from '@/hooks';
 import {
   fetchStationInformation,
@@ -25,11 +29,21 @@ import {
 import {
   geocodeAddress,
   updateRouteOpacity,
-  calculateZoomForBounds,
+  flyToBounds,
   calculateRouteBounds,
   findLocationInArray,
+  calculateTrailBounds,
+  initTrailBoundsFromDefaults,
+  getAreaBounds,
+  updateMtnBikeOpacity,
+  highlightMtnBikeArea,
+  initMtnBikeColors,
+  initMtnBikeLayers,
+  TRAIL_LAYERS,
 } from '@/utils/map';
 import { mapConfig } from '@/config/map.config';
+import { MAP_EVENTS } from '@/events';
+import { TRAIL_METADATA } from '@/data/trail-metadata';
 
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
@@ -41,6 +55,7 @@ const MapboxMap = memo(function MapboxMap() {
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const watchId = useRef<number | null>(null);
   const locationWatch = useRef<NodeJS.Timeout | undefined>(undefined);
+  const wakeLock = useRef<WakeLockSentinel | null>(null);
   const [watchingLocation, setWatchingLocation] = useState(false);
 
   // Track markers for attractions and bike resources
@@ -90,9 +105,18 @@ const MapboxMap = memo(function MapboxMap() {
             lat: position.coords.latitude,
           });
         }
+
+        // Broadcast location for elevation profile tracking
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.LOCATION_UPDATE, {
+            detail: {
+              lng: position.coords.longitude,
+              lat: position.coords.latitude,
+            },
+          }),
+        );
       },
       () => {
-        //console.log(positionError);
         if (locationMarker.current) {
           locationMarker.current.remove();
           locationMarker.current = null;
@@ -141,41 +165,76 @@ const MapboxMap = memo(function MapboxMap() {
         showToast(selectedRoute.name);
       }
 
-      // Update opacities for all routes
+      // Update opacities for all routes and reset mountain bike trails
       updateRouteOpacity(map.current, bikeRoutes, routeId, {
         selected: 0.8,
         unselected: 0.2,
       });
+      updateMtnBikeOpacity(map.current, null);
 
       if (selectedRoute?.bounds) {
-        const bounds = selectedRoute.bounds;
+        flyToBounds(map.current, selectedRoute.bounds);
+      }
+    },
+    [showToast],
+  );
 
-        try {
-          // Calculate the center of the bounds
-          const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
-          const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
+  // Handle trail selection events
+  const handleTrailSelect = useCallback(
+    (event: CustomEvent) => {
+      if (!map.current) return;
 
-          // Calculate zoom level based on bounds and device type
-          const isMobile = window.innerWidth <= 768;
-          const zoom = calculateZoomForBounds(bounds, isMobile);
+      const { trailName } = event.detail;
+      const trail = mountainBikeTrails.find((t) => t.trailName === trailName);
 
-          // Use flyTo which tends to be more reliable
-          map.current.flyTo({
-            center: [centerLng, centerLat],
-            zoom: zoom,
-            essential: true,
-            duration: 1000,
-          });
+      if (trail) {
+        showToast(trail.displayName);
+      }
 
-          // Force a resize to ensure the map is rendered properly
-          setTimeout(() => {
-            if (map.current) {
-              map.current.resize();
-            }
-          }, 100);
-        } catch (error) {
-          console.error('Error flying to route:', error);
-        }
+      // Dim bike routes and highlight the selected trail
+      updateRouteOpacity(map.current, bikeRoutes, null, {
+        selected: 0.1,
+        unselected: 0.1,
+      });
+      updateMtnBikeOpacity(map.current, trailName);
+
+      // Calculate bounds lazily if not yet available
+      if (trail && !trail.bounds) {
+        trail.bounds =
+          calculateTrailBounds(map.current, trailName) ?? undefined;
+      }
+
+      if (trail?.bounds) {
+        flyToBounds(map.current, trail.bounds);
+      }
+    },
+    [showToast],
+  );
+
+  const handleTrailDeselect = useCallback(() => {
+    if (!map.current) return;
+    updateMtnBikeOpacity(map.current, null);
+  }, []);
+
+  // Handle area (rec area heading) selection — zoom to area bounds
+  const handleAreaSelect = useCallback(
+    (event: CustomEvent) => {
+      if (!map.current) return;
+
+      const { areaName } = event.detail;
+      const bounds = getAreaBounds(mountainBikeTrails, areaName);
+
+      showToast(areaName);
+
+      // Dim bike routes, highlight trails in selected area
+      updateRouteOpacity(map.current, bikeRoutes, null, {
+        selected: 0.1,
+        unselected: 0.1,
+      });
+      highlightMtnBikeArea(map.current, mountainBikeTrails, areaName);
+
+      if (bounds) {
+        flyToBounds(map.current, bounds);
       }
     },
     [showToast],
@@ -274,7 +333,7 @@ const MapboxMap = memo(function MapboxMap() {
       });
 
       // Dispatch event to notify the MapLegend component
-      window.dispatchEvent(new CustomEvent('route-deselect'));
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
     }
   }, []);
 
@@ -329,7 +388,7 @@ const MapboxMap = memo(function MapboxMap() {
         if (isAttraction && !showAttractions) {
           // Toggle attractions layer on
           window.dispatchEvent(
-            new CustomEvent('layer-toggle', {
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
               detail: { layer: 'attractions', visible: true },
             }),
           );
@@ -341,7 +400,7 @@ const MapboxMap = memo(function MapboxMap() {
         if (isBikeResource && !showBikeResources) {
           // Toggle bike resources layer on
           window.dispatchEvent(
-            new CustomEvent('layer-toggle', {
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
               detail: { layer: 'bikeResources', visible: true },
             }),
           );
@@ -356,7 +415,7 @@ const MapboxMap = memo(function MapboxMap() {
         if (isBikeRental && !showBikeRentals) {
           // Toggle bike rentals layer on
           window.dispatchEvent(
-            new CustomEvent('layer-toggle', {
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
               detail: { layer: 'bikeRentals', visible: true },
             }),
           );
@@ -405,12 +464,15 @@ const MapboxMap = memo(function MapboxMap() {
     const centerLocationHandler = (e: Event) =>
       handleCenterLocation(e as CustomEvent);
 
-    window.addEventListener('layer-toggle', layerToggleHandler);
-    window.addEventListener('center-location', centerLocationHandler);
+    window.addEventListener(MAP_EVENTS.LAYER_TOGGLE, layerToggleHandler);
+    window.addEventListener(MAP_EVENTS.CENTER_LOCATION, centerLocationHandler);
 
     return () => {
-      window.removeEventListener('layer-toggle', layerToggleHandler);
-      window.removeEventListener('center-location', centerLocationHandler);
+      window.removeEventListener(MAP_EVENTS.LAYER_TOGGLE, layerToggleHandler);
+      window.removeEventListener(
+        MAP_EVENTS.CENTER_LOCATION,
+        centerLocationHandler,
+      );
     };
   }, [handleLayerToggle, handleCenterLocation]);
 
@@ -420,12 +482,79 @@ const MapboxMap = memo(function MapboxMap() {
     const routeSelectHandler = (e: Event) =>
       handleRouteSelect(e as CustomEvent);
 
-    window.addEventListener('route-select', routeSelectHandler);
+    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, routeSelectHandler);
 
     return () => {
-      window.removeEventListener('route-select', routeSelectHandler);
+      window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, routeSelectHandler);
     };
   }, [handleRouteSelect]);
+
+  // Set up trail-select and trail-deselect event listeners
+  useEffect(() => {
+    const trailSelectHandler = (e: Event) =>
+      handleTrailSelect(e as CustomEvent);
+    const trailDeselectHandler = () => handleTrailDeselect();
+
+    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, trailSelectHandler);
+    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, trailDeselectHandler);
+
+    return () => {
+      window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, trailSelectHandler);
+      window.removeEventListener(
+        MAP_EVENTS.TRAIL_DESELECT,
+        trailDeselectHandler,
+      );
+    };
+  }, [handleTrailSelect, handleTrailDeselect]);
+
+  // Set up area-select event listener
+  useEffect(() => {
+    const areaSelectHandler = (e: Event) => handleAreaSelect(e as CustomEvent);
+
+    window.addEventListener(MAP_EVENTS.AREA_SELECT, areaSelectHandler);
+
+    return () => {
+      window.removeEventListener(MAP_EVENTS.AREA_SELECT, areaSelectHandler);
+    };
+  }, [handleAreaSelect]);
+
+  // Elevation profile hover marker
+  useEffect(() => {
+    let marker: mapboxgl.Marker | null = null;
+
+    const el = document.createElement('div');
+    el.style.width = '12px';
+    el.style.height = '12px';
+    el.style.borderRadius = '50%';
+    el.style.backgroundColor = '#3b82f6';
+    el.style.border = '2px solid white';
+    el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.4)';
+
+    const handler = (e: Event) => {
+      const { lng, lat } = (e as CustomEvent).detail;
+      if (lng === null || lat === null) {
+        if (marker) {
+          marker.remove();
+          marker = null;
+        }
+        return;
+      }
+      if (!map.current) return;
+      if (!marker) {
+        marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([lng, lat])
+          .addTo(map.current);
+      } else {
+        marker.setLngLat([lng, lat]);
+      }
+    };
+
+    window.addEventListener(MAP_EVENTS.ELEVATION_HOVER, handler);
+    return () => {
+      window.removeEventListener(MAP_EVENTS.ELEVATION_HOVER, handler);
+      if (marker) marker.remove();
+    };
+  }, []);
 
   // Initialize map on component mount
   useEffect(() => {
@@ -440,6 +569,9 @@ const MapboxMap = memo(function MapboxMap() {
           // Ensure FontAwesome is loaded
           ensureFontAwesomeLoaded();
 
+          // Expose map for console debugging (e.g. querying tileset features)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any).__map = null;
           const newMap = new mapboxgl.Map({
             container: mapContainer.current as HTMLElement,
             style: mapConfig.mapbox.styleUrl,
@@ -451,6 +583,8 @@ const MapboxMap = memo(function MapboxMap() {
           });
 
           map.current = newMap;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any).__map = newMap;
 
           // Add basic controls
           newMap.addControl(new mapboxgl.NavigationControl());
@@ -458,11 +592,6 @@ const MapboxMap = memo(function MapboxMap() {
           // Wait for map to load
           await new Promise<void>((resolve) => {
             newMap.on('load', () => {
-              // Log all available layers
-              const style = newMap.getStyle();
-              if (style?.layers) {
-                console.log('Available Map Layers:', style.layers);
-              }
               resolve();
             });
           });
@@ -480,7 +609,39 @@ const MapboxMap = memo(function MapboxMap() {
                     route.defaultWidth,
                   );
                   newMap.setPaintProperty(layer.id, 'line-color', route.color);
-                  newMap.setPaintProperty(layer.id, 'line-opacity', 0.2); // Start with low opacity
+                  newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
+                  newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
+                  newMap.setLayoutProperty(layer.id, 'line-join', 'round');
+
+                  // Add white casing layer beneath the route
+                  const casingId = `${layer.id}-casing`;
+                  if (!newMap.getLayer(casingId)) {
+                    const routeLayer = layer as {
+                      source?: string;
+                      'source-layer'?: string;
+                    };
+                    newMap.addLayer(
+                      {
+                        id: casingId,
+                        type: 'line',
+                        source: routeLayer.source ?? 'composite',
+                        ...(routeLayer['source-layer']
+                          ? { 'source-layer': routeLayer['source-layer'] }
+                          : {}),
+                        layout: {
+                          'line-cap': 'round',
+                          'line-join': 'round',
+                        },
+                        paint: {
+                          'line-color': '#ffffff',
+                          'line-width': route.defaultWidth + 2,
+                          'line-opacity': 0.3,
+                        },
+                        ...(layer.filter ? { filter: layer.filter } : {}),
+                      },
+                      layer.id,
+                    );
+                  }
 
                   // Calculate and store route bounds
                   const bounds = calculateRouteBounds(newMap, route, layer);
@@ -501,7 +662,7 @@ const MapboxMap = memo(function MapboxMap() {
 
               // Dispatch route-select event (same as clicking in legend)
               window.dispatchEvent(
-                new CustomEvent('route-select', {
+                new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
                   detail: { routeId: route.id },
                 }),
               );
@@ -518,6 +679,43 @@ const MapboxMap = memo(function MapboxMap() {
             });
           });
 
+          // Initialize all mountain bike trail layers
+          initMtnBikeColors(newMap);
+          initMtnBikeLayers(newMap);
+          initTrailBoundsFromDefaults(mountainBikeTrails);
+
+          for (const cfg of TRAIL_LAYERS) {
+            if (!newMap.getLayer(cfg.layerId)) continue;
+
+            newMap.setPaintProperty(cfg.layerId, 'line-opacity', 0.15);
+            newMap.setPaintProperty(cfg.layerId, 'line-width', 2);
+
+            // Click handler on hit-test layer for easier tapping
+            const hId = `${cfg.layerId} Hit`;
+            if (newMap.getLayer(hId)) {
+              newMap.on('click', hId, (e) => {
+                e.preventDefault();
+                const rawName = e.features?.[0]?.properties?.[cfg.trailProp];
+                if (!rawName) return;
+                const meta = TRAIL_METADATA[rawName];
+                const trailName = meta?.displayName ?? rawName;
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
+                    detail: { trailName },
+                  }),
+                );
+              });
+
+              newMap.on('mouseenter', hId, () => {
+                newMap.getCanvas().style.cursor = 'pointer';
+              });
+
+              newMap.on('mouseleave', hId, () => {
+                newMap.getCanvas().style.cursor = '';
+              });
+            }
+          }
+
           // Force a resize to ensure proper display
           setTimeout(() => {
             if (map.current) {
@@ -527,6 +725,17 @@ const MapboxMap = memo(function MapboxMap() {
 
           initializeLocationMarker();
           initializeGestureWatch();
+
+          // Debug: click map to simulate GPS location
+          if (mapConfig.debug.simulateLocation) {
+            newMap.on('click', (e) => {
+              window.dispatchEvent(
+                new CustomEvent(MAP_EVENTS.LOCATION_UPDATE, {
+                  detail: { lng: e.lngLat.lng, lat: e.lngLat.lat },
+                }),
+              );
+            });
+          }
 
           // Clear existing marker managers before initialization
           attractionMarkers.current.clear();
@@ -573,6 +782,12 @@ const MapboxMap = memo(function MapboxMap() {
         locationWatch.current = undefined;
       }
 
+      // Release wake lock
+      if (wakeLock.current) {
+        wakeLock.current.release();
+        wakeLock.current = null;
+      }
+
       // Clean up all markers before removing the map
       if (locationMarker.current) {
         locationMarker.current.remove();
@@ -593,6 +808,20 @@ const MapboxMap = memo(function MapboxMap() {
     setWatchingLocation(value);
 
     if (value) {
+      // Keep screen awake while tracking
+      if ('wakeLock' in navigator) {
+        navigator.wakeLock
+          .request('screen')
+          .then((lock) => {
+            if (locationWatch.current !== undefined) {
+              wakeLock.current = lock;
+            } else {
+              lock.release();
+            }
+          })
+          .catch(() => {});
+      }
+
       // When enabled: immediately center on current location (preserving zoom)
       if (map.current && locationMarker.current) {
         const lngLat = locationMarker.current.getLngLat();
@@ -622,6 +851,11 @@ const MapboxMap = memo(function MapboxMap() {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
       }
+      // Release wake lock
+      if (wakeLock.current) {
+        wakeLock.current.release();
+        wakeLock.current = null;
+      }
     }
   };
 
@@ -640,6 +874,8 @@ const MapboxMap = memo(function MapboxMap() {
           {toastMessage}
         </div>
       )}
+
+      <ElevationProfile />
 
       {/* Location tracking toggle */}
       {mapConfig.debug.showLocationTracker && (
