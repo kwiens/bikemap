@@ -209,6 +209,7 @@ const SORBA_COLOR_EXPRESSION: mapboxgl.Expression = [
 
 const SORBA_CASING_ID = 'SORBA Regional Trails Casing';
 const SORBA_GLOW_ID = 'SORBA Regional Trails Glow';
+export const SORBA_HIT_ID = 'SORBA Regional Trails Hit';
 
 export function initSorbaColors(map: mapboxgl.Map): void {
   try {
@@ -269,6 +270,25 @@ export function initSorbaLayers(map: mapboxgl.Map): void {
       },
       SORBA_CASING_ID,
     );
+  }
+
+  // Invisible wide hit-test layer for easier tapping
+  if (!map.getLayer(SORBA_HIT_ID)) {
+    map.addLayer({
+      id: SORBA_HIT_ID,
+      type: 'line',
+      source,
+      'source-layer': SORBA_SOURCE_LAYER,
+      layout: {
+        'line-cap': 'round',
+        'line-join': 'round',
+      },
+      paint: {
+        'line-color': 'rgba(0,0,0,0)',
+        'line-width': 20,
+        'line-opacity': 0,
+      },
+    });
   }
 
   // Set the main trail layer to round caps/joins and thinner default

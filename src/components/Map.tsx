@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
-import '@/app/map.css';
 import { MapLegendProvider } from '@/components/MapLegend';
 import {
   bikeRoutes,
@@ -42,32 +40,12 @@ import {
   highlightSorbaArea,
   initSorbaColors,
   initSorbaLayers,
+  SORBA_HIT_ID,
 } from '@/utils/map';
 import { mapConfig } from '@/config/map.config';
 
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
-
-// Persist map state across HMR to prevent overlay loss during development.
-// The map container div and Mapbox instance are stored on window so they
-// survive React component unmount/remount cycles triggered by Fast Refresh.
-interface PersistedMapState {
-  map: mapboxgl.Map;
-  container: HTMLDivElement;
-  attractionMarkers: MarkerManager;
-  bikeResourceMarkers: MarkerManager;
-  bikeRentalMarkers: MarkerManager;
-}
-
-function getPersistedMap(): PersistedMapState | null {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (window as any).__bikemap ?? null;
-}
-
-function setPersistedMap(state: PersistedMapState): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__bikemap = state;
-}
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
@@ -619,34 +597,19 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Initialize map on component mount
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (map.current) {
+      return; // already initialized
+    }
 
-    // HMR recovery: reuse persisted map instance instead of recreating
-    const persisted = getPersistedMap();
-    if (persisted) {
-      mapContainer.current.appendChild(persisted.container);
-      map.current = persisted.map;
-      attractionMarkers.current = persisted.attractionMarkers;
-      bikeResourceMarkers.current = persisted.bikeResourceMarkers;
-      bikeRentalMarkers.current = persisted.bikeRentalMarkers;
-      persisted.map.resize();
-      initializeLocationMarker();
-      initializeGestureWatch();
-    } else {
-      // Create inner container for Mapbox (separate from React-managed wrapper
-      // so it can survive HMR remounts via window persistence)
-      const container = document.createElement('div');
-      container.style.width = '100%';
-      container.style.height = '100%';
-      mapContainer.current.appendChild(container);
-
+    // Initialize map
+    if (mapContainer.current) {
       const initializeMap = async () => {
         try {
           // Ensure FontAwesome is loaded
           ensureFontAwesomeLoaded();
 
           const newMap = new mapboxgl.Map({
-            container,
+            container: mapContainer.current as HTMLElement,
             style: mapConfig.mapbox.styleUrl,
             center: mapConfig.defaultView.center,
             zoom: mapConfig.defaultView.zoom,
@@ -656,16 +619,6 @@ const MapboxMap = memo(function MapboxMap() {
           });
 
           map.current = newMap;
-
-          // Persist immediately for HMR recovery (before await so
-          // React Strict Mode double-invoke can also recover)
-          setPersistedMap({
-            map: newMap,
-            container,
-            attractionMarkers: attractionMarkers.current,
-            bikeResourceMarkers: bikeResourceMarkers.current,
-            bikeRentalMarkers: bikeRentalMarkers.current,
-          });
 
           // Add basic controls
           newMap.addControl(new mapboxgl.NavigationControl());
@@ -773,8 +726,8 @@ const MapboxMap = memo(function MapboxMap() {
             initSorbaLayers(newMap);
             initTrailBoundsFromDefaults(sorbaTrails);
 
-            // Click handler for SORBA trails
-            newMap.on('click', SORBA_LAYER_ID, (e) => {
+            // Click handler on wide hit-test layer for easier tapping
+            newMap.on('click', SORBA_HIT_ID, (e) => {
               e.preventDefault();
               const trailName = e.features?.[0]?.properties?.Trail;
               if (trailName) {
@@ -786,11 +739,11 @@ const MapboxMap = memo(function MapboxMap() {
               }
             });
 
-            newMap.on('mouseenter', SORBA_LAYER_ID, () => {
+            newMap.on('mouseenter', SORBA_HIT_ID, () => {
               newMap.getCanvas().style.cursor = 'pointer';
             });
 
-            newMap.on('mouseleave', SORBA_LAYER_ID, () => {
+            newMap.on('mouseleave', SORBA_HIT_ID, () => {
               newMap.getCanvas().style.cursor = '';
             });
           }
@@ -834,7 +787,12 @@ const MapboxMap = memo(function MapboxMap() {
       initializeMap();
     }
 
-    // Cleanup
+    // Capture refs for cleanup
+    const attractionMarkersRef = attractionMarkers.current;
+    const bikeResourceMarkersRef = bikeResourceMarkers.current;
+    const bikeRentalMarkersRef = bikeRentalMarkers.current;
+
+    // Cleanup event listener
     return () => {
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
@@ -845,22 +803,18 @@ const MapboxMap = memo(function MapboxMap() {
         locationWatch.current = undefined;
       }
 
+      // Clean up all markers before removing the map
       if (locationMarker.current) {
         locationMarker.current.remove();
-        locationMarker.current = null;
       }
 
-      // In development, preserve map and markers for HMR recovery.
-      // In production, fully clean up (HMR doesn't exist).
-      if (process.env.NODE_ENV !== 'development') {
-        attractionMarkers.current.clear();
-        bikeResourceMarkers.current.clear();
-        bikeRentalMarkers.current.clear();
+      attractionMarkersRef.clear();
+      bikeResourceMarkersRef.clear();
+      bikeRentalMarkersRef.clear();
 
-        if (map.current) {
-          map.current.remove();
-          map.current = null;
-        }
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
       }
     };
   }, []); // Empty dependency array - only run once on mount
