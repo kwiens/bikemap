@@ -8,8 +8,11 @@ import {
   flyToBounds,
   updateMtnBikeOpacity,
   highlightMtnBikeArea,
+  initMtnBikeColors,
+  TRAIL_LAYERS,
 } from './map';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
+import { TRAIL_METADATA, RATING_COLORS } from '@/data/trail-metadata';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type mapboxgl from 'mapbox-gl';
 
@@ -138,6 +141,7 @@ describe('Mapbox Geo Integration', () => {
     it('should update opacity for selected and unselected routes', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(undefined),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -196,6 +200,7 @@ describe('Mapbox Geo Integration', () => {
     it('should set all routes to unselected when selectedId is null', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(undefined),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -764,5 +769,115 @@ describe('highlightMtnBikeArea', () => {
 
     // No setPaintProperty calls for SORBA layers since no trails matched
     expect(mockMap.setPaintProperty).not.toHaveBeenCalled();
+  });
+});
+
+describe('TRAIL_LAYERS', () => {
+  it('has entries for both SORBA and Godsey Ridge layers', () => {
+    expect(TRAIL_LAYERS.length).toBeGreaterThanOrEqual(2);
+    expect(
+      TRAIL_LAYERS.find((l) => l.layerId === 'SORBA Regional Trails'),
+    ).toBeDefined();
+    expect(
+      TRAIL_LAYERS.find((l) => l.layerId === 'Godsey Ridge Trails'),
+    ).toBeDefined();
+  });
+
+  it('SORBA layer uses rating property directly', () => {
+    const sorba = TRAIL_LAYERS.find(
+      (l) => l.layerId === 'SORBA Regional Trails',
+    );
+    expect(sorba?.hasRatingProp).toBe(true);
+    expect(sorba?.trailProp).toBe('Trail');
+  });
+
+  it('Godsey layer uses metadata for ratings', () => {
+    const godsey = TRAIL_LAYERS.find(
+      (l) => l.layerId === 'Godsey Ridge Trails',
+    );
+    expect(godsey?.hasRatingProp).toBe(false);
+    expect(godsey?.trailProp).toBe('Name');
+  });
+});
+
+describe('TRAIL_METADATA', () => {
+  it('has entries for all Godsey Ridge trails', () => {
+    const godseyNames = [
+      'Green as built',
+      'Blue as built 1',
+      'Blue as built 2',
+      'Exper_Spur_As_built_21626',
+      'Expert_As_Built_1',
+      'Expert_As_Built_2',
+    ];
+    for (const name of godseyNames) {
+      expect(TRAIL_METADATA[name]).toBeDefined();
+      expect(TRAIL_METADATA[name].displayName).toContain('Godsey Ridge');
+    }
+  });
+
+  it('all ratings have corresponding colors', () => {
+    for (const meta of Object.values(TRAIL_METADATA)) {
+      if (meta.rating) {
+        expect(RATING_COLORS[meta.rating]).toBeDefined();
+      }
+    }
+  });
+});
+
+describe('initMtnBikeColors', () => {
+  it('sets line-color on all existing trail layers', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue({ id: 'test' }),
+      setPaintProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    initMtnBikeColors(mockMap);
+
+    // Should set color on each trail layer
+    for (const cfg of TRAIL_LAYERS) {
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        cfg.layerId,
+        'line-color',
+        expect.anything(),
+      );
+    }
+  });
+
+  it('skips layers that do not exist', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue(undefined),
+      setPaintProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    initMtnBikeColors(mockMap);
+
+    expect(mockMap.setPaintProperty).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
+  it('reverse-maps display name to raw feature value for metadata layers', () => {
+    const allLayers = new Set([
+      'SORBA Regional Trails',
+      'Godsey Ridge Trails',
+      'SORBA Regional Trails Casing',
+      'SORBA Regional Trails Glow',
+      'Godsey Ridge Trails Casing',
+      'Godsey Ridge Trails Glow',
+    ]);
+    const mockMap = {
+      setPaintProperty: vi.fn(),
+      getLayer: vi.fn((id: string) => (allLayers.has(id) ? { id } : undefined)),
+    } as unknown as mapboxgl.Map;
+
+    updateMtnBikeOpacity(mockMap, 'Godsey Ridge Green');
+
+    // The Godsey layer should use the raw name 'Green as built' in the expression
+    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+      'Godsey Ridge Trails',
+      'line-opacity',
+      ['case', ['==', ['get', 'Name'], 'Green as built'], 0.9, 0.15],
+    );
   });
 });

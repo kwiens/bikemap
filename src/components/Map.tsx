@@ -668,26 +668,6 @@ const MapboxMap = memo(function MapboxMap() {
             });
           });
 
-          // Log trail names as tiles load (for discovering new trails)
-          const seenTrails = new Set<string>();
-          newMap.on('moveend', () => {
-            const features = newMap.querySourceFeatures('composite', {
-              sourceLayer: 'SORBA_Regional_Trails-1oj4dx',
-            });
-            const newNames: string[] = [];
-            for (const f of features) {
-              const name = f.properties?.Trail;
-              if (name && !seenTrails.has(name)) {
-                seenTrails.add(name);
-                newNames.push(name);
-              }
-            }
-            if (newNames.length > 0) {
-              console.log('New trails found:', newNames.sort());
-              console.log('All trails seen:', [...seenTrails].sort());
-            }
-          });
-
           // Initialize all mountain bike trail layers
           initMtnBikeColors(newMap);
           initMtnBikeLayers(newMap);
