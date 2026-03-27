@@ -128,17 +128,24 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Function to handle trail selection
-  const handleTrailSelect = useCallback((trailName: string) => {
-    setSelectedTrail(trailName);
-    setSelectedRoute(null);
+  const handleTrailSelect = useCallback(
+    (trailName: string) => {
+      setSelectedTrail(trailName);
+      setSelectedRoute(null);
 
-    window.dispatchEvent(
-      new CustomEvent('trail-select', {
-        detail: { trailName },
-      }),
-    );
-    window.dispatchEvent(new CustomEvent('route-deselect'));
-  }, []);
+      window.dispatchEvent(
+        new CustomEvent('trail-select', {
+          detail: { trailName },
+        }),
+      );
+      window.dispatchEvent(new CustomEvent('route-deselect'));
+
+      if (window.innerWidth <= 768 && isOpen) {
+        toggle();
+      }
+    },
+    [isOpen, toggle],
+  );
 
   // Function to handle area (rec area heading) selection
   const handleAreaSelect = useCallback((areaName: string) => {
