@@ -268,7 +268,7 @@ export function ElevationProfile() {
           </span>
         </div>
 
-        <div style={{ position: 'relative' }}>
+        <div className="elevation-chart-wrapper">
           <ElevationSvg
             points={points}
             gradeColors={gradeColors}
