@@ -39,7 +39,7 @@ export const bikeRoutes: BikeRoute[] = [
     name: 'Riverwalk Greenway Trail',
     color: '#059669',
     description:
-      'Fun route through the university to visit the zoo and a nearby park.',
+      'Fun route through the university to visit the zoo and a nearby park. No traffic.',
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
@@ -48,7 +48,7 @@ export const bikeRoutes: BikeRoute[] = [
     id: 'South_Chick_GreenWay-public',
     name: 'South Chickamauga Creek',
     color: '#7C3AED',
-    description: 'A new bike route to explore.',
+    description: 'A new bike route to explore. No traffic.',
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
