@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import './globals.css';
+import './map.css';
+import '@/components/map-legend.css';
+import '@/components/welcome-modal.css';
 import Script from 'next/script';
 
 const geistSans = Geist({
