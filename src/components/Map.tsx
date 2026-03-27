@@ -721,7 +721,7 @@ const MapboxMap = memo(function MapboxMap() {
                         paint: {
                           'line-color': '#ffffff',
                           'line-width': route.defaultWidth + 2,
-                          'line-opacity': 0.2,
+                          'line-opacity': 0.3,
                         },
                         ...(layer.filter ? { filter: layer.filter } : {}),
                       },

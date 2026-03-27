@@ -241,7 +241,7 @@ export function initSorbaLayers(map: mapboxgl.Map): void {
         paint: {
           'line-color': '#ffffff',
           'line-width': 5,
-          'line-opacity': 0.15,
+          'line-opacity': 0.25,
         },
       },
       SORBA_LAYER_ID,
@@ -302,8 +302,8 @@ export function updateSorbaOpacity(
         map.setPaintProperty(SORBA_CASING_ID, 'line-opacity', [
           'case',
           ['==', ['get', 'Trail'], selectedTrailName],
-          0.8,
-          0.15,
+          0.9,
+          0.25,
         ]);
         map.setPaintProperty(SORBA_CASING_ID, 'line-width', [
           'case',
@@ -318,7 +318,7 @@ export function updateSorbaOpacity(
         map.setPaintProperty(SORBA_GLOW_ID, 'line-opacity', [
           'case',
           ['==', ['get', 'Trail'], selectedTrailName],
-          0.6,
+          0.7,
           0,
         ]);
         map.setPaintProperty(SORBA_GLOW_ID, 'line-width', [
@@ -333,7 +333,7 @@ export function updateSorbaOpacity(
       map.setPaintProperty(SORBA_LAYER_ID, 'line-width', 2);
 
       if (map.getLayer(SORBA_CASING_ID)) {
-        map.setPaintProperty(SORBA_CASING_ID, 'line-opacity', 0.15);
+        map.setPaintProperty(SORBA_CASING_ID, 'line-opacity', 0.25);
         map.setPaintProperty(SORBA_CASING_ID, 'line-width', 4);
       }
 
