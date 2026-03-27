@@ -41,6 +41,7 @@ import {
   updateSorbaOpacity,
   highlightSorbaArea,
   initSorbaColors,
+  initSorbaLayers,
 } from '@/utils/map';
 import { mapConfig } from '@/config/map.config';
 
@@ -694,7 +695,39 @@ const MapboxMap = memo(function MapboxMap() {
                     route.defaultWidth,
                   );
                   newMap.setPaintProperty(layer.id, 'line-color', route.color);
-                  newMap.setPaintProperty(layer.id, 'line-opacity', 0.2); // Start with low opacity
+                  newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
+                  newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
+                  newMap.setLayoutProperty(layer.id, 'line-join', 'round');
+
+                  // Add white casing layer beneath the route
+                  const casingId = `${layer.id}-casing`;
+                  if (!newMap.getLayer(casingId)) {
+                    const routeLayer = layer as {
+                      source?: string;
+                      'source-layer'?: string;
+                    };
+                    newMap.addLayer(
+                      {
+                        id: casingId,
+                        type: 'line',
+                        source: routeLayer.source ?? 'composite',
+                        ...(routeLayer['source-layer']
+                          ? { 'source-layer': routeLayer['source-layer'] }
+                          : {}),
+                        layout: {
+                          'line-cap': 'round',
+                          'line-join': 'round',
+                        },
+                        paint: {
+                          'line-color': '#ffffff',
+                          'line-width': route.defaultWidth + 2,
+                          'line-opacity': 0.2,
+                        },
+                        ...(layer.filter ? { filter: layer.filter } : {}),
+                      },
+                      layer.id,
+                    );
+                  }
 
                   // Calculate and store route bounds
                   const bounds = calculateRouteBounds(newMap, route, layer);
@@ -735,8 +768,9 @@ const MapboxMap = memo(function MapboxMap() {
           // Initialize SORBA trail layer
           if (newMap.getLayer(SORBA_LAYER_ID)) {
             newMap.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', 0.15);
-            newMap.setPaintProperty(SORBA_LAYER_ID, 'line-width', 3);
+            newMap.setPaintProperty(SORBA_LAYER_ID, 'line-width', 2);
             initSorbaColors(newMap);
+            initSorbaLayers(newMap);
             initTrailBoundsFromDefaults(sorbaTrails);
 
             // Click handler for SORBA trails

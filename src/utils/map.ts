@@ -11,11 +11,27 @@ export function updateRouteOpacity(
 ) {
   routes.forEach((route) => {
     try {
+      const isSelected = route.id === selectedId;
       map.setPaintProperty(
         route.id,
         'line-opacity',
-        route.id === selectedId ? opacity.selected : opacity.unselected,
+        isSelected ? opacity.selected : opacity.unselected,
       );
+
+      // Update casing layer
+      const casingId = `${route.id}-casing`;
+      if (map.getLayer(casingId)) {
+        map.setPaintProperty(
+          casingId,
+          'line-opacity',
+          isSelected ? opacity.selected * 0.8 : opacity.unselected * 0.8,
+        );
+        map.setPaintProperty(
+          casingId,
+          'line-width',
+          isSelected ? route.defaultWidth + 4 : route.defaultWidth + 2,
+        );
+      }
     } catch (error) {
       console.error(`Error setting opacity for route ${route.id}:`, error);
     }
@@ -191,6 +207,9 @@ const SORBA_COLOR_EXPRESSION: mapboxgl.Expression = [
   '#6B7280', // unrated fallback
 ];
 
+const SORBA_CASING_ID = 'SORBA Regional Trails Casing';
+const SORBA_GLOW_ID = 'SORBA Regional Trails Glow';
+
 export function initSorbaColors(map: mapboxgl.Map): void {
   try {
     map.setPaintProperty(SORBA_LAYER_ID, 'line-color', SORBA_COLOR_EXPRESSION);
@@ -199,12 +218,71 @@ export function initSorbaColors(map: mapboxgl.Map): void {
   }
 }
 
+export function initSorbaLayers(map: mapboxgl.Map): void {
+  const layer = map.getLayer(SORBA_LAYER_ID) as
+    | mapboxgl.LayerSpecification
+    | undefined;
+  if (!layer) return;
+
+  const source = (layer as { source?: string }).source ?? 'composite';
+
+  // White casing layer — drawn beneath the trail line
+  if (!map.getLayer(SORBA_CASING_ID)) {
+    map.addLayer(
+      {
+        id: SORBA_CASING_ID,
+        type: 'line',
+        source,
+        'source-layer': SORBA_SOURCE_LAYER,
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 5,
+          'line-opacity': 0.15,
+        },
+      },
+      SORBA_LAYER_ID,
+    );
+  }
+
+  // Selection glow layer — wide white blur behind selected trail
+  if (!map.getLayer(SORBA_GLOW_ID)) {
+    map.addLayer(
+      {
+        id: SORBA_GLOW_ID,
+        type: 'line',
+        source,
+        'source-layer': SORBA_SOURCE_LAYER,
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 0,
+          'line-opacity': 0,
+          'line-blur': 6,
+        },
+      },
+      SORBA_CASING_ID,
+    );
+  }
+
+  // Set the main trail layer to round caps/joins and thinner default
+  map.setLayoutProperty(SORBA_LAYER_ID, 'line-cap', 'round');
+  map.setLayoutProperty(SORBA_LAYER_ID, 'line-join', 'round');
+}
+
 export function updateSorbaOpacity(
   map: mapboxgl.Map,
   selectedTrailName: string | null,
 ): void {
   try {
     if (selectedTrailName) {
+      // Main trail line
       map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', [
         'case',
         ['==', ['get', 'Trail'], selectedTrailName],
@@ -214,12 +292,54 @@ export function updateSorbaOpacity(
       map.setPaintProperty(SORBA_LAYER_ID, 'line-width', [
         'case',
         ['==', ['get', 'Trail'], selectedTrailName],
-        6,
-        3,
+        4,
+        2,
       ]);
+
+      // White casing
+      if (map.getLayer(SORBA_CASING_ID)) {
+        map.setPaintProperty(SORBA_CASING_ID, 'line-opacity', [
+          'case',
+          ['==', ['get', 'Trail'], selectedTrailName],
+          0.8,
+          0.15,
+        ]);
+        map.setPaintProperty(SORBA_CASING_ID, 'line-width', [
+          'case',
+          ['==', ['get', 'Trail'], selectedTrailName],
+          6,
+          4,
+        ]);
+      }
+
+      // Selection glow
+      if (map.getLayer(SORBA_GLOW_ID)) {
+        map.setPaintProperty(SORBA_GLOW_ID, 'line-opacity', [
+          'case',
+          ['==', ['get', 'Trail'], selectedTrailName],
+          0.5,
+          0,
+        ]);
+        map.setPaintProperty(SORBA_GLOW_ID, 'line-width', [
+          'case',
+          ['==', ['get', 'Trail'], selectedTrailName],
+          16,
+          0,
+        ]);
+      }
     } else {
       map.setPaintProperty(SORBA_LAYER_ID, 'line-opacity', 0.15);
-      map.setPaintProperty(SORBA_LAYER_ID, 'line-width', 3);
+      map.setPaintProperty(SORBA_LAYER_ID, 'line-width', 2);
+
+      if (map.getLayer(SORBA_CASING_ID)) {
+        map.setPaintProperty(SORBA_CASING_ID, 'line-opacity', 0.15);
+        map.setPaintProperty(SORBA_CASING_ID, 'line-width', 4);
+      }
+
+      if (map.getLayer(SORBA_GLOW_ID)) {
+        map.setPaintProperty(SORBA_GLOW_ID, 'line-opacity', 0);
+        map.setPaintProperty(SORBA_GLOW_ID, 'line-width', 0);
+      }
     }
   } catch {
     // SORBA layer may not exist yet
@@ -249,9 +369,31 @@ export function highlightSorbaArea(
       'match',
       ['get', 'Trail'],
       trailNames,
-      4,
+      3,
       2,
     ]);
+
+    if (map.getLayer(SORBA_CASING_ID)) {
+      map.setPaintProperty(SORBA_CASING_ID, 'line-opacity', [
+        'match',
+        ['get', 'Trail'],
+        trailNames,
+        0.6,
+        0.1,
+      ]);
+      map.setPaintProperty(SORBA_CASING_ID, 'line-width', [
+        'match',
+        ['get', 'Trail'],
+        trailNames,
+        5,
+        4,
+      ]);
+    }
+
+    if (map.getLayer(SORBA_GLOW_ID)) {
+      map.setPaintProperty(SORBA_GLOW_ID, 'line-opacity', 0);
+      map.setPaintProperty(SORBA_GLOW_ID, 'line-width', 0);
+    }
   } catch (error) {
     console.error('Error highlighting SORBA area:', error);
   }
