@@ -27,12 +27,10 @@ export function RideHistory({
     setSummaries(getRideSummaries());
   }, []);
 
-  // Load summaries on mount
   useEffect(() => {
     refreshSummaries();
   }, [refreshSummaries]);
 
-  // Listen for recording stop to refresh the list
   useEffect(() => {
     const handleStop = () => refreshSummaries();
 
@@ -42,7 +40,6 @@ export function RideHistory({
     };
   }, [refreshSummaries]);
 
-  // Load full ride when selected
   useEffect(() => {
     if (selectedRideId) {
       const ride = loadRide(selectedRideId);
@@ -74,7 +71,7 @@ export function RideHistory({
 
   if (summaries.length === 0) {
     return (
-      <div className="ride-empty-state">
+      <div className="px-3 py-4 text-gray-500 text-[13px] leading-relaxed">
         No rides recorded yet. Tap Record to start! Rides are stored in your
         browser and are not synced between devices or to the cloud.
       </div>

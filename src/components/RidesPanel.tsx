@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { MAP_EVENTS } from '@/events';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faStopwatch } from '@fortawesome/free-solid-svg-icons';
+import { cn } from '@/lib/utils';
 import { useRideRecording, useToast } from '@/hooks';
 import { formatElapsed, formatDistance, formatElevation } from '@/utils/format';
 import { RideHistory } from './sidebar/RideHistory';
@@ -44,7 +45,6 @@ export function RidesPanel() {
     );
   }, []);
 
-  // Close when main sidebar opens
   useEffect(() => {
     const handler = (e: Event) => {
       const { isOpen: sidebarOpen } = (e as CustomEvent).detail;
@@ -56,7 +56,6 @@ export function RidesPanel() {
     return () => window.removeEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handler);
   }, []);
 
-  // Close on outside click (mobile)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (window.innerWidth > 768) return;
@@ -70,7 +69,6 @@ export function RidesPanel() {
       document.removeEventListener('pointerdown', handleClickOutside);
   }, [isOpen, toggle]);
 
-  // Listen for ride select/deselect
   useEffect(() => {
     const handleSelect = (e: Event) => {
       const { rideId } = (e as CustomEvent).detail;
@@ -121,12 +119,17 @@ export function RidesPanel() {
 
   return (
     <>
-      {/* Toggle button — below the main sidebar toggle */}
-      <div className="rides-toggle-container">
+      {/* Toggle button */}
+      <div className="fixed top-4 right-4 z-[1701]">
         <button
           ref={toggleRef}
           onClick={toggle}
-          className={`toggle-button ${isRecording && !isOpen ? 'recording-active' : ''}`}
+          className={cn(
+            'toggle-button',
+            isRecording &&
+              !isOpen &&
+              'bg-red-500 animate-recording-pulse [&_.toggle-button-icon]:text-white',
+          )}
           type="button"
           aria-label={isOpen ? 'Close rides panel' : 'Open rides panel'}
         >
@@ -140,63 +143,66 @@ export function RidesPanel() {
       {/* Panel */}
       <div
         ref={panelRef}
-        className={`rides-panel-container ${isOpen ? 'sidebar-visible' : 'sidebar-hidden'}`}
+        className={cn(
+          'fixed top-0 right-0 h-full w-[280px] bg-white shadow-[-2px_0_5px_rgba(0,0,0,0.1)] z-[1700] overflow-hidden transition-transform duration-300 ease-in-out flex flex-col',
+          'max-md:w-full max-md:max-w-[320px]',
+          isOpen ? 'translate-x-0' : 'translate-x-full',
+        )}
       >
-        <div className="rides-panel-header">
-          <h2>My Rides</h2>
+        <div className="px-4 pt-4 pb-2 border-b border-gray-200">
+          <h2 className="m-0 text-base font-semibold text-gray-700">
+            My Rides
+          </h2>
         </div>
 
         {toastMessage && (
           <div
-            className={`rides-panel-toast ${toastFadingOut ? 'fade-out' : ''}`}
+            className={cn(
+              'mx-4 mt-2 px-3 py-2 bg-gray-700 text-white rounded-md text-[13px] text-center animate-toast-slide-in',
+              toastFadingOut &&
+                'opacity-0 transition-opacity duration-300 ease-in',
+            )}
           >
             {toastMessage}
           </div>
         )}
 
-        <div className="rides-panel-content">
-          {/* Ride list */}
+        <div className="flex-1 overflow-y-auto px-4 py-3">
           <RideHistory
             selectedRideId={selectedRideId}
             onRideSelect={handleRideSelect}
           />
         </div>
 
-        {/* Recording controls — fixed at bottom */}
-        <div className="rides-panel-footer">
+        {/* Recording controls */}
+        <div className="px-4 py-3 border-t border-gray-200">
           {isRecording ? (
-            <div className="rides-recording-active">
-              <div className="rides-recording-stats">
-                <div className="rides-recording-stat">
-                  <span className="rides-recording-stat-value">
-                    {formatElapsed(elapsedTime)}
-                  </span>
-                  <span className="rides-recording-stat-label">Time</span>
-                </div>
-                <div className="rides-recording-stat">
-                  <span className="rides-recording-stat-value">
-                    {formatDistance(liveDistance)}
-                  </span>
-                  <span className="rides-recording-stat-label">Distance</span>
-                </div>
-                <div className="rides-recording-stat">
-                  <span className="rides-recording-stat-value">
-                    {formatElevation(liveElevationGain)}
-                  </span>
-                  <span className="rides-recording-stat-label">Climbing</span>
-                </div>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex justify-between text-center">
+                <RecordingStat
+                  value={formatElapsed(elapsedTime)}
+                  label="Time"
+                />
+                <RecordingStat
+                  value={formatDistance(liveDistance)}
+                  label="Distance"
+                />
+                <RecordingStat
+                  value={formatElevation(liveElevationGain)}
+                  label="Climbing"
+                />
               </div>
-              <div className="rides-recording-buttons">
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  className="rides-recording-pause-btn"
+                  className="flex-1 p-2.5 rounded-lg text-sm font-semibold cursor-pointer border-none transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
                   onClick={isPaused ? resumeRecording : pauseRecording}
                 >
                   {isPaused ? 'Resume' : 'Pause'}
                 </button>
                 <button
                   type="button"
-                  className="rides-recording-finish-btn"
+                  className="flex-1 p-2.5 rounded-lg text-sm font-semibold cursor-pointer border-none transition-colors bg-red-500 text-white hover:bg-red-600"
                   onClick={handleRecordClick}
                 >
                   Finish
@@ -206,15 +212,26 @@ export function RidesPanel() {
           ) : (
             <button
               type="button"
-              className="rides-record-btn"
+              className="w-full flex items-center gap-2 py-5 px-3.5 border border-gray-200 rounded-lg bg-white cursor-pointer text-[15px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
               onClick={handleRecordClick}
             >
-              <div className="rides-record-dot" />
+              <div className="w-3 h-3 rounded-full bg-red-500 shrink-0" />
               <span>Record a Ride</span>
             </button>
           )}
         </div>
       </div>
     </>
+  );
+}
+
+function RecordingStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-col flex-1">
+      <span className="text-base font-bold tabular-nums text-gray-700">
+        {value}
+      </span>
+      <span className="text-[11px] text-gray-500 mt-px">{label}</span>
+    </div>
   );
 }

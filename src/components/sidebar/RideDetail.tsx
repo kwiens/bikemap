@@ -11,6 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import type { RecordedRide } from '@/data/ride';
 import { MAP_EVENTS } from '@/events';
+import { cn } from '@/lib/utils';
 import { buildRideGpx } from '@/utils/gpx';
 import { deleteRide, renameRide } from '@/utils/ride-storage';
 import {
@@ -86,9 +87,9 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
   const { stats } = ride;
 
   return (
-    <div className="ride-detail">
+    <div className="p-3">
       <div
-        className="ride-detail-back"
+        className="flex items-center gap-1.5 text-[13px] text-blue-500 cursor-pointer mb-2.5 py-0.5 hover:text-blue-600"
         onClick={handleClose}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -103,9 +104,9 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
         <span>Back</span>
       </div>
 
-      <div className="ride-detail-header">
+      <div className="flex items-center justify-between gap-2 mb-1">
         {editing ? (
-          <div className="ride-detail-name-edit">
+          <div className="flex items-center gap-1.5 flex-1">
             <input
               type="text"
               value={nameInput}
@@ -115,85 +116,82 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
                 if (e.key === 'Escape') setEditing(false);
               }}
               autoFocus
+              className="flex-1 text-sm font-semibold px-1.5 py-0.5 border border-gray-200 rounded outline-none min-w-0 focus:border-blue-500"
             />
-            <button
-              type="button"
-              onClick={handleRename}
-              className="ride-detail-icon-btn"
-            >
-              <FontAwesomeIcon icon={faCheck} />
-            </button>
+            <IconButton onClick={handleRename} icon={faCheck} />
           </div>
         ) : (
-          <div className="ride-detail-name">
-            <span>{currentName}</span>
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="ride-detail-icon-btn"
-            >
-              <FontAwesomeIcon icon={faPencilAlt} />
-            </button>
+          <div className="flex items-center gap-1.5 font-semibold text-sm flex-1 min-w-0">
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+              {currentName}
+            </span>
+            <IconButton onClick={() => setEditing(true)} icon={faPencilAlt} />
           </div>
         )}
       </div>
 
-      <div className="ride-detail-date">
+      <div className="text-xs text-gray-500 mb-3">
         {date} at {time}
       </div>
 
-      <div className="ride-detail-stats">
-        <div className="ride-stat">
-          <span className="ride-stat-value">
-            {formatDistance(stats.distance)}
-          </span>
-          <span className="ride-stat-label">Distance</span>
-        </div>
-        <div className="ride-stat">
-          <span className="ride-stat-value">
-            {formatDuration(stats.elapsedTime)}
-          </span>
-          <span className="ride-stat-label">Time</span>
-        </div>
-        <div className="ride-stat">
-          <span className="ride-stat-value">{formatSpeed(stats.avgSpeed)}</span>
-          <span className="ride-stat-label">Avg Speed</span>
-        </div>
-        <div className="ride-stat">
-          <span className="ride-stat-value">{formatSpeed(stats.maxSpeed)}</span>
-          <span className="ride-stat-label">Max Speed</span>
-        </div>
-        <div className="ride-stat">
-          <span className="ride-stat-value">
-            {formatElevation(stats.elevationGain)}
-          </span>
-          <span className="ride-stat-label">Climbing</span>
-        </div>
-        <div className="ride-stat">
-          <span className="ride-stat-value">
-            {formatDuration(stats.movingTime)}
-          </span>
-          <span className="ride-stat-label">Moving</span>
-        </div>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <Stat value={formatDistance(stats.distance)} label="Distance" />
+        <Stat value={formatDuration(stats.elapsedTime)} label="Time" />
+        <Stat value={formatSpeed(stats.avgSpeed)} label="Avg Speed" />
+        <Stat value={formatSpeed(stats.maxSpeed)} label="Max Speed" />
+        <Stat value={formatElevation(stats.elevationGain)} label="Climbing" />
+        <Stat value={formatDuration(stats.movingTime)} label="Moving" />
       </div>
 
-      <div className="ride-detail-actions">
+      <div className="flex gap-2">
         <button
           type="button"
-          className="ride-action-btn ride-action-export"
+          className="flex-1 py-1.5 px-2.5 border border-gray-200 rounded-md bg-white cursor-pointer text-xs font-medium flex items-center justify-center gap-1 transition-colors hover:bg-blue-50 hover:border-blue-500 hover:text-blue-600"
           onClick={handleExportGpx}
         >
           <FontAwesomeIcon icon={faDownload} /> Export GPX
         </button>
         <button
           type="button"
-          className={`ride-action-btn ride-action-delete ${confirmDelete ? 'confirming' : ''}`}
+          className={cn(
+            'flex-1 py-1.5 px-2.5 border border-gray-200 rounded-md bg-white cursor-pointer text-xs font-medium flex items-center justify-center gap-1 transition-colors',
+            confirmDelete
+              ? 'bg-red-500 text-white border-red-500'
+              : 'hover:bg-red-100 hover:border-red-500 hover:text-red-500',
+          )}
           onClick={handleDelete}
         >
           <FontAwesomeIcon icon={faTrash} />{' '}
           {confirmDelete ? 'Confirm Delete' : 'Delete'}
         </button>
       </div>
+    </div>
+  );
+}
+
+function IconButton({
+  onClick,
+  icon,
+}: {
+  onClick: () => void;
+  icon: typeof faCheck;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="bg-transparent border-none cursor-pointer text-gray-500 p-1 text-[13px] leading-none rounded hover:text-gray-700 hover:bg-gray-100"
+    >
+      <FontAwesomeIcon icon={icon} />
+    </button>
+  );
+}
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <span className="text-sm font-semibold text-gray-700">{value}</span>
+      <span className="text-[11px] text-gray-500 mt-px">{label}</span>
     </div>
   );
 }
