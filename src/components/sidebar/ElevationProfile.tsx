@@ -11,6 +11,13 @@ import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { bikeRoutes } from '@/data/geo_data';
 import { slugify } from '@/utils/string';
 import { MAP_EVENTS } from '@/events';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faDownload,
+  faShareAlt,
+  faChevronDown,
+  faChevronUp,
+} from '@fortawesome/free-solid-svg-icons';
 
 const CHART_HEIGHT = 100;
 const CHART_PADDING_TOP = 4;
@@ -94,6 +101,33 @@ export function downsampleStops(
 // Profile data cache to avoid refetching on revisit
 const profileCache = new Map<string, ElevationProfileData>();
 
+function downloadGpx(profile: ElevationProfileData): void {
+  const gpxPoints = profile.profile
+    .map(
+      ([, elev, lng, lat]) =>
+        `      <trkpt lat="${lat}" lon="${lng}"><ele>${(elev / 3.28084).toFixed(1)}</ele></trkpt>`,
+    )
+    .join('\n');
+
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Bike Chatt" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${profile.trail}</name>
+    <trkseg>
+${gpxPoints}
+    </trkseg>
+  </trk>
+</gpx>`;
+
+  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${slugify(profile.trail)}.gpx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // Find the closest profile point to a given lng/lat using squared Euclidean distance
 // (with latitude correction for longitude scaling)
 export function findClosestProfileIndex(
@@ -138,11 +172,14 @@ export function ElevationProfile() {
   // Keep profile in a ref so location handler always sees latest
   const profileRef = useRef<ElevationProfileData | null>(null);
 
+  const [collapsed, setCollapsed] = useState(false);
+
   useEffect(() => {
     const handleTrailSelect = (e: Event) => {
       const { trailName: name } = (e as CustomEvent).detail;
       sourceRef.current = 'trail';
       setTrailName(name);
+      window.history.replaceState(null, '', `?trail=${slugify(name)}`);
     };
     const handleRouteSelect = (e: Event) => {
       const { routeId } = (e as CustomEvent).detail;
@@ -154,11 +191,15 @@ export function ElevationProfile() {
       const route = bikeRoutes.find((r) => r.id === routeId);
       sourceRef.current = 'route';
       setTrailName(route?.name ?? null);
+      if (route) {
+        window.history.replaceState(null, '', `?route=${slugify(route.name)}`);
+      }
     };
     const handleRouteDeselect = () => {
       if (sourceRef.current === 'route') {
         sourceRef.current = null;
         setTrailName(null);
+        window.history.replaceState(null, '', window.location.pathname);
       }
     };
     const handleSidebarToggle = (e: Event) => {
@@ -332,56 +373,88 @@ export function ElevationProfile() {
           <span>{(maxDist / 5280).toFixed(1)} mi</span>
           <span>+{profile.gain.toLocaleString()} ft climbing</span>
         </div>
-      </div>
-
-      <div className="elevation-chart-container">
-        <div className="elevation-y-axis">
-          <span className="elevation-y-label elevation-y-max">
-            {profile.max.toLocaleString()} ft
-          </span>
-          <span className="elevation-y-label elevation-y-min">
-            {profile.min.toLocaleString()} ft
-          </span>
-        </div>
-
-        <div className="elevation-chart-wrapper">
-          <ElevationSvg
-            points={points}
-            gradeColors={gradeColors}
-            profile={profile}
-            chartWidth={chartWidth}
-            svgRef={svgRef}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={clearHover}
-            onTouchStart={handleTouch}
-            onTouchMove={handleTouch}
-            onTouchEnd={clearHover}
-          />
-          {locationIndex !== null && (
-            <LocationIndicator
-              points={points}
-              profile={profile}
-              chartWidth={chartWidth}
-              locationIndex={locationIndex}
-            />
-          )}
-          {hoverIndex !== null && (
-            <HoverIndicator
-              points={points}
-              gradeColors={gradeColors}
-              profile={profile}
-              chartWidth={chartWidth}
-              hoverIndex={hoverIndex}
-            />
-          )}
+        <div className="elevation-actions">
+          <button
+            type="button"
+            className="elevation-action-btn"
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+            }}
+            title="Copy link"
+          >
+            <FontAwesomeIcon icon={faShareAlt} />
+          </button>
+          <button
+            type="button"
+            className="elevation-action-btn"
+            onClick={() => downloadGpx(profile)}
+            title="Download GPX"
+          >
+            <FontAwesomeIcon icon={faDownload} />
+          </button>
+          <button
+            type="button"
+            className="elevation-action-btn"
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? 'Expand' : 'Collapse'}
+          >
+            <FontAwesomeIcon icon={collapsed ? faChevronUp : faChevronDown} />
+          </button>
         </div>
       </div>
 
-      <div className="elevation-tooltip">
-        {hoverIndex !== null
-          ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${points[hoverIndex][1].toLocaleString()} ft`
-          : '\u00A0'}
-      </div>
+      {!collapsed && (
+        <>
+          <div className="elevation-chart-container">
+            <div className="elevation-y-axis">
+              <span className="elevation-y-label elevation-y-max">
+                {profile.max.toLocaleString()} ft
+              </span>
+              <span className="elevation-y-label elevation-y-min">
+                {profile.min.toLocaleString()} ft
+              </span>
+            </div>
+
+            <div className="elevation-chart-wrapper">
+              <ElevationSvg
+                points={points}
+                gradeColors={gradeColors}
+                profile={profile}
+                chartWidth={chartWidth}
+                svgRef={svgRef}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={clearHover}
+                onTouchStart={handleTouch}
+                onTouchMove={handleTouch}
+                onTouchEnd={clearHover}
+              />
+              {locationIndex !== null && (
+                <LocationIndicator
+                  points={points}
+                  profile={profile}
+                  chartWidth={chartWidth}
+                  locationIndex={locationIndex}
+                />
+              )}
+              {hoverIndex !== null && (
+                <HoverIndicator
+                  points={points}
+                  gradeColors={gradeColors}
+                  profile={profile}
+                  chartWidth={chartWidth}
+                  hoverIndex={hoverIndex}
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="elevation-tooltip">
+            {hoverIndex !== null
+              ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${points[hoverIndex][1].toLocaleString()} ft`
+              : '\u00A0'}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -602,9 +602,31 @@
 
 .elevation-overlay-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
   margin-bottom: 4px;
+}
+
+.elevation-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.elevation-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-gray-400);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.elevation-action-btn:hover {
+  color: var(--color-gray-600);
+  background-color: var(--color-gray-50);
 }
 
 .elevation-overlay-title {
