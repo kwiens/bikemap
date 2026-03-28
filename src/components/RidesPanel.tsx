@@ -13,13 +13,21 @@ export function RidesPanel() {
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
 
-  const { isRecording, elapsedTime, startRecording, stopRecording } =
-    useRideRecording();
+  const {
+    isRecording,
+    isPaused,
+    elapsedTime,
+    liveDistance,
+    liveElevationGain,
+    startRecording,
+    pauseRecording,
+    resumeRecording,
+    stopRecording,
+  } = useRideRecording();
 
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
 
-  // Format elapsed time as M:SS or H:MM:SS
   function formatElapsed(seconds: number): string {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -27,6 +35,14 @@ export function RidesPanel() {
     if (h > 0)
       return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function formatMiles(meters: number): string {
+    return `${(meters / 1609.344).toFixed(1)} mi`;
+  }
+
+  function formatFeet(meters: number): string {
+    return `${Math.round(meters * 3.28084)} ft`;
   }
 
   const toggle = useCallback(() => {
@@ -146,28 +162,57 @@ export function RidesPanel() {
           />
         </div>
 
-        {/* Record button — fixed at bottom */}
+        {/* Recording controls — fixed at bottom */}
         <div className="rides-panel-footer">
-          <button
-            type="button"
-            className={`rides-record-btn ${isRecording ? 'recording' : ''}`}
-            onClick={handleRecordClick}
-          >
-            {isRecording ? (
-              <>
-                <div className="rides-record-stop-icon" />
-                <span>Stop</span>
-                <span className="rides-record-time">
-                  {formatElapsed(elapsedTime)}
-                </span>
-              </>
-            ) : (
-              <>
-                <div className="rides-record-dot" />
-                <span>Record a Ride</span>
-              </>
-            )}
-          </button>
+          {isRecording ? (
+            <div className="rides-recording-active">
+              <div className="rides-recording-stats">
+                <div className="rides-recording-stat">
+                  <span className="rides-recording-stat-value">
+                    {formatElapsed(elapsedTime)}
+                  </span>
+                  <span className="rides-recording-stat-label">Time</span>
+                </div>
+                <div className="rides-recording-stat">
+                  <span className="rides-recording-stat-value">
+                    {formatMiles(liveDistance)}
+                  </span>
+                  <span className="rides-recording-stat-label">Distance</span>
+                </div>
+                <div className="rides-recording-stat">
+                  <span className="rides-recording-stat-value">
+                    {formatFeet(liveElevationGain)}
+                  </span>
+                  <span className="rides-recording-stat-label">Climbing</span>
+                </div>
+              </div>
+              <div className="rides-recording-buttons">
+                <button
+                  type="button"
+                  className="rides-recording-pause-btn"
+                  onClick={isPaused ? resumeRecording : pauseRecording}
+                >
+                  {isPaused ? 'Resume' : 'Pause'}
+                </button>
+                <button
+                  type="button"
+                  className="rides-recording-finish-btn"
+                  onClick={handleRecordClick}
+                >
+                  Finish
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="rides-record-btn"
+              onClick={handleRecordClick}
+            >
+              <div className="rides-record-dot" />
+              <span>Record a Ride</span>
+            </button>
+          )}
         </div>
       </div>
     </>

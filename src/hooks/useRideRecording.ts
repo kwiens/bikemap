@@ -5,22 +5,40 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RecordedRide, RidePoint } from '../data/ride';
 import { generateRideName } from '../data/ride';
 import { MAP_EVENTS } from '../events';
-import { computeBounds, computeRideStats } from '../utils/ride-stats';
+import {
+  computeBounds,
+  computeRideStats,
+  haversineDistance,
+} from '../utils/ride-stats';
 import { saveRide } from '../utils/ride-storage';
 
 interface UseRideRecordingReturn {
   isRecording: boolean;
+  isPaused: boolean;
   pointCount: number;
   elapsedTime: number; // seconds
+  liveDistance: number; // meters
+  liveElevationGain: number; // meters
   startRecording: () => void;
+  pauseRecording: () => void;
+  resumeRecording: () => void;
   stopRecording: () => RecordedRide | null;
   discardRecording: () => void;
 }
 
 export function useRideRecording(): UseRideRecordingReturn {
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [pointCount, setPointCount] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [liveDistance, setLiveDistance] = useState(0);
+  const [liveElevationGain, setLiveElevationGain] = useState(0);
+  const distanceRef = useRef(0);
+  const elevGainRef = useRef(0);
+  const prevAltRef = useRef<number | null>(null);
+  const pausedRef = useRef(false);
+  const pausedTimeRef = useRef(0); // accumulated paused ms
+  const pauseStartRef = useRef(0);
 
   const pointsRef = useRef<RidePoint[]>([]);
   const watchIdRef = useRef<number | null>(null);
@@ -63,15 +81,26 @@ export function useRideRecording(): UseRideRecordingReturn {
 
     pointsRef.current = [];
     startTimeRef.current = Date.now();
+    distanceRef.current = 0;
+    elevGainRef.current = 0;
+    prevAltRef.current = null;
+    pausedRef.current = false;
+    pausedTimeRef.current = 0;
+    pauseStartRef.current = 0;
     setPointCount(0);
     setElapsedTime(0);
+    setLiveDistance(0);
+    setLiveElevationGain(0);
     setIsRecording(true);
+    setIsPaused(false);
 
     acquireWakeLock();
 
     // Start GPS watch
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
+        if (pausedRef.current) return;
+
         const point: RidePoint = {
           lng: position.coords.longitude,
           lat: position.coords.latitude,
@@ -80,8 +109,32 @@ export function useRideRecording(): UseRideRecordingReturn {
           speed: position.coords.speed,
           timestamp: position.timestamp,
         };
+        const prev = pointsRef.current[pointsRef.current.length - 1];
         pointsRef.current.push(point);
         setPointCount(pointsRef.current.length);
+
+        // Accumulate live distance
+        if (prev && point.accuracy < 30 && prev.accuracy < 30) {
+          distanceRef.current += haversineDistance(
+            prev.lat,
+            prev.lng,
+            point.lat,
+            point.lng,
+          );
+          setLiveDistance(distanceRef.current);
+        }
+
+        // Accumulate live elevation gain
+        if (point.altitude !== null) {
+          if (prevAltRef.current !== null) {
+            const delta = point.altitude - prevAltRef.current;
+            if (delta > 0) {
+              elevGainRef.current += delta;
+              setLiveElevationGain(elevGainRef.current);
+            }
+          }
+          prevAltRef.current = point.altitude;
+        }
       },
       undefined,
       {
@@ -93,11 +146,30 @@ export function useRideRecording(): UseRideRecordingReturn {
 
     // Start elapsed time counter
     timerRef.current = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      const paused = pausedRef.current
+        ? pausedTimeRef.current + (Date.now() - pauseStartRef.current)
+        : pausedTimeRef.current;
+      setElapsedTime(
+        Math.floor((Date.now() - startTimeRef.current - paused) / 1000),
+      );
     }, 1000);
 
     window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
   }, [isRecording, acquireWakeLock]);
+
+  const pauseRecording = useCallback(() => {
+    if (!isRecording || pausedRef.current) return;
+    pausedRef.current = true;
+    pauseStartRef.current = Date.now();
+    setIsPaused(true);
+  }, [isRecording]);
+
+  const resumeRecording = useCallback(() => {
+    if (!isRecording || !pausedRef.current) return;
+    pausedTimeRef.current += Date.now() - pauseStartRef.current;
+    pausedRef.current = false;
+    setIsPaused(false);
+  }, [isRecording]);
 
   const cleanup = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -112,6 +184,8 @@ export function useRideRecording(): UseRideRecordingReturn {
     setIsRecording(false);
     setPointCount(0);
     setElapsedTime(0);
+    setLiveDistance(0);
+    setLiveElevationGain(0);
   }, [releaseWakeLock]);
 
   const stopRecording = useCallback((): RecordedRide | null => {
@@ -168,9 +242,14 @@ export function useRideRecording(): UseRideRecordingReturn {
 
   return {
     isRecording,
+    isPaused,
     pointCount,
     elapsedTime,
+    liveDistance,
+    liveElevationGain,
     startRecording,
+    pauseRecording,
+    resumeRecording,
     stopRecording,
     discardRecording,
   };
