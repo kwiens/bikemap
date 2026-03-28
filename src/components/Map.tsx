@@ -42,6 +42,7 @@ import {
   initMtnBikeLayers,
   TRAIL_LAYERS,
   addRideLayer,
+  updateRideLayer,
   removeRideLayer,
 } from '@/utils/map';
 import { loadRide } from '@/utils/ride-storage';
@@ -111,13 +112,31 @@ const MapboxMap = memo(function MapboxMap() {
   useEffect(() => {
     const selectHandler = (e: Event) => handleRideSelect(e as CustomEvent);
     const deselectHandler = () => handleRideDeselect();
+    const updateHandler = (e: Event) => {
+      if (!map.current) return;
+      const { coordinates } = (e as CustomEvent).detail;
+      if (coordinates.length >= 2) {
+        updateRideLayer(map.current, coordinates);
+      }
+    };
+    const stopHandler = () => {
+      // Recording stopped — remove live line (ride-select will redraw the saved ride)
+      if (map.current) removeRideLayer(map.current);
+    };
 
     window.addEventListener(MAP_EVENTS.RIDE_SELECT, selectHandler);
     window.addEventListener(MAP_EVENTS.RIDE_DESELECT, deselectHandler);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_UPDATE, updateHandler);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, stopHandler);
 
     return () => {
       window.removeEventListener(MAP_EVENTS.RIDE_SELECT, selectHandler);
       window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, deselectHandler);
+      window.removeEventListener(
+        MAP_EVENTS.RIDE_RECORDING_UPDATE,
+        updateHandler,
+      );
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, stopHandler);
     };
   }, [handleRideSelect, handleRideDeselect]);
 
@@ -914,6 +933,19 @@ const MapboxMap = memo(function MapboxMap() {
   const toggleWatchLocation = () => {
     setLocationWatch(!watchingLocation);
   };
+
+  // Enable location tracking when recording starts, disable when it stops
+  useEffect(() => {
+    const handleStart = () => setLocationWatch(true);
+    const handleStop = () => setLocationWatch(false);
+
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_START, handleStart);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handleStop);
+    return () => {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handleStart);
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handleStop);
+    };
+  }, []);
 
   return (
     <>

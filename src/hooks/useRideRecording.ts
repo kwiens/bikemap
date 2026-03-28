@@ -113,6 +113,15 @@ export function useRideRecording(): UseRideRecordingReturn {
         pointsRef.current.push(point);
         setPointCount(pointsRef.current.length);
 
+        // Broadcast coordinates for live map line
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
+            detail: {
+              coordinates: pointsRef.current.map((p) => [p.lng, p.lat]),
+            },
+          }),
+        );
+
         // Accumulate live distance
         if (prev && point.accuracy < 30 && prev.accuracy < 30) {
           distanceRef.current += haversineDistance(

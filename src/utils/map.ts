@@ -538,6 +538,24 @@ export function addRideLayer(
   });
 }
 
+export function updateRideLayer(
+  map: mapboxgl.Map,
+  coordinates: [number, number][],
+): void {
+  const source = map.getSource(RIDE_SOURCE_ID) as
+    | mapboxgl.GeoJSONSource
+    | undefined;
+  if (source) {
+    source.setData({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates },
+    });
+  } else {
+    addRideLayer(map, coordinates);
+  }
+}
+
 export function removeRideLayer(map: mapboxgl.Map): void {
   if (map.getLayer(RIDE_LINE_ID)) map.removeLayer(RIDE_LINE_ID);
   if (map.getSource(RIDE_SOURCE_ID)) map.removeSource(RIDE_SOURCE_ID);
