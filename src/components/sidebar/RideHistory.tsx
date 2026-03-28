@@ -90,7 +90,8 @@ export function RideHistory({
   if (summaries.length === 0) {
     return (
       <div className="ride-empty-state">
-        No rides recorded yet. Tap Record to start!
+        No rides recorded yet. Tap Record to start! Rides are stored in your
+        browser and are not synced between devices or to the cloud.
       </div>
     );
   }
