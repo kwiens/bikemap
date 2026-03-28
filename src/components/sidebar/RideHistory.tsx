@@ -20,11 +20,13 @@ import { RideDetail } from './RideDetail';
 export interface RideHistoryProps {
   selectedRideId: string | null;
   onRideSelect: (rideId: string) => void;
+  isRecording?: boolean;
 }
 
 export function RideHistory({
   selectedRideId,
   onRideSelect,
+  isRecording,
 }: RideHistoryProps) {
   const [summaries, setSummaries] = useState<RideSummary[]>([]);
   const [selectedRide, setSelectedRide] = useState<RecordedRide | null>(null);
@@ -82,11 +84,13 @@ export function RideHistory({
           className="text-3xl mb-3 text-gray-300"
         />
         <p className="text-sm font-medium text-gray-500 mb-1">
-          Track your rides
+          {isRecording ? 'Recording your ride' : 'Track your rides'}
         </p>
         <p className="text-xs leading-relaxed">
-          Tap Record to start logging your ride with GPS. Rides are saved
-          offline on your device.
+          {isRecording
+            ? 'Logging your ride with GPS.'
+            : 'Tap Record to start logging your ride with GPS.'}{' '}
+          Rides are saved offline on your device.
         </p>
       </div>
     );

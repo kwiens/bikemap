@@ -3,7 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MAP_EVENTS } from '@/events';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faStopwatch } from '@fortawesome/free-solid-svg-icons';
+import {
+  faTimes,
+  faStopwatch,
+  faPause,
+  faPlay,
+  faFlagCheckered,
+} from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { useRideRecording, useToast } from '@/hooks';
 import { formatElapsed, formatDistance, formatElevation } from '@/utils/format';
@@ -145,9 +151,7 @@ export function RidesPanel() {
           className={cn(
             'toggle-button',
             isRecording &&
-              !isOpen &&
-              'bg-red-500 animate-recording-pulse [&_.toggle-button-icon]:text-white hover:bg-red-600',
-            isRecording && isOpen && '[&_.toggle-button-icon]:text-red-500',
+              'animate-recording-pulse [&_.toggle-button-icon]:text-red-500',
           )}
           type="button"
           aria-label={isOpen ? 'Close rides panel' : 'Open rides panel'}
@@ -158,6 +162,42 @@ export function RidesPanel() {
           />
         </button>
       </div>
+
+      {/* Floating recording HUD — visible when recording with panel closed */}
+      {isRecording && !isOpen && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[1700] bg-white rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-4 max-md:left-2 max-md:right-14 max-md:translate-x-0">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse-dot" />
+            <span className="text-sm font-bold tabular-nums text-gray-700">
+              {formatElapsed(elapsedTime)}
+            </span>
+          </div>
+          <span className="text-sm tabular-nums text-gray-600">
+            {formatDistance(liveDistance)}
+          </span>
+          <span className="text-sm tabular-nums text-gray-600">
+            {formatElevation(liveElevationGain)}
+          </span>
+          <div className="flex gap-1.5 ml-auto">
+            <button
+              type="button"
+              className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center cursor-pointer border-none hover:bg-gray-200 text-xs"
+              onClick={isPaused ? resumeRecording : pauseRecording}
+              aria-label={isPaused ? 'Resume' : 'Pause'}
+            >
+              <FontAwesomeIcon icon={isPaused ? faPlay : faPause} />
+            </button>
+            <button
+              type="button"
+              className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center cursor-pointer border-none hover:bg-red-600 text-xs"
+              onClick={handleRecordClick}
+              aria-label="Finish ride"
+            >
+              <FontAwesomeIcon icon={faFlagCheckered} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Panel */}
       <div
@@ -213,6 +253,7 @@ export function RidesPanel() {
           <RideHistory
             selectedRideId={selectedRideId}
             onRideSelect={handleRideSelect}
+            isRecording={isRecording}
           />
         </div>
 
