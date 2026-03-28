@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { buildRideGpx } from '@/utils/gpx';
 import { deleteRide, renameRide } from '@/utils/ride-storage';
 import {
+  downloadFile,
   formatDuration,
   formatDistance,
   formatSpeed,
@@ -25,16 +26,6 @@ interface RideDetailProps {
   ride: RecordedRide;
   onClose: () => void;
   onDeleted: () => void;
-}
-
-function downloadFile(content: string, filename: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {

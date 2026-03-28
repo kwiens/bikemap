@@ -135,17 +135,29 @@ export async function renameRide(id: string, newName: string): Promise<void> {
 
 export async function getRideSummaries(): Promise<RideSummary[]> {
   const db = await openDB();
-  const rides = (await idbRequest(
-    db.transaction(STORE_NAME).objectStore(STORE_NAME).getAll(),
-  )) as RecordedRide[];
-  return rides
-    .map((ride) => ({
-      id: ride.id,
-      name: ride.name,
-      startTime: ride.startTime,
-      stats: ride.stats,
-    }))
-    .sort((a, b) => b.startTime - a.startTime);
+  const summaries: RideSummary[] = [];
+  const tx = db.transaction(STORE_NAME);
+  const store = tx.objectStore(STORE_NAME);
+
+  return new Promise((resolve, reject) => {
+    const req = store.openCursor();
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (cursor) {
+        const ride = cursor.value as RecordedRide;
+        summaries.push({
+          id: ride.id,
+          name: ride.name,
+          startTime: ride.startTime,
+          stats: ride.stats,
+        });
+        cursor.continue();
+      } else {
+        resolve(summaries.sort((a, b) => b.startTime - a.startTime));
+      }
+    };
+    req.onerror = () => reject(req.error);
+  });
 }
 
 export async function getStorageUsage(): Promise<{
