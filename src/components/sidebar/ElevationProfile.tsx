@@ -160,6 +160,7 @@ export function findClosestProfileIndex(
 
 export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
+  const [copyToast, setCopyToast] = useState(false);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -379,6 +380,8 @@ export function ElevationProfile() {
             className="elevation-action-btn"
             onClick={() => {
               navigator.clipboard.writeText(window.location.href);
+              setCopyToast(true);
+              setTimeout(() => setCopyToast(false), 2000);
             }}
             title="Copy link"
           >
@@ -402,6 +405,8 @@ export function ElevationProfile() {
           </button>
         </div>
       </div>
+
+      {copyToast && <div className="elevation-copy-toast">Link copied</div>}
 
       {!collapsed && (
         <>
