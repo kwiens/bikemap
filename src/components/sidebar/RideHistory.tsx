@@ -3,7 +3,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { RecordedRide, RideSummary } from '@/data/ride';
 import { MAP_EVENTS } from '@/events';
-import { getRideSummaries, loadRide } from '@/utils/ride-storage';
+import {
+  getRideSummaries,
+  getStorageUsage,
+  loadRide,
+} from '@/utils/ride-storage';
 import {
   formatDistance,
   formatDurationShort,
@@ -108,6 +112,40 @@ export function RideHistory({
           </div>
         </div>
       ))}
+      <StorageIndicator />
+    </div>
+  );
+}
+
+function StorageIndicator() {
+  const { usedKB, totalKB } = getStorageUsage();
+  const pct = Math.min(100, (usedKB / totalKB) * 100);
+  const label =
+    usedKB < 1024 ? `${usedKB} KB` : `${(usedKB / 1024).toFixed(1)} MB`;
+
+  return (
+    <div style={{ padding: '12px 0 4px', fontSize: '11px', color: '#6b7280' }}>
+      <div
+        style={{
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: '#e5e7eb',
+          marginBottom: 4,
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            borderRadius: 2,
+            backgroundColor: pct > 80 ? '#ef4444' : '#3b82f6',
+            width: `${pct}%`,
+            transition: 'width 0.3s',
+          }}
+        />
+      </div>
+      <span>
+        {label} of {totalKB / 1024} MB used
+      </span>
     </div>
   );
 }

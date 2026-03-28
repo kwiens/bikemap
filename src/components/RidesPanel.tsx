@@ -124,12 +124,7 @@ export function RidesPanel() {
         <button
           ref={toggleRef}
           onClick={toggle}
-          className={cn(
-            'toggle-button',
-            isRecording &&
-              !isOpen &&
-              'bg-red-500 animate-recording-pulse [&_.toggle-button-icon]:text-white',
-          )}
+          className={`toggle-button ${isRecording && !isOpen ? 'recording-active' : ''}`}
           type="button"
           aria-label={isOpen ? 'Close rides panel' : 'Open rides panel'}
         >

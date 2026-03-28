@@ -80,3 +80,16 @@ export function getRideSummaries(): RideSummary[] {
   }
   return summaries.sort((a, b) => b.startTime - a.startTime);
 }
+
+export function getStorageUsage(): { usedKB: number; totalKB: number } {
+  let usedBytes = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) {
+      usedBytes += key.length * 2; // UTF-16
+      const val = localStorage.getItem(key);
+      if (val) usedBytes += val.length * 2;
+    }
+  }
+  return { usedKB: Math.round(usedBytes / 1024), totalKB: 5120 };
+}
