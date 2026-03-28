@@ -19,7 +19,7 @@ import {
   MarkerManager,
 } from '@/components/MapMarkers';
 import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
-import { useToast, useMapResize } from '@/hooks';
+import { useToast, useMapResize, useRideRecording } from '@/hooks';
 import {
   fetchStationInformation,
   fetchStationStatus,
@@ -40,7 +40,10 @@ import {
   initMtnBikeColors,
   initMtnBikeLayers,
   TRAIL_LAYERS,
+  addRideLayer,
+  removeRideLayer,
 } from '@/utils/map';
+import { loadRide } from '@/utils/ride-storage';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
 import { TRAIL_METADATA } from '@/data/trail-metadata';
@@ -73,6 +76,82 @@ const MapboxMap = memo(function MapboxMap() {
     showToast,
   } = useToast();
   useMapResize({ map });
+
+  // Ride recording
+  const { isRecording, elapsedTime, startRecording, stopRecording } =
+    useRideRecording();
+
+  // Format elapsed time as M:SS or H:MM:SS
+  function formatElapsed(seconds: number): string {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0)
+      return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  // Handle record button click
+  const handleRecordClick = useCallback(() => {
+    if (isRecording) {
+      const ride = stopRecording();
+      if (ride) {
+        showToast('Ride saved!');
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
+            detail: { rideId: ride.id },
+          }),
+        );
+      } else {
+        showToast('Ride too short to save');
+      }
+    } else {
+      startRecording();
+    }
+  }, [isRecording, stopRecording, startRecording, showToast]);
+
+  // Handle ride select — show ride on map
+  const handleRideSelect = useCallback((event: CustomEvent) => {
+    if (!map.current) return;
+    const { rideId } = event.detail;
+    const ride = loadRide(rideId);
+    if (!ride) return;
+
+    const coords: [number, number][] = ride.points.map((p) => [p.lng, p.lat]);
+    addRideLayer(map.current, coords);
+
+    // Dim other routes/trails
+    updateRouteOpacity(map.current, bikeRoutes, null, {
+      selected: 0.1,
+      unselected: 0.1,
+    });
+    updateMtnBikeOpacity(map.current, null);
+
+    // Fly to ride bounds
+    const [swLng, swLat, neLng, neLat] = ride.bounds;
+    const bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+    flyToBounds(map.current, bounds);
+  }, []);
+
+  // Handle ride deselect — remove ride from map
+  const handleRideDeselect = useCallback(() => {
+    if (!map.current) return;
+    removeRideLayer(map.current);
+  }, []);
+
+  // Set up ride select/deselect event listeners
+  useEffect(() => {
+    const selectHandler = (e: Event) => handleRideSelect(e as CustomEvent);
+    const deselectHandler = () => handleRideDeselect();
+
+    window.addEventListener(MAP_EVENTS.RIDE_SELECT, selectHandler);
+    window.addEventListener(MAP_EVENTS.RIDE_DESELECT, deselectHandler);
+
+    return () => {
+      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, selectHandler);
+      window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, deselectHandler);
+    };
+  }, [handleRideSelect, handleRideDeselect]);
 
   // Create location marker
   function initializeLocationMarker() {
@@ -140,6 +219,10 @@ const MapboxMap = memo(function MapboxMap() {
       if (locationWatch.current) {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
+      }
+      if (wakeLock.current) {
+        wakeLock.current.release();
+        wakeLock.current = null;
       }
     };
 
@@ -876,6 +959,32 @@ const MapboxMap = memo(function MapboxMap() {
       )}
 
       <ElevationProfile />
+
+      {/* Ride recording button */}
+      <div
+        onClick={handleRecordClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleRecordClick();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        className={`ride-record-button ${isRecording ? 'recording' : ''}`}
+        aria-label={isRecording ? 'Stop recording ride' : 'Record a ride'}
+      >
+        {isRecording ? (
+          <div className="ride-record-stop-icon" />
+        ) : (
+          <div className="ride-record-dot" />
+        )}
+      </div>
+      {isRecording && (
+        <div className="ride-record-badge">
+          <span>{formatElapsed(elapsedTime)}</span>
+        </div>
+      )}
 
       {/* Location tracking toggle */}
       {mapConfig.debug.showLocationTracker && (

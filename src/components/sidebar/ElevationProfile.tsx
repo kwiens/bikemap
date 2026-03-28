@@ -11,6 +11,8 @@ import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { bikeRoutes } from '@/data/geo_data';
 import { slugify } from '@/utils/string';
 import { MAP_EVENTS } from '@/events';
+import { loadRide } from '@/utils/ride-storage';
+import { rideToElevationProfile } from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faDownload,
@@ -168,8 +170,8 @@ export function ElevationProfile() {
   const [chartWidth, setChartWidth] = useState(800);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const svgRef = useRef<SVGSVGElement>(null);
-  // Track whether current profile is from a route or trail selection
-  const sourceRef = useRef<'trail' | 'route' | null>(null);
+  // Track whether current profile is from a route, trail, or ride selection
+  const sourceRef = useRef<'trail' | 'route' | 'ride' | null>(null);
   // Keep profile in a ref so location handler always sees latest
   const profileRef = useRef<ElevationProfileData | null>(null);
 
@@ -196,6 +198,13 @@ export function ElevationProfile() {
         window.history.replaceState(null, '', `?route=${slugify(route.name)}`);
       }
     };
+    const handleTrailDeselect = () => {
+      if (sourceRef.current === 'trail') {
+        sourceRef.current = null;
+        setTrailName(null);
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    };
     const handleRouteDeselect = () => {
       if (sourceRef.current === 'route') {
         sourceRef.current = null;
@@ -206,14 +215,50 @@ export function ElevationProfile() {
     const handleSidebarToggle = (e: Event) => {
       setSidebarOpen((e as CustomEvent).detail.isOpen);
     };
+    const handleRideSelect = (e: Event) => {
+      const { rideId } = (e as CustomEvent).detail;
+      const ride = loadRide(rideId);
+      if (!ride) return;
+      const elevProfile = rideToElevationProfile(ride);
+      sourceRef.current = 'ride';
+      if (elevProfile) {
+        setTrailName(ride.name);
+        profileCache.set(ride.name, elevProfile);
+        setProfile(elevProfile);
+        profileRef.current = elevProfile;
+        setHoverIndex(null);
+        setLocationIndex(null);
+        setLoading(false);
+      } else {
+        setTrailName(null);
+        setProfile(null);
+        profileRef.current = null;
+      }
+    };
+    const handleRideDeselect = () => {
+      if (sourceRef.current === 'ride') {
+        sourceRef.current = null;
+        setTrailName(null);
+        setProfile(null);
+        profileRef.current = null;
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    };
 
     window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
+    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
     window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
     window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
+    window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
+    window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
 
     return () => {
       window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
+      window.removeEventListener(
+        MAP_EVENTS.TRAIL_DESELECT,
+        handleTrailDeselect,
+      );
       window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
       window.removeEventListener(
         MAP_EVENTS.ROUTE_DESELECT,
@@ -223,6 +268,8 @@ export function ElevationProfile() {
         MAP_EVENTS.SIDEBAR_TOGGLE,
         handleSidebarToggle,
       );
+      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
+      window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
     };
   }, []);
 
@@ -250,6 +297,9 @@ export function ElevationProfile() {
       setLocationIndex(null);
       return;
     }
+
+    // Ride profiles are set directly by the RIDE_SELECT handler — skip fetch
+    if (sourceRef.current === 'ride') return;
 
     const cached = profileCache.get(trailName);
     if (cached) {
