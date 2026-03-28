@@ -8,7 +8,11 @@ const DB_NAME = 'bike-chatt-rides';
 const DB_VERSION = 1;
 const STORE_NAME = 'rides';
 
+let cachedDB: IDBDatabase | null = null;
+
 function openDB(): Promise<IDBDatabase> {
+  if (cachedDB) return Promise.resolve(cachedDB);
+
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -22,11 +26,20 @@ function openDB(): Promise<IDBDatabase> {
 
     req.onsuccess = () => {
       const db = req.result;
+      cachedDB = db;
       migrateFromLocalStorage(db).then(() => resolve(db));
     };
 
     req.onerror = () => reject(req.error);
   });
+}
+
+// Close the cached connection (used by tests to allow deleteDatabase)
+export function closeDB(): void {
+  if (cachedDB) {
+    cachedDB.close();
+    cachedDB = null;
+  }
 }
 
 // One-time migration from localStorage to IndexedDB
