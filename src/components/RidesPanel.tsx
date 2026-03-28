@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { MAP_EVENTS } from '@/events';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faStopwatch } from '@fortawesome/free-solid-svg-icons';
-import { useRideRecording } from '@/hooks';
+import { useRideRecording, useToast } from '@/hooks';
 import { RideHistory } from './sidebar/RideHistory';
 
 export function RidesPanel() {
@@ -12,6 +12,11 @@ export function RidesPanel() {
   const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const {
+    message: toastMessage,
+    isFadingOut: toastFadingOut,
+    showToast,
+  } = useToast();
 
   const {
     isRecording,
@@ -116,16 +121,19 @@ export function RidesPanel() {
     if (isRecording) {
       const ride = stopRecording();
       if (ride) {
+        showToast('Ride saved!');
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
             detail: { rideId: ride.id },
           }),
         );
+      } else {
+        showToast('Ride too short to save — keep recording longer');
       }
     } else {
       startRecording();
     }
-  }, [isRecording, stopRecording, startRecording]);
+  }, [isRecording, stopRecording, startRecording, showToast]);
 
   return (
     <>
@@ -153,6 +161,14 @@ export function RidesPanel() {
         <div className="rides-panel-header">
           <h2>My Rides</h2>
         </div>
+
+        {toastMessage && (
+          <div
+            className={`rides-panel-toast ${toastFadingOut ? 'fade-out' : ''}`}
+          >
+            {toastMessage}
+          </div>
+        )}
 
         <div className="rides-panel-content">
           {/* Ride list */}
