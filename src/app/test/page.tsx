@@ -40,7 +40,7 @@ function buildRideFromPoints(
   points: import('@/data/ride').RidePoint[],
 ): RecordedRide {
   const stats = computeRideStats(points);
-  const bounds = computeBounds(points);
+  const bounds = computeBounds(points) ?? [0, 0, 0, 0];
   // Strip accuracy/speed — only needed for stats computation above
   const storedPoints = points.map(({ lng, lat, altitude, timestamp }) => ({
     lng,

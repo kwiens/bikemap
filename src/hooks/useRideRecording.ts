@@ -309,7 +309,7 @@ export function useRideRecording(
     const points = [...pointsRef.current];
     const endTime = Date.now();
     const stats = computeRideStats(points);
-    const bounds = computeBounds(points);
+    const bounds = computeBounds(points) ?? [0, 0, 0, 0];
 
     // Strip accuracy/speed — only needed for stats computation above
     const storedPoints: StoredRidePoint[] = points.map(

@@ -175,8 +175,8 @@ export function computeMaxSpeed(points: AnyRidePoint[]): number {
 
 export function computeBounds(
   points: AnyRidePoint[],
-): [number, number, number, number] {
-  if (points.length === 0) return [0, 0, 0, 0];
+): [number, number, number, number] | null {
+  if (points.length === 0) return null;
 
   let minLng = Infinity;
   let minLat = Infinity;
