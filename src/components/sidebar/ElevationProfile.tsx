@@ -215,6 +215,9 @@ export function ElevationProfile() {
     const handleSidebarToggle = (e: Event) => {
       setSidebarOpen((e as CustomEvent).detail.isOpen);
     };
+    const handleRidesPanelToggle = (e: Event) => {
+      setSidebarOpen((e as CustomEvent).detail.isOpen);
+    };
     const handleRideSelect = (e: Event) => {
       const { rideId } = (e as CustomEvent).detail;
       const ride = loadRide(rideId);
@@ -250,6 +253,10 @@ export function ElevationProfile() {
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
     window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
     window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
+    window.addEventListener(
+      MAP_EVENTS.RIDES_PANEL_TOGGLE,
+      handleRidesPanelToggle,
+    );
     window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
     window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
 
@@ -267,6 +274,10 @@ export function ElevationProfile() {
       window.removeEventListener(
         MAP_EVENTS.SIDEBAR_TOGGLE,
         handleSidebarToggle,
+      );
+      window.removeEventListener(
+        MAP_EVENTS.RIDES_PANEL_TOGGLE,
+        handleRidesPanelToggle,
       );
       window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
       window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);

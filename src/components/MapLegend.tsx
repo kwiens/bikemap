@@ -268,6 +268,19 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Close when rides panel opens
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { isOpen: panelOpen } = (e as CustomEvent).detail;
+      if (panelOpen && isOpenRef.current) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+    return () =>
+      window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+  }, []);
+
   return (
     <>
       {children}

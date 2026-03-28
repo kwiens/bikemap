@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { MapLegendProvider } from '@/components/MapLegend';
+import { RidesPanel } from '@/components/RidesPanel';
 import {
   bikeRoutes,
   mapFeatures,
@@ -19,7 +20,7 @@ import {
   MarkerManager,
 } from '@/components/MapMarkers';
 import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
-import { useToast, useMapResize, useRideRecording } from '@/hooks';
+import { useToast, useMapResize } from '@/hooks';
 import {
   fetchStationInformation,
   fetchStationStatus,
@@ -76,39 +77,6 @@ const MapboxMap = memo(function MapboxMap() {
     showToast,
   } = useToast();
   useMapResize({ map });
-
-  // Ride recording
-  const { isRecording, elapsedTime, startRecording, stopRecording } =
-    useRideRecording();
-
-  // Format elapsed time as M:SS or H:MM:SS
-  function formatElapsed(seconds: number): string {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    if (h > 0)
-      return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    return `${m}:${String(s).padStart(2, '0')}`;
-  }
-
-  // Handle record button click
-  const handleRecordClick = useCallback(() => {
-    if (isRecording) {
-      const ride = stopRecording();
-      if (ride) {
-        showToast('Ride saved!');
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
-            detail: { rideId: ride.id },
-          }),
-        );
-      } else {
-        showToast('Ride too short to save');
-      }
-    } else {
-      startRecording();
-    }
-  }, [isRecording, stopRecording, startRecording, showToast]);
 
   // Handle ride select — show ride on map
   const handleRideSelect = useCallback((event: CustomEvent) => {
@@ -960,32 +928,6 @@ const MapboxMap = memo(function MapboxMap() {
 
       <ElevationProfile />
 
-      {/* Ride recording button */}
-      <div
-        onClick={handleRecordClick}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleRecordClick();
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        className={`ride-record-button ${isRecording ? 'recording' : ''}`}
-        aria-label={isRecording ? 'Stop recording ride' : 'Record a ride'}
-      >
-        {isRecording ? (
-          <div className="ride-record-stop-icon" />
-        ) : (
-          <div className="ride-record-dot" />
-        )}
-      </div>
-      {isRecording && (
-        <div className="ride-record-badge">
-          <span>{formatElapsed(elapsedTime)}</span>
-        </div>
-      )}
-
       {/* Location tracking toggle */}
       {mapConfig.debug.showLocationTracker && (
         <div
@@ -1034,6 +976,7 @@ export default function BikeMap() {
         }}
       >
         <MapboxMap />
+        <RidesPanel />
       </div>
     </MapLegendProvider>
   );

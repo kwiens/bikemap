@@ -505,6 +505,44 @@ export function highlightMtnBikeArea(
   }
 }
 
+// Recorded ride layer management
+const RIDE_SOURCE_ID = 'recorded-ride';
+const RIDE_LINE_ID = 'recorded-ride-line';
+const RIDE_LINE_COLOR = '#ff6b35';
+
+export function addRideLayer(
+  map: mapboxgl.Map,
+  coordinates: [number, number][],
+): void {
+  removeRideLayer(map);
+
+  map.addSource(RIDE_SOURCE_ID, {
+    type: 'geojson',
+    data: {
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates },
+    },
+  });
+
+  map.addLayer({
+    id: RIDE_LINE_ID,
+    type: 'line',
+    source: RIDE_SOURCE_ID,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': RIDE_LINE_COLOR,
+      'line-width': 4,
+      'line-opacity': 0.85,
+    },
+  });
+}
+
+export function removeRideLayer(map: mapboxgl.Map): void {
+  if (map.getLayer(RIDE_LINE_ID)) map.removeLayer(RIDE_LINE_ID);
+  if (map.getSource(RIDE_SOURCE_ID)) map.removeSource(RIDE_SOURCE_ID);
+}
+
 // Geocoding utility
 export async function geocodeAddress(
   address: string,
