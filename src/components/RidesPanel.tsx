@@ -23,6 +23,7 @@ export function RidesPanel() {
   const {
     isRecording,
     isPaused,
+    hasRecovery,
     elapsedTime,
     liveDistance,
     liveElevationGain,
@@ -30,10 +31,15 @@ export function RidesPanel() {
     pauseRecording,
     resumeRecording,
     stopRecording,
+    recoverRide,
+    dismissRecovery,
   } = useRideRecording(showToast);
 
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
+
+  const isRecordingRef = useRef(false);
+  isRecordingRef.current = isRecording;
 
   const toggle = useCallback(() => {
     const next = !isOpenRef.current;
@@ -44,6 +50,18 @@ export function RidesPanel() {
       }),
     );
   }, []);
+
+  const handleRecoverRide = useCallback(async () => {
+    const ride = await recoverRide();
+    if (ride) {
+      showToast('Ride recovered!');
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
+          detail: { rideId: ride.id },
+        }),
+      );
+    }
+  }, [recoverRide, showToast]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -124,7 +142,13 @@ export function RidesPanel() {
         <button
           ref={toggleRef}
           onClick={toggle}
-          className={`toggle-button ${isRecording && !isOpen ? 'recording-active' : ''}`}
+          className={cn(
+            'toggle-button',
+            isRecording &&
+              !isOpen &&
+              'bg-red-500 animate-recording-pulse [&_.toggle-button-icon]:text-white hover:bg-red-600',
+            isRecording && isOpen && '[&_.toggle-button-icon]:text-red-500',
+          )}
           type="button"
           aria-label={isOpen ? 'Close rides panel' : 'Open rides panel'}
         >
@@ -163,6 +187,29 @@ export function RidesPanel() {
         )}
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
+          {hasRecovery && !isRecording && (
+            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+              <p className="font-medium text-amber-800 mb-2">
+                Unfinished ride found
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-1.5 bg-amber-500 text-white rounded text-xs font-medium hover:bg-amber-600"
+                  onClick={handleRecoverRide}
+                >
+                  Save it
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  onClick={dismissRecovery}
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          )}
           <RideHistory
             selectedRideId={selectedRideId}
             onRideSelect={handleRideSelect}
@@ -203,6 +250,9 @@ export function RidesPanel() {
                   Finish
                 </button>
               </div>
+              <p className="text-[11px] text-gray-400 text-center mt-1 leading-tight">
+                Keep your phone on to track GPS. The screen will stay on.
+              </p>
             </div>
           ) : (
             <button

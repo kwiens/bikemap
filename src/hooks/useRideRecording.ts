@@ -5,19 +5,27 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RecordedRide, RidePoint, StoredRidePoint } from '../data/ride';
 import { generateRideName } from '../data/ride';
 
-type GpsErrorCallback = (message: string) => void;
+type NotifyCallback = (message: string) => void;
+
+// If no GPS point arrives for this long, the app was likely backgrounded
+const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
   computeRideStats,
   haversineDistance,
 } from '../utils/ride-stats';
-import { saveRide } from '../utils/ride-storage';
+import {
+  saveRide,
+  saveInProgress,
+  clearInProgress,
+  loadInProgress,
+} from '../utils/ride-storage';
 
 interface UseRideRecordingReturn {
   isRecording: boolean;
   isPaused: boolean;
-  pointCount: number;
+  hasRecovery: boolean;
   elapsedTime: number; // seconds
   liveDistance: number; // meters
   liveElevationGain: number; // meters
@@ -25,15 +33,17 @@ interface UseRideRecordingReturn {
   pauseRecording: () => void;
   resumeRecording: () => void;
   stopRecording: () => Promise<RecordedRide | null>;
-  discardRecording: () => void;
+  recoverRide: () => Promise<RecordedRide | null>;
+  dismissRecovery: () => void;
 }
 
 export function useRideRecording(
-  onGpsError?: GpsErrorCallback,
+  onNotify?: NotifyCallback,
 ): UseRideRecordingReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [pointCount, setPointCount] = useState(0);
+  const [hasRecovery, setHasRecovery] = useState(false);
+
   const [elapsedTime, setElapsedTime] = useState(0);
   const [liveDistance, setLiveDistance] = useState(0);
   const [liveElevationGain, setLiveElevationGain] = useState(0);
@@ -41,9 +51,14 @@ export function useRideRecording(
   const elevGainRef = useRef(0);
   const prevAltRef = useRef<number | null>(null);
   const pausedRef = useRef(false);
+  const manualPauseRef = useRef(false); // true when user explicitly paused
   const pausedTimeRef = useRef(0); // accumulated paused ms
   const pauseStartRef = useRef(0);
+  const lowSpeedCountRef = useRef(0); // consecutive low-speed GPS readings
 
+  const saveIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(
+    undefined,
+  );
   const pointsRef = useRef<RidePoint[]>([]);
   const watchIdRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(
@@ -68,17 +83,34 @@ export function useRideRecording(
     }
   }, []);
 
-  // Re-acquire wake lock when page becomes visible again
+  // Re-acquire wake lock and detect GPS gaps when page becomes visible
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && isRecording) {
-        acquireWakeLock();
+      if (document.visibilityState !== 'visible' || !isRecording) return;
+      if (pausedRef.current) return;
+
+      acquireWakeLock();
+
+      // Check for background gap
+      const lastPoint = pointsRef.current[pointsRef.current.length - 1];
+      if (lastPoint) {
+        const gap = Date.now() - lastPoint.timestamp;
+        if (gap > BACKGROUND_GAP_THRESHOLD_MS) {
+          onNotify?.('GPS paused while app was in background — gap in track');
+        }
       }
+
+      // Request an immediate position fix to minimize the gap
+      navigator.geolocation.getCurrentPosition(
+        () => {}, // watchPosition will pick up the next point
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 },
+      );
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility);
-  }, [isRecording, acquireWakeLock]);
+  }, [isRecording, acquireWakeLock, onNotify]);
 
   const cleanup = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -89,9 +121,14 @@ export function useRideRecording(
       clearInterval(timerRef.current);
       timerRef.current = undefined;
     }
+    if (saveIntervalRef.current !== undefined) {
+      clearInterval(saveIntervalRef.current);
+      saveIntervalRef.current = undefined;
+    }
+    void clearInProgress();
     releaseWakeLock();
     setIsRecording(false);
-    setPointCount(0);
+
     setElapsedTime(0);
     setLiveDistance(0);
     setLiveElevationGain(0);
@@ -106,9 +143,11 @@ export function useRideRecording(
     elevGainRef.current = 0;
     prevAltRef.current = null;
     pausedRef.current = false;
+    manualPauseRef.current = false;
     pausedTimeRef.current = 0;
     pauseStartRef.current = 0;
-    setPointCount(0);
+    lowSpeedCountRef.current = 0;
+
     setElapsedTime(0);
     setLiveDistance(0);
     setLiveElevationGain(0);
@@ -120,7 +159,38 @@ export function useRideRecording(
     // Start GPS watch
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
-        if (pausedRef.current) return;
+        const speed = position.coords.speed ?? 0;
+        const AUTO_PAUSE_SPEED = 0.5; // m/s (~1.1 mph)
+        const AUTO_PAUSE_COUNT = 3; // consecutive low-speed readings
+
+        // Manual pause — skip everything
+        if (manualPauseRef.current) return;
+
+        // Auto-pause logic
+        if (pausedRef.current) {
+          // Currently auto-paused — check if moving again
+          if (speed >= AUTO_PAUSE_SPEED) {
+            // Resume
+            pausedTimeRef.current += Date.now() - pauseStartRef.current;
+            pausedRef.current = false;
+            lowSpeedCountRef.current = 0;
+            setIsPaused(false);
+          }
+          return;
+        }
+
+        // Not paused — check if we should auto-pause
+        if (speed < AUTO_PAUSE_SPEED) {
+          lowSpeedCountRef.current++;
+          if (lowSpeedCountRef.current >= AUTO_PAUSE_COUNT) {
+            pausedRef.current = true;
+            pauseStartRef.current = Date.now();
+            setIsPaused(true);
+            return;
+          }
+        } else {
+          lowSpeedCountRef.current = 0;
+        }
 
         const point: RidePoint = {
           lng: position.coords.longitude,
@@ -132,7 +202,6 @@ export function useRideRecording(
         };
         const prev = pointsRef.current[pointsRef.current.length - 1];
         pointsRef.current.push(point);
-        setPointCount(pointsRef.current.length);
 
         // Broadcast coordinates for live map line
         window.dispatchEvent(
@@ -176,7 +245,7 @@ export function useRideRecording(
         if (error.code !== 3) {
           // Timeout is transient; permission/unavailable are fatal
           cleanup();
-          onGpsError?.(msg);
+          onNotify?.(msg);
         }
       },
       {
@@ -196,20 +265,37 @@ export function useRideRecording(
       );
     }, 1000);
 
+    // Periodically save in-progress data for crash recovery
+    saveIntervalRef.current = setInterval(() => {
+      if (pointsRef.current.length > 0) {
+        void saveInProgress({
+          startTime: startTimeRef.current,
+          points: pointsRef.current,
+        });
+      }
+    }, 30_000);
+
     window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
-  }, [isRecording, acquireWakeLock, cleanup, onGpsError]);
+  }, [isRecording, acquireWakeLock, cleanup, onNotify]);
 
   const pauseRecording = useCallback(() => {
-    if (!isRecording || pausedRef.current) return;
-    pausedRef.current = true;
-    pauseStartRef.current = Date.now();
+    if (!isRecording || manualPauseRef.current) return;
+    manualPauseRef.current = true;
+    if (!pausedRef.current) {
+      pausedRef.current = true;
+      pauseStartRef.current = Date.now();
+    }
     setIsPaused(true);
   }, [isRecording]);
 
   const resumeRecording = useCallback(() => {
-    if (!isRecording || !pausedRef.current) return;
-    pausedTimeRef.current += Date.now() - pauseStartRef.current;
-    pausedRef.current = false;
+    if (!isRecording || !manualPauseRef.current) return;
+    manualPauseRef.current = false;
+    if (pausedRef.current) {
+      pausedTimeRef.current += Date.now() - pauseStartRef.current;
+      pausedRef.current = false;
+    }
+    lowSpeedCountRef.current = 0;
     setIsPaused(false);
   }, [isRecording]);
 
@@ -256,9 +342,54 @@ export function useRideRecording(
     return ride;
   }, [isRecording, cleanup]);
 
-  const discardRecording = useCallback(() => {
-    cleanup();
-  }, [cleanup]);
+  // Check for recoverable in-progress ride on mount
+  useEffect(() => {
+    loadInProgress().then((data) => {
+      if (data && data.points.length >= 2) {
+        setHasRecovery(true);
+      }
+    });
+  }, []);
+
+  const recoverRide = useCallback(async (): Promise<RecordedRide | null> => {
+    const data = await loadInProgress();
+    if (!data || data.points.length < 2) {
+      await clearInProgress();
+      setHasRecovery(false);
+      return null;
+    }
+
+    const stats = computeRideStats(data.points);
+    const bounds = computeBounds(data.points);
+    const storedPoints: StoredRidePoint[] = data.points.map(
+      ({ lng, lat, altitude, timestamp }) => ({
+        lng,
+        lat,
+        altitude,
+        timestamp,
+      }),
+    );
+
+    const ride: RecordedRide = {
+      id: crypto.randomUUID(),
+      name: generateRideName(data.startTime),
+      startTime: data.startTime,
+      endTime: data.points[data.points.length - 1].timestamp,
+      points: storedPoints,
+      stats,
+      bounds,
+    };
+
+    await saveRide(ride);
+    await clearInProgress();
+    setHasRecovery(false);
+    return ride;
+  }, []);
+
+  const dismissRecovery = useCallback(() => {
+    void clearInProgress();
+    setHasRecovery(false);
+  }, []);
 
   // Cleanup on unmount — use refs directly to avoid stale closure from cleanup()
   useEffect(() => {
@@ -266,6 +397,8 @@ export function useRideRecording(
       if (watchIdRef.current !== null)
         navigator.geolocation.clearWatch(watchIdRef.current);
       if (timerRef.current !== undefined) clearInterval(timerRef.current);
+      if (saveIntervalRef.current !== undefined)
+        clearInterval(saveIntervalRef.current);
       wakeLockRef.current?.release();
     };
   }, []);
@@ -273,7 +406,7 @@ export function useRideRecording(
   return {
     isRecording,
     isPaused,
-    pointCount,
+    hasRecovery,
     elapsedTime,
     liveDistance,
     liveElevationGain,
@@ -281,6 +414,7 @@ export function useRideRecording(
     pauseRecording,
     resumeRecording,
     stopRecording,
-    discardRecording,
+    recoverRide,
+    dismissRecovery,
   };
 }

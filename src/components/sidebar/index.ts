@@ -9,8 +9,6 @@ export { AttractionsList } from './AttractionsList';
 export { BikeResourcesList } from './BikeResourcesList';
 export { BikeRentalList } from './BikeRentalList';
 export { InformationSection } from './InformationSection';
-export { RideHistory } from './RideHistory';
-export { RideDetail } from './RideDetail';
 export { Footer } from './Footer';
 
 // Types

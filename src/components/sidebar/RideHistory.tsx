@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBicycle } from '@fortawesome/free-solid-svg-icons';
 import type { RecordedRide, RideSummary } from '@/data/ride';
 import { MAP_EVENTS } from '@/events';
 import {
@@ -74,9 +76,18 @@ export function RideHistory({
 
   if (summaries.length === 0) {
     return (
-      <div className="px-3 py-4 text-gray-500 text-[13px] leading-relaxed">
-        No rides recorded yet. Tap Record to start! Rides are stored in your
-        browser and are not synced between devices or to the cloud.
+      <div className="py-8 px-4 text-center text-gray-400">
+        <FontAwesomeIcon
+          icon={faBicycle}
+          className="text-3xl mb-3 text-gray-300"
+        />
+        <p className="text-sm font-medium text-gray-500 mb-1">
+          Track your rides
+        </p>
+        <p className="text-xs leading-relaxed">
+          Tap Record to start logging your ride with GPS. Rides are saved
+          offline on your device.
+        </p>
       </div>
     );
   }

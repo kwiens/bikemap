@@ -5,8 +5,10 @@ import type { RecordedRide, RideSummary } from '../data/ride';
 import { RIDES_INDEX_KEY, rideStorageKey } from '../data/ride';
 
 const DB_NAME = 'bike-chatt-rides';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'rides';
+const PROGRESS_STORE = 'progress';
+const PROGRESS_KEY = 'current';
 
 let cachedDB: IDBDatabase | null = null;
 
@@ -21,6 +23,9 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         store.createIndex('startTime', 'startTime');
+      }
+      if (!db.objectStoreNames.contains(PROGRESS_STORE)) {
+        db.createObjectStore(PROGRESS_STORE);
       }
     };
 
@@ -157,4 +162,36 @@ export async function getStorageUsage(): Promise<{
     }
   }
   return { usedKB: 0, totalKB: 0 };
+}
+
+// --- In-progress ride recovery ---
+
+export interface InProgressRide {
+  startTime: number;
+  points: import('../data/ride').RidePoint[];
+}
+
+export async function saveInProgress(data: InProgressRide): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(PROGRESS_STORE, 'readwrite');
+  tx.objectStore(PROGRESS_STORE).put(data, PROGRESS_KEY);
+  await idbTransaction(tx);
+}
+
+export async function loadInProgress(): Promise<InProgressRide | null> {
+  const db = await openDB();
+  const result = await idbRequest(
+    db
+      .transaction(PROGRESS_STORE)
+      .objectStore(PROGRESS_STORE)
+      .get(PROGRESS_KEY),
+  );
+  return (result as InProgressRide) ?? null;
+}
+
+export async function clearInProgress(): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(PROGRESS_STORE, 'readwrite');
+  tx.objectStore(PROGRESS_STORE).delete(PROGRESS_KEY);
+  await idbTransaction(tx);
 }
