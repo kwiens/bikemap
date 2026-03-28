@@ -1,8 +1,18 @@
 // Pure functions for computing ride statistics from GPS points
 
 import type { ElevationProfile } from '../data/mountain-bike-trails';
-import type { RecordedRide, RidePoint, RideStats } from '../data/ride';
+import type {
+  RecordedRide,
+  RidePoint,
+  RideStats,
+  StoredRidePoint,
+} from '../data/ride';
 import { FEET_PER_METER } from '../utils/format';
+
+// Functions accept both full RidePoint (during recording) and StoredRidePoint (from storage).
+// Missing speed/accuracy fields are handled gracefully.
+type AnyRidePoint = RidePoint | StoredRidePoint;
+
 const EARTH_RADIUS_M = 6371000;
 
 // Accuracy threshold: ignore points with GPS accuracy worse than this
@@ -32,15 +42,13 @@ export function haversineDistance(
   return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export function computeDistance(points: RidePoint[]): number {
+export function computeDistance(points: AnyRidePoint[]): number {
   let total = 0;
   for (let i = 1; i < points.length; i++) {
-    if (
-      points[i].accuracy > MAX_ACCURACY_M ||
-      points[i - 1].accuracy > MAX_ACCURACY_M
-    ) {
-      continue;
-    }
+    const acc = 'accuracy' in points[i] ? (points[i] as RidePoint).accuracy : 0;
+    const prevAcc =
+      'accuracy' in points[i - 1] ? (points[i - 1] as RidePoint).accuracy : 0;
+    if (acc > MAX_ACCURACY_M || prevAcc > MAX_ACCURACY_M) continue;
     total += haversineDistance(
       points[i - 1].lat,
       points[i - 1].lng,
@@ -51,14 +59,20 @@ export function computeDistance(points: RidePoint[]): number {
   return total;
 }
 
-export function computeMovingTime(points: RidePoint[]): number {
+export function computeMovingTime(points: AnyRidePoint[]): number {
   if (points.length < 2) return 0;
+
+  // If points lack speed data (StoredRidePoint), return total elapsed time
+  const hasSpeed = 'speed' in points[0];
+  if (!hasSpeed) {
+    return points[points.length - 1].timestamp - points[0].timestamp;
+  }
 
   let movingMs = 0;
   let stopStart: number | null = null;
 
   for (let i = 1; i < points.length; i++) {
-    const prevSpeed = points[i - 1].speed ?? 0;
+    const prevSpeed = (points[i - 1] as RidePoint).speed ?? 0;
     const dt = points[i].timestamp - points[i - 1].timestamp;
 
     if (prevSpeed < STOP_SPEED) {
@@ -117,7 +131,7 @@ function smoothAltitudes(points: { altitude: number | null }[]): number[] {
   return smoothed;
 }
 
-export function computeElevation(points: RidePoint[]): {
+export function computeElevation(points: AnyRidePoint[]): {
   gain: number;
   loss: number;
   min: number;
@@ -148,22 +162,19 @@ export function computeElevation(points: RidePoint[]): {
   return { gain, loss, min, max };
 }
 
-export function computeMaxSpeed(points: RidePoint[]): number {
+export function computeMaxSpeed(points: AnyRidePoint[]): number {
   let maxSpeed = 0;
   for (const p of points) {
-    if (
-      p.speed !== null &&
-      p.speed > maxSpeed &&
-      p.speed < MAX_PLAUSIBLE_SPEED
-    ) {
-      maxSpeed = p.speed;
+    const speed = 'speed' in p ? (p as RidePoint).speed : null;
+    if (speed !== null && speed > maxSpeed && speed < MAX_PLAUSIBLE_SPEED) {
+      maxSpeed = speed;
     }
   }
   return maxSpeed;
 }
 
 export function computeBounds(
-  points: RidePoint[],
+  points: AnyRidePoint[],
 ): [number, number, number, number] {
   if (points.length === 0) return [0, 0, 0, 0];
 
@@ -182,7 +193,7 @@ export function computeBounds(
   return [minLng, minLat, maxLng, maxLat];
 }
 
-export function computeRideStats(points: RidePoint[]): RideStats {
+export function computeRideStats(points: AnyRidePoint[]): RideStats {
   if (points.length < 2) {
     return {
       distance: 0,
@@ -220,22 +231,36 @@ export function computeRideStats(points: RidePoint[]): RideStats {
 export function rideToElevationProfile(
   ride: RecordedRide,
 ): ElevationProfile | null {
-  const pointsWithAlt = ride.points.filter((p) => p.altitude !== null);
+  return pointsToElevationProfile(ride.points, ride.name, ride.stats);
+}
+
+/** Build an elevation profile from raw GPS points (works for both saved rides and live recording). */
+export function pointsToElevationProfile(
+  points: { lat: number; lng: number; altitude: number | null }[],
+  name: string,
+  stats?: {
+    elevationGain: number;
+    elevationLoss: number;
+    elevationMin: number;
+    elevationMax: number;
+  },
+): ElevationProfile | null {
+  const pointsWithAlt = points.filter((p) => p.altitude !== null);
   if (pointsWithAlt.length < 5) return null;
 
-  const smoothed = smoothAltitudes(ride.points);
+  const smoothed = smoothAltitudes(points);
   const profile: [number, number, number, number][] = [];
   let cumDistFt = 0;
 
-  for (let i = 0; i < ride.points.length; i++) {
+  for (let i = 0; i < points.length; i++) {
     if (Number.isNaN(smoothed[i])) continue;
 
     if (i > 0) {
       const seg = haversineDistance(
-        ride.points[i - 1].lat,
-        ride.points[i - 1].lng,
-        ride.points[i].lat,
-        ride.points[i].lng,
+        points[i - 1].lat,
+        points[i - 1].lng,
+        points[i].lat,
+        points[i].lng,
       );
       cumDistFt += seg * FEET_PER_METER;
     }
@@ -243,20 +268,38 @@ export function rideToElevationProfile(
     profile.push([
       cumDistFt,
       smoothed[i] * FEET_PER_METER,
-      ride.points[i].lng,
-      ride.points[i].lat,
+      points[i].lng,
+      points[i].lat,
     ]);
   }
 
   if (profile.length < 5) return null;
 
+  // Use provided stats or compute from the smoothed profile
+  let gain: number;
+  let loss: number;
+  let min: number;
+  let max: number;
+  if (stats) {
+    gain = stats.elevationGain * FEET_PER_METER;
+    loss = stats.elevationLoss * FEET_PER_METER;
+    min = stats.elevationMin * FEET_PER_METER;
+    max = stats.elevationMax * FEET_PER_METER;
+  } else {
+    const computed = computeElevation(points as AnyRidePoint[]);
+    gain = computed.gain * FEET_PER_METER;
+    loss = computed.loss * FEET_PER_METER;
+    min = computed.min * FEET_PER_METER;
+    max = computed.max * FEET_PER_METER;
+  }
+
   return {
-    trail: ride.name,
+    trail: name,
     distance: profile[profile.length - 1][0],
-    gain: ride.stats.elevationGain * FEET_PER_METER,
-    loss: ride.stats.elevationLoss * FEET_PER_METER,
-    min: ride.stats.elevationMin * FEET_PER_METER,
-    max: ride.stats.elevationMax * FEET_PER_METER,
+    gain,
+    loss,
+    min,
+    max,
     profile,
   };
 }

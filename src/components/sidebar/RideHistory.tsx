@@ -32,7 +32,9 @@ export function RideHistory({
   const [selectedRide, setSelectedRide] = useState<RecordedRide | null>(null);
 
   const refreshSummaries = useCallback(() => {
-    getRideSummaries().then(setSummaries);
+    getRideSummaries()
+      .then(setSummaries)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -50,7 +52,9 @@ export function RideHistory({
 
   useEffect(() => {
     if (selectedRideId) {
-      loadRide(selectedRideId).then(setSelectedRide);
+      loadRide(selectedRideId)
+        .then(setSelectedRide)
+        .catch(() => {});
     } else {
       setSelectedRide(null);
     }
@@ -144,7 +148,9 @@ function StorageIndicator() {
   } | null>(null);
 
   useEffect(() => {
-    getStorageUsage().then(setUsage);
+    getStorageUsage()
+      .then(setUsage)
+      .catch(() => {});
   }, []);
 
   if (!usage) return null;

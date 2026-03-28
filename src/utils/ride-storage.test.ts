@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { RecordedRide, RideStats } from '../data/ride';
+import type { RecordedRide, RideStats, RidePoint } from '../data/ride';
 import {
   saveRide,
   loadRide,
@@ -7,6 +7,9 @@ import {
   deleteRide,
   renameRide,
   getRideSummaries,
+  saveInProgress,
+  loadInProgress,
+  clearInProgress,
   closeDB,
 } from './ride-storage';
 
@@ -125,6 +128,81 @@ describe('ride-storage (IndexedDB)', () => {
       await saveRide(makeFakeRide({ id: 'c', startTime: 2000 }));
       const summaries = await getRideSummaries();
       expect(summaries.map((s) => s.id)).toEqual(['b', 'c', 'a']);
+    });
+  });
+
+  describe('crash recovery (in-progress)', () => {
+    const fakePoints: RidePoint[] = [
+      {
+        lng: -85.3,
+        lat: 35.05,
+        altitude: 200,
+        accuracy: 5,
+        speed: 5,
+        timestamp: 1000,
+      },
+      {
+        lng: -85.301,
+        lat: 35.051,
+        altitude: 205,
+        accuracy: 5,
+        speed: 5,
+        timestamp: 4000,
+      },
+      {
+        lng: -85.302,
+        lat: 35.052,
+        altitude: 210,
+        accuracy: 5,
+        speed: 5,
+        timestamp: 7000,
+      },
+    ];
+
+    it('returns null when no in-progress ride exists', async () => {
+      expect(await loadInProgress()).toBeNull();
+    });
+
+    it('round-trips in-progress data', async () => {
+      await saveInProgress({ startTime: 1000, points: fakePoints });
+      const data = await loadInProgress();
+      expect(data).not.toBeNull();
+      expect(data?.startTime).toBe(1000);
+      expect(data?.points).toHaveLength(3);
+    });
+
+    it('clearInProgress removes the data', async () => {
+      await saveInProgress({ startTime: 1000, points: fakePoints });
+      await clearInProgress();
+      expect(await loadInProgress()).toBeNull();
+    });
+
+    it('overwrites previous in-progress data on save', async () => {
+      await saveInProgress({ startTime: 1000, points: fakePoints });
+      const morePoints: RidePoint[] = [
+        ...fakePoints,
+        {
+          lng: -85.303,
+          lat: 35.053,
+          altitude: 215,
+          accuracy: 5,
+          speed: 5,
+          timestamp: 10000,
+        },
+      ];
+      await saveInProgress({ startTime: 1000, points: morePoints });
+      const data = await loadInProgress();
+      expect(data?.points).toHaveLength(4);
+    });
+
+    it('in-progress data is independent of saved rides', async () => {
+      await saveInProgress({ startTime: 1000, points: fakePoints });
+      await saveRide(makeFakeRide({ id: 'separate' }));
+      const progress = await loadInProgress();
+      expect(progress).not.toBeNull();
+      const rides = await loadAllRides();
+      expect(rides).toHaveLength(1);
+      expect(rides[0].id).toBe('separate');
     });
   });
 });
