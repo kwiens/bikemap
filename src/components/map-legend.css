@@ -74,12 +74,12 @@
   color: var(--color-gray-700);
 }
 
-/* Rides Panel Toggle — top-right corner */
+/* Rides Panel Toggle — top-right corner, above map controls */
 .rides-toggle-container {
   position: fixed;
   top: 16px;
   right: 16px;
-  z-index: 1002;
+  z-index: 1700;
 }
 
 /* Rides Panel — slides in from the right */
@@ -91,7 +91,7 @@
   width: 280px;
   background-color: var(--color-white);
   box-shadow: -2px 0 5px var(--shadow-medium);
-  z-index: 1001;
+  z-index: 1700;
   overflow: hidden;
   transition: transform 0.3s ease-in-out;
   display: flex;
@@ -134,12 +134,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 20px 14px;
   border: 1px solid var(--color-gray-200);
   border-radius: 8px;
   background: white;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--color-gray-700);
   transition: background-color 0.15s, border-color 0.15s;
