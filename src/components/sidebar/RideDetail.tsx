@@ -47,7 +47,7 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
   const handleRename = () => {
     const trimmed = nameInput.trim();
     if (trimmed && trimmed !== currentName) {
-      renameRide(ride.id, trimmed);
+      void renameRide(ride.id, trimmed);
       setCurrentName(trimmed);
     }
     setEditing(false);
@@ -63,7 +63,7 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
       setConfirmDelete(true);
       return;
     }
-    deleteRide(ride.id);
+    void deleteRide(ride.id);
     window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
     onDeleted();
   };

@@ -99,9 +99,9 @@ export function RidesPanel() {
     [isOpen, toggle],
   );
 
-  const handleRecordClick = useCallback(() => {
+  const handleRecordClick = useCallback(async () => {
     if (isRecording) {
-      const ride = stopRecording();
+      const ride = await stopRecording();
       if (ride) {
         showToast('Ride saved!');
         window.dispatchEvent(

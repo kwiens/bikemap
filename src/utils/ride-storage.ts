@@ -1,91 +1,139 @@
-// localStorage CRUD for recorded rides
-// Each ride is stored individually to avoid per-value size limits.
+// IndexedDB storage for recorded rides
+// Migrates existing localStorage rides on first open.
 
 import type { RecordedRide, RideSummary } from '../data/ride';
 import { RIDES_INDEX_KEY, rideStorageKey } from '../data/ride';
 
-function readIndex(): string[] {
-  const raw = localStorage.getItem(RIDES_INDEX_KEY);
-  if (!raw) return [];
+const DB_NAME = 'bike-chatt-rides';
+const DB_VERSION = 1;
+const STORE_NAME = 'rides';
+
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        store.createIndex('startTime', 'startTime');
+      }
+    };
+
+    req.onsuccess = () => {
+      const db = req.result;
+      migrateFromLocalStorage(db).then(() => resolve(db));
+    };
+
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// One-time migration from localStorage to IndexedDB
+async function migrateFromLocalStorage(db: IDBDatabase): Promise<void> {
+  const indexRaw = localStorage.getItem(RIDES_INDEX_KEY);
+  if (!indexRaw) return;
+
+  let ids: string[];
   try {
-    return JSON.parse(raw) as string[];
+    ids = JSON.parse(indexRaw) as string[];
   } catch {
-    return [];
+    return;
   }
-}
 
-function writeIndex(ids: string[]): void {
-  localStorage.setItem(RIDES_INDEX_KEY, JSON.stringify(ids));
-}
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
 
-export function saveRide(ride: RecordedRide): void {
-  const ids = readIndex();
-  if (!ids.includes(ride.id)) {
-    ids.unshift(ride.id); // newest first
-    writeIndex(ids);
-  }
-  localStorage.setItem(rideStorageKey(ride.id), JSON.stringify(ride));
-}
-
-export function loadRide(id: string): RecordedRide | null {
-  const raw = localStorage.getItem(rideStorageKey(id));
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as RecordedRide;
-  } catch {
-    return null;
-  }
-}
-
-export function loadAllRides(): RecordedRide[] {
-  const ids = readIndex();
-  const rides: RecordedRide[] = [];
-  for (const id of ids) {
-    const ride = loadRide(id);
-    if (ride) rides.push(ride);
-  }
-  return rides.sort((a, b) => b.startTime - a.startTime);
-}
-
-export function deleteRide(id: string): void {
-  localStorage.removeItem(rideStorageKey(id));
-  const ids = readIndex().filter((i) => i !== id);
-  writeIndex(ids);
-}
-
-export function renameRide(id: string, newName: string): void {
-  const ride = loadRide(id);
-  if (!ride) return;
-  ride.name = newName;
-  localStorage.setItem(rideStorageKey(id), JSON.stringify(ride));
-}
-
-export function getRideSummaries(): RideSummary[] {
-  const ids = readIndex();
-  const summaries: RideSummary[] = [];
   for (const id of ids) {
     const raw = localStorage.getItem(rideStorageKey(id));
     if (!raw) continue;
     try {
       const ride = JSON.parse(raw) as RecordedRide;
-      summaries.push({
-        id: ride.id,
-        name: ride.name,
-        startTime: ride.startTime,
-        stats: ride.stats,
-      });
+      store.put(ride);
+      localStorage.removeItem(rideStorageKey(id));
     } catch {
       // skip corrupted entries
     }
   }
-  return summaries.sort((a, b) => b.startTime - a.startTime);
+
+  localStorage.removeItem(RIDES_INDEX_KEY);
+
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbTransaction(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function saveRide(ride: RecordedRide): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  tx.objectStore(STORE_NAME).put(ride);
+  await idbTransaction(tx);
+}
+
+export async function loadRide(id: string): Promise<RecordedRide | null> {
+  const db = await openDB();
+  const result = await idbRequest(
+    db.transaction(STORE_NAME).objectStore(STORE_NAME).get(id),
+  );
+  return (result as RecordedRide) ?? null;
+}
+
+export async function loadAllRides(): Promise<RecordedRide[]> {
+  const db = await openDB();
+  const rides = (await idbRequest(
+    db.transaction(STORE_NAME).objectStore(STORE_NAME).getAll(),
+  )) as RecordedRide[];
+  return rides.sort((a, b) => b.startTime - a.startTime);
+}
+
+export async function deleteRide(id: string): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  tx.objectStore(STORE_NAME).delete(id);
+  await idbTransaction(tx);
+}
+
+export async function renameRide(id: string, newName: string): Promise<void> {
+  const ride = await loadRide(id);
+  if (!ride) return;
+  ride.name = newName;
+  await saveRide(ride);
+}
+
+export async function getRideSummaries(): Promise<RideSummary[]> {
+  const db = await openDB();
+  const rides = (await idbRequest(
+    db.transaction(STORE_NAME).objectStore(STORE_NAME).getAll(),
+  )) as RecordedRide[];
+  return rides
+    .map((ride) => ({
+      id: ride.id,
+      name: ride.name,
+      startTime: ride.startTime,
+      stats: ride.stats,
+    }))
+    .sort((a, b) => b.startTime - a.startTime);
 }
 
 export async function getStorageUsage(): Promise<{
   usedKB: number;
   totalKB: number;
 }> {
-  // Use Storage API for accurate quota when available
   if (navigator.storage?.estimate) {
     const est = await navigator.storage.estimate();
     if (est.usage !== undefined && est.quota !== undefined) {
@@ -95,17 +143,5 @@ export async function getStorageUsage(): Promise<{
       };
     }
   }
-
-  // Fallback: measure localStorage directly
-  let usedBytes = 0;
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key) {
-      usedBytes += key.length;
-      const val = localStorage.getItem(key);
-      if (val) usedBytes += val.length;
-    }
-  }
-  // Most browsers allow 5-10MB; use 10MB as default
-  return { usedKB: Math.round(usedBytes / 1024), totalKB: 10240 };
+  return { usedKB: 0, totalKB: 0 };
 }

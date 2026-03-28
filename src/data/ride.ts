@@ -1,5 +1,6 @@
 // Ride recording data types and helpers
 
+// Full point — used during recording (not persisted)
 export interface RidePoint {
   lng: number;
   lat: number;
@@ -7,6 +8,14 @@ export interface RidePoint {
   accuracy: number; // meters, from coords.accuracy
   speed: number | null; // m/s, from coords.speed
   timestamp: number; // Unix ms
+}
+
+// Slim point — persisted to storage (accuracy/speed dropped after stats computed)
+export interface StoredRidePoint {
+  lng: number;
+  lat: number;
+  altitude: number | null;
+  timestamp: number;
 }
 
 export interface RideStats {
@@ -26,7 +35,7 @@ export interface RecordedRide {
   name: string;
   startTime: number; // Unix ms
   endTime: number; // Unix ms
-  points: RidePoint[];
+  points: StoredRidePoint[];
   stats: RideStats;
   bounds: [number, number, number, number]; // [swLng, swLat, neLng, neLat]
 }

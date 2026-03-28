@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { RecordedRide, RidePoint } from '../data/ride';
+import type { RecordedRide, RidePoint, StoredRidePoint } from '../data/ride';
 import { generateRideName } from '../data/ride';
 
 type GpsErrorCallback = (message: string) => void;
@@ -24,7 +24,7 @@ interface UseRideRecordingReturn {
   startRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
-  stopRecording: () => RecordedRide | null;
+  stopRecording: () => Promise<RecordedRide | null>;
   discardRecording: () => void;
 }
 
@@ -213,7 +213,7 @@ export function useRideRecording(
     setIsPaused(false);
   }, [isRecording]);
 
-  const stopRecording = useCallback((): RecordedRide | null => {
+  const stopRecording = useCallback(async (): Promise<RecordedRide | null> => {
     if (!isRecording || pointsRef.current.length < 2) {
       cleanup();
       return null;
@@ -224,17 +224,27 @@ export function useRideRecording(
     const stats = computeRideStats(points);
     const bounds = computeBounds(points);
 
+    // Strip accuracy/speed — only needed for stats computation above
+    const storedPoints: StoredRidePoint[] = points.map(
+      ({ lng, lat, altitude, timestamp }) => ({
+        lng,
+        lat,
+        altitude,
+        timestamp,
+      }),
+    );
+
     const ride: RecordedRide = {
       id: crypto.randomUUID(),
       name: generateRideName(startTimeRef.current),
       startTime: startTimeRef.current,
       endTime,
-      points,
+      points: storedPoints,
       stats,
       bounds,
     };
 
-    saveRide(ride);
+    await saveRide(ride);
     cleanup();
 
     window.dispatchEvent(

@@ -1,7 +1,7 @@
 // GPX 1.1 generation from GeoJSON features and recorded rides
 // Spec: https://www.topografix.com/gpx/1/1/
 
-import type { RidePoint } from '../data/ride';
+import type { StoredRidePoint } from '../data/ride';
 
 function escapeXml(str: string): string {
   return str
@@ -59,7 +59,7 @@ export interface GpxRoute {
 
 export interface RideGpxInput {
   name: string;
-  points: RidePoint[];
+  points: StoredRidePoint[];
 }
 
 export function buildRideGpx(input: RideGpxInput): string {

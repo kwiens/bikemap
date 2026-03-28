@@ -80,10 +80,10 @@ const MapboxMap = memo(function MapboxMap() {
   useMapResize({ map });
 
   // Handle ride select — show ride on map
-  const handleRideSelect = useCallback((event: CustomEvent) => {
+  const handleRideSelect = useCallback(async (event: CustomEvent) => {
     if (!map.current) return;
     const { rideId } = event.detail;
-    const ride = loadRide(rideId);
+    const ride = await loadRide(rideId);
     if (!ride) return;
 
     const coords: [number, number][] = ride.points.map((p) => [p.lng, p.lat]);

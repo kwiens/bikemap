@@ -219,9 +219,9 @@ export function ElevationProfile() {
     const handleRidesPanelToggle = (e: Event) => {
       setRidesPanelOpen((e as CustomEvent).detail.isOpen);
     };
-    const handleRideSelect = (e: Event) => {
+    const handleRideSelect = async (e: Event) => {
       const { rideId } = (e as CustomEvent).detail;
-      const ride = loadRide(rideId);
+      const ride = await loadRide(rideId);
       if (!ride) return;
       const elevProfile = rideToElevationProfile(ride);
       sourceRef.current = 'ride';

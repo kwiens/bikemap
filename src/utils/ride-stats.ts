@@ -90,7 +90,7 @@ export function computeMovingTime(points: RidePoint[]): number {
   return movingMs;
 }
 
-function smoothAltitudes(points: RidePoint[]): number[] {
+function smoothAltitudes(points: { altitude: number | null }[]): number[] {
   const altitudes = points.map((p) => p.altitude);
   const smoothed: number[] = [];
 
