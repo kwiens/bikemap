@@ -5,6 +5,7 @@ import { MAP_EVENTS } from '@/events';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faStopwatch } from '@fortawesome/free-solid-svg-icons';
 import { useRideRecording, useToast } from '@/hooks';
+import { formatElapsed, formatDistance, formatElevation } from '@/utils/format';
 import { RideHistory } from './sidebar/RideHistory';
 
 export function RidesPanel() {
@@ -28,27 +29,10 @@ export function RidesPanel() {
     pauseRecording,
     resumeRecording,
     stopRecording,
-  } = useRideRecording();
+  } = useRideRecording(showToast);
 
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
-
-  function formatElapsed(seconds: number): string {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    if (h > 0)
-      return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    return `${m}:${String(s).padStart(2, '0')}`;
-  }
-
-  function formatMiles(meters: number): string {
-    return `${(meters / 1609.344).toFixed(1)} mi`;
-  }
-
-  function formatFeet(meters: number): string {
-    return `${Math.round(meters * 3.28084)} ft`;
-  }
 
   const toggle = useCallback(() => {
     const next = !isOpenRef.current;
@@ -142,7 +126,7 @@ export function RidesPanel() {
         <button
           ref={toggleRef}
           onClick={toggle}
-          className="toggle-button"
+          className={`toggle-button ${isRecording && !isOpen ? 'recording-active' : ''}`}
           type="button"
           aria-label={isOpen ? 'Close rides panel' : 'Open rides panel'}
         >
@@ -191,13 +175,13 @@ export function RidesPanel() {
                 </div>
                 <div className="rides-recording-stat">
                   <span className="rides-recording-stat-value">
-                    {formatMiles(liveDistance)}
+                    {formatDistance(liveDistance)}
                   </span>
                   <span className="rides-recording-stat-label">Distance</span>
                 </div>
                 <div className="rides-recording-stat">
                   <span className="rides-recording-stat-value">
-                    {formatFeet(liveElevationGain)}
+                    {formatElevation(liveElevationGain)}
                   </span>
                   <span className="rides-recording-stat-label">Climbing</span>
                 </div>

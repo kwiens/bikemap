@@ -2,8 +2,7 @@
 
 import type { ElevationProfile } from '../data/mountain-bike-trails';
 import type { RecordedRide, RidePoint, RideStats } from '../data/ride';
-
-const METERS_TO_FEET = 3.28084;
+import { FEET_PER_METER } from '../utils/format';
 const EARTH_RADIUS_M = 6371000;
 
 // Accuracy threshold: ignore points with GPS accuracy worse than this
@@ -238,12 +237,12 @@ export function rideToElevationProfile(
         ride.points[i].lat,
         ride.points[i].lng,
       );
-      cumDistFt += seg * METERS_TO_FEET;
+      cumDistFt += seg * FEET_PER_METER;
     }
 
     profile.push([
       cumDistFt,
-      smoothed[i] * METERS_TO_FEET,
+      smoothed[i] * FEET_PER_METER,
       ride.points[i].lng,
       ride.points[i].lat,
     ]);
@@ -254,10 +253,10 @@ export function rideToElevationProfile(
   return {
     trail: ride.name,
     distance: profile[profile.length - 1][0],
-    gain: ride.stats.elevationGain * METERS_TO_FEET,
-    loss: ride.stats.elevationLoss * METERS_TO_FEET,
-    min: ride.stats.elevationMin * METERS_TO_FEET,
-    max: ride.stats.elevationMax * METERS_TO_FEET,
+    gain: ride.stats.elevationGain * FEET_PER_METER,
+    loss: ride.stats.elevationLoss * FEET_PER_METER,
+    min: ride.stats.elevationMin * FEET_PER_METER,
+    max: ride.stats.elevationMax * FEET_PER_METER,
     profile,
   };
 }

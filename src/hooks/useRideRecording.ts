@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RecordedRide, RidePoint } from '../data/ride';
 import { generateRideName } from '../data/ride';
+
+type GpsErrorCallback = (message: string) => void;
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
@@ -26,7 +28,9 @@ interface UseRideRecordingReturn {
   discardRecording: () => void;
 }
 
-export function useRideRecording(): UseRideRecordingReturn {
+export function useRideRecording(
+  onGpsError?: GpsErrorCallback,
+): UseRideRecordingReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [pointCount, setPointCount] = useState(0);
@@ -75,6 +79,23 @@ export function useRideRecording(): UseRideRecordingReturn {
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility);
   }, [isRecording, acquireWakeLock]);
+
+  const cleanup = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (timerRef.current !== undefined) {
+      clearInterval(timerRef.current);
+      timerRef.current = undefined;
+    }
+    releaseWakeLock();
+    setIsRecording(false);
+    setPointCount(0);
+    setElapsedTime(0);
+    setLiveDistance(0);
+    setLiveElevationGain(0);
+  }, [releaseWakeLock]);
 
   const startRecording = useCallback(() => {
     if (isRecording) return;
@@ -145,7 +166,19 @@ export function useRideRecording(): UseRideRecordingReturn {
           prevAltRef.current = point.altitude;
         }
       },
-      undefined,
+      (error) => {
+        const messages: Record<number, string> = {
+          1: 'Location permission denied — cannot record ride',
+          2: 'GPS unavailable — check your device settings',
+          3: 'GPS timed out — trying again...',
+        };
+        const msg = messages[error.code] ?? 'GPS error';
+        if (error.code !== 3) {
+          // Timeout is transient; permission/unavailable are fatal
+          cleanup();
+          onGpsError?.(msg);
+        }
+      },
       {
         enableHighAccuracy: true,
         maximumAge: 0,
@@ -164,7 +197,7 @@ export function useRideRecording(): UseRideRecordingReturn {
     }, 1000);
 
     window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
-  }, [isRecording, acquireWakeLock]);
+  }, [isRecording, acquireWakeLock, cleanup, onGpsError]);
 
   const pauseRecording = useCallback(() => {
     if (!isRecording || pausedRef.current) return;
@@ -179,23 +212,6 @@ export function useRideRecording(): UseRideRecordingReturn {
     pausedRef.current = false;
     setIsPaused(false);
   }, [isRecording]);
-
-  const cleanup = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    if (timerRef.current !== undefined) {
-      clearInterval(timerRef.current);
-      timerRef.current = undefined;
-    }
-    releaseWakeLock();
-    setIsRecording(false);
-    setPointCount(0);
-    setElapsedTime(0);
-    setLiveDistance(0);
-    setLiveElevationGain(0);
-  }, [releaseWakeLock]);
 
   const stopRecording = useCallback((): RecordedRide | null => {
     if (!isRecording || pointsRef.current.length < 2) {
@@ -234,18 +250,13 @@ export function useRideRecording(): UseRideRecordingReturn {
     cleanup();
   }, [cleanup]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount — use refs directly to avoid stale closure from cleanup()
   useEffect(() => {
     return () => {
-      if (watchIdRef.current !== null) {
+      if (watchIdRef.current !== null)
         navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-      if (timerRef.current !== undefined) {
-        clearInterval(timerRef.current);
-      }
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release();
-      }
+      if (timerRef.current !== undefined) clearInterval(timerRef.current);
+      wakeLockRef.current?.release();
     };
   }, []);
 

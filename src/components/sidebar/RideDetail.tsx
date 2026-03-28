@@ -13,37 +13,18 @@ import type { RecordedRide } from '@/data/ride';
 import { MAP_EVENTS } from '@/events';
 import { buildRideGpx } from '@/utils/gpx';
 import { deleteRide, renameRide } from '@/utils/ride-storage';
+import {
+  formatDuration,
+  formatDistance,
+  formatSpeed,
+  formatElevation,
+} from '@/utils/format';
 import { slugify } from '@/utils/string';
 
 interface RideDetailProps {
   ride: RecordedRide;
   onClose: () => void;
   onDeleted: () => void;
-}
-
-function formatDuration(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0)
-    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-function formatDistance(meters: number): string {
-  const miles = meters / 1609.344;
-  return `${miles.toFixed(1)} mi`;
-}
-
-function formatSpeed(mps: number): string {
-  const mph = mps * 2.23694;
-  return `${mph.toFixed(1)} mph`;
-}
-
-function formatElevation(meters: number): string {
-  const feet = meters * 3.28084;
-  return `${Math.round(feet)} ft`;
 }
 
 function downloadFile(content: string, filename: string, mimeType: string) {

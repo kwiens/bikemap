@@ -4,31 +4,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { RecordedRide, RideSummary } from '@/data/ride';
 import { MAP_EVENTS } from '@/events';
 import { getRideSummaries, loadRide } from '@/utils/ride-storage';
+import {
+  formatDistance,
+  formatDurationShort,
+  formatDate,
+} from '@/utils/format';
 import { RideDetail } from './RideDetail';
 
 export interface RideHistoryProps {
   selectedRideId: string | null;
   onRideSelect: (rideId: string) => void;
-}
-
-function formatDistance(meters: number): string {
-  const miles = meters / 1609.344;
-  return `${miles.toFixed(1)} mi`;
-}
-
-function formatDuration(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
 }
 
 export function RideHistory({
@@ -122,7 +107,7 @@ export function RideHistory({
           <div className="route-description">
             {formatDate(s.startTime)} &middot;{' '}
             {formatDistance(s.stats.distance)} &middot;{' '}
-            {formatDuration(s.stats.elapsedTime)}
+            {formatDurationShort(s.stats.elapsedTime)}
           </div>
         </div>
       ))}
