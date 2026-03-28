@@ -74,23 +74,23 @@
   color: var(--color-gray-700);
 }
 
-/* Rides Panel Toggle — below main sidebar toggle */
+/* Rides Panel Toggle — top-right corner */
 .rides-toggle-container {
   position: fixed;
-  top: 68px;
-  left: 16px;
+  top: 16px;
+  right: 16px;
   z-index: 1002;
 }
 
-/* Rides Panel — z-index 1001 so it covers the main sidebar toggle when open */
+/* Rides Panel — slides in from the right */
 .rides-panel-container {
   position: fixed;
   top: 0;
-  left: 0;
+  right: 0;
   height: 100%;
   width: 280px;
   background-color: var(--color-white);
-  box-shadow: 2px 0 5px var(--shadow-medium);
+  box-shadow: -2px 0 5px var(--shadow-medium);
   z-index: 1001;
   overflow: hidden;
   transition: transform 0.3s ease-in-out;
@@ -98,8 +98,16 @@
   flex-direction: column;
 }
 
+.rides-panel-container.sidebar-hidden {
+  transform: translateX(100%);
+}
+
+.rides-panel-container.sidebar-visible {
+  transform: translateX(0);
+}
+
 .rides-panel-header {
-  padding: 16px 16px 8px 60px;
+  padding: 16px 16px 8px 16px;
   border-bottom: 1px solid var(--color-gray-100);
 }
 
@@ -698,6 +706,10 @@
 
 .elevation-overlay-full {
   left: 16px;
+}
+
+.elevation-overlay-rides-open {
+  right: 296px;
 }
 
 @media (max-width: 768px) {

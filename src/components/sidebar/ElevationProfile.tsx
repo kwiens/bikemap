@@ -169,6 +169,7 @@ export function ElevationProfile() {
   const [locationIndex, setLocationIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [ridesPanelOpen, setRidesPanelOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   // Track whether current profile is from a route, trail, or ride selection
   const sourceRef = useRef<'trail' | 'route' | 'ride' | null>(null);
@@ -216,7 +217,7 @@ export function ElevationProfile() {
       setSidebarOpen((e as CustomEvent).detail.isOpen);
     };
     const handleRidesPanelToggle = (e: Event) => {
-      setSidebarOpen((e as CustomEvent).detail.isOpen);
+      setRidesPanelOpen((e as CustomEvent).detail.isOpen);
     };
     const handleRideSelect = (e: Event) => {
       const { rideId } = (e as CustomEvent).detail;
@@ -427,7 +428,7 @@ export function ElevationProfile() {
 
   return (
     <div
-      className={`elevation-overlay ${sidebarOpen ? 'elevation-overlay-sidebar-open' : 'elevation-overlay-full'}`}
+      className={`elevation-overlay ${sidebarOpen ? 'elevation-overlay-sidebar-open' : 'elevation-overlay-full'} ${ridesPanelOpen ? 'elevation-overlay-rides-open' : ''}`}
     >
       <div className="elevation-overlay-header">
         <span className="elevation-overlay-title">{trailName}</span>
