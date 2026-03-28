@@ -28,7 +28,7 @@ export function RideHistory({
   const [selectedRide, setSelectedRide] = useState<RecordedRide | null>(null);
 
   const refreshSummaries = useCallback(() => {
-    setSummaries(getRideSummaries());
+    getRideSummaries().then(setSummaries);
   }, []);
 
   useEffect(() => {
@@ -46,8 +46,7 @@ export function RideHistory({
 
   useEffect(() => {
     if (selectedRideId) {
-      const ride = loadRide(selectedRideId);
-      setSelectedRide(ride);
+      loadRide(selectedRideId).then(setSelectedRide);
     } else {
       setSelectedRide(null);
     }
@@ -139,23 +138,11 @@ function StorageIndicator() {
   const pct = Math.min(100, (usedKB / totalKB) * 100);
 
   return (
-    <div style={{ padding: '12px 0 4px', fontSize: '11px', color: '#6b7280' }}>
-      <div
-        style={{
-          height: 4,
-          borderRadius: 2,
-          backgroundColor: '#e5e7eb',
-          marginBottom: 4,
-        }}
-      >
+    <div className="pt-3 pb-1 text-[11px] text-gray-500">
+      <div className="h-1 rounded-sm bg-gray-200 mb-1">
         <div
-          style={{
-            height: '100%',
-            borderRadius: 2,
-            backgroundColor: pct > 80 ? '#ef4444' : '#3b82f6',
-            width: `${pct}%`,
-            transition: 'width 0.3s',
-          }}
+          className={`h-full rounded-sm transition-[width] duration-300 ${pct > 80 ? 'bg-red-500' : 'bg-blue-500'}`}
+          style={{ width: `${pct}%` }}
         />
       </div>
       <span>
