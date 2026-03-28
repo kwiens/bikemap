@@ -632,20 +632,6 @@
   background-color: var(--color-gray-50);
 }
 
-.elevation-copy-toast {
-  font-size: 11px;
-  color: var(--color-gray-600);
-  text-align: center;
-  padding: 2px 0;
-  animation: fade-in-out 2s ease-in-out;
-}
-
-@keyframes fade-in-out {
-  0% { opacity: 0; }
-  15% { opacity: 1; }
-  85% { opacity: 1; }
-  100% { opacity: 0; }
-}
 
 .elevation-overlay-title {
   font-size: 13px;
