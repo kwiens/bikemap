@@ -26,15 +26,9 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes
-        selectedRoute={null}
-        onRouteSelect={mockOnRouteSelect}
-        isExpanded={true}
-        onToggle={vi.fn()}
-      />,
+      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    expect(screen.getByText('Pick a Loop')).toBeInTheDocument();
     expect(screen.getByText('Test Route 1')).toBeInTheDocument();
     expect(screen.getByText('Test Route 2')).toBeInTheDocument();
     expect(screen.getByText('Description for route 1')).toBeInTheDocument();
@@ -45,12 +39,7 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes
-        selectedRoute={null}
-        onRouteSelect={mockOnRouteSelect}
-        isExpanded={true}
-        onToggle={vi.fn()}
-      />,
+      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
     const route1Button = screen.getByRole('button', {
@@ -66,12 +55,7 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes
-        selectedRoute={null}
-        onRouteSelect={mockOnRouteSelect}
-        isExpanded={true}
-        onToggle={vi.fn()}
-      />,
+      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
     const route2Button = screen.getByRole('button', {
@@ -87,12 +71,7 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes
-        selectedRoute={null}
-        onRouteSelect={mockOnRouteSelect}
-        isExpanded={true}
-        onToggle={vi.fn()}
-      />,
+      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
     const route1Button = screen.getByRole('button', {
@@ -108,12 +87,7 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes
-        selectedRoute="route-1"
-        onRouteSelect={mockOnRouteSelect}
-        isExpanded={true}
-        onToggle={vi.fn()}
-      />,
+      <BikeRoutes selectedRoute="route-1" onRouteSelect={mockOnRouteSelect} />,
     );
 
     const route1Button = screen.getByRole('button', {
@@ -131,12 +105,7 @@ describe('BikeRoutes', () => {
     const mockOnRouteSelect = vi.fn();
 
     render(
-      <BikeRoutes
-        selectedRoute={null}
-        onRouteSelect={mockOnRouteSelect}
-        isExpanded={true}
-        onToggle={vi.fn()}
-      />,
+      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
     const colorIndicators = document.querySelectorAll('.route-color-indicator');

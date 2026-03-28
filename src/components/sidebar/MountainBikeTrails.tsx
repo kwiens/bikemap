@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faChevronRight,
+  faChevronDown,
+} from '@fortawesome/free-solid-svg-icons';
 import { mountainBikeTrails, regionFor } from '@/data/geo_data';
 import type { MountainBikeTrailsProps } from './types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
@@ -89,8 +94,6 @@ export function MountainBikeTrails({
   selectedTrail,
   onTrailSelect,
   onAreaSelect,
-  isExpanded,
-  onToggle,
 }: MountainBikeTrailsProps) {
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(
     new Set(),
@@ -113,11 +116,6 @@ export function MountainBikeTrails({
       );
     });
   }, [searchQuery]);
-
-  // Clear search when section collapses
-  useEffect(() => {
-    if (!isExpanded) setSearchQuery('');
-  }, [isExpanded]);
 
   // Auto-expand region and area when a trail is selected
   useEffect(() => {
@@ -142,140 +140,130 @@ export function MountainBikeTrails({
 
   return (
     <div className="section-container">
-      <div
-        className="section-title section-title-clickable"
-        onClick={onToggle}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        aria-expanded={isExpanded}
-      >
-        <span className="section-title-chevron">
-          {isExpanded ? '\u25BC' : '\u25B6'}
-        </span>
-        Mountain Bike Trails
-      </div>
-      {isExpanded && (
-        <div className="section-items">
-          <div className="trail-search">
-            <input
-              ref={searchRef}
-              type="text"
-              className="trail-search-input"
-              placeholder="Search trails..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                className="trail-search-clear"
-                onClick={() => {
-                  setSearchQuery('');
-                  searchRef.current?.focus();
-                }}
-                aria-label="Clear search"
-              >
-                &times;
-              </button>
-            )}
-          </div>
-
-          {searchResults ? (
-            searchResults.length > 0 ? (
-              searchResults.map((trail) => (
-                <TrailRow
-                  key={trail.trailName}
-                  trail={trail}
-                  selectedTrail={selectedTrail}
-                  onTrailSelect={onTrailSelect}
-                />
-              ))
-            ) : (
-              <div className="trail-search-empty">No trails found</div>
-            )
-          ) : (
-            [...regionGroups.entries()].map(([region, areas]) => {
-              const isRegionExpanded = expandedRegions.has(region);
-              const regionTrailCount = regionTrailCounts.get(region) ?? 0;
-              return (
-                <React.Fragment key={region}>
-                  <div
-                    className="region-heading region-clickable"
-                    onClick={() => {
-                      toggleSet(setExpandedRegions, region);
-                      onAreaSelect(region);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        toggleSet(setExpandedRegions, region);
-                        onAreaSelect(region);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={isRegionExpanded}
-                  >
-                    <span className="region-chevron">
-                      {isRegionExpanded ? '\u25BC' : '\u25B6'}
-                    </span>
-                    {region}
-                    <span className="region-count">{regionTrailCount}</span>
-                  </div>
-                  {isRegionExpanded &&
-                    [...areas.entries()].map(([area, trails]) => {
-                      const singleArea = areas.size === 1;
-                      const isAreaExpanded =
-                        singleArea || expandedAreas.has(area);
-                      return (
-                        <React.Fragment key={area}>
-                          {!singleArea && (
-                            <div
-                              className="rec-area-heading rec-area-clickable"
-                              onClick={() => handleAreaClick(area)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  handleAreaClick(area);
-                                }
-                              }}
-                              role="button"
-                              tabIndex={0}
-                              aria-expanded={isAreaExpanded}
-                            >
-                              <span className="rec-area-chevron">
-                                {isAreaExpanded ? '\u25BC' : '\u25B6'}
-                              </span>
-                              {area}
-                              <span className="rec-area-count">
-                                {trails.length}
-                              </span>
-                            </div>
-                          )}
-                          {isAreaExpanded &&
-                            trails.map((trail) => (
-                              <TrailRow
-                                key={trail.trailName}
-                                trail={trail}
-                                selectedTrail={selectedTrail}
-                                onTrailSelect={onTrailSelect}
-                              />
-                            ))}
-                        </React.Fragment>
-                      );
-                    })}
-                </React.Fragment>
-              );
-            })
+      <div className="section-items">
+        <div className="trail-search">
+          <input
+            ref={searchRef}
+            type="text"
+            className="trail-search-input"
+            placeholder="Search trails..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              className="trail-search-clear"
+              onClick={() => {
+                setSearchQuery('');
+                searchRef.current?.focus();
+              }}
+              aria-label="Clear search"
+            >
+              &times;
+            </button>
           )}
         </div>
-      )}
+
+        {searchResults ? (
+          searchResults.length > 0 ? (
+            searchResults.map((trail) => (
+              <TrailRow
+                key={trail.trailName}
+                trail={trail}
+                selectedTrail={selectedTrail}
+                onTrailSelect={onTrailSelect}
+              />
+            ))
+          ) : (
+            <div className="trail-search-empty">No trails found</div>
+          )
+        ) : (
+          [...regionGroups.entries()].map(([region, areas]) => {
+            const isRegionExpanded = expandedRegions.has(region);
+            const regionTrailCount = regionTrailCounts.get(region) ?? 0;
+            return (
+              <React.Fragment key={region}>
+                <div
+                  className="region-heading region-clickable"
+                  onClick={() => {
+                    toggleSet(setExpandedRegions, region);
+                    onAreaSelect(region);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleSet(setExpandedRegions, region);
+                      onAreaSelect(region);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isRegionExpanded}
+                >
+                  <span className="region-chevron">
+                    <FontAwesomeIcon
+                      icon={isRegionExpanded ? faChevronDown : faChevronRight}
+                      className="text-[10px]"
+                    />
+                  </span>
+                  {region}
+                  <span className="region-count">{regionTrailCount}</span>
+                </div>
+                {isRegionExpanded &&
+                  [...areas.entries()].map(([area, trails]) => {
+                    const singleArea = areas.size === 1;
+                    const isAreaExpanded =
+                      singleArea || expandedAreas.has(area);
+                    return (
+                      <React.Fragment key={area}>
+                        {!singleArea && (
+                          <div
+                            className="rec-area-heading rec-area-clickable"
+                            onClick={() => handleAreaClick(area)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleAreaClick(area);
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            aria-expanded={isAreaExpanded}
+                          >
+                            <span className="rec-area-chevron">
+                              <FontAwesomeIcon
+                                icon={
+                                  isAreaExpanded
+                                    ? faChevronDown
+                                    : faChevronRight
+                                }
+                                className="text-[10px]"
+                              />
+                            </span>
+                            {area}
+                            <span className="rec-area-count">
+                              {trails.length}
+                            </span>
+                          </div>
+                        )}
+                        {isAreaExpanded &&
+                          trails.map((trail) => (
+                            <TrailRow
+                              key={trail.trailName}
+                              trail={trail}
+                              selectedTrail={selectedTrail}
+                              onTrailSelect={onTrailSelect}
+                            />
+                          ))}
+                      </React.Fragment>
+                    );
+                  })}
+              </React.Fragment>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

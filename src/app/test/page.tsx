@@ -471,7 +471,9 @@ export default function TestPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refreshCount = useCallback(() => {
-    setRideCount(loadAllRides().length);
+    loadAllRides()
+      .then((rides) => setRideCount(rides.length))
+      .catch(() => {});
   }, []);
 
   // Load Cherokee Loop GPX on mount
@@ -494,31 +496,31 @@ export default function TestPage() {
     refreshCount();
   }, [refreshCount]);
 
-  const handleAddExample = (track: ExampleTrack) => {
+  const handleAddExample = async (track: ExampleTrack) => {
     const points = waypointsToRidePoints(track.waypoints);
     const ride = buildRideFromPoints(track.name, points);
-    saveRide(ride);
+    await saveRide(ride);
     refreshCount();
   };
 
-  const handleAddCherokee = () => {
+  const handleAddCherokee = async () => {
     if (!cherokeePoints) return;
     const ride = buildRideFromPoints('Cherokee Loop', cherokeePoints);
-    saveRide(ride);
+    await saveRide(ride);
     refreshCount();
   };
 
-  const handleAddAll = () => {
+  const handleAddAll = async () => {
     let count = 0;
     for (const track of EXAMPLE_TRACKS) {
       const points = waypointsToRidePoints(track.waypoints);
       const ride = buildRideFromPoints(track.name, points);
-      saveRide(ride);
+      await saveRide(ride);
       count++;
     }
     if (cherokeePoints) {
       const ride = buildRideFromPoints('Cherokee Loop', cherokeePoints);
-      saveRide(ride);
+      await saveRide(ride);
       count++;
     }
     refreshCount();
@@ -526,10 +528,10 @@ export default function TestPage() {
     setTimeout(() => setBulkMsg(null), 2000);
   };
 
-  const handleClearAll = () => {
-    const rides = loadAllRides();
+  const handleClearAll = async () => {
+    const rides = await loadAllRides();
     for (const r of rides) {
-      deleteRide(r.id);
+      await deleteRide(r.id);
     }
     refreshCount();
     setBulkMsg('All rides cleared');
@@ -541,7 +543,7 @@ export default function TestPage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const xml = reader.result as string;
       const points = parseGpxToRidePoints(xml);
       if (points.length < 2) {
@@ -550,7 +552,7 @@ export default function TestPage() {
       }
       const name = file.name.replace(/\.gpx$/i, '');
       const ride = buildRideFromPoints(name, points);
-      saveRide(ride);
+      await saveRide(ride);
       refreshCount();
       setImportMsg(
         `Imported "${name}" — ${points.length} points, ${metersToMiles(ride.stats.distance)} mi`,
@@ -563,7 +565,7 @@ export default function TestPage() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const handleDrawSave = (name: string, coords: [number, number][]) => {
+  const handleDrawSave = async (name: string, coords: [number, number][]) => {
     const waypoints: [number, number, number][] = coords.map(([lng, lat]) => [
       lng,
       lat,
@@ -571,7 +573,7 @@ export default function TestPage() {
     ]);
     const points = waypointsToRidePoints(waypoints);
     const ride = buildRideFromPoints(name, points);
-    saveRide(ride);
+    await saveRide(ride);
     refreshCount();
   };
 

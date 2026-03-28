@@ -53,21 +53,10 @@ const defaultProps: MountainBikeTrailsProps = {
   selectedTrail: null,
   onTrailSelect: vi.fn(),
   onAreaSelect: vi.fn(),
-  isExpanded: true,
-  onToggle: vi.fn(),
 };
 
 describe('MountainBikeTrails', () => {
-  it('does not render trail list when collapsed', () => {
-    render(<MountainBikeTrails {...defaultProps} isExpanded={false} />);
-
-    expect(screen.getByText('Mountain Bike Trails')).toBeInTheDocument();
-    expect(screen.queryByText('Region 1')).not.toBeInTheDocument();
-    expect(screen.queryByText('Region 2')).not.toBeInTheDocument();
-    expect(screen.queryByText('Trail A')).not.toBeInTheDocument();
-  });
-
-  it('renders region headings when expanded', () => {
+  it('renders region headings', () => {
     render(<MountainBikeTrails {...defaultProps} />);
 
     expect(screen.getByText('Region 1')).toBeInTheDocument();
