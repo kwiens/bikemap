@@ -112,15 +112,17 @@ const MapboxMap = memo(function MapboxMap() {
   useEffect(() => {
     const selectHandler = (e: Event) => handleRideSelect(e as CustomEvent);
     const deselectHandler = () => handleRideDeselect();
+    const liveCoords: [number, number][] = [];
     const updateHandler = (e: Event) => {
       if (!map.current) return;
-      const { coordinates } = (e as CustomEvent).detail;
-      if (coordinates.length >= 2) {
-        updateRideLayer(map.current, coordinates);
+      const { point } = (e as CustomEvent).detail;
+      liveCoords.push(point);
+      if (liveCoords.length >= 2) {
+        updateRideLayer(map.current, liveCoords);
       }
     };
     const stopHandler = () => {
-      // Recording stopped — remove live line (ride-select will redraw the saved ride)
+      liveCoords.length = 0;
       if (map.current) removeRideLayer(map.current);
     };
 

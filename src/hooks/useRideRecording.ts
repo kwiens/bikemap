@@ -14,6 +14,7 @@ import {
   computeBounds,
   computeRideStats,
   haversineDistance,
+  MAX_ACCURACY_M,
 } from '../utils/ride-stats';
 import {
   saveRide,
@@ -203,18 +204,17 @@ export function useRideRecording(
         const prev = pointsRef.current[pointsRef.current.length - 1];
         pointsRef.current.push(point);
 
-        // Broadcast coordinates for live map line and elevation profile
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-            detail: {
-              coordinates: pointsRef.current.map((p) => [p.lng, p.lat]),
-              points: pointsRef.current,
-            },
+            detail: { point: [point.lng, point.lat] as [number, number] },
           }),
         );
 
-        // Accumulate live distance
-        if (prev && point.accuracy < 30 && prev.accuracy < 30) {
+        if (
+          prev &&
+          point.accuracy < MAX_ACCURACY_M &&
+          prev.accuracy < MAX_ACCURACY_M
+        ) {
           distanceRef.current += haversineDistance(
             prev.lat,
             prev.lng,
@@ -224,7 +224,6 @@ export function useRideRecording(
           setLiveDistance(distanceRef.current);
         }
 
-        // Accumulate live elevation gain
         if (point.altitude !== null) {
           if (prevAltRef.current !== null) {
             const delta = point.altitude - prevAltRef.current;
@@ -300,18 +299,13 @@ export function useRideRecording(
     setIsPaused(false);
   }, [isRecording]);
 
-  const stopRecording = useCallback(async (): Promise<RecordedRide | null> => {
-    if (!isRecording || pointsRef.current.length < 2) {
-      cleanup();
-      return null;
-    }
-
-    const points = [...pointsRef.current];
-    const endTime = Date.now();
+  function buildRide(
+    points: RidePoint[],
+    startTime: number,
+    endTime: number,
+  ): RecordedRide {
     const stats = computeRideStats(points);
     const bounds = computeBounds(points) ?? [0, 0, 0, 0];
-
-    // Strip accuracy/speed — only needed for stats computation above
     const storedPoints: StoredRidePoint[] = points.map(
       ({ lng, lat, altitude, timestamp }) => ({
         lng,
@@ -320,16 +314,25 @@ export function useRideRecording(
         timestamp,
       }),
     );
-
-    const ride: RecordedRide = {
+    return {
       id: crypto.randomUUID(),
-      name: generateRideName(startTimeRef.current),
-      startTime: startTimeRef.current,
+      name: generateRideName(startTime),
+      startTime,
       endTime,
       points: storedPoints,
       stats,
       bounds,
     };
+  }
+
+  const stopRecording = useCallback(async (): Promise<RecordedRide | null> => {
+    if (!isRecording || pointsRef.current.length < 2) {
+      cleanup();
+      return null;
+    }
+
+    const points = [...pointsRef.current];
+    const ride = buildRide(points, startTimeRef.current, Date.now());
 
     await saveRide(ride);
     cleanup();
@@ -343,7 +346,6 @@ export function useRideRecording(
     return ride;
   }, [isRecording, cleanup]);
 
-  // Check for recoverable in-progress ride on mount
   useEffect(() => {
     loadInProgress().then((data) => {
       if (data && data.points.length >= 2) {
@@ -360,26 +362,11 @@ export function useRideRecording(
       return null;
     }
 
-    const stats = computeRideStats(data.points);
-    const bounds = computeBounds(data.points);
-    const storedPoints: StoredRidePoint[] = data.points.map(
-      ({ lng, lat, altitude, timestamp }) => ({
-        lng,
-        lat,
-        altitude,
-        timestamp,
-      }),
+    const ride = buildRide(
+      data.points,
+      data.startTime,
+      data.points[data.points.length - 1].timestamp,
     );
-
-    const ride: RecordedRide = {
-      id: crypto.randomUUID(),
-      name: generateRideName(data.startTime),
-      startTime: data.startTime,
-      endTime: data.points[data.points.length - 1].timestamp,
-      points: storedPoints,
-      stats,
-      bounds,
-    };
 
     await saveRide(ride);
     await clearInProgress();

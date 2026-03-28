@@ -16,7 +16,7 @@ type AnyRidePoint = RidePoint | StoredRidePoint;
 const EARTH_RADIUS_M = 6371000;
 
 // Accuracy threshold: ignore points with GPS accuracy worse than this
-const MAX_ACCURACY_M = 30;
+export const MAX_ACCURACY_M = 30;
 // Speed threshold: below this is considered "stopped" (m/s, ~1.1 mph)
 const STOP_SPEED = 0.5;
 // Duration threshold: must be stopped for this long to count (ms)

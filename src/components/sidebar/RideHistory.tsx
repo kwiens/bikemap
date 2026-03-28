@@ -67,6 +67,7 @@ export function RideHistory({
 
   const handleDeleted = () => {
     setSelectedRide(null);
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
     refreshSummaries();
   };
 
