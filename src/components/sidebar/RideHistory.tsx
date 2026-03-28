@@ -117,11 +117,26 @@ export function RideHistory({
   );
 }
 
+function formatKB(kb: number): string {
+  if (kb < 1024) return `${kb} KB`;
+  if (kb < 1024 * 1024) return `${(kb / 1024).toFixed(1)} MB`;
+  return `${(kb / (1024 * 1024)).toFixed(1)} GB`;
+}
+
 function StorageIndicator() {
-  const { usedKB, totalKB } = getStorageUsage();
+  const [usage, setUsage] = useState<{
+    usedKB: number;
+    totalKB: number;
+  } | null>(null);
+
+  useEffect(() => {
+    getStorageUsage().then(setUsage);
+  }, []);
+
+  if (!usage) return null;
+
+  const { usedKB, totalKB } = usage;
   const pct = Math.min(100, (usedKB / totalKB) * 100);
-  const label =
-    usedKB < 1024 ? `${usedKB} KB` : `${(usedKB / 1024).toFixed(1)} MB`;
 
   return (
     <div style={{ padding: '12px 0 4px', fontSize: '11px', color: '#6b7280' }}>
@@ -144,7 +159,7 @@ function StorageIndicator() {
         />
       </div>
       <span>
-        {label} of {totalKB / 1024} MB used
+        {formatKB(usedKB)} of {formatKB(totalKB)} used
       </span>
     </div>
   );

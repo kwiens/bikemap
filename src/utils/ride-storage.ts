@@ -81,15 +81,31 @@ export function getRideSummaries(): RideSummary[] {
   return summaries.sort((a, b) => b.startTime - a.startTime);
 }
 
-export function getStorageUsage(): { usedKB: number; totalKB: number } {
+export async function getStorageUsage(): Promise<{
+  usedKB: number;
+  totalKB: number;
+}> {
+  // Use Storage API for accurate quota when available
+  if (navigator.storage?.estimate) {
+    const est = await navigator.storage.estimate();
+    if (est.usage !== undefined && est.quota !== undefined) {
+      return {
+        usedKB: Math.round(est.usage / 1024),
+        totalKB: Math.round(est.quota / 1024),
+      };
+    }
+  }
+
+  // Fallback: measure localStorage directly
   let usedBytes = 0;
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key) {
-      usedBytes += key.length * 2; // UTF-16
+      usedBytes += key.length;
       const val = localStorage.getItem(key);
-      if (val) usedBytes += val.length * 2;
+      if (val) usedBytes += val.length;
     }
   }
-  return { usedKB: Math.round(usedBytes / 1024), totalKB: 5120 };
+  // Most browsers allow 5-10MB; use 10MB as default
+  return { usedKB: Math.round(usedBytes / 1024), totalKB: 10240 };
 }
