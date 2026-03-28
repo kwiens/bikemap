@@ -68,24 +68,6 @@
   background-color: #e5e5e5;
 }
 
-.toggle-button.recording-active {
-  background-color: var(--color-red-primary);
-  animation: toggle-recording-pulse 1.5s ease-in-out infinite;
-}
-
-.toggle-button.recording-active:hover {
-  background-color: var(--color-red-dark);
-}
-
-.toggle-button.recording-active .toggle-button-icon {
-  color: var(--color-white);
-}
-
-@keyframes toggle-recording-pulse {
-  0%, 100% { box-shadow: 0 4px 6px var(--shadow-medium); }
-  50% { box-shadow: 0 2px 12px rgba(239, 68, 68, 0.5); }
-}
-
 .toggle-button-icon {
   width: 20px;
   height: 20px;

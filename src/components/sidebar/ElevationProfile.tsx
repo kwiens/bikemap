@@ -12,7 +12,10 @@ import { bikeRoutes } from '@/data/geo_data';
 import { slugify } from '@/utils/string';
 import { MAP_EVENTS } from '@/events';
 import { loadRide } from '@/utils/ride-storage';
-import { rideToElevationProfile } from '@/utils/ride-stats';
+import {
+  rideToElevationProfile,
+  pointsToElevationProfile,
+} from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faDownload,
@@ -248,6 +251,30 @@ export function ElevationProfile() {
         window.history.replaceState(null, '', window.location.pathname);
       }
     };
+    const handleRecordingStart = () => {
+      sourceRef.current = 'ride';
+      setTrailName('Recording');
+      setCollapsed(false);
+    };
+    const handleRecordingUpdate = (e: Event) => {
+      if (sourceRef.current !== 'ride') return;
+      const { points } = (e as CustomEvent).detail;
+      if (!points) return;
+      const elevProfile = pointsToElevationProfile(points, 'Recording');
+      if (elevProfile) {
+        setProfile(elevProfile);
+        profileRef.current = elevProfile;
+        setLoading(false);
+      }
+    };
+    const handleRecordingStop = () => {
+      if (sourceRef.current === 'ride') {
+        sourceRef.current = null;
+        setTrailName(null);
+        setProfile(null);
+        profileRef.current = null;
+      }
+    };
 
     window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
     window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
@@ -260,6 +287,18 @@ export function ElevationProfile() {
     );
     window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
     window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
+    window.addEventListener(
+      MAP_EVENTS.RIDE_RECORDING_START,
+      handleRecordingStart,
+    );
+    window.addEventListener(
+      MAP_EVENTS.RIDE_RECORDING_UPDATE,
+      handleRecordingUpdate,
+    );
+    window.addEventListener(
+      MAP_EVENTS.RIDE_RECORDING_STOP,
+      handleRecordingStop,
+    );
 
     return () => {
       window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
@@ -282,6 +321,18 @@ export function ElevationProfile() {
       );
       window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
       window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
+      window.removeEventListener(
+        MAP_EVENTS.RIDE_RECORDING_START,
+        handleRecordingStart,
+      );
+      window.removeEventListener(
+        MAP_EVENTS.RIDE_RECORDING_UPDATE,
+        handleRecordingUpdate,
+      );
+      window.removeEventListener(
+        MAP_EVENTS.RIDE_RECORDING_STOP,
+        handleRecordingStop,
+      );
     };
   }, []);
 

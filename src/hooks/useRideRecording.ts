@@ -203,11 +203,12 @@ export function useRideRecording(
         const prev = pointsRef.current[pointsRef.current.length - 1];
         pointsRef.current.push(point);
 
-        // Broadcast coordinates for live map line
+        // Broadcast coordinates for live map line and elevation profile
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
             detail: {
               coordinates: pointsRef.current.map((p) => [p.lng, p.lat]),
+              points: pointsRef.current,
             },
           }),
         );

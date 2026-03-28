@@ -21,8 +21,8 @@ const config: Config = {
           },
         },
         'recording-pulse': {
-          '0%, 100%': { boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
-          '50%': { boxShadow: '0 2px 12px rgba(239, 68, 68, 0.5)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(239, 68, 68, 0.4)' },
+          '50%': { boxShadow: '0 0 16px 6px rgba(239, 68, 68, 0.6)' },
         },
         'toast-slide-in': {
           from: { opacity: '0', transform: 'translateY(-4px)' },

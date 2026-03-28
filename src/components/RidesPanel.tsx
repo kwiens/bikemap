@@ -151,7 +151,9 @@ export function RidesPanel() {
           className={cn(
             'toggle-button',
             isRecording &&
+              !isOpen &&
               'animate-recording-pulse [&_.toggle-button-icon]:text-red-500',
+            isRecording && isOpen && '[&_.toggle-button-icon]:text-red-500',
           )}
           type="button"
           aria-label={isOpen ? 'Close rides panel' : 'Open rides panel'}
@@ -205,7 +207,7 @@ export function RidesPanel() {
         className={cn(
           'fixed top-0 right-0 h-full w-[280px] bg-white shadow-[-2px_0_5px_rgba(0,0,0,0.1)] z-[1700] overflow-hidden transition-transform duration-300 ease-in-out flex flex-col',
           'max-md:w-full max-md:max-w-[320px]',
-          isOpen ? 'translate-x-0' : 'translate-x-full',
+          isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
         )}
       >
         <div className="px-4 pt-4 pb-2 border-b border-gray-200">
