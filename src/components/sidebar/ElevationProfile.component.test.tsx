@@ -95,9 +95,7 @@ describe('ElevationProfile component', () => {
       window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
     });
 
-    await waitFor(() => {
-      expect(screen.queryByText('Test Trail')).not.toBeInTheDocument();
-    });
+    expect(screen.queryByText('Test Trail')).not.toBeInTheDocument();
   });
 
   it('trail-sourced profile survives route-select event', async () => {

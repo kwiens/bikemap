@@ -131,35 +131,39 @@ describe('useRideRecording', () => {
     const events: string[] = [];
     const handler = (e: Event) => events.push(e.type);
     window.addEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
+    try {
+      const { result } = renderHook(() => useRideRecording());
 
-    const { result } = renderHook(() => useRideRecording());
+      act(() => {
+        result.current.startRecording();
+      });
 
-    act(() => {
-      result.current.startRecording();
-    });
-
-    expect(events).toContain(MAP_EVENTS.RIDE_RECORDING_START);
-    window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
+      expect(events).toContain(MAP_EVENTS.RIDE_RECORDING_START);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
+    }
   });
 
   it('dispatches RIDE_RECORDING_UPDATE on GPS position', () => {
     const events: CustomEvent[] = [];
     const handler = (e: Event) => events.push(e as CustomEvent);
     window.addEventListener(MAP_EVENTS.RIDE_RECORDING_UPDATE, handler);
+    try {
+      const { result } = renderHook(() => useRideRecording());
 
-    const { result } = renderHook(() => useRideRecording());
+      act(() => {
+        result.current.startRecording();
+      });
 
-    act(() => {
-      result.current.startRecording();
-    });
+      act(() => {
+        simulatePosition(-85.3, 35.0);
+      });
 
-    act(() => {
-      simulatePosition(-85.3, 35.0);
-    });
-
-    expect(events).toHaveLength(1);
-    expect(events[0].detail.point).toEqual([-85.3, 35.0]);
-    window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_UPDATE, handler);
+      expect(events).toHaveLength(1);
+      expect(events[0].detail.point).toEqual([-85.3, 35.0]);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_UPDATE, handler);
+    }
   });
 
   it('pause and resume toggle isPaused', () => {

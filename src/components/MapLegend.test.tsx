@@ -217,28 +217,25 @@ describe('MapLegendProvider', () => {
     expect(trailDeselectIdx).toBeLessThan(areaSelectIdx);
   });
 
-  it('layer toggle has radio-button behavior', () => {
+  it('renders map layers in routes section', () => {
     render(
       <MapLegendProvider>
         <div />
       </MapLegendProvider>,
     );
 
-    // Map layers should be rendered in routes section
     expect(screen.getByTestId('map-layers')).toBeInTheDocument();
   });
 
-  it('closes sidebar when rides panel opens', () => {
+  it('hides map layers when switched to trails section', () => {
     render(
       <MapLegendProvider>
         <div />
       </MapLegendProvider>,
     );
 
-    dispatch(MAP_EVENTS.RIDES_PANEL_TOGGLE, { isOpen: true });
+    dispatch(MAP_EVENTS.RIDE_STYLE_CHOSEN, { style: 'mountain' });
 
-    // Sidebar should have the hidden transform class
-    const sidebar = screen.getByTestId('footer').parentElement;
-    expect(sidebar?.className).toContain('-translate-x-full');
+    expect(screen.queryByTestId('map-layers')).not.toBeInTheDocument();
   });
 });

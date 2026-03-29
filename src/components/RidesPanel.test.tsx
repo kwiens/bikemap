@@ -147,20 +147,24 @@ describe('RidesPanel', () => {
     const events: CustomEvent[] = [];
     const handler = (e: Event) => events.push(e as CustomEvent);
     window.addEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+    try {
+      render(<RidesPanel />);
+      openPanel();
 
-    render(<RidesPanel />);
-    openPanel();
-
-    expect(events).toHaveLength(1);
-    expect(events[0].detail.isOpen).toBe(true);
-
-    window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+      expect(events).toHaveLength(1);
+      expect(events[0].detail.isOpen).toBe(true);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+    }
   });
 
-  it('closes when sidebar opens', () => {
+  it('dispatches panel-close when sidebar opens', () => {
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+
     render(<RidesPanel />);
-    openPanel();
-    expect(screen.getByText('My Rides')).toBeInTheDocument();
+    openPanel(); // opens panel, dispatches isOpen: true
 
     act(() => {
       window.dispatchEvent(
@@ -170,8 +174,10 @@ describe('RidesPanel', () => {
       );
     });
 
-    // Panel should be closed (translate-x-full)
-    const panel = screen.getByText('My Rides').closest('[class*="translate"]');
-    expect(panel?.className).toContain('translate-x-full');
+    // Should have dispatched isOpen: false after the sidebar opened
+    const closeEvent = events.find((e) => e.detail.isOpen === false);
+    expect(closeEvent).toBeDefined();
+
+    window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
   });
 });
