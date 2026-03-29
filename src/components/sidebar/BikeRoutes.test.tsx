@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BikeRoutes } from './BikeRoutes';
 
-// Mock the geo_data module
 vi.mock('@/data/geo_data', () => ({
   bikeRoutes: [
     {
@@ -22,12 +21,8 @@ vi.mock('@/data/geo_data', () => ({
 }));
 
 describe('BikeRoutes', () => {
-  it('should render all routes', () => {
-    const mockOnRouteSelect = vi.fn();
-
-    render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
-    );
+  it('renders all routes with descriptions', () => {
+    render(<BikeRoutes selectedRoute={null} onRouteSelect={vi.fn()} />);
 
     expect(screen.getByText('Test Route 1')).toBeInTheDocument();
     expect(screen.getByText('Test Route 2')).toBeInTheDocument();
@@ -35,69 +30,27 @@ describe('BikeRoutes', () => {
     expect(screen.getByText('Description for route 2')).toBeInTheDocument();
   });
 
-  it('should call onRouteSelect when route is clicked', () => {
-    const mockOnRouteSelect = vi.fn();
+  it.each([
+    ['click', 'click', {}],
+    ['Enter key', 'keyDown', { key: 'Enter' }],
+    ['Space key', 'keyDown', { key: ' ' }],
+  ])('calls onRouteSelect on %s', (_label, event, eventArgs) => {
+    const onRouteSelect = vi.fn();
+    render(<BikeRoutes selectedRoute={null} onRouteSelect={onRouteSelect} />);
 
-    render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
-    );
+    const button = screen.getByRole('button', { name: /test route 1/i });
+    fireEvent[event as 'click' | 'keyDown'](button, eventArgs);
 
-    const route1Button = screen.getByRole('button', {
-      name: /test route 1/i,
-    });
-
-    fireEvent.click(route1Button);
-
-    expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
+    expect(onRouteSelect).toHaveBeenCalledWith('route-1');
   });
 
-  it('should call onRouteSelect on Enter key press', () => {
-    const mockOnRouteSelect = vi.fn();
+  it('highlights selected route with data-selected attribute', () => {
+    render(<BikeRoutes selectedRoute="route-1" onRouteSelect={vi.fn()} />);
 
-    render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
-    );
+    const route1 = screen.getByRole('button', { name: /test route 1/i });
+    const route2 = screen.getByRole('button', { name: /test route 2/i });
 
-    const route2Button = screen.getByRole('button', {
-      name: /test route 2/i,
-    });
-
-    fireEvent.keyDown(route2Button, { key: 'Enter' });
-
-    expect(mockOnRouteSelect).toHaveBeenCalledWith('route-2');
-  });
-
-  it('should call onRouteSelect on Space key press', () => {
-    const mockOnRouteSelect = vi.fn();
-
-    render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
-    );
-
-    const route1Button = screen.getByRole('button', {
-      name: /test route 1/i,
-    });
-
-    fireEvent.keyDown(route1Button, { key: ' ' });
-
-    expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
-  });
-
-  it('should highlight selected route', () => {
-    const mockOnRouteSelect = vi.fn();
-
-    render(
-      <BikeRoutes selectedRoute="route-1" onRouteSelect={mockOnRouteSelect} />,
-    );
-
-    const route1Button = screen.getByRole('button', {
-      name: /test route 1/i,
-    });
-    const route2Button = screen.getByRole('button', {
-      name: /test route 2/i,
-    });
-
-    expect(route1Button).toHaveAttribute('data-selected');
-    expect(route2Button).not.toHaveAttribute('data-selected');
+    expect(route1).toHaveAttribute('data-selected');
+    expect(route2).not.toHaveAttribute('data-selected');
   });
 });
