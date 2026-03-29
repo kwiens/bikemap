@@ -8,9 +8,13 @@ import {
 import { TRAIL_METADATA, RATING_COLORS } from '@/data/trail-metadata';
 import { mockMap, mockMountainBikeTrail } from '@/test/fixtures';
 
+function mapWithLayers() {
+  return mockMap({ getLayer: vi.fn().mockReturnValue({ id: 'stub' }) });
+}
+
 describe('updateMtnBikeOpacity', () => {
   it('sets conditional expressions when a trail is selected', () => {
-    const map = mockMap();
+    const map = mapWithLayers();
 
     updateMtnBikeOpacity(map, 'Five Points');
 
@@ -27,7 +31,7 @@ describe('updateMtnBikeOpacity', () => {
   });
 
   it('resets to default opacity and width when selectedTrailName is null', () => {
-    const map = mockMap();
+    const map = mapWithLayers();
 
     updateMtnBikeOpacity(map, null);
 
@@ -59,7 +63,7 @@ describe('updateMtnBikeOpacity', () => {
   });
 
   it('updates casing and glow layers when they exist and trail is selected', () => {
-    const map = mockMap();
+    const map = mapWithLayers();
 
     updateMtnBikeOpacity(map, 'Five Points');
 
@@ -102,7 +106,7 @@ describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
 
 describe('highlightMtnBikeArea', () => {
   it('highlights trails matching by recArea', () => {
-    const map = mockMap();
+    const map = mapWithLayers();
     const trails = [
       mockMountainBikeTrail({
         trailName: 'Trail A',
@@ -197,7 +201,7 @@ describe('TRAIL_METADATA', () => {
 
 describe('initMtnBikeColors', () => {
   it('sets line-color on all existing trail layers', () => {
-    const map = mockMap();
+    const map = mapWithLayers();
 
     initMtnBikeColors(map);
 

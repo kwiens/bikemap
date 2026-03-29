@@ -1,15 +1,17 @@
 import { vi } from 'vitest';
+import { act } from '@testing-library/react';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import type { RidePoint, StoredRidePoint } from '@/data/ride';
 import type mapboxgl from 'mapbox-gl';
 
 const STUB_ICON = {} as IconDefinition;
+const FIXED_TIMESTAMP = 1700000000000;
 
 export function mockMap(overrides: Record<string, unknown> = {}): mapboxgl.Map {
   return {
     setPaintProperty: vi.fn(),
-    getLayer: vi.fn().mockReturnValue({ id: 'stub' }),
+    getLayer: vi.fn().mockReturnValue(undefined),
     getSource: vi.fn(),
     addLayer: vi.fn(),
     addSource: vi.fn(),
@@ -56,7 +58,7 @@ export function mockRidePoint(overrides: Partial<RidePoint> = {}): RidePoint {
     altitude: 200,
     accuracy: 5,
     speed: 3.5,
-    timestamp: Date.now(),
+    timestamp: FIXED_TIMESTAMP,
     ...overrides,
   };
 }
@@ -68,9 +70,7 @@ export function mockStoredRidePoint(
     lng: -85.3,
     lat: 35.0,
     altitude: 200,
-    accuracy: 5,
-    speed: 3.5,
-    timestamp: Date.now(),
+    timestamp: FIXED_TIMESTAMP,
     ...overrides,
   };
 }
@@ -85,4 +85,13 @@ export function mockBounds(
     getSouth: () => 34.8,
     ...overrides,
   } as mapboxgl.LngLatBounds;
+}
+
+export function dispatch(
+  event: string,
+  detail?: Record<string, unknown>,
+): void {
+  act(() => {
+    window.dispatchEvent(new CustomEvent(event, { detail }));
+  });
 }
