@@ -177,6 +177,15 @@ export function initTrailBoundsFromDefaults(trails: MountainBikeTrail[]): void {
   }
 }
 
+export function initRouteBoundsFromDefaults(routes: BikeRoute[]): void {
+  for (const route of routes) {
+    if (!route.bounds && route.defaultBounds) {
+      const [swLng, swLat, neLng, neLat] = route.defaultBounds;
+      route.bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+    }
+  }
+}
+
 export function getAreaBounds(
   trails: MountainBikeTrail[],
   areaName: string,
@@ -503,6 +512,62 @@ export function highlightMtnBikeArea(
       console.error('Error highlighting mountain bike area:', error);
     }
   }
+}
+
+// Recorded ride layer management
+const RIDE_SOURCE_ID = 'recorded-ride';
+const RIDE_LINE_ID = 'recorded-ride-line';
+const RIDE_LINE_COLOR = '#ff6b35';
+
+export function addRideLayer(
+  map: mapboxgl.Map,
+  coordinates: [number, number][],
+): void {
+  removeRideLayer(map);
+
+  map.addSource(RIDE_SOURCE_ID, {
+    type: 'geojson',
+    data: {
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates },
+    },
+  });
+
+  map.addLayer({
+    id: RIDE_LINE_ID,
+    type: 'line',
+    source: RIDE_SOURCE_ID,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': RIDE_LINE_COLOR,
+      'line-width': 4,
+      'line-opacity': 0.85,
+    },
+  });
+}
+
+export function updateRideLayer(
+  map: mapboxgl.Map,
+  coordinates: [number, number][],
+): void {
+  const source = map.getSource(RIDE_SOURCE_ID) as
+    | mapboxgl.GeoJSONSource
+    | undefined;
+  if (source) {
+    source.setData({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates },
+    });
+  } else {
+    addRideLayer(map, coordinates);
+  }
+}
+
+export function removeRideLayer(map: mapboxgl.Map): void {
+  if (map.getLayer(RIDE_LINE_ID)) map.removeLayer(RIDE_LINE_ID);
+  if (map.getSource(RIDE_SOURCE_ID)) map.removeSource(RIDE_SOURCE_ID);
 }
 
 // Geocoding utility

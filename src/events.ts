@@ -11,4 +11,10 @@ export const MAP_EVENTS = {
   ELEVATION_HOVER: 'elevation-hover',
   LOCATION_UPDATE: 'location-update',
   RIDE_STYLE_CHOSEN: 'ride-style-chosen',
+  RIDE_RECORDING_START: 'ride-recording-start',
+  RIDE_RECORDING_STOP: 'ride-recording-stop',
+  RIDE_RECORDING_UPDATE: 'ride-recording-update',
+  RIDE_SELECT: 'ride-select',
+  RIDE_DESELECT: 'ride-deselect',
+  RIDES_PANEL_TOGGLE: 'rides-panel-toggle',
 } as const;

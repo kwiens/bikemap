@@ -1,5 +1,7 @@
-// GPX 1.1 generation from GeoJSON features
+// GPX 1.1 generation from GeoJSON features and recorded rides
 // Spec: https://www.topografix.com/gpx/1/1/
+
+import type { StoredRidePoint } from '../data/ride';
 
 function escapeXml(str: string): string {
   return str
@@ -53,6 +55,43 @@ export interface GpxRoute {
   name: string;
   description: string;
   features: GeoJSON.Feature[];
+}
+
+export interface RideGpxInput {
+  name: string;
+  points: StoredRidePoint[];
+}
+
+export function buildRideGpx(input: RideGpxInput): string {
+  const trkpts = input.points
+    .map((p) => {
+      const children: string[] = [];
+      if (p.altitude !== null) {
+        children.push(`        <ele>${p.altitude.toFixed(1)}</ele>`);
+      }
+      children.push(
+        `        <time>${new Date(p.timestamp).toISOString()}</time>`,
+      );
+      return `      <trkpt lat="${p.lat}" lon="${p.lng}">\n${children.join('\n')}\n      </trkpt>`;
+    })
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
+     version="1.1"
+     creator="Bike Chattanooga">
+  <metadata>
+    <name>${escapeXml(input.name)}</name>
+  </metadata>
+  <trk>
+    <name>${escapeXml(input.name)}</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>`;
 }
 
 export function buildGpx(routes: GpxRoute[]): string | null {

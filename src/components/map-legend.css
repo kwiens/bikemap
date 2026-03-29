@@ -94,14 +94,14 @@
 }
 
 .sidebar-inner-content {
-  padding: 16px;
+  padding: 8px 16px 16px;
 }
 
 .sidebar-header {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 23.5px 16px;
+  padding: 17px 16px 12px 68px;
   border-bottom: 1px solid var(--color-gray-100);
   background-color: var(--color-gray-50);
 }
@@ -539,8 +539,7 @@
   border-radius: 4px;
   padding: 8px 4px 4px 16px;
   display: flex;
-  align-items: center;
-  white-space: nowrap;
+  align-items: baseline;
 }
 
 .rec-area-clickable:hover {
@@ -572,19 +571,23 @@
 /* Elevation profile overlay */
 .elevation-overlay {
   position: absolute;
-  bottom: 16px;
+  bottom: 4px;
   left: 296px;
   right: 16px;
   background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   padding: 10px 16px 6px;
-  z-index: 1000;
+  z-index: 1700;
   pointer-events: auto;
 }
 
 .elevation-overlay-full {
   left: 16px;
+}
+
+.elevation-overlay-rides-open {
+  right: 296px;
 }
 
 @media (max-width: 768px) {
@@ -790,12 +793,6 @@
   }
 }
 
-/* Desktop responsiveness */
-@media (min-width: 769px) {
-  .sidebar-header {
-    padding-left: 60px;
-  }
-}
 
 .icon-purple {
   color: var(--color-purple-primary);
@@ -851,3 +848,4 @@
   color: var(--color-red-500);
   font-weight: 500;
 }
+

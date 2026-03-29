@@ -120,6 +120,16 @@ When trails are added or modified in the Mapbox tileset, run `scripts/add_trail_
 - Use existing icon libraries (Font Awesome or lucide-react) - don't add new ones
 - Directories use lowercase-dash naming
 
+### Styling with Tailwind CSS
+
+Use Tailwind utility classes for all new component styling. Do not add new custom CSS classes to `map-legend.css` or other stylesheets.
+
+- **Use `cn()` from `@/lib/utils`** (clsx + tailwind-merge) for conditional classes: `className={cn('base-classes', condition && 'conditional-classes')}`
+- **Existing shared CSS classes** (`toggle-button`, `route-item`, `card-header`, `section-items`, `sidebar-container`, `sidebar-visible`, `sidebar-hidden`, etc.) are used across multiple components in `map-legend.css` — continue using them as-is. Only add Tailwind to new or component-specific styling.
+- **Custom animations** go in `tailwind.config.ts` under `theme.extend.keyframes` and `theme.extend.animation`, not in CSS `@keyframes`.
+- **Use standard Tailwind colors** (e.g., `text-gray-500`, `bg-red-500`) instead of CSS variables like `var(--color-gray-500)` for new code. The CSS variables in `map-legend.css` exist for legacy/shared classes.
+- **Dynamic values** that can't be expressed as Tailwind classes (e.g., computed widths from JS) can use `style={{}}` for that single property. Everything else should be Tailwind.
+
 ## Testing
 
 ### Unit Tests

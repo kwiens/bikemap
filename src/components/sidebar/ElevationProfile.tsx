@@ -8,7 +8,6 @@ import React, {
   useRef,
 } from 'react';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
-import { bikeRoutes } from '@/data/geo_data';
 import { slugify } from '@/utils/string';
 import { MAP_EVENTS } from '@/events';
 import { loadRide } from '@/utils/ride-storage';
@@ -169,6 +168,7 @@ export function ElevationProfile() {
   const [locationIndex, setLocationIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [ridesPanelOpen, setRidesPanelOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   // Track whether current profile is from a route, trail, or ride selection
   const sourceRef = useRef<'trail' | 'route' | 'ride' | null>(null);
@@ -184,18 +184,13 @@ export function ElevationProfile() {
       setTrailName(name);
       window.history.replaceState(null, '', `?trail=${slugify(name)}`);
     };
-    const handleRouteSelect = (e: Event) => {
-      const { routeId } = (e as CustomEvent).detail;
-      if (routeId === 'Chatt_TPL_Trails-public') {
+    const handleRouteSelect = () => {
+      // Routes don't show elevation profiles — only trails and recorded rides do
+      if (sourceRef.current === 'route') {
         sourceRef.current = null;
         setTrailName(null);
-        return;
-      }
-      const route = bikeRoutes.find((r) => r.id === routeId);
-      sourceRef.current = 'route';
-      setTrailName(route?.name ?? null);
-      if (route) {
-        window.history.replaceState(null, '', `?route=${slugify(route.name)}`);
+        setProfile(null);
+        profileRef.current = null;
       }
     };
     const handleTrailDeselect = () => {
@@ -215,10 +210,15 @@ export function ElevationProfile() {
     const handleSidebarToggle = (e: Event) => {
       setSidebarOpen((e as CustomEvent).detail.isOpen);
     };
-    const handleRideSelect = (e: Event) => {
+    const handleRidesPanelToggle = (e: Event) => {
+      setRidesPanelOpen((e as CustomEvent).detail.isOpen);
+    };
+    let latestRideId: string | null = null;
+    const handleRideSelect = async (e: Event) => {
       const { rideId } = (e as CustomEvent).detail;
-      const ride = loadRide(rideId);
-      if (!ride) return;
+      latestRideId = rideId;
+      const ride = await loadRide(rideId);
+      if (!ride || latestRideId !== rideId) return; // stale check
       const elevProfile = rideToElevationProfile(ride);
       sourceRef.current = 'ride';
       if (elevProfile) {
@@ -244,14 +244,39 @@ export function ElevationProfile() {
         window.history.replaceState(null, '', window.location.pathname);
       }
     };
+    const handleRecordingStart = () => {
+      sourceRef.current = 'ride';
+      setTrailName('Recording');
+      setCollapsed(false);
+    };
+    const handleRecordingStop = () => {
+      if (sourceRef.current === 'ride') {
+        sourceRef.current = null;
+        setTrailName(null);
+        setProfile(null);
+        profileRef.current = null;
+      }
+    };
 
     window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
     window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
     window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
     window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
+    window.addEventListener(
+      MAP_EVENTS.RIDES_PANEL_TOGGLE,
+      handleRidesPanelToggle,
+    );
     window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
     window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
+    window.addEventListener(
+      MAP_EVENTS.RIDE_RECORDING_START,
+      handleRecordingStart,
+    );
+    window.addEventListener(
+      MAP_EVENTS.RIDE_RECORDING_STOP,
+      handleRecordingStop,
+    );
 
     return () => {
       window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
@@ -268,8 +293,20 @@ export function ElevationProfile() {
         MAP_EVENTS.SIDEBAR_TOGGLE,
         handleSidebarToggle,
       );
+      window.removeEventListener(
+        MAP_EVENTS.RIDES_PANEL_TOGGLE,
+        handleRidesPanelToggle,
+      );
       window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
       window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
+      window.removeEventListener(
+        MAP_EVENTS.RIDE_RECORDING_START,
+        handleRecordingStart,
+      );
+      window.removeEventListener(
+        MAP_EVENTS.RIDE_RECORDING_STOP,
+        handleRecordingStop,
+      );
     };
   }, []);
 
@@ -416,7 +453,7 @@ export function ElevationProfile() {
 
   return (
     <div
-      className={`elevation-overlay ${sidebarOpen ? 'elevation-overlay-sidebar-open' : 'elevation-overlay-full'}`}
+      className={`elevation-overlay ${sidebarOpen ? 'elevation-overlay-sidebar-open' : 'elevation-overlay-full'} ${ridesPanelOpen ? 'elevation-overlay-rides-open' : ''}`}
     >
       <div className="elevation-overlay-header">
         <span className="elevation-overlay-title">{trailName}</span>

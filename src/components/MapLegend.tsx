@@ -6,7 +6,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
 
 import {
-  SidebarHeader,
   BikeRoutes,
   MountainBikeTrails,
   MapLayers,
@@ -268,6 +267,19 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Close when rides panel opens
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { isOpen: panelOpen } = (e as CustomEvent).detail;
+      if (panelOpen && isOpenRef.current) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+    return () =>
+      window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+  }, []);
+
   return (
     <>
       {children}
@@ -292,19 +304,35 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         ref={sidebarRef}
         className={`sidebar-container ${isOpen ? 'sidebar-visible' : 'sidebar-hidden'}`}
       >
-        <SidebarHeader />
+        {/* Casual / MTB toggle in header */}
+        <div className="sidebar-header">
+          <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
+            <button
+              type="button"
+              className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors ${activeSection === 'routes' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveSection('routes')}
+            >
+              Casual
+            </button>
+            <button
+              type="button"
+              className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors ${activeSection === 'trails' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveSection('trails')}
+            >
+              MTB
+            </button>
+          </div>
+        </div>
 
         <div className="sidebar-content">
           <div className="sidebar-inner-content">
-            <BikeRoutes
-              selectedRoute={selectedRoute}
-              onRouteSelect={handleRouteSelect}
-              isExpanded={activeSection === 'routes'}
-              onToggle={() => setActiveSection('routes')}
-            />
-
             {activeSection === 'routes' && (
               <>
+                <BikeRoutes
+                  selectedRoute={selectedRoute}
+                  onRouteSelect={handleRouteSelect}
+                />
+
                 <MapLayers
                   showAttractions={showAttractions}
                   showBikeResources={showBikeResources}
@@ -331,13 +359,13 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
               </>
             )}
 
-            <MountainBikeTrails
-              selectedTrail={selectedTrail}
-              onTrailSelect={handleTrailSelect}
-              onAreaSelect={handleAreaSelect}
-              isExpanded={activeSection === 'trails'}
-              onToggle={() => setActiveSection('trails')}
-            />
+            {activeSection === 'trails' && (
+              <MountainBikeTrails
+                selectedTrail={selectedTrail}
+                onTrailSelect={handleTrailSelect}
+                onAreaSelect={handleAreaSelect}
+              />
+            )}
 
             <InformationSection />
           </div>

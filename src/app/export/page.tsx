@@ -9,22 +9,13 @@ import { mapConfig } from '@/config/map.config';
 import { buildSvg } from '@/utils/svg';
 import { buildGpx } from '@/utils/gpx';
 import { slugify } from '@/utils/string';
+import { downloadFile } from '@/utils/format';
 
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
 
 interface RouteFeatures {
   routeId: string;
   features: GeoJSON.Feature[];
-}
-
-function downloadFile(content: string, filename: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 const buttonStyle: React.CSSProperties = {

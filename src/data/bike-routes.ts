@@ -11,7 +11,8 @@ export interface BikeRoute {
   icon: IconDefinition; // Route icon
   defaultWidth: number; // Default line width
   opacity: number; // Line opacity (0-1)
-  bounds?: mapboxgl.LngLatBounds; // Optional bounds of the route
+  defaultBounds?: [number, number, number, number]; // [swLng, swLat, neLng, neLat] fallback
+  bounds?: mapboxgl.LngLatBounds; // Runtime-calculated bounds
 }
 
 export const bikeRoutes: BikeRoute[] = [
@@ -23,6 +24,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    defaultBounds: [-85.326925, 35.028003, -85.301479, 35.061734],
   },
   {
     id: 'zoo-loop-v2-full-public',
@@ -33,6 +35,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    defaultBounds: [-85.307614, 35.037548, -85.281097, 35.061733],
   },
   {
     id: 'Riverwalk_trail-test-public',
@@ -43,6 +46,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    defaultBounds: [-85.328424, 35.009749, -85.230088, 35.102443],
   },
   {
     id: 'South_Chick_GreenWay-public',
@@ -52,6 +56,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    defaultBounds: [-85.260157, 35.042472, -85.212365, 35.089989],
   },
   {
     id: 'cherokeeloop',
@@ -61,6 +66,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    defaultBounds: [-85.320807, 35.060177, -85.300536, 35.089277],
   },
   {
     id: 'Moccasin Bend Route',
@@ -70,5 +76,6 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    defaultBounds: [-85.333107, 35.052837, -85.305119, 35.062845],
   },
 ];

@@ -17,8 +17,6 @@ export interface ToggleSwitchProps {
 export interface BikeRoutesProps {
   selectedRoute: string | null;
   onRouteSelect: (routeId: string) => void;
-  isExpanded: boolean;
-  onToggle: () => void;
 }
 
 export interface MapLayersProps {
@@ -49,8 +47,6 @@ export interface MountainBikeTrailsProps {
   selectedTrail: string | null;
   onTrailSelect: (trailName: string) => void;
   onAreaSelect: (areaName: string) => void;
-  isExpanded: boolean;
-  onToggle: () => void;
 }
 
 export interface ExternalLinkProps {
