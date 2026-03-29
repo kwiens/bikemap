@@ -20,7 +20,7 @@ export const localResources: LocalResource[] = [
     name: 'About This Map',
     description:
       'This map is a guide to the best bike routes in Chattanooga. Made with ❤️ by iFixit, the free repair guide for every thing.',
-    url: 'https://www.ifixit.com',
+    url: '/about',
     icon: faInfoCircle,
     colorTheme: 'gray',
     secondaryDescription:

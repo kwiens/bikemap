@@ -14,11 +14,11 @@ function ExternalLink({
   href: string;
   children: React.ReactNode;
 }) {
+  const isExternal = href.startsWith('http');
   return (
     <a
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+      {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
       className="text-blue-500 no-underline font-medium hover:underline"
     >
       {children}
