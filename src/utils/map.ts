@@ -177,6 +177,15 @@ export function initTrailBoundsFromDefaults(trails: MountainBikeTrail[]): void {
   }
 }
 
+export function initRouteBoundsFromDefaults(routes: BikeRoute[]): void {
+  for (const route of routes) {
+    if (!route.bounds && route.defaultBounds) {
+      const [swLng, swLat, neLng, neLat] = route.defaultBounds;
+      route.bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+    }
+  }
+}
+
 export function getAreaBounds(
   trails: MountainBikeTrail[],
   areaName: string,

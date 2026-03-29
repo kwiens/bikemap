@@ -35,6 +35,7 @@ import {
   findLocationInArray,
   calculateTrailBounds,
   initTrailBoundsFromDefaults,
+  initRouteBoundsFromDefaults,
   getAreaBounds,
   updateMtnBikeOpacity,
   highlightMtnBikeArea,
@@ -750,6 +751,9 @@ const MapboxMap = memo(function MapboxMap() {
               newMap.getCanvas().style.cursor = '';
             });
           });
+
+          // Fill in default bounds for any routes that couldn't be calculated at runtime
+          initRouteBoundsFromDefaults(bikeRoutes);
 
           // Initialize all mountain bike trail layers
           initMtnBikeColors(newMap);

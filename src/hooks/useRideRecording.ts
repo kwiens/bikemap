@@ -113,6 +113,16 @@ export function useRideRecording(
       document.removeEventListener('visibilitychange', handleVisibility);
   }, [isRecording, acquireWakeLock, onNotify]);
 
+  // Warn before closing tab while recording
+  useEffect(() => {
+    if (!isRecording) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isRecording]);
+
   const cleanup = useCallback(() => {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
@@ -273,7 +283,7 @@ export function useRideRecording(
           points: pointsRef.current,
         });
       }
-    }, 30_000);
+    }, 10_000);
 
     window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
   }, [isRecording, acquireWakeLock, cleanup, onNotify]);
