@@ -407,15 +407,17 @@ const MapboxMap = memo(function MapboxMap() {
       }
     }
 
-    // Reset route opacity and dispatch event when any layer is toggled on
     if (visible) {
       updateRouteOpacity(map.current, bikeRoutes, null, {
         selected: 0.1,
         unselected: 0.1,
       });
-
-      // Dispatch event to notify the MapLegend component
       window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
+    } else {
+      updateRouteOpacity(map.current, bikeRoutes, null, {
+        selected: 1,
+        unselected: 1,
+      });
     }
   }, []);
 
