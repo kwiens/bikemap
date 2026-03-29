@@ -219,19 +219,18 @@ export function RidesPanel() {
           </h2>
         </div>
 
-        {toastMessage && (
-          <div
-            className={cn(
-              'mx-4 mt-2 px-3 py-2 bg-gray-700 text-white rounded-md text-[13px] text-center animate-toast-slide-in',
-              toastFadingOut &&
-                'opacity-0 transition-opacity duration-300 ease-in',
-            )}
-          >
-            {toastMessage}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="relative flex-1 overflow-y-auto px-4 py-3">
+          {toastMessage && (
+            <div
+              className={cn(
+                'absolute top-2 left-4 right-4 px-3 py-2 bg-gray-700 text-white rounded-md text-[13px] text-center animate-toast-slide-in z-10',
+                toastFadingOut &&
+                  'opacity-0 transition-opacity duration-300 ease-in',
+              )}
+            >
+              {toastMessage}
+            </div>
+          )}
           {hasRecovery && !isRecording && (
             <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
               <p className="font-medium text-amber-800 mb-2">
