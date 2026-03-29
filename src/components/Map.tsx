@@ -107,6 +107,10 @@ const MapboxMap = memo(function MapboxMap() {
   const handleRideDeselect = useCallback(() => {
     if (!map.current) return;
     removeRideLayer(map.current);
+    updateRouteOpacity(map.current, bikeRoutes, null, {
+      selected: 1,
+      unselected: 1,
+    });
   }, []);
 
   // Set up ride select/deselect event listeners

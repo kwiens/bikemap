@@ -42,11 +42,15 @@ export function RideHistory({
   }, [refreshSummaries]);
 
   useEffect(() => {
-    const handleStop = () => refreshSummaries();
+    const refresh = () => refreshSummaries();
 
-    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handleStop);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, refresh);
+    window.addEventListener(MAP_EVENTS.RIDE_SELECT, refresh);
+    window.addEventListener(MAP_EVENTS.RIDE_DESELECT, refresh);
     return () => {
-      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handleStop);
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, refresh);
+      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, refresh);
+      window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, refresh);
     };
   }, [refreshSummaries]);
 
@@ -154,7 +158,7 @@ function StorageIndicator() {
       .catch(() => {});
   }, []);
 
-  if (!usage) return null;
+  if (!usage || usage.totalKB === 0) return null;
 
   const { usedKB, totalKB } = usage;
   const pct = Math.min(100, (usedKB / totalKB) * 100);
