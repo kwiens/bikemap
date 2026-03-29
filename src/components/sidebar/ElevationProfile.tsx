@@ -723,9 +723,8 @@ function HoverIndicator({
   return (
     <svg
       viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-      className={CHART_SVG_CLASS}
+      className={`${CHART_SVG_CLASS} absolute top-0 left-0 pointer-events-none`}
       preserveAspectRatio="none"
-      style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
     >
       <line
         x1={x}
@@ -768,19 +767,8 @@ function LocationIndicator({
 
   return (
     <div
-      style={{
-        position: 'absolute',
-        left: `${leftPct}%`,
-        top: `${topPct}%`,
-        width: 18,
-        height: 18,
-        borderRadius: '50%',
-        backgroundColor: '#4285F4',
-        border: '2px solid white',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-        transform: 'translate(-50%, -50%)',
-        pointerEvents: 'none',
-      }}
+      className="absolute w-[18px] h-[18px] rounded-full bg-[#4285F4] border-2 border-white shadow-[0_1px_4px_rgba(0,0,0,0.4)] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+      style={{ left: `${leftPct}%`, top: `${topPct}%` }}
     />
   );
 }

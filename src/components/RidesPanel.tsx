@@ -10,6 +10,7 @@ import {
   faPlay,
   faFlagCheckered,
 } from '@fortawesome/free-solid-svg-icons';
+import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
 import { cn } from '@/lib/utils';
 import { useRideRecording, useToast } from '@/hooks';
 import { formatElapsed, formatDistance, formatElevation } from '@/utils/format';
@@ -154,7 +155,7 @@ export function RidesPanel() {
           ref={toggleRef}
           onClick={toggle}
           className={cn(
-            'bg-white rounded-full p-3 shadow-md cursor-pointer flex items-center justify-center border-none transition-colors duration-150 hover:bg-gray-50 active:bg-[#e5e5e5]',
+            TOGGLE_BTN_CLASS,
             isRecording &&
               !isOpen &&
               'animate-recording-pulse [&_svg]:text-red-500',
@@ -165,7 +166,7 @@ export function RidesPanel() {
         >
           <FontAwesomeIcon
             icon={isOpen ? faTimes : faStopwatch}
-            className="w-5 h-5 text-gray-700"
+            className={TOGGLE_ICON_CLASS}
           />
         </button>
       </div>

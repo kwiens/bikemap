@@ -17,6 +17,7 @@ import {
   type LocationProps,
 } from './sidebar';
 import { getRideStyle } from './WelcomeModal';
+import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
 import { cn } from '@/lib/utils';
 
 // Main provider component
@@ -290,12 +291,12 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         <button
           ref={toggleButtonRef}
           onClick={toggle}
-          className="bg-white rounded-full p-3 shadow-md cursor-pointer flex items-center justify-center border-none transition-colors duration-150 hover:bg-gray-50 active:bg-[#e5e5e5]"
+          className={TOGGLE_BTN_CLASS}
           type="button"
         >
           <FontAwesomeIcon
             icon={isOpen ? faTimes : faLayerGroup}
-            className="w-5 h-5 text-gray-700"
+            className={TOGGLE_ICON_CLASS}
           />
         </button>
       </div>

@@ -51,14 +51,13 @@ function toggleSet(
   });
 }
 
-function trailShapeClass(rating: string | undefined) {
-  const isAdvanced = rating === 'advanced' || rating === 'expert';
-  return cn(
-    'shrink-0',
-    isAdvanced ? 'w-2.5 h-2.5 rotate-45 rounded-[1px]' : 'w-3 h-3',
-    !isAdvanced && (rating === 'intermediate' ? 'rounded-sm' : 'rounded-full'),
-  );
-}
+const TRAIL_SHAPE: Record<string, string> = {
+  easy: 'shrink-0 w-3 h-3 rounded-full',
+  intermediate: 'shrink-0 w-3 h-3 rounded-sm',
+  advanced: 'shrink-0 w-2.5 h-2.5 rotate-45 rounded-[1px]',
+  expert: 'shrink-0 w-2.5 h-2.5 rotate-45 rounded-[1px]',
+  unrated: 'shrink-0 w-3 h-3 rounded-full',
+};
 
 function TrailRow({
   trail,
@@ -94,7 +93,7 @@ function TrailRow({
     >
       <div className="flex items-center gap-3">
         <div
-          className={trailShapeClass(trail.rating)}
+          className={TRAIL_SHAPE[trail.rating || 'unrated']}
           style={{ backgroundColor: trail.color }}
         />
         <span className="font-medium text-[13px]">{trail.displayName}</span>
@@ -207,7 +206,7 @@ export function MountainBikeTrails({
             return (
               <React.Fragment key={region}>
                 <div
-                  className="text-xs font-bold text-gray-700 pt-2.5 pb-1 cursor-pointer rounded p-2.5 px-1 flex items-center whitespace-nowrap hover:bg-blue-600/5 hover:text-blue-600"
+                  className="text-xs font-bold text-gray-700 cursor-pointer rounded pt-2.5 pb-1 px-1 flex items-center whitespace-nowrap hover:bg-blue-600/5 hover:text-blue-600"
                   onClick={() => {
                     toggleSet(setExpandedRegions, region);
                     onAreaSelect(region);
@@ -243,7 +242,7 @@ export function MountainBikeTrails({
                       <React.Fragment key={area}>
                         {!singleArea && (
                           <div
-                            className="text-[11px] font-semibold uppercase text-gray-500 tracking-wide py-2 pb-1 cursor-pointer rounded p-2 px-1 pl-4 flex items-baseline hover:bg-blue-600/5 hover:text-blue-600"
+                            className="text-[11px] font-semibold uppercase text-gray-500 tracking-wide cursor-pointer rounded py-2 pb-1 px-1 pl-4 flex items-baseline hover:bg-blue-600/5 hover:text-blue-600"
                             onClick={() => handleAreaClick(area)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
