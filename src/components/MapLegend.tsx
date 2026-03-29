@@ -6,7 +6,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
 
 import {
-  SidebarHeader,
   BikeRoutes,
   MountainBikeTrails,
   MapLayers,
@@ -305,28 +304,28 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         ref={sidebarRef}
         className={`sidebar-container ${isOpen ? 'sidebar-visible' : 'sidebar-hidden'}`}
       >
-        <SidebarHeader />
+        {/* Casual / MTB toggle in header */}
+        <div className="sidebar-header">
+          <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
+            <button
+              type="button"
+              className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors ${activeSection === 'routes' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveSection('routes')}
+            >
+              Casual
+            </button>
+            <button
+              type="button"
+              className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors ${activeSection === 'trails' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveSection('trails')}
+            >
+              MTB
+            </button>
+          </div>
+        </div>
 
         <div className="sidebar-content">
           <div className="sidebar-inner-content">
-            {/* Casual / Mountain Bike toggle */}
-            <div className="flex bg-gray-100 rounded-lg p-1 mx-3 mt-1 mb-2 border border-gray-200">
-              <button
-                type="button"
-                className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-md transition-colors ${activeSection === 'routes' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                onClick={() => setActiveSection('routes')}
-              >
-                Casual
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-md transition-colors ${activeSection === 'trails' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                onClick={() => setActiveSection('trails')}
-              >
-                Mountain Bike
-              </button>
-            </div>
-
             {activeSection === 'routes' && (
               <>
                 <BikeRoutes

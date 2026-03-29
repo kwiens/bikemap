@@ -77,7 +77,7 @@ function TrailRow({
           className={`trail-shape trail-shape-${trail.rating || 'unrated'}`}
           style={{ backgroundColor: trail.color }}
         />
-        <span className="route-name">{trail.displayName}</span>
+        <span className="route-name text-[13px]">{trail.displayName}</span>
         {trail.distance || trail.elevationGain ? (
           <span className="trail-distance">
             {trail.distance ? `${trail.distance} mi` : ''}
