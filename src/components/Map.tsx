@@ -603,6 +603,16 @@ const MapboxMap = memo(function MapboxMap() {
     };
   }, [handleAreaSelect]);
 
+  // Listen for toast events from other components
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { message } = (e as CustomEvent).detail;
+      showToast(message);
+    };
+    window.addEventListener(MAP_EVENTS.TOAST, handler);
+    return () => window.removeEventListener(MAP_EVENTS.TOAST, handler);
+  }, [showToast]);
+
   // Elevation profile hover marker
   useEffect(() => {
     let marker: mapboxgl.Marker | null = null;

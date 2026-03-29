@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   geocodeAddress,
   updateRouteOpacity,
-  calculateZoomForBounds,
   calculateRouteBounds,
   findLocationInArray,
   flyToBounds,
@@ -269,72 +268,6 @@ describe('Mapbox Geo Integration', () => {
     });
   });
 
-  describe('calculateZoomForBounds', () => {
-    it('should calculate zoom for mobile device', () => {
-      const mockBounds = {
-        getNorth: () => 35.1,
-        getSouth: () => 35.0,
-        getEast: () => -85.2,
-        getWest: () => -85.3,
-      } as mapboxgl.LngLatBounds;
-
-      const zoom = calculateZoomForBounds(mockBounds, true);
-
-      expect(zoom).toBeGreaterThanOrEqual(12);
-      expect(zoom).toBeLessThanOrEqual(16);
-    });
-
-    it('should calculate zoom for desktop device', () => {
-      const mockBounds = {
-        getNorth: () => 35.1,
-        getSouth: () => 35.0,
-        getEast: () => -85.2,
-        getWest: () => -85.3,
-      } as mapboxgl.LngLatBounds;
-
-      const zoom = calculateZoomForBounds(mockBounds, false);
-
-      expect(zoom).toBeGreaterThanOrEqual(14);
-      expect(zoom).toBeLessThanOrEqual(18);
-    });
-
-    it('should return higher zoom for smaller bounds', () => {
-      const smallBounds = {
-        getNorth: () => 35.05,
-        getSouth: () => 35.04,
-        getEast: () => -85.29,
-        getWest: () => -85.3,
-      } as mapboxgl.LngLatBounds;
-
-      const largeBounds = {
-        getNorth: () => 35.2,
-        getSouth: () => 34.9,
-        getEast: () => -85.0,
-        getWest: () => -85.5,
-      } as mapboxgl.LngLatBounds;
-
-      const smallZoom = calculateZoomForBounds(smallBounds, false);
-      const largeZoom = calculateZoomForBounds(largeBounds, false);
-
-      expect(smallZoom).toBeGreaterThan(largeZoom);
-    });
-
-    it('should enforce minimum zoom levels', () => {
-      const hugeBounds = {
-        getNorth: () => 40.0,
-        getSouth: () => 30.0,
-        getEast: () => -80.0,
-        getWest: () => -90.0,
-      } as mapboxgl.LngLatBounds;
-
-      const mobileZoom = calculateZoomForBounds(hugeBounds, true);
-      const desktopZoom = calculateZoomForBounds(hugeBounds, false);
-
-      expect(mobileZoom).toBe(12);
-      expect(desktopZoom).toBe(14);
-    });
-  });
-
   describe('calculateRouteBounds', () => {
     it('should calculate bounds for LineString features', () => {
       const mockMap = {
@@ -527,90 +460,39 @@ describe('flyToBounds', () => {
     getSouth: () => 34.8,
   } as mapboxgl.LngLatBounds;
 
-  it('should call map.flyTo with the center of the bounds', () => {
+  it('should call map.fitBounds with padding and animation', () => {
     const mockMap = {
-      flyTo: vi.fn(),
+      fitBounds: vi.fn(),
     } as unknown as mapboxgl.Map;
-
-    Object.defineProperty(window, 'innerWidth', {
-      value: 1024,
-      writable: true,
-    });
 
     flyToBounds(mockMap, mockBounds);
 
-    expect(mockMap.flyTo).toHaveBeenCalledWith(
-      expect.objectContaining({
-        center: [-85.25, 35],
-        essential: true,
-        duration: 1000,
-      }),
-    );
-  });
-
-  it('should use mobile zoom when window.innerWidth <= 768', () => {
-    const mockMap = {
-      flyTo: vi.fn(),
-    } as unknown as mapboxgl.Map;
-
-    Object.defineProperty(window, 'innerWidth', { value: 400, writable: true });
-
-    flyToBounds(mockMap, mockBounds);
-
-    const callArgs = (mockMap.flyTo as ReturnType<typeof vi.fn>).mock
-      .calls[0][0];
-    const mobileZoom = callArgs.zoom;
-
-    // Mobile zoom uses calculateZoomForBounds(bounds, true) which uses Math.max(12, 16 - maxDiff * 100)
-    const expectedZoom = calculateZoomForBounds(mockBounds, true);
-    expect(mobileZoom).toBe(expectedZoom);
-  });
-
-  it('should use desktop zoom when window.innerWidth > 768', () => {
-    const mockMap = {
-      flyTo: vi.fn(),
-    } as unknown as mapboxgl.Map;
-
-    Object.defineProperty(window, 'innerWidth', {
-      value: 1024,
-      writable: true,
+    expect(mockMap.fitBounds).toHaveBeenCalledWith(mockBounds, {
+      padding: 60,
+      duration: 1000,
+      essential: true,
     });
-
-    flyToBounds(mockMap, mockBounds);
-
-    const callArgs = (mockMap.flyTo as ReturnType<typeof vi.fn>).mock
-      .calls[0][0];
-    const desktopZoom = callArgs.zoom;
-
-    // Desktop zoom uses calculateZoomForBounds(bounds, false) which uses Math.max(14, 18 - maxDiff * 100)
-    const expectedZoom = calculateZoomForBounds(mockBounds, false);
-    expect(desktopZoom).toBe(expectedZoom);
   });
 
-  it('should compute center as midpoint of bounds', () => {
+  it('should pass bounds directly to fitBounds for any size', () => {
     const mockMap = {
-      flyTo: vi.fn(),
+      fitBounds: vi.fn(),
     } as unknown as mapboxgl.Map;
 
-    Object.defineProperty(window, 'innerWidth', {
-      value: 1024,
-      writable: true,
-    });
-
-    const asymmetricBounds = {
+    const largeBounds = {
       getWest: () => -86.0,
       getEast: () => -84.0,
       getNorth: () => 36.0,
       getSouth: () => 34.0,
     } as mapboxgl.LngLatBounds;
 
-    flyToBounds(mockMap, asymmetricBounds);
+    flyToBounds(mockMap, largeBounds);
 
-    expect(mockMap.flyTo).toHaveBeenCalledWith(
-      expect.objectContaining({
-        center: [-85.0, 35.0],
-      }),
-    );
+    expect(mockMap.fitBounds).toHaveBeenCalledWith(largeBounds, {
+      padding: 60,
+      duration: 1000,
+      essential: true,
+    });
   });
 });
 

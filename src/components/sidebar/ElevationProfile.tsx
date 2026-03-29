@@ -167,7 +167,6 @@ export function findClosestProfileIndex(
 
 export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
-  const [copyToast, setCopyToast] = useState(false);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -480,8 +479,11 @@ export function ElevationProfile() {
             className={ACTION_BTN_CLASS}
             onClick={() => {
               navigator.clipboard.writeText(window.location.href);
-              setCopyToast(true);
-              setTimeout(() => setCopyToast(false), 2000);
+              window.dispatchEvent(
+                new CustomEvent(MAP_EVENTS.TOAST, {
+                  detail: { message: 'Link copied' },
+                }),
+              );
             }}
             title="Copy link"
           >
@@ -505,12 +507,6 @@ export function ElevationProfile() {
           </button>
         </div>
       </div>
-
-      {copyToast && (
-        <div className="text-[11px] text-gray-600 text-center py-0.5 animate-fade-in-out">
-          Link copied
-        </div>
-      )}
 
       {!collapsed && (
         <>

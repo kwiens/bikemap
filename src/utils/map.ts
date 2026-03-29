@@ -49,33 +49,14 @@ export function updateRouteOpacity(
   });
 }
 
-export function calculateZoomForBounds(
-  bounds: mapboxgl.LngLatBounds,
-  isMobile: boolean,
-): number {
-  const latDiff = bounds.getNorth() - bounds.getSouth();
-  const lngDiff = bounds.getEast() - bounds.getWest();
-  const maxDiff = Math.max(latDiff, lngDiff);
-
-  return isMobile
-    ? Math.max(12, 16 - maxDiff * 100)
-    : Math.max(14, 18 - maxDiff * 100);
-}
-
 export function flyToBounds(
   map: mapboxgl.Map,
   bounds: mapboxgl.LngLatBounds,
 ): void {
-  const centerLng = (bounds.getWest() + bounds.getEast()) / 2;
-  const centerLat = (bounds.getNorth() + bounds.getSouth()) / 2;
-  const isMobile = window.innerWidth <= 768;
-  const zoom = calculateZoomForBounds(bounds, isMobile);
-
-  map.flyTo({
-    center: [centerLng, centerLat],
-    zoom,
-    essential: true,
+  map.fitBounds(bounds, {
+    padding: 60,
     duration: 1000,
+    essential: true,
   });
 }
 
