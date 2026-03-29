@@ -62,8 +62,8 @@
 /* Debug Mode Toggle */
 .location-watch-toggle {
   position: absolute;
-  top: 20px;
-  right: 68px;
+  bottom: 36px;
+  right: 16px;
   width: 40px;
   height: 40px;
   padding: 6px 12px;
