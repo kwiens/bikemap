@@ -112,45 +112,19 @@ describe('MountainBikeTrails', () => {
     expect(onAreaSelect).toHaveBeenCalledWith('Region 1');
   });
 
-  it('search filters trails by name', () => {
+  it.each([
+    ['trail name', 'Trail A', 'Trail A', 'Trail B'],
+    ['trail name (case insensitive)', 'trail a', 'Trail A', 'Trail B'],
+    ['region name', 'Region 2', 'Trail D', 'Trail A'],
+    ['rec area name', 'Area 2', 'Trail C', 'Trail A'],
+  ])('search matches by %s', (_label, query, expectedVisible, expectedHidden) => {
     render(<MountainBikeTrails {...defaultProps} />);
 
     const searchInput = screen.getByPlaceholderText('Search trails...');
-    fireEvent.change(searchInput, { target: { value: 'Trail A' } });
+    fireEvent.change(searchInput, { target: { value: query } });
 
-    expect(screen.getByText('Trail A')).toBeInTheDocument();
-    expect(screen.queryByText('Trail B')).not.toBeInTheDocument();
-    expect(screen.queryByText('Trail C')).not.toBeInTheDocument();
-  });
-
-  it('search is case insensitive', () => {
-    render(<MountainBikeTrails {...defaultProps} />);
-
-    const searchInput = screen.getByPlaceholderText('Search trails...');
-    fireEvent.change(searchInput, { target: { value: 'trail a' } });
-
-    expect(screen.getByText('Trail A')).toBeInTheDocument();
-  });
-
-  it('search matches region name', () => {
-    render(<MountainBikeTrails {...defaultProps} />);
-
-    const searchInput = screen.getByPlaceholderText('Search trails...');
-    fireEvent.change(searchInput, { target: { value: 'Region 2' } });
-
-    // Trail D is in Area 3 which maps to Region 2
-    expect(screen.getByText('Trail D')).toBeInTheDocument();
-    expect(screen.queryByText('Trail A')).not.toBeInTheDocument();
-  });
-
-  it('search matches rec area name', () => {
-    render(<MountainBikeTrails {...defaultProps} />);
-
-    const searchInput = screen.getByPlaceholderText('Search trails...');
-    fireEvent.change(searchInput, { target: { value: 'Area 2' } });
-
-    expect(screen.getByText('Trail C')).toBeInTheDocument();
-    expect(screen.queryByText('Trail A')).not.toBeInTheDocument();
+    expect(screen.getByText(expectedVisible)).toBeInTheDocument();
+    expect(screen.queryByText(expectedHidden)).not.toBeInTheDocument();
   });
 
   it('shows no trails found for unmatched search', () => {
