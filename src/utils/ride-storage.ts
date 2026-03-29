@@ -1,8 +1,4 @@
-// IndexedDB storage for recorded rides
-// Migrates existing localStorage rides on first open.
-
 import type { RecordedRide, RideSummary } from '../data/ride';
-import { RIDES_INDEX_KEY, rideStorageKey } from '../data/ride';
 
 const DB_NAME = 'bike-chatt-rides';
 const DB_VERSION = 2;
@@ -47,7 +43,12 @@ export function closeDB(): void {
   }
 }
 
-// One-time migration from localStorage to IndexedDB
+// Legacy localStorage keys — only used for migration
+const RIDES_INDEX_KEY = 'recorded-ride-ids';
+function rideStorageKey(id: string): string {
+  return `ride-${id}`;
+}
+
 async function migrateFromLocalStorage(db: IDBDatabase): Promise<void> {
   const indexRaw = localStorage.getItem(RIDES_INDEX_KEY);
   if (!indexRaw) return;

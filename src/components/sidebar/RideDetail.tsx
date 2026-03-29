@@ -57,10 +57,6 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
     onDeleted();
   };
 
-  const handleClose = () => {
-    onClose();
-  };
-
   const date = new Date(ride.startTime).toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
@@ -78,11 +74,11 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
     <div className="p-3">
       <div
         className="flex items-center gap-1.5 text-[13px] text-blue-500 cursor-pointer mb-2.5 py-0.5 hover:text-blue-600"
-        onClick={handleClose}
+        onClick={onClose}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            handleClose();
+            onClose();
           }
         }}
         role="button"

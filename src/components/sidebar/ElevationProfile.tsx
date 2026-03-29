@@ -8,14 +8,10 @@ import React, {
   useRef,
 } from 'react';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
-import { bikeRoutes } from '@/data/geo_data';
 import { slugify } from '@/utils/string';
 import { MAP_EVENTS } from '@/events';
 import { loadRide } from '@/utils/ride-storage';
-import {
-  rideToElevationProfile,
-  pointsToElevationProfile,
-} from '@/utils/ride-stats';
+import { rideToElevationProfile } from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faDownload,
@@ -188,18 +184,13 @@ export function ElevationProfile() {
       setTrailName(name);
       window.history.replaceState(null, '', `?trail=${slugify(name)}`);
     };
-    const handleRouteSelect = (e: Event) => {
-      const { routeId } = (e as CustomEvent).detail;
-      if (routeId === 'Chatt_TPL_Trails-public') {
+    const handleRouteSelect = () => {
+      // Routes don't show elevation profiles — only trails and recorded rides do
+      if (sourceRef.current === 'route') {
         sourceRef.current = null;
         setTrailName(null);
-        return;
-      }
-      const route = bikeRoutes.find((r) => r.id === routeId);
-      sourceRef.current = 'route';
-      setTrailName(route?.name ?? null);
-      if (route) {
-        window.history.replaceState(null, '', `?route=${slugify(route.name)}`);
+        setProfile(null);
+        profileRef.current = null;
       }
     };
     const handleTrailDeselect = () => {
@@ -256,16 +247,9 @@ export function ElevationProfile() {
       setTrailName('Recording');
       setCollapsed(false);
     };
-    const handleRecordingUpdate = (e: Event) => {
-      if (sourceRef.current !== 'ride') return;
-      const { points } = (e as CustomEvent).detail;
-      if (!points) return;
-      const elevProfile = pointsToElevationProfile(points, 'Recording');
-      if (elevProfile) {
-        setProfile(elevProfile);
-        profileRef.current = elevProfile;
-        setLoading(false);
-      }
+    const handleRecordingUpdate = () => {
+      // Elevation profile updates only after ride is saved (via RIDE_SELECT),
+      // not during live recording — avoids recomputing on every GPS tick.
     };
     const handleRecordingStop = () => {
       if (sourceRef.current === 'ride') {

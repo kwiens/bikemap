@@ -1,5 +1,3 @@
-// Ride recording data types and helpers
-
 // Full point — used during recording (not persisted)
 export interface RidePoint {
   lng: number;
@@ -45,12 +43,6 @@ export interface RideSummary {
   name: string;
   startTime: number;
   stats: RideStats;
-}
-
-export const RIDES_INDEX_KEY = 'recorded-ride-ids';
-
-export function rideStorageKey(id: string): string {
-  return `ride-${id}`;
 }
 
 export function generateRideName(startTime: number): string {
