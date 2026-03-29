@@ -1,6 +1,6 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLocationArrow } from '@fortawesome/free-solid-svg-icons';
+import { cn } from '@/lib/utils';
 import { bikeResources } from '@/data/geo_data';
+import { SidebarCard } from './SidebarCard';
 import type { BikeResourcesListProps } from './types';
 
 export function BikeResourcesList({
@@ -8,42 +8,19 @@ export function BikeResourcesList({
   onCenterLocation,
 }: BikeResourcesListProps) {
   return (
-    <div className={`section-container ${!show ? 'hidden' : ''}`}>
-      <h3 className="section-title">Bike Resources</h3>
-      <div className="section-items">
+    <div className={cn('mb-6', !show && 'hidden')}>
+      <h3 className="text-sm font-medium mb-2 text-gray-600">Bike Resources</h3>
+      <div className="flex flex-col gap-2">
         {bikeResources.map((location) => (
-          <div
+          <SidebarCard
             key={location.name}
-            className="card card-green"
+            colorTheme="green"
+            icon={location.icon}
+            title={location.name}
+            description={location.description}
             onClick={() => onCenterLocation(location)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onCenterLocation(location);
-              }
-            }}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="card-header">
-              <div className="card-icon-container card-icon-green">
-                <FontAwesomeIcon
-                  icon={location.icon}
-                  className="card-icon icon-green"
-                />
-              </div>
-              <span className="card-title">{location.name}</span>
-            </div>
-            <div className="card-description card-description-flex">
-              <span className="description-text">{location.description}</span>
-              <div className="location-arrow-container-green">
-                <FontAwesomeIcon
-                  icon={faLocationArrow}
-                  className="location-arrow-icon"
-                />
-              </div>
-            </div>
-          </div>
+            showArrow
+          />
         ))}
       </div>
     </div>

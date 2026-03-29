@@ -1,6 +1,5 @@
 // Sidebar components
 export { ToggleSwitch } from './ToggleSwitch';
-export { SidebarHeader } from './SidebarHeader';
 export { BikeRoutes } from './BikeRoutes';
 export { MountainBikeTrails } from './MountainBikeTrails';
 export { ElevationProfile } from './ElevationProfile';
@@ -10,6 +9,7 @@ export { BikeResourcesList } from './BikeResourcesList';
 export { BikeRentalList } from './BikeRentalList';
 export { InformationSection } from './InformationSection';
 export { Footer } from './Footer';
+export { SidebarCard } from './SidebarCard';
 
 // Types
 export type {
@@ -21,5 +21,4 @@ export type {
   AttractionsListProps,
   BikeResourcesListProps,
   BikeRentalListProps,
-  ExternalLinkProps,
 } from './types';

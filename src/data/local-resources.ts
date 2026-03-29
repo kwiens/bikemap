@@ -9,7 +9,7 @@ export interface LocalResource {
   description: string;
   url: string;
   icon: IconDefinition;
-  color: string;
+  colorTheme: 'blue' | 'green' | 'purple' | 'gray';
   secondaryDescription?: string;
   secondaryUrl?: string;
   secondaryLinkText?: string;
@@ -22,7 +22,7 @@ export const localResources: LocalResource[] = [
       'This map is a guide to the best bike routes in Chattanooga. Made with ❤️ by iFixit, the free repair guide for every thing.',
     url: 'https://www.ifixit.com',
     icon: faInfoCircle,
-    color: '#6B7280',
+    colorTheme: 'gray',
     secondaryDescription:
       "Dedicated to the memory of our friend and collaborator. Donate to Yoseph's Bikes to help children access the joy of riding.",
     secondaryUrl: 'https://www.whiteoakbicycle.org/yoyobikes',
@@ -34,6 +34,6 @@ export const localResources: LocalResource[] = [
       'Chattanooga City Bike Rentals: Find 24-7 bike rentals throughout the city.',
     url: 'https://bikechatt.com',
     icon: faBicycle,
-    color: '#6B7280',
+    colorTheme: 'gray',
   },
 ];

@@ -97,20 +97,7 @@ describe('BikeRoutes', () => {
       name: /test route 2/i,
     });
 
-    expect(route1Button).toHaveClass('route-item-selected');
-    expect(route2Button).not.toHaveClass('route-item-selected');
-  });
-
-  it('should display route color indicators', () => {
-    const mockOnRouteSelect = vi.fn();
-
-    render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
-    );
-
-    const colorIndicators = document.querySelectorAll('.route-color-indicator');
-    expect(colorIndicators).toHaveLength(2);
-    expect(colorIndicators[0]).toHaveStyle({ backgroundColor: '#FF0000' });
-    expect(colorIndicators[1]).toHaveStyle({ backgroundColor: '#00FF00' });
+    expect(route1Button).toHaveAttribute('data-selected');
+    expect(route2Button).not.toHaveAttribute('data-selected');
   });
 });

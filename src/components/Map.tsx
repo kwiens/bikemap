@@ -20,6 +20,7 @@ import {
   MarkerManager,
 } from '@/components/MapMarkers';
 import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
+import { cn } from '@/lib/utils';
 import { useToast, useMapResize } from '@/hooks';
 import {
   fetchStationInformation,
@@ -966,11 +967,16 @@ const MapboxMap = memo(function MapboxMap() {
 
   return (
     <>
-      <div ref={mapContainer} className="map-container" />
+      <div ref={mapContainer} className="w-full h-full absolute inset-0" />
 
       {/* Route selection toast */}
       {toastMessage && (
-        <div className={`route-toast ${toastFadingOut ? 'fade-out' : ''}`}>
+        <div
+          className={cn(
+            'absolute top-5 left-1/2 -translate-x-1/2 bg-black/65 text-white px-6 py-3 rounded-lg text-base font-medium z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none animate-toast-fade-in',
+            toastFadingOut && 'animate-toast-fade-out',
+          )}
+        >
           {toastMessage}
         </div>
       )}
@@ -989,7 +995,11 @@ const MapboxMap = memo(function MapboxMap() {
           }}
           role="button"
           tabIndex={0}
-          className={`location-watch-toggle ${watchingLocation ? 'active' : 'inactive'}`}
+          className={cn(
+            'absolute bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[1600] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
+            watchingLocation &&
+              'bg-[rgb(165,240,255)] active:bg-[rgb(145,220,235)]',
+          )}
         >
           <svg
             viewBox="0 0 100 100"
@@ -1016,14 +1026,7 @@ const MapboxMap = memo(function MapboxMap() {
 export default function BikeMap() {
   return (
     <MapLegendProvider>
-      <div
-        style={{
-          width: '100vw',
-          height: '100vh',
-          position: 'relative',
-          overflow: 'visible',
-        }}
-      >
+      <div className="w-screen h-screen relative overflow-visible">
         <MapboxMap />
         <RidesPanel />
       </div>

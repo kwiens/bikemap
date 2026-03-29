@@ -16,6 +16,7 @@ import {
   formatDate,
   formatBytes,
 } from '@/utils/format';
+import { cn } from '@/lib/utils';
 import { RideDetail } from './RideDetail';
 
 export interface RideHistoryProps {
@@ -104,7 +105,7 @@ export function RideHistory({
   }
 
   return (
-    <div className="section-items">
+    <div className="flex flex-col gap-2">
       {summaries.map((s) => (
         <div
           key={s.id}
@@ -117,16 +118,21 @@ export function RideHistory({
           }}
           role="button"
           tabIndex={0}
-          className={`route-item ${selectedRideId === s.id ? 'route-item-selected' : ''}`}
+          className={cn(
+            'p-2 rounded cursor-pointer transition-all duration-200 border border-transparent',
+            selectedRideId === s.id
+              ? 'bg-blue-600/10 border-blue-600'
+              : 'hover:bg-blue-600/5 hover:border-blue-500',
+          )}
         >
-          <div className="card-header">
+          <div className="flex items-center gap-3">
             <div
-              className="route-color-indicator"
+              className="w-4 h-4 rounded"
               style={{ backgroundColor: '#ff6b35' }}
             />
-            <span className="route-name">{s.name}</span>
+            <span className="font-medium">{s.name}</span>
           </div>
-          <div className="route-description">
+          <div className="text-xs text-gray-500 mt-1 ml-7">
             {formatDate(s.startTime)} &middot;{' '}
             {formatDistance(s.stats.distance)} &middot;{' '}
             {formatDurationShort(s.stats.elapsedTime)}

@@ -107,7 +107,7 @@ When trails are added or modified in the Mapbox tileset, run `scripts/add_trail_
 
 - The Mapbox canvas (`.map-container`) uses `position: absolute` with `z-index: 500` and covers the full viewport. It will obscure any sibling or child elements with a lower z-index.
 - To overlay UI on the map, render elements **inside the `MapboxMap` component's fragment** (the `<>` in its return), as siblings of `.map-container`. Do **not** place overlays in the outer `BikeMap` wrapper — they will be hidden behind the map canvas.
-- Overlay elements must use `z-index: 1000` or higher and `position: absolute` to appear above the map. See `.route-toast` and `.elevation-overlay` in `map.css` / `map-legend.css` for working examples.
+- Overlay elements must use `z-index: 1000` or higher and `position: absolute` to appear above the map. See the route toast in `Map.tsx` and elevation overlay in `ElevationProfile.tsx` for working examples.
 - The sidebar (MapLegend) manages its own stacking context separately and is not affected by this.
 
 ## Code Style
@@ -122,13 +122,13 @@ When trails are added or modified in the Mapbox tileset, run `scripts/add_trail_
 
 ### Styling with Tailwind CSS
 
-Use Tailwind utility classes for all new component styling. Do not add new custom CSS classes to `map-legend.css` or other stylesheets.
+All component styling uses Tailwind utility classes. The only remaining custom CSS is in `map.css` for Mapbox DOM-API elements (markers, popups, location dots) that cannot be styled with Tailwind.
 
 - **Use `cn()` from `@/lib/utils`** (clsx + tailwind-merge) for conditional classes: `className={cn('base-classes', condition && 'conditional-classes')}`
-- **Existing shared CSS classes** (`toggle-button`, `route-item`, `card-header`, `section-items`, `sidebar-container`, `sidebar-visible`, `sidebar-hidden`, etc.) are used across multiple components in `map-legend.css` — continue using them as-is. Only add Tailwind to new or component-specific styling.
 - **Custom animations** go in `tailwind.config.ts` under `theme.extend.keyframes` and `theme.extend.animation`, not in CSS `@keyframes`.
-- **Use standard Tailwind colors** (e.g., `text-gray-500`, `bg-red-500`) instead of CSS variables like `var(--color-gray-500)` for new code. The CSS variables in `map-legend.css` exist for legacy/shared classes.
+- **Use standard Tailwind colors** (e.g., `text-gray-500`, `bg-red-500`). App brand colors are available as `app-primary` and `app-secondary`.
 - **Dynamic values** that can't be expressed as Tailwind classes (e.g., computed widths from JS) can use `style={{}}` for that single property. Everything else should be Tailwind.
+- **SidebarCard** (`src/components/sidebar/SidebarCard.tsx`) is a shared card component with a `colorTheme` prop (`blue | green | purple | gray`) used across AttractionsList, BikeResourcesList, BikeRentalList, and InformationSection.
 
 ## Testing
 

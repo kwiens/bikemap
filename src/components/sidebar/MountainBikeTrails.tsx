@@ -4,6 +4,7 @@ import {
   faChevronRight,
   faChevronDown,
 } from '@fortawesome/free-solid-svg-icons';
+import { cn } from '@/lib/utils';
 import { mountainBikeTrails, regionFor } from '@/data/geo_data';
 import type { MountainBikeTrailsProps } from './types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
@@ -50,6 +51,15 @@ function toggleSet(
   });
 }
 
+function trailShapeClass(rating: string | undefined) {
+  const isAdvanced = rating === 'advanced' || rating === 'expert';
+  return cn(
+    'shrink-0',
+    isAdvanced ? 'w-2.5 h-2.5 rotate-45 rounded-[1px]' : 'w-3 h-3',
+    !isAdvanced && (rating === 'intermediate' ? 'rounded-sm' : 'rounded-full'),
+  );
+}
+
 function TrailRow({
   trail,
   selectedTrail,
@@ -70,16 +80,26 @@ function TrailRow({
       }}
       role="button"
       tabIndex={0}
-      className={`route-item ${selectedTrail === trail.trailName ? 'route-item-selected' : ''} ${selectedTrail && selectedTrail !== trail.trailName ? 'route-item-faded' : ''}`}
+      data-selected={selectedTrail === trail.trailName || undefined}
+      data-faded={
+        (selectedTrail && selectedTrail !== trail.trailName) || undefined
+      }
+      className={cn(
+        'p-2 rounded cursor-pointer transition-all duration-200 border border-transparent',
+        selectedTrail === trail.trailName
+          ? 'bg-blue-600/10 border-blue-600'
+          : 'hover:bg-blue-600/5 hover:border-blue-500',
+        selectedTrail && selectedTrail !== trail.trailName && 'opacity-70',
+      )}
     >
-      <div className="card-header">
+      <div className="flex items-center gap-3">
         <div
-          className={`trail-shape trail-shape-${trail.rating || 'unrated'}`}
+          className={trailShapeClass(trail.rating)}
           style={{ backgroundColor: trail.color }}
         />
-        <span className="route-name text-[13px]">{trail.displayName}</span>
+        <span className="font-medium text-[13px]">{trail.displayName}</span>
         {trail.distance || trail.elevationGain ? (
-          <span className="trail-distance">
+          <span className="text-[11px] text-gray-500 ml-auto shrink-0">
             {trail.distance ? `${trail.distance} mi` : ''}
             {trail.distance && trail.elevationGain ? ' \u00B7 ' : ''}
             {trail.elevationGain ? `\u2191${trail.elevationGain} ft` : ''}
@@ -139,13 +159,13 @@ export function MountainBikeTrails({
   }
 
   return (
-    <div className="section-container">
-      <div className="section-items">
-        <div className="trail-search">
+    <div className="mb-6">
+      <div className="flex flex-col gap-2">
+        <div className="relative">
           <input
             ref={searchRef}
             type="text"
-            className="trail-search-input"
+            className="w-full py-2 pr-8 pl-3 border border-gray-300 rounded-lg text-sm text-app-secondary bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30 placeholder:text-gray-400"
             placeholder="Search trails..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -153,7 +173,7 @@ export function MountainBikeTrails({
           {searchQuery && (
             <button
               type="button"
-              className="trail-search-clear"
+              className="absolute right-1 top-1/2 -translate-y-1/2 bg-transparent border-none text-lg text-gray-400 cursor-pointer px-2 py-1 leading-none hover:text-gray-500"
               onClick={() => {
                 setSearchQuery('');
                 searchRef.current?.focus();
@@ -176,7 +196,9 @@ export function MountainBikeTrails({
               />
             ))
           ) : (
-            <div className="trail-search-empty">No trails found</div>
+            <div className="p-3 text-center text-gray-400 text-sm">
+              No trails found
+            </div>
           )
         ) : (
           [...regionGroups.entries()].map(([region, areas]) => {
@@ -185,7 +207,7 @@ export function MountainBikeTrails({
             return (
               <React.Fragment key={region}>
                 <div
-                  className="region-heading region-clickable"
+                  className="text-xs font-bold text-gray-700 pt-2.5 pb-1 cursor-pointer rounded p-2.5 px-1 flex items-center whitespace-nowrap hover:bg-blue-600/5 hover:text-blue-600"
                   onClick={() => {
                     toggleSet(setExpandedRegions, region);
                     onAreaSelect(region);
@@ -201,14 +223,16 @@ export function MountainBikeTrails({
                   tabIndex={0}
                   aria-expanded={isRegionExpanded}
                 >
-                  <span className="region-chevron">
+                  <span className="text-[9px] mr-1.5 inline-block w-3 shrink-0">
                     <FontAwesomeIcon
                       icon={isRegionExpanded ? faChevronDown : faChevronRight}
                       className="text-[10px]"
                     />
                   </span>
                   {region}
-                  <span className="region-count">{regionTrailCount}</span>
+                  <span className="ml-auto text-[10px] font-normal text-gray-400">
+                    {regionTrailCount}
+                  </span>
                 </div>
                 {isRegionExpanded &&
                   [...areas.entries()].map(([area, trails]) => {
@@ -219,7 +243,7 @@ export function MountainBikeTrails({
                       <React.Fragment key={area}>
                         {!singleArea && (
                           <div
-                            className="rec-area-heading rec-area-clickable"
+                            className="text-[11px] font-semibold uppercase text-gray-500 tracking-wide py-2 pb-1 cursor-pointer rounded p-2 px-1 pl-4 flex items-baseline hover:bg-blue-600/5 hover:text-blue-600"
                             onClick={() => handleAreaClick(area)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
@@ -231,7 +255,7 @@ export function MountainBikeTrails({
                             tabIndex={0}
                             aria-expanded={isAreaExpanded}
                           >
-                            <span className="rec-area-chevron">
+                            <span className="text-[8px] mr-1 inline-block w-2.5">
                               <FontAwesomeIcon
                                 icon={
                                   isAreaExpanded
@@ -242,7 +266,7 @@ export function MountainBikeTrails({
                               />
                             </span>
                             {area}
-                            <span className="rec-area-count">
+                            <span className="ml-auto text-[10px] font-normal text-gray-400">
                               {trails.length}
                             </span>
                           </div>

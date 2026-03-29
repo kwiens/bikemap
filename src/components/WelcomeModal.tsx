@@ -8,8 +8,8 @@ import {
   faRoute,
   faMapMarkerAlt,
 } from '@fortawesome/free-solid-svg-icons';
+import { cn } from '@/lib/utils';
 import { MAP_EVENTS } from '@/events';
-import './welcome-modal.css';
 
 const STORAGE_KEY = 'bikechatt-welcome-dismissed';
 const RIDE_STYLE_COOKIE = 'bikechatt-ride-style';
@@ -56,102 +56,130 @@ export function WelcomeModal() {
   if (!visible) return null;
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: overlay dismiss on click
     <div
-      className={`welcome-overlay ${exiting ? 'welcome-exit' : 'welcome-enter'}`}
+      className={cn(
+        'fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-[4px] p-5',
+        exiting ? 'animate-welcome-fade-out' : 'animate-welcome-fade-in',
+      )}
     >
       {/* biome-ignore lint/a11y/noStaticElementInteractions: stop propagation for content area */}
-      <div className="welcome-content" onClick={(e) => e.stopPropagation()}>
-        <div className="welcome-header">
-          <span className="welcome-bike-icon">
+      <div
+        className={cn(
+          'bg-white rounded-3xl w-full max-w-[400px] px-7 pt-10 pb-8 text-center shadow-[0_24px_48px_rgba(0,0,0,0.25)] animate-welcome-slide-up',
+          exiting && 'animate-welcome-slide-down',
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-8">
+          <span className="inline-flex items-center justify-center w-[72px] h-[72px] rounded-full bg-app-primary text-app-secondary text-[32px] mb-4">
             <FontAwesomeIcon icon={faBicycle} />
           </span>
-          <h1 className="welcome-title">Bike Chatt</h1>
-          <p className="welcome-subtitle">Your guide to biking Chattanooga</p>
+          <h1 className="text-[32px] font-bold text-app-secondary mb-1.5 tracking-tight">
+            Bike Chatt
+          </h1>
+          <p className="text-[17px] text-gray-500 font-normal">
+            Your guide to biking Chattanooga
+          </p>
         </div>
 
-        <div className="welcome-features">
-          <div className="welcome-feature">
+        <div className="flex flex-col gap-4 mb-7 text-left">
+          <div className="flex items-center gap-4">
             <div
-              className="welcome-feature-icon"
+              className="shrink-0 w-12 h-12 rounded-[14px] flex items-center justify-center text-white text-xl"
               style={{ background: '#2563EB' }}
             >
               <FontAwesomeIcon icon={faRoute} />
             </div>
-            <div className="welcome-feature-text">
-              <strong>Plan Fun Routes</strong>
-              <span>
+            <div className="flex flex-col gap-0.5">
+              <strong className="text-base font-semibold text-app-secondary">
+                Plan Fun Routes
+              </strong>
+              <span className="text-sm text-gray-500 leading-snug">
                 Scenic loops to the zoo, aquarium, riverwalk &amp; more
               </span>
             </div>
           </div>
 
-          <div className="welcome-feature">
+          <div className="flex items-center gap-4">
             <div
-              className="welcome-feature-icon"
+              className="shrink-0 w-12 h-12 rounded-[14px] flex items-center justify-center text-white text-xl"
               style={{ background: '#059669' }}
             >
               <FontAwesomeIcon icon={faBicycle} />
             </div>
-            <div className="welcome-feature-text">
-              <strong>Find Safe Paths</strong>
-              <span>Low-traffic greenways and protected bike trails</span>
+            <div className="flex flex-col gap-0.5">
+              <strong className="text-base font-semibold text-app-secondary">
+                Find Safe Paths
+              </strong>
+              <span className="text-sm text-gray-500 leading-snug">
+                Low-traffic greenways and protected bike trails
+              </span>
             </div>
           </div>
 
-          <div className="welcome-feature">
+          <div className="flex items-center gap-4">
             <div
-              className="welcome-feature-icon"
+              className="shrink-0 w-12 h-12 rounded-[14px] flex items-center justify-center text-white text-xl"
               style={{ background: '#7C3AED' }}
             >
               <FontAwesomeIcon icon={faMapMarkerAlt} />
             </div>
-            <div className="welcome-feature-text">
-              <strong>Grab a Bike</strong>
-              <span>24/7 city bike rental stations across downtown</span>
+            <div className="flex flex-col gap-0.5">
+              <strong className="text-base font-semibold text-app-secondary">
+                Grab a Bike
+              </strong>
+              <span className="text-sm text-gray-500 leading-snug">
+                24/7 city bike rental stations across downtown
+              </span>
             </div>
           </div>
         </div>
 
-        <p className="welcome-question">How do you want to ride?</p>
+        <p className="text-[17px] font-semibold text-app-secondary mb-4">
+          How do you want to ride?
+        </p>
 
-        <div className="welcome-choices">
+        <div className="flex gap-4 mb-6">
           <button
             type="button"
-            className="welcome-choice"
+            className="flex-1 flex flex-col items-center gap-2.5 py-6 px-4 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-[#a5d730]"
             onClick={() => choose('casual')}
           >
             <span
-              className="welcome-choice-icon"
+              className="inline-flex items-center justify-center w-14 h-14 rounded-full text-white text-2xl"
               style={{ background: '#2563EB' }}
             >
               <FontAwesomeIcon icon={faBicycle} />
             </span>
-            <strong>Casual</strong>
-            <span className="welcome-choice-desc">
+            <strong className="text-lg font-bold text-app-secondary">
+              Casual
+            </strong>
+            <span className="text-[13px] text-gray-500 leading-snug">
               Scenic loops, greenways &amp; city rides
             </span>
           </button>
 
           <button
             type="button"
-            className="welcome-choice"
+            className="flex-1 flex flex-col items-center gap-2.5 py-6 px-4 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-[#a5d730]"
             onClick={() => choose('mountain')}
           >
             <span
-              className="welcome-choice-icon"
+              className="inline-flex items-center justify-center w-14 h-14 rounded-full text-white text-2xl"
               style={{ background: '#059669' }}
             >
               <FontAwesomeIcon icon={faMountain} />
             </span>
-            <strong>Mountain</strong>
-            <span className="welcome-choice-desc">
+            <strong className="text-lg font-bold text-app-secondary">
+              Mountain
+            </strong>
+            <span className="text-[13px] text-gray-500 leading-snug">
               Singletrack trails &amp; off-road adventures
             </span>
           </button>
         </div>
 
-        <p className="welcome-dismiss-hint">You can always switch later</p>
+        <p className="text-[13px] text-gray-400">You can always switch later</p>
       </div>
     </div>
   );

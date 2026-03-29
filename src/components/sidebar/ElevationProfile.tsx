@@ -19,6 +19,7 @@ import {
   faChevronDown,
   faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
+import { cn } from '@/lib/utils';
 
 const CHART_HEIGHT = 100;
 const CHART_PADDING_TOP = 4;
@@ -453,18 +454,25 @@ export function ElevationProfile() {
 
   return (
     <div
-      className={`elevation-overlay ${sidebarOpen ? 'elevation-overlay-sidebar-open' : 'elevation-overlay-full'} ${ridesPanelOpen ? 'elevation-overlay-rides-open' : ''}`}
+      className={cn(
+        'absolute bottom-1 left-[296px] right-4 bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-[1700] pointer-events-auto',
+        'max-md:left-2 max-md:right-2 max-md:bottom-[60px] max-md:px-2 max-md:pt-2 max-md:pb-1',
+        sidebarOpen ? 'max-md:hidden' : 'left-4',
+        ridesPanelOpen && 'right-[296px]',
+      )}
     >
-      <div className="elevation-overlay-header">
-        <span className="elevation-overlay-title">{trailName}</span>
-        <div className="elevation-stats">
+      <div className="flex items-center gap-3 mb-1">
+        <span className="text-[13px] font-semibold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">
+          {trailName}
+        </span>
+        <div className="flex gap-3 text-[11px] text-gray-500 ml-auto shrink-0">
           <span>{(maxDist / 5280).toFixed(1)} mi</span>
           <span>+{profile.gain.toLocaleString()} ft climbing</span>
         </div>
-        <div className="elevation-actions">
+        <div className="flex gap-1 ml-2 shrink-0">
           <button
             type="button"
-            className="elevation-action-btn"
+            className="bg-transparent border-none cursor-pointer text-gray-400 text-xs px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-50"
             onClick={() => {
               navigator.clipboard.writeText(window.location.href);
               setCopyToast(true);
@@ -476,7 +484,7 @@ export function ElevationProfile() {
           </button>
           <button
             type="button"
-            className="elevation-action-btn"
+            className="bg-transparent border-none cursor-pointer text-gray-400 text-xs px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-50"
             onClick={() => downloadGpx(profile)}
             title="Download GPX"
           >
@@ -484,7 +492,7 @@ export function ElevationProfile() {
           </button>
           <button
             type="button"
-            className="elevation-action-btn"
+            className="bg-transparent border-none cursor-pointer text-gray-400 text-xs px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-50"
             onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? 'Expand' : 'Collapse'}
           >
@@ -493,21 +501,25 @@ export function ElevationProfile() {
         </div>
       </div>
 
-      {copyToast && <div className="elevation-copy-toast">Link copied</div>}
+      {copyToast && (
+        <div className="text-[11px] text-gray-600 text-center py-0.5 animate-fade-in-out">
+          Link copied
+        </div>
+      )}
 
       {!collapsed && (
         <>
-          <div className="elevation-chart-container">
-            <div className="elevation-y-axis">
-              <span className="elevation-y-label elevation-y-max">
+          <div className="flex relative">
+            <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
+              <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
                 {profile.max.toLocaleString()} ft
               </span>
-              <span className="elevation-y-label elevation-y-min">
+              <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
                 {profile.min.toLocaleString()} ft
               </span>
             </div>
 
-            <div className="elevation-chart-wrapper">
+            <div className="relative flex-1">
               <ElevationSvg
                 points={points}
                 gradeColors={gradeColors}
@@ -540,7 +552,7 @@ export function ElevationProfile() {
             </div>
           </div>
 
-          <div className="elevation-tooltip">
+          <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
             {hoverIndex !== null
               ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${points[hoverIndex][1].toLocaleString()} ft`
               : '\u00A0'}
@@ -598,7 +610,7 @@ const ElevationSvg = React.memo(function ElevationSvg({
   return (
     <svg
       viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-      className="elevation-chart"
+      className="w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none"
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
       onTouchStart={onTouchStart}
@@ -706,7 +718,7 @@ function HoverIndicator({
   return (
     <svg
       viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-      className="elevation-chart"
+      className="w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none"
       preserveAspectRatio="none"
       style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
     >

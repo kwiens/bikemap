@@ -12,9 +12,9 @@ export function MapLayers({
   onToggleBikeRentals,
 }: MapLayersProps) {
   return (
-    <div className="section-container">
-      <h3 className="section-title">Map Layers</h3>
-      <div className="section-items">
+    <div className="mb-6">
+      <h3 className="text-sm font-medium mb-2 text-gray-600">Map Layers</h3>
+      <div className="flex flex-col gap-2">
         {/* Attractions Layer Toggle */}
         <div
           onClick={onToggleAttractions}
@@ -26,11 +26,14 @@ export function MapLayers({
           }}
           role="button"
           tabIndex={0}
-          className="layer-toggle"
+          className="p-2 rounded cursor-pointer transition-all duration-200 flex items-center justify-between hover:bg-blue-600/5"
         >
-          <div className="card-header">
-            <FontAwesomeIcon icon={faMapMarkerAlt} className="layer-icon" />
-            <span className="layer-name">Attractions</span>
+          <div className="flex items-center gap-3">
+            <FontAwesomeIcon
+              icon={faMapMarkerAlt}
+              className="w-4 h-4 text-gray-500"
+            />
+            <span className="font-medium">Attractions</span>
           </div>
           <ToggleSwitch isActive={showAttractions} />
         </div>
@@ -46,11 +49,14 @@ export function MapLayers({
           }}
           role="button"
           tabIndex={0}
-          className="layer-toggle"
+          className="p-2 rounded cursor-pointer transition-all duration-200 flex items-center justify-between hover:bg-blue-600/5"
         >
-          <div className="card-header">
-            <FontAwesomeIcon icon={faBicycle} className="layer-icon" />
-            <span className="layer-name">Bike Resources</span>
+          <div className="flex items-center gap-3">
+            <FontAwesomeIcon
+              icon={faBicycle}
+              className="w-4 h-4 text-gray-500"
+            />
+            <span className="font-medium">Bike Resources</span>
           </div>
           <ToggleSwitch isActive={showBikeResources} />
         </div>
@@ -66,11 +72,14 @@ export function MapLayers({
           }}
           role="button"
           tabIndex={0}
-          className="layer-toggle"
+          className="p-2 rounded cursor-pointer transition-all duration-200 flex items-center justify-between hover:bg-blue-600/5"
         >
-          <div className="card-header">
-            <FontAwesomeIcon icon={faBicycle} className="layer-icon" />
-            <span className="layer-name">Bike Rentals</span>
+          <div className="flex items-center gap-3">
+            <FontAwesomeIcon
+              icon={faBicycle}
+              className="w-4 h-4 text-gray-500"
+            />
+            <span className="font-medium">Bike Rentals</span>
           </div>
           <ToggleSwitch isActive={showBikeRentals} />
         </div>

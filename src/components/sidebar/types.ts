@@ -48,8 +48,3 @@ export interface MountainBikeTrailsProps {
   onTrailSelect: (trailName: string) => void;
   onAreaSelect: (areaName: string) => void;
 }
-
-export interface ExternalLinkProps {
-  href: string;
-  children: React.ReactNode;
-}

@@ -5,15 +5,21 @@ import {
   faChevronDown,
 } from '@fortawesome/free-solid-svg-icons';
 import { localResources } from '@/data/geo_data';
-import type { ExternalLinkProps } from './types';
+import { SidebarCard } from './SidebarCard';
 
-function ExternalLink({ href, children }: ExternalLinkProps) {
+function ExternalLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="external-link"
+      className="text-blue-500 no-underline font-medium hover:underline"
     >
       {children}
     </a>
@@ -42,9 +48,9 @@ export function InformationSection() {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="section-container">
+    <div className="mb-6">
       <div
-        className="section-title section-title-clickable"
+        className="text-sm font-medium mb-2 text-gray-600 cursor-pointer flex items-center select-none hover:text-blue-600"
         onClick={() => setIsExpanded(!isExpanded)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -56,7 +62,7 @@ export function InformationSection() {
         tabIndex={0}
         aria-expanded={isExpanded}
       >
-        <span className="section-title-chevron">
+        <span className="text-[10px] mr-1.5 inline-block w-3.5 shrink-0">
           <FontAwesomeIcon
             icon={isExpanded ? faChevronDown : faChevronRight}
             className="text-[10px]"
@@ -65,43 +71,36 @@ export function InformationSection() {
         About
       </div>
       {isExpanded && (
-        <div className="section-items">
+        <div className="flex flex-col gap-2">
           {localResources.map((resource) => (
-            <div key={resource.name} className="card">
-              <div className="card-header">
-                <div
-                  className="card-icon-container"
-                  data-color={resource.color}
-                >
-                  <FontAwesomeIcon
-                    icon={resource.icon}
-                    className="card-icon"
-                    data-color={resource.color}
-                  />
-                </div>
-                <span className="card-title">{resource.name}</span>
-              </div>
-              <div className="card-description">
-                {renderDescriptionWithLink(
-                  resource.description,
-                  resource.url,
-                  resource.description.includes('iFixit')
-                    ? 'iFixit'
-                    : resource.name,
-                )}
-              </div>
-              {resource.secondaryDescription &&
-                resource.secondaryUrl &&
-                resource.secondaryLinkText && (
-                  <div className="card-description">
-                    {renderDescriptionWithLink(
-                      resource.secondaryDescription,
-                      resource.secondaryUrl,
-                      resource.secondaryLinkText,
+            <SidebarCard
+              key={resource.name}
+              colorTheme={resource.colorTheme}
+              icon={resource.icon}
+              title={resource.name}
+              description={
+                <>
+                  {renderDescriptionWithLink(
+                    resource.description,
+                    resource.url,
+                    resource.description.includes('iFixit')
+                      ? 'iFixit'
+                      : resource.name,
+                  )}
+                  {resource.secondaryDescription &&
+                    resource.secondaryUrl &&
+                    resource.secondaryLinkText && (
+                      <div className="mt-1">
+                        {renderDescriptionWithLink(
+                          resource.secondaryDescription,
+                          resource.secondaryUrl,
+                          resource.secondaryLinkText,
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-            </div>
+                </>
+              }
+            />
           ))}
         </div>
       )}
