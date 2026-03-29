@@ -149,7 +149,7 @@ export function RidesPanel() {
   return (
     <>
       {/* Toggle button */}
-      <div className="fixed top-4 right-4 z-[1701]">
+      <div className="fixed top-5 right-4 z-[1701]">
         <button
           ref={toggleRef}
           onClick={toggle}
@@ -172,17 +172,15 @@ export function RidesPanel() {
 
       {/* Floating recording HUD — visible when recording with panel closed */}
       {isRecording && !isOpen && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[1700] bg-white rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-4 max-md:left-2 max-md:right-14 max-md:translate-x-0">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse-dot" />
-            <span className="text-sm font-bold tabular-nums text-gray-700">
-              {formatElapsed(elapsedTime)}
-            </span>
-          </div>
-          <span className="text-sm tabular-nums text-gray-600">
+        <div className="fixed top-[22px] left-1/2 -translate-x-1/2 z-[1700] bg-white rounded-xl shadow-lg h-10 px-3 flex items-center gap-2.5 text-sm max-md:left-2 max-md:right-[68px] max-md:translate-x-0">
+          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse-dot shrink-0 self-center mt-px" />
+          <span className="font-bold tabular-nums text-gray-700">
+            {formatElapsed(elapsedTime)}
+          </span>
+          <span className="tabular-nums text-gray-500">
             {formatDistance(liveDistance)}
           </span>
-          <span className="text-sm tabular-nums text-gray-600">
+          <span className="tabular-nums text-gray-500">
             {formatElevation(liveElevationGain)}
           </span>
           <div className="flex gap-1.5 ml-auto">
