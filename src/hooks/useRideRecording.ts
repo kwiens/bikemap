@@ -299,12 +299,10 @@ export function useRideRecording(
   }, [isRecording]);
 
   const resumeRecording = useCallback(() => {
-    if (!isRecording || !manualPauseRef.current) return;
+    if (!isRecording || !pausedRef.current) return;
     manualPauseRef.current = false;
-    if (pausedRef.current) {
-      pausedTimeRef.current += Date.now() - pauseStartRef.current;
-      pausedRef.current = false;
-    }
+    pausedTimeRef.current += Date.now() - pauseStartRef.current;
+    pausedRef.current = false;
     lowSpeedCountRef.current = 0;
     setIsPaused(false);
   }, [isRecording]);
