@@ -7,9 +7,59 @@ import {
   faMountain,
   faRoute,
   faMapMarkerAlt,
+  type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { MAP_EVENTS } from '@/events';
+
+const features: {
+  icon: IconDefinition;
+  bg: string;
+  title: string;
+  desc: string;
+}[] = [
+  {
+    icon: faRoute,
+    bg: 'bg-blue-600',
+    title: 'Plan Fun Routes',
+    desc: 'Scenic loops to the zoo, aquarium, riverwalk & more',
+  },
+  {
+    icon: faBicycle,
+    bg: 'bg-emerald-600',
+    title: 'Find Safe Paths',
+    desc: 'Low-traffic greenways and protected bike trails',
+  },
+  {
+    icon: faMapMarkerAlt,
+    bg: 'bg-violet-600',
+    title: 'Grab a Bike',
+    desc: '24/7 city bike rental stations across downtown',
+  },
+];
+
+const choices: {
+  style: RideStyle;
+  icon: IconDefinition;
+  bg: string;
+  label: string;
+  desc: string;
+}[] = [
+  {
+    style: 'casual',
+    icon: faBicycle,
+    bg: 'bg-blue-600',
+    label: 'Casual',
+    desc: 'Scenic loops, greenways & city rides',
+  },
+  {
+    style: 'mountain',
+    icon: faMountain,
+    bg: 'bg-emerald-600',
+    label: 'Mountain',
+    desc: 'Singletrack trails & off-road adventures',
+  },
+];
 
 const STORAGE_KEY = 'bikechatt-welcome-dismissed';
 const RIDE_STYLE_COOKIE = 'bikechatt-ride-style';
@@ -83,56 +133,26 @@ export function WelcomeModal() {
         </div>
 
         <div className="flex flex-col gap-4 mb-7 text-left">
-          <div className="flex items-center gap-4">
-            <div
-              className="shrink-0 w-12 h-12 rounded-[14px] flex items-center justify-center text-white text-xl"
-              style={{ background: '#2563EB' }}
-            >
-              <FontAwesomeIcon icon={faRoute} />
+          {features.map((f) => (
+            <div key={f.title} className="flex items-center gap-4">
+              <div
+                className={cn(
+                  'shrink-0 w-12 h-12 rounded-[14px] flex items-center justify-center text-white text-xl',
+                  f.bg,
+                )}
+              >
+                <FontAwesomeIcon icon={f.icon} />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <strong className="text-base font-semibold text-app-secondary">
+                  {f.title}
+                </strong>
+                <span className="text-sm text-gray-500 leading-snug">
+                  {f.desc}
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <strong className="text-base font-semibold text-app-secondary">
-                Plan Fun Routes
-              </strong>
-              <span className="text-sm text-gray-500 leading-snug">
-                Scenic loops to the zoo, aquarium, riverwalk &amp; more
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div
-              className="shrink-0 w-12 h-12 rounded-[14px] flex items-center justify-center text-white text-xl"
-              style={{ background: '#059669' }}
-            >
-              <FontAwesomeIcon icon={faBicycle} />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <strong className="text-base font-semibold text-app-secondary">
-                Find Safe Paths
-              </strong>
-              <span className="text-sm text-gray-500 leading-snug">
-                Low-traffic greenways and protected bike trails
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div
-              className="shrink-0 w-12 h-12 rounded-[14px] flex items-center justify-center text-white text-xl"
-              style={{ background: '#7C3AED' }}
-            >
-              <FontAwesomeIcon icon={faMapMarkerAlt} />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <strong className="text-base font-semibold text-app-secondary">
-                Grab a Bike
-              </strong>
-              <span className="text-sm text-gray-500 leading-snug">
-                24/7 city bike rental stations across downtown
-              </span>
-            </div>
-          </div>
+          ))}
         </div>
 
         <p className="text-[17px] font-semibold text-app-secondary mb-4">
@@ -140,43 +160,29 @@ export function WelcomeModal() {
         </p>
 
         <div className="flex gap-4 mb-6">
-          <button
-            type="button"
-            className="flex-1 flex flex-col items-center gap-2.5 py-6 px-4 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-[#a5d730]"
-            onClick={() => choose('casual')}
-          >
-            <span
-              className="inline-flex items-center justify-center w-14 h-14 rounded-full text-white text-2xl"
-              style={{ background: '#2563EB' }}
+          {choices.map((c) => (
+            <button
+              key={c.style}
+              type="button"
+              className="flex-1 flex flex-col items-center gap-2.5 py-6 px-4 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-[#a5d730]"
+              onClick={() => choose(c.style)}
             >
-              <FontAwesomeIcon icon={faBicycle} />
-            </span>
-            <strong className="text-lg font-bold text-app-secondary">
-              Casual
-            </strong>
-            <span className="text-[13px] text-gray-500 leading-snug">
-              Scenic loops, greenways &amp; city rides
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className="flex-1 flex flex-col items-center gap-2.5 py-6 px-4 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-[#a5d730]"
-            onClick={() => choose('mountain')}
-          >
-            <span
-              className="inline-flex items-center justify-center w-14 h-14 rounded-full text-white text-2xl"
-              style={{ background: '#059669' }}
-            >
-              <FontAwesomeIcon icon={faMountain} />
-            </span>
-            <strong className="text-lg font-bold text-app-secondary">
-              Mountain
-            </strong>
-            <span className="text-[13px] text-gray-500 leading-snug">
-              Singletrack trails &amp; off-road adventures
-            </span>
-          </button>
+              <span
+                className={cn(
+                  'inline-flex items-center justify-center w-14 h-14 rounded-full text-white text-2xl',
+                  c.bg,
+                )}
+              >
+                <FontAwesomeIcon icon={c.icon} />
+              </span>
+              <strong className="text-lg font-bold text-app-secondary">
+                {c.label}
+              </strong>
+              <span className="text-[13px] text-gray-500 leading-snug">
+                {c.desc}
+              </span>
+            </button>
+          ))}
         </div>
 
         <p className="text-[13px] text-gray-400">You can always switch later</p>

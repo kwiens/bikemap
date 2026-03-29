@@ -11,6 +11,8 @@ import {
 import { SidebarCard } from './SidebarCard';
 import type { BikeRentalListProps } from './types';
 
+const BADGE_CLASS = 'bg-gray-200 px-2 py-0.5 rounded text-gray-600';
+
 export function BikeRentalList({
   show,
   onCenterLocation,
@@ -75,29 +77,21 @@ export function BikeRentalList({
               showArrow
             >
               <div className="flex flex-wrap gap-2 mt-2 ml-10 text-xs text-gray-500">
-                <span className="bg-gray-200 px-2 py-0.5 rounded text-gray-600">
-                  {location.rentalType}
-                </span>
-                <span className="bg-gray-200 px-2 py-0.5 rounded text-gray-600">
-                  {location.price}
-                </span>
-                <span className="bg-gray-200 px-2 py-0.5 rounded text-gray-600">
-                  {location.hours}
-                </span>
+                <span className={BADGE_CLASS}>{location.rentalType}</span>
+                <span className={BADGE_CLASS}>{location.price}</span>
+                <span className={BADGE_CLASS}>{location.hours}</span>
                 {location.availableBikes !== undefined && (
-                  <span className="bg-gray-200 px-2 py-0.5 rounded text-gray-600">
+                  <span className={BADGE_CLASS}>
                     Bikes: {location.availableBikes}
                   </span>
                 )}
                 {location.availableDocks !== undefined && (
-                  <span className="bg-gray-200 px-2 py-0.5 rounded text-gray-600">
+                  <span className={BADGE_CLASS}>
                     Docks: {location.availableDocks}
                   </span>
                 )}
                 {location.isChargingStation && (
-                  <span className="bg-gray-200 px-2 py-0.5 rounded text-gray-600">
-                    Charging Available
-                  </span>
+                  <span className={BADGE_CLASS}>Charging Available</span>
                 )}
               </div>
             </SidebarCard>

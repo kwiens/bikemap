@@ -30,6 +30,11 @@ const GRADE_YELLOW = 12;
 const GRADE_RED = 25;
 const MAX_GRADIENT_STOPS = 200;
 
+const CHART_SVG_CLASS =
+  'w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none';
+const ACTION_BTN_CLASS =
+  'bg-transparent border-none cursor-pointer text-gray-400 text-xs px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-50';
+
 export function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
   if (g <= GRADE_YELLOW) {
@@ -472,7 +477,7 @@ export function ElevationProfile() {
         <div className="flex gap-1 ml-2 shrink-0">
           <button
             type="button"
-            className="bg-transparent border-none cursor-pointer text-gray-400 text-xs px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-50"
+            className={ACTION_BTN_CLASS}
             onClick={() => {
               navigator.clipboard.writeText(window.location.href);
               setCopyToast(true);
@@ -484,7 +489,7 @@ export function ElevationProfile() {
           </button>
           <button
             type="button"
-            className="bg-transparent border-none cursor-pointer text-gray-400 text-xs px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-50"
+            className={ACTION_BTN_CLASS}
             onClick={() => downloadGpx(profile)}
             title="Download GPX"
           >
@@ -492,7 +497,7 @@ export function ElevationProfile() {
           </button>
           <button
             type="button"
-            className="bg-transparent border-none cursor-pointer text-gray-400 text-xs px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-50"
+            className={ACTION_BTN_CLASS}
             onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? 'Expand' : 'Collapse'}
           >
@@ -610,7 +615,7 @@ const ElevationSvg = React.memo(function ElevationSvg({
   return (
     <svg
       viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-      className="w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none"
+      className={CHART_SVG_CLASS}
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
       onTouchStart={onTouchStart}
@@ -718,7 +723,7 @@ function HoverIndicator({
   return (
     <svg
       viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-      className="w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none"
+      className={CHART_SVG_CLASS}
       preserveAspectRatio="none"
       style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
     >

@@ -154,18 +154,18 @@ export function RidesPanel() {
           ref={toggleRef}
           onClick={toggle}
           className={cn(
-            'toggle-button',
+            'bg-white rounded-full p-3 shadow-md cursor-pointer flex items-center justify-center border-none transition-colors duration-150 hover:bg-gray-50 active:bg-[#e5e5e5]',
             isRecording &&
               !isOpen &&
-              'animate-recording-pulse [&_.toggle-button-icon]:text-red-500',
-            isRecording && isOpen && '[&_.toggle-button-icon]:text-red-500',
+              'animate-recording-pulse [&_svg]:text-red-500',
+            isRecording && isOpen && '[&_svg]:text-red-500',
           )}
           type="button"
           aria-label={isOpen ? 'Close rides panel' : 'Open rides panel'}
         >
           <FontAwesomeIcon
             icon={isOpen ? faTimes : faStopwatch}
-            className="toggle-button-icon"
+            className="w-5 h-5 text-gray-700"
           />
         </button>
       </div>
