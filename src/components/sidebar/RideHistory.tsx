@@ -65,14 +65,11 @@ export function RideHistory({
   }, [selectedRideId]);
 
   const handleDetailClose = () => {
-    setSelectedRide(null);
     window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
   };
 
   const handleDeleted = () => {
-    setSelectedRide(null);
     window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
-    refreshSummaries();
   };
 
   if (selectedRide) {
