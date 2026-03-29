@@ -278,10 +278,10 @@ export function useRideRecording(
     // Periodically save in-progress data for crash recovery
     saveIntervalRef.current = setInterval(() => {
       if (pointsRef.current.length > 0) {
-        void saveInProgress({
+        saveInProgress({
           startTime: startTimeRef.current,
           points: pointsRef.current,
-        });
+        }).catch(() => {});
       }
     }, 10_000);
 

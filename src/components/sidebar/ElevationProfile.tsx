@@ -213,10 +213,12 @@ export function ElevationProfile() {
     const handleRidesPanelToggle = (e: Event) => {
       setRidesPanelOpen((e as CustomEvent).detail.isOpen);
     };
+    let latestRideId: string | null = null;
     const handleRideSelect = async (e: Event) => {
       const { rideId } = (e as CustomEvent).detail;
+      latestRideId = rideId;
       const ride = await loadRide(rideId);
-      if (!ride) return;
+      if (!ride || latestRideId !== rideId) return; // stale check
       const elevProfile = rideToElevationProfile(ride);
       sourceRef.current = 'ride';
       if (elevProfile) {

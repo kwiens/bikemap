@@ -118,12 +118,16 @@ const MapboxMap = memo(function MapboxMap() {
     const selectHandler = (e: Event) => handleRideSelect(e as CustomEvent);
     const deselectHandler = () => handleRideDeselect();
     const liveCoords: [number, number][] = [];
+    let updateSkip = 0;
     const updateHandler = (e: Event) => {
       if (!map.current) return;
       const { point } = (e as CustomEvent).detail;
       liveCoords.push(point);
-      if (liveCoords.length >= 2) {
+      // Throttle Mapbox setData to every 3rd point
+      updateSkip++;
+      if (liveCoords.length >= 2 && updateSkip >= 3) {
         updateRideLayer(map.current, liveCoords);
+        updateSkip = 0;
       }
     };
     const stopHandler = () => {

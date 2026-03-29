@@ -74,6 +74,11 @@ export function RidesPanel() {
       const { isOpen: sidebarOpen } = (e as CustomEvent).detail;
       if (sidebarOpen && isOpenRef.current) {
         setIsOpen(false);
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, {
+            detail: { isOpen: false },
+          }),
+        );
       }
     };
     window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handler);
