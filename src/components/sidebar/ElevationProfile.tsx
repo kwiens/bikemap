@@ -162,6 +162,7 @@ export function findClosestProfileIndex(
 export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
   const [copyToast, setCopyToast] = useState(false);
+  const [toastFading, setToastFading] = useState(false);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -452,102 +453,109 @@ export function ElevationProfile() {
   const maxDist = points[points.length - 1][0];
 
   return (
-    <div
-      className={`elevation-overlay ${sidebarOpen ? 'elevation-overlay-sidebar-open' : 'elevation-overlay-full'} ${ridesPanelOpen ? 'elevation-overlay-rides-open' : ''}`}
-    >
-      <div className="elevation-overlay-header">
-        <span className="elevation-overlay-title">{trailName}</span>
-        <div className="elevation-stats">
-          <span>{(maxDist / 5280).toFixed(1)} mi</span>
-          <span>+{profile.gain.toLocaleString()} ft climbing</span>
+    <>
+      {copyToast && (
+        <div className={`route-toast ${toastFading ? 'fade-out' : ''}`}>
+          Link copied
         </div>
-        <div className="elevation-actions">
-          <button
-            type="button"
-            className="elevation-action-btn"
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              setCopyToast(true);
-              setTimeout(() => setCopyToast(false), 2000);
-            }}
-            title="Copy link"
-          >
-            <FontAwesomeIcon icon={faShareAlt} />
-          </button>
-          <button
-            type="button"
-            className="elevation-action-btn"
-            onClick={() => downloadGpx(profile)}
-            title="Download GPX"
-          >
-            <FontAwesomeIcon icon={faDownload} />
-          </button>
-          <button
-            type="button"
-            className="elevation-action-btn"
-            onClick={() => setCollapsed(!collapsed)}
-            title={collapsed ? 'Expand' : 'Collapse'}
-          >
-            <FontAwesomeIcon icon={collapsed ? faChevronUp : faChevronDown} />
-          </button>
+      )}
+      <div
+        className={`elevation-overlay ${sidebarOpen ? 'elevation-overlay-sidebar-open' : 'elevation-overlay-full'} ${ridesPanelOpen ? 'elevation-overlay-rides-open' : ''}`}
+      >
+        <div className="elevation-overlay-header">
+          <span className="elevation-overlay-title">{trailName}</span>
+          <div className="elevation-stats">
+            <span>{(maxDist / 5280).toFixed(1)} mi</span>
+            <span>+{profile.gain.toLocaleString()} ft climbing</span>
+          </div>
+          <div className="elevation-actions">
+            <button
+              type="button"
+              className="elevation-action-btn"
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                setCopyToast(true);
+                setToastFading(false);
+                setTimeout(() => setToastFading(true), 2000);
+                setTimeout(() => setCopyToast(false), 2300);
+              }}
+              title="Copy link"
+            >
+              <FontAwesomeIcon icon={faShareAlt} />
+            </button>
+            <button
+              type="button"
+              className="elevation-action-btn"
+              onClick={() => downloadGpx(profile)}
+              title="Download GPX"
+            >
+              <FontAwesomeIcon icon={faDownload} />
+            </button>
+            <button
+              type="button"
+              className="elevation-action-btn"
+              onClick={() => setCollapsed(!collapsed)}
+              title={collapsed ? 'Expand' : 'Collapse'}
+            >
+              <FontAwesomeIcon icon={collapsed ? faChevronUp : faChevronDown} />
+            </button>
+          </div>
         </div>
-      </div>
 
-      {copyToast && <div className="elevation-copy-toast">Link copied</div>}
+        {!collapsed && (
+          <>
+            <div className="elevation-chart-container">
+              <div className="elevation-y-axis">
+                <span className="elevation-y-label elevation-y-max">
+                  {profile.max.toLocaleString()} ft
+                </span>
+                <span className="elevation-y-label elevation-y-min">
+                  {profile.min.toLocaleString()} ft
+                </span>
+              </div>
 
-      {!collapsed && (
-        <>
-          <div className="elevation-chart-container">
-            <div className="elevation-y-axis">
-              <span className="elevation-y-label elevation-y-max">
-                {profile.max.toLocaleString()} ft
-              </span>
-              <span className="elevation-y-label elevation-y-min">
-                {profile.min.toLocaleString()} ft
-              </span>
-            </div>
-
-            <div className="elevation-chart-wrapper">
-              <ElevationSvg
-                points={points}
-                gradeColors={gradeColors}
-                profile={profile}
-                chartWidth={chartWidth}
-                svgRef={svgRef}
-                onMouseMove={handleMouseMove}
-                onMouseLeave={clearHover}
-                onTouchStart={handleTouch}
-                onTouchMove={handleTouch}
-                onTouchEnd={clearHover}
-              />
-              {locationIndex !== null && (
-                <LocationIndicator
-                  points={points}
-                  profile={profile}
-                  chartWidth={chartWidth}
-                  locationIndex={locationIndex}
-                />
-              )}
-              {hoverIndex !== null && (
-                <HoverIndicator
+              <div className="elevation-chart-wrapper">
+                <ElevationSvg
                   points={points}
                   gradeColors={gradeColors}
                   profile={profile}
                   chartWidth={chartWidth}
-                  hoverIndex={hoverIndex}
+                  svgRef={svgRef}
+                  onMouseMove={handleMouseMove}
+                  onMouseLeave={clearHover}
+                  onTouchStart={handleTouch}
+                  onTouchMove={handleTouch}
+                  onTouchEnd={clearHover}
                 />
-              )}
+                {locationIndex !== null && (
+                  <LocationIndicator
+                    points={points}
+                    profile={profile}
+                    chartWidth={chartWidth}
+                    locationIndex={locationIndex}
+                  />
+                )}
+                {hoverIndex !== null && (
+                  <HoverIndicator
+                    points={points}
+                    gradeColors={gradeColors}
+                    profile={profile}
+                    chartWidth={chartWidth}
+                    hoverIndex={hoverIndex}
+                  />
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="elevation-tooltip">
-            {hoverIndex !== null
-              ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${points[hoverIndex][1].toLocaleString()} ft`
-              : '\u00A0'}
-          </div>
-        </>
-      )}
-    </div>
+            <div className="elevation-tooltip">
+              {hoverIndex !== null
+                ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${points[hoverIndex][1].toLocaleString()} ft`
+                : '\u00A0'}
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
