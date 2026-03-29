@@ -270,9 +270,10 @@ export function useRideRecording(
       const paused = pausedRef.current
         ? pausedTimeRef.current + (Date.now() - pauseStartRef.current)
         : pausedTimeRef.current;
-      setElapsedTime(
-        Math.floor((Date.now() - startTimeRef.current - paused) / 1000),
+      const next = Math.floor(
+        (Date.now() - startTimeRef.current - paused) / 1000,
       );
+      setElapsedTime((prev) => (prev === next ? prev : next));
     }, 1000);
 
     // Periodically save in-progress data for crash recovery
