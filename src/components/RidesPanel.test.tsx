@@ -4,21 +4,25 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { RidesPanel } from './RidesPanel';
 import { MAP_EVENTS } from '@/events';
 
-// Mock useRideRecording hook
-const mockHook = {
-  isRecording: false,
-  isPaused: false,
-  hasRecovery: false,
-  elapsedTime: 0,
-  liveDistance: 0,
-  liveElevationGain: 0,
-  startRecording: vi.fn(),
-  pauseRecording: vi.fn(),
-  resumeRecording: vi.fn(),
-  stopRecording: vi.fn().mockResolvedValue(null),
-  recoverRide: vi.fn().mockResolvedValue(null),
-  dismissRecovery: vi.fn(),
-};
+// Mock useRideRecording hook — rebuilt each test via beforeEach
+function createMockHook() {
+  return {
+    isRecording: false,
+    isPaused: false,
+    hasRecovery: false,
+    elapsedTime: 0,
+    liveDistance: 0,
+    liveElevationGain: 0,
+    startRecording: vi.fn(),
+    pauseRecording: vi.fn(),
+    resumeRecording: vi.fn(),
+    stopRecording: vi.fn().mockResolvedValue(null),
+    recoverRide: vi.fn().mockResolvedValue(null),
+    dismissRecovery: vi.fn(),
+  };
+}
+
+let mockHook = createMockHook();
 
 vi.mock('@/hooks', () => ({
   useRideRecording: () => mockHook,
@@ -44,14 +48,7 @@ function openPanel() {
 
 describe('RidesPanel', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Reset mock state
-    mockHook.isRecording = false;
-    mockHook.isPaused = false;
-    mockHook.hasRecovery = false;
-    mockHook.elapsedTime = 0;
-    mockHook.liveDistance = 0;
-    mockHook.liveElevationGain = 0;
+    mockHook = createMockHook();
   });
 
   it('renders toggle button', () => {

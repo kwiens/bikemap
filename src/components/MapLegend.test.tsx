@@ -1,8 +1,9 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MapLegendProvider } from './MapLegend';
 import { MAP_EVENTS } from '@/events';
+import { dispatch } from '@/test/fixtures';
 
 // Mock all sidebar children to keep tests focused on MapLegendProvider state
 vi.mock('./sidebar', () => ({
@@ -57,12 +58,6 @@ let mockRideStyle: string | null = null;
 vi.mock('./WelcomeModal', () => ({
   getRideStyle: () => mockRideStyle,
 }));
-
-function dispatch(event: string, detail?: Record<string, unknown>) {
-  act(() => {
-    window.dispatchEvent(new CustomEvent(event, { detail }));
-  });
-}
 
 describe('MapLegendProvider', () => {
   const events: Array<{ type: string; detail: unknown }> = [];

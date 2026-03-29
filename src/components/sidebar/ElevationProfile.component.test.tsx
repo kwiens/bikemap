@@ -1,8 +1,9 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { ElevationProfile } from './ElevationProfile';
 import { MAP_EVENTS } from '@/events';
+import { dispatch } from '@/test/fixtures';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 
 // Mock ride-storage and ride-stats (used for ride-select)
@@ -28,6 +29,13 @@ const mockProfile: ElevationProfileData = {
     [1000, 900, -85.304, 35.004],
   ],
 };
+
+async function selectTrail(name: string) {
+  dispatch(MAP_EVENTS.TRAIL_SELECT, { trailName: name });
+  await waitFor(() => {
+    expect(screen.getByText(name)).toBeInTheDocument();
+  });
+}
 
 describe('ElevationProfile component', () => {
   beforeEach(() => {
@@ -56,17 +64,7 @@ describe('ElevationProfile component', () => {
   it('loads and shows profile on trail-select event', async () => {
     render(<ElevationProfile />);
 
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-          detail: { trailName: 'Test Trail' },
-        }),
-      );
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Trail')).toBeInTheDocument();
-    });
+    await selectTrail('Test Trail');
 
     expect(global.fetch).toHaveBeenCalledWith(
       '/data/elevation/test-trail.json',
@@ -77,23 +75,9 @@ describe('ElevationProfile component', () => {
   it('clears profile on trail-deselect when source was trail', async () => {
     render(<ElevationProfile />);
 
-    // Select trail
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-          detail: { trailName: 'Test Trail' },
-        }),
-      );
-    });
+    await selectTrail('Test Trail');
 
-    await waitFor(() => {
-      expect(screen.getByText('Test Trail')).toBeInTheDocument();
-    });
-
-    // Deselect
-    act(() => {
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
-    });
+    dispatch(MAP_EVENTS.TRAIL_DESELECT);
 
     expect(screen.queryByText('Test Trail')).not.toBeInTheDocument();
   });
@@ -101,26 +85,9 @@ describe('ElevationProfile component', () => {
   it('trail-sourced profile survives route-select event', async () => {
     render(<ElevationProfile />);
 
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-          detail: { trailName: 'Test Trail' },
-        }),
-      );
-    });
+    await selectTrail('Test Trail');
 
-    await waitFor(() => {
-      expect(screen.getByText('Test Trail')).toBeInTheDocument();
-    });
-
-    // Route-select should NOT clear trail-sourced profile
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
-          detail: { routeId: 'some-route' },
-        }),
-      );
-    });
+    dispatch(MAP_EVENTS.ROUTE_SELECT, { routeId: 'some-route' });
 
     expect(screen.getByText('Test Trail')).toBeInTheDocument();
   });
@@ -128,22 +95,9 @@ describe('ElevationProfile component', () => {
   it('trail-sourced profile survives route-deselect event', async () => {
     render(<ElevationProfile />);
 
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-          detail: { trailName: 'Test Trail' },
-        }),
-      );
-    });
+    await selectTrail('Test Trail');
 
-    await waitFor(() => {
-      expect(screen.getByText('Test Trail')).toBeInTheDocument();
-    });
-
-    // route-deselect should NOT clear trail-sourced profile
-    act(() => {
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-    });
+    dispatch(MAP_EVENTS.ROUTE_DESELECT);
 
     expect(screen.getByText('Test Trail')).toBeInTheDocument();
   });
@@ -151,13 +105,7 @@ describe('ElevationProfile component', () => {
   it('location-update is ignored when no profile loaded', () => {
     const { container } = render(<ElevationProfile />);
 
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.LOCATION_UPDATE, {
-          detail: { lng: -85.302, lat: 35.002 },
-        }),
-      );
-    });
+    dispatch(MAP_EVENTS.LOCATION_UPDATE, { lng: -85.302, lat: 35.002 });
 
     expect(container.innerHTML).toBe('');
   });
@@ -165,26 +113,13 @@ describe('ElevationProfile component', () => {
   it('recording-stop clears ride-sourced state and allows new trail selection', async () => {
     render(<ElevationProfile />);
 
-    // Start recording
-    act(() => {
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
+    dispatch(MAP_EVENTS.RIDE_RECORDING_START);
+    dispatch(MAP_EVENTS.RIDE_RECORDING_STOP);
+
+    dispatch(MAP_EVENTS.TRAIL_SELECT, {
+      trailName: 'After Recording Trail',
     });
 
-    // Stop recording — should clear source
-    act(() => {
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
-    });
-
-    // Now select a trail — should work because sourceRef was cleared
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-          detail: { trailName: 'After Recording Trail' },
-        }),
-      );
-    });
-
-    // The profile fetch should use the new trail name (slugified)
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         '/data/elevation/after-recording-trail.json',

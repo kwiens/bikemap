@@ -34,16 +34,19 @@ describe('addRideLayer', () => {
     );
   });
 
-  it('removes existing layer before adding', () => {
-    const map = mockMap();
+  it('removes existing layer before adding when layer exists', () => {
+    const map = mockMap({
+      getLayer: vi.fn().mockReturnValue({ id: 'recorded-ride-line' }),
+      getSource: vi.fn().mockReturnValue({ type: 'geojson' }),
+    });
 
     addRideLayer(map, [
       [-85.3, 35.0],
       [-85.31, 35.01],
     ]);
 
-    // removeRideLayer is called first, which checks getLayer/getSource
-    expect(map.removeLayer).toHaveBeenCalled();
+    expect(map.removeLayer).toHaveBeenCalledWith('recorded-ride-line');
+    expect(map.removeSource).toHaveBeenCalledWith('recorded-ride');
   });
 });
 
