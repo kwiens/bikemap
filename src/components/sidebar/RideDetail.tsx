@@ -48,12 +48,12 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
     downloadFile(gpx, `${slugify(currentName)}.gpx`, 'application/gpx+xml');
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!confirmDelete) {
       setConfirmDelete(true);
       return;
     }
-    deleteRide(ride.id).catch(() => {});
+    await deleteRide(ride.id).catch(() => {});
     onDeleted();
   };
 

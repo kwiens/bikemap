@@ -249,10 +249,6 @@ export function ElevationProfile() {
       setTrailName('Recording');
       setCollapsed(false);
     };
-    const handleRecordingUpdate = () => {
-      // Elevation profile updates only after ride is saved (via RIDE_SELECT),
-      // not during live recording — avoids recomputing on every GPS tick.
-    };
     const handleRecordingStop = () => {
       if (sourceRef.current === 'ride') {
         sourceRef.current = null;
@@ -276,10 +272,6 @@ export function ElevationProfile() {
     window.addEventListener(
       MAP_EVENTS.RIDE_RECORDING_START,
       handleRecordingStart,
-    );
-    window.addEventListener(
-      MAP_EVENTS.RIDE_RECORDING_UPDATE,
-      handleRecordingUpdate,
     );
     window.addEventListener(
       MAP_EVENTS.RIDE_RECORDING_STOP,
@@ -310,10 +302,6 @@ export function ElevationProfile() {
       window.removeEventListener(
         MAP_EVENTS.RIDE_RECORDING_START,
         handleRecordingStart,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.RIDE_RECORDING_UPDATE,
-        handleRecordingUpdate,
       );
       window.removeEventListener(
         MAP_EVENTS.RIDE_RECORDING_STOP,

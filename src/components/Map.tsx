@@ -111,6 +111,7 @@ const MapboxMap = memo(function MapboxMap() {
       selected: 1,
       unselected: 1,
     });
+    updateMtnBikeOpacity(map.current, null);
   }, []);
 
   // Set up ride select/deselect event listeners

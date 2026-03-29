@@ -239,6 +239,7 @@ export function pointsToElevationProfile(
   points: { lat: number; lng: number; altitude: number | null }[],
   name: string,
   stats?: {
+    distance?: number; // meters — used for consistent total distance
     elevationGain: number;
     elevationLoss: number;
     elevationMin: number;
@@ -293,9 +294,14 @@ export function pointsToElevationProfile(
     max = computed.max * FEET_PER_METER;
   }
 
+  const totalDistFt =
+    stats?.distance != null
+      ? stats.distance * FEET_PER_METER
+      : profile[profile.length - 1][0];
+
   return {
     trail: name,
-    distance: profile[profile.length - 1][0],
+    distance: totalDistFt,
     gain,
     loss,
     min,
