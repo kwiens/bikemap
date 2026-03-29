@@ -259,7 +259,12 @@ describe('computeBounds', () => {
     ];
     const bounds = computeBounds(points);
     expect(bounds).not.toBeNull();
-    const [swLng, swLat, neLng, neLat] = bounds!;
+    const [swLng, swLat, neLng, neLat] = bounds as [
+      number,
+      number,
+      number,
+      number,
+    ];
     expect(swLng).toBe(-85.31);
     expect(swLat).toBe(35.04);
     expect(neLng).toBe(-85.29);
@@ -270,7 +275,12 @@ describe('computeBounds', () => {
     const points = [makePoint({ lng: -85.3, lat: 35.05 })];
     const bounds = computeBounds(points);
     expect(bounds).not.toBeNull();
-    const [swLng, swLat, neLng, neLat] = bounds!;
+    const [swLng, swLat, neLng, neLat] = bounds as [
+      number,
+      number,
+      number,
+      number,
+    ];
     expect(swLng).toBe(-85.3);
     expect(neLng).toBe(-85.3);
     expect(swLat).toBe(35.05);
@@ -357,18 +367,23 @@ describe('rideToElevationProfile', () => {
 
   it('profile distances are cumulative and in feet', () => {
     const points = makeTrack(10, { startAlt: 200, altStep: 0 });
-    const profile = rideToElevationProfile(makeRide(points))!;
-    expect(profile.profile[0][0]).toBe(0); // first distance is 0
-    for (let i = 1; i < profile.profile.length; i++) {
-      expect(profile.profile[i][0]).toBeGreaterThan(profile.profile[i - 1][0]);
+    const profile = rideToElevationProfile(makeRide(points));
+    expect(profile).not.toBeNull();
+    const p = profile as NonNullable<typeof profile>;
+    expect(p.profile[0][0]).toBe(0); // first distance is 0
+    for (let i = 1; i < p.profile.length; i++) {
+      expect(p.profile[i][0]).toBeGreaterThan(p.profile[i - 1][0]);
     }
   });
 
   it('converts elevation to feet', () => {
     const points = makeTrack(10, { startAlt: 100, altStep: 0 });
-    const profile = rideToElevationProfile(makeRide(points))!;
+    const profile = rideToElevationProfile(makeRide(points));
+    expect(profile).not.toBeNull();
     // 100m ≈ 328 ft — profile elevations should be in feet range
-    const elevations = profile.profile.map((p) => p[1]);
+    const elevations = (profile as NonNullable<typeof profile>).profile.map(
+      (p) => p[1],
+    );
     for (const e of elevations) {
       expect(e).toBeGreaterThan(300);
       expect(e).toBeLessThan(400);
