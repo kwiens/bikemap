@@ -571,14 +571,14 @@
 /* Elevation profile overlay */
 .elevation-overlay {
   position: absolute;
-  bottom: 28px;
+  bottom: 4px;
   left: 296px;
   right: 16px;
   background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   padding: 10px 16px 6px;
-  z-index: 1000;
+  z-index: 1700;
   pointer-events: auto;
 }
 
