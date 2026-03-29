@@ -75,6 +75,22 @@ export async function fetchStationStatus(): Promise<GBFSStationStatus[]> {
   return data.data.stations;
 }
 
+// Fetch and normalize all bike rental locations in one call
+export async function loadBikeRentalLocations(): Promise<BikeRentalLocation[]> {
+  const [stations, statuses] = await Promise.all([
+    fetchStationInformation(),
+    fetchStationStatus(),
+  ]);
+
+  const statusMap = new Map(
+    statuses.map((status) => [status.station_id, status]),
+  );
+
+  return stations.map((station) =>
+    gbfsToBikeRentalLocation(station, statusMap.get(station.station_id)),
+  );
+}
+
 // Extended BikeRentalLocation interface with GBFS-specific fields
 export interface BikeRentalLocation {
   name: string;

@@ -22,12 +22,7 @@ import {
 import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
 import { cn } from '@/lib/utils';
 import { useToast, useMapResize } from '@/hooks';
-import {
-  fetchStationInformation,
-  fetchStationStatus,
-  gbfsToBikeRentalLocation,
-  type GBFSStationStatus,
-} from '@/data/gbfs';
+import { loadBikeRentalLocations } from '@/data/gbfs';
 import {
   geocodeAddress,
   updateRouteOpacity,
@@ -338,24 +333,8 @@ const MapboxMap = memo(function MapboxMap() {
         bikeRentalMarkers.current.hide();
 
         try {
-          // Fetch station information and status
-          const [stations, statuses] = await Promise.all([
-            fetchStationInformation(),
-            fetchStationStatus(),
-          ]);
+          const rentalLocations = await loadBikeRentalLocations();
 
-          // Create status map
-          const statusMap: { [key: string]: GBFSStationStatus } = {};
-          statuses.forEach((status) => {
-            statusMap[status.station_id] = status;
-          });
-
-          // Convert GBFS stations to our format and create markers
-          const rentalLocations = stations.map((station) =>
-            gbfsToBikeRentalLocation(station, statusMap[station.station_id]),
-          );
-
-          // Create markers using the utility function
           const markers = rentalLocations
             .map((location) => createBikeRentalMarker(location))
             .filter((marker): marker is mapboxgl.Marker => marker !== null);
