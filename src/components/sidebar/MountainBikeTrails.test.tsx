@@ -79,25 +79,25 @@ describe('MountainBikeTrails', () => {
     expect(onTrailSelect).toHaveBeenCalledWith('Trail D');
   });
 
-  it('selected trail gets route-item-selected class', () => {
+  it('selected trail gets selected styling', () => {
     render(<MountainBikeTrails {...defaultProps} selectedTrail="Trail D" />);
 
     // selectedTrail auto-expands the region and area, so Trail D should be visible
     const trailDButton = screen.getByRole('button', { name: /Trail D/ });
-    expect(trailDButton).toHaveClass('route-item-selected');
+    expect(trailDButton).toHaveAttribute('data-selected');
   });
 
-  it('non-selected trails get route-item-faded when a trail is selected', () => {
+  it('non-selected trails get faded when a trail is selected', () => {
     render(<MountainBikeTrails {...defaultProps} selectedTrail="Trail A" />);
 
     // Trail A is selected, so auto-expand puts Region 1 and Area 1 open
     const trailAButton = screen.getByRole('button', { name: /Trail A/ });
     const trailBButton = screen.getByRole('button', { name: /Trail B/ });
 
-    expect(trailAButton).toHaveClass('route-item-selected');
-    expect(trailAButton).not.toHaveClass('route-item-faded');
-    expect(trailBButton).toHaveClass('route-item-faded');
-    expect(trailBButton).not.toHaveClass('route-item-selected');
+    expect(trailAButton).toHaveAttribute('data-selected');
+    expect(trailAButton).not.toHaveAttribute('data-faded');
+    expect(trailBButton).toHaveAttribute('data-faded');
+    expect(trailBButton).not.toHaveAttribute('data-selected');
   });
 
   it('clicking region heading calls onAreaSelect', () => {

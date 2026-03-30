@@ -7,9 +7,59 @@ import {
   faMountain,
   faRoute,
   faMapMarkerAlt,
+  type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
+import { cn } from '@/lib/utils';
 import { MAP_EVENTS } from '@/events';
-import './welcome-modal.css';
+
+const features: {
+  icon: IconDefinition;
+  bg: string;
+  title: string;
+  desc: string;
+}[] = [
+  {
+    icon: faRoute,
+    bg: 'bg-blue-600',
+    title: 'Plan Fun Routes',
+    desc: 'Scenic loops to the river and zoo',
+  },
+  {
+    icon: faBicycle,
+    bg: 'bg-emerald-600',
+    title: 'Find Safe Paths',
+    desc: 'Low-traffic greenways & bike trails',
+  },
+  {
+    icon: faMapMarkerAlt,
+    bg: 'bg-violet-600',
+    title: 'Grab a Bike',
+    desc: 'Bike rental stations around town',
+  },
+];
+
+const choices: {
+  style: RideStyle;
+  icon: IconDefinition;
+  bg: string;
+  label: string;
+  desc: string;
+}[] = [
+  {
+    style: 'casual',
+    icon: faBicycle,
+    bg: 'bg-blue-600',
+    label: 'Casual',
+    desc: 'Scenic loops & greenways',
+  },
+  {
+    style: 'mountain',
+    icon: faMountain,
+    bg: 'bg-emerald-600',
+    label: 'Mountain',
+    desc: 'Singletrack trails & adventures',
+  },
+];
 
 const STORAGE_KEY = 'bikechatt-welcome-dismissed';
 const RIDE_STYLE_COOKIE = 'bikechatt-ride-style';
@@ -56,102 +106,84 @@ export function WelcomeModal() {
   if (!visible) return null;
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: overlay dismiss on click
     <div
-      className={`welcome-overlay ${exiting ? 'welcome-exit' : 'welcome-enter'}`}
+      className={cn(
+        'fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-[4px] px-5 py-10',
+        exiting ? 'animate-welcome-fade-out' : 'animate-welcome-fade-in',
+      )}
     >
       {/* biome-ignore lint/a11y/noStaticElementInteractions: stop propagation for content area */}
-      <div className="welcome-content" onClick={(e) => e.stopPropagation()}>
-        <div className="welcome-header">
-          <span className="welcome-bike-icon">
+      <div
+        className={cn(
+          'bg-white rounded-3xl w-full max-w-[400px] px-7 pt-7 pb-6 text-center shadow-[0_24px_48px_rgba(0,0,0,0.25)] animate-welcome-slide-up',
+          exiting && 'animate-welcome-slide-down',
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-5">
+          <span className="inline-flex items-center justify-center w-[60px] h-[60px] rounded-full bg-app-primary text-app-secondary text-[28px] mb-3">
             <FontAwesomeIcon icon={faBicycle} />
           </span>
-          <h1 className="welcome-title">Bike Chatt</h1>
-          <p className="welcome-subtitle">Your guide to biking Chattanooga</p>
+          <h1 className="text-[28px] font-bold text-app-secondary mb-1 tracking-tight">
+            Bike Chatt
+          </h1>
+          <p className="text-[15px] text-gray-500 font-normal">
+            Your guide to biking Chattanooga
+          </p>
         </div>
 
-        <div className="welcome-features">
-          <div className="welcome-feature">
-            <div
-              className="welcome-feature-icon"
-              style={{ background: '#2563EB' }}
-            >
-              <FontAwesomeIcon icon={faRoute} />
+        <div className="flex flex-col gap-3 mb-5 text-left">
+          {features.map((f) => (
+            <div key={f.title} className="flex items-center gap-4">
+              <div
+                className={cn(
+                  'shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg',
+                  f.bg,
+                )}
+              >
+                <FontAwesomeIcon icon={f.icon} />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <strong className="text-base font-semibold text-app-secondary">
+                  {f.title}
+                </strong>
+                <span className="text-sm text-gray-500 leading-snug">
+                  {f.desc}
+                </span>
+              </div>
             </div>
-            <div className="welcome-feature-text">
-              <strong>Plan Fun Routes</strong>
-              <span>
-                Scenic loops to the zoo, aquarium, riverwalk &amp; more
+          ))}
+        </div>
+
+        <p className="text-[15px] font-semibold text-app-secondary mb-3">
+          How do you want to ride?
+        </p>
+
+        <div className="flex gap-3">
+          {choices.map((c) => (
+            <button
+              key={c.style}
+              type="button"
+              className="flex-1 flex flex-col items-center gap-2 py-4 px-3 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-[#a5d730]"
+              onClick={() => choose(c.style)}
+            >
+              <span
+                className={cn(
+                  'inline-flex items-center justify-center w-12 h-12 rounded-full text-white text-xl',
+                  c.bg,
+                )}
+              >
+                <FontAwesomeIcon icon={c.icon} />
               </span>
-            </div>
-          </div>
-
-          <div className="welcome-feature">
-            <div
-              className="welcome-feature-icon"
-              style={{ background: '#059669' }}
-            >
-              <FontAwesomeIcon icon={faBicycle} />
-            </div>
-            <div className="welcome-feature-text">
-              <strong>Find Safe Paths</strong>
-              <span>Low-traffic greenways and protected bike trails</span>
-            </div>
-          </div>
-
-          <div className="welcome-feature">
-            <div
-              className="welcome-feature-icon"
-              style={{ background: '#7C3AED' }}
-            >
-              <FontAwesomeIcon icon={faMapMarkerAlt} />
-            </div>
-            <div className="welcome-feature-text">
-              <strong>Grab a Bike</strong>
-              <span>24/7 city bike rental stations across downtown</span>
-            </div>
-          </div>
+              <strong className="text-lg font-bold text-app-secondary">
+                {c.label}
+              </strong>
+              <span className="text-[13px] text-gray-500 leading-snug">
+                {c.desc}
+              </span>
+            </button>
+          ))}
         </div>
-
-        <p className="welcome-question">How do you want to ride?</p>
-
-        <div className="welcome-choices">
-          <button
-            type="button"
-            className="welcome-choice"
-            onClick={() => choose('casual')}
-          >
-            <span
-              className="welcome-choice-icon"
-              style={{ background: '#2563EB' }}
-            >
-              <FontAwesomeIcon icon={faBicycle} />
-            </span>
-            <strong>Casual</strong>
-            <span className="welcome-choice-desc">
-              Scenic loops, greenways &amp; city rides
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className="welcome-choice"
-            onClick={() => choose('mountain')}
-          >
-            <span
-              className="welcome-choice-icon"
-              style={{ background: '#059669' }}
-            >
-              <FontAwesomeIcon icon={faMountain} />
-            </span>
-            <strong>Mountain</strong>
-            <span className="welcome-choice-desc">
-              Singletrack trails &amp; off-road adventures
-            </span>
-          </button>
-        </div>
-
-        <p className="welcome-dismiss-hint">You can always switch later</p>
       </div>
     </div>
   );

@@ -40,8 +40,8 @@ export const bikeResources: BikeResource[] = [
     description:
       'Official retailer offering a range of Trek bikes, accessories, and professional maintenance services.',
     address: '307 Manufacturers Road, Suite 117, Chattanooga, TN 37405',
-    latitude: 35.0617,
-    longitude: -85.3086,
+    latitude: 35.0524,
+    longitude: -85.3108,
     icon: faRoad,
   },
   {

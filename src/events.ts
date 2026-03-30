@@ -17,4 +17,5 @@ export const MAP_EVENTS = {
   RIDE_SELECT: 'ride-select',
   RIDE_DESELECT: 'ride-deselect',
   RIDES_PANEL_TOGGLE: 'rides-panel-toggle',
+  TOAST: 'toast',
 } as const;

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.9/schema.json",
   "files": {
     "ignoreUnknown": false,
     "includes": [
@@ -10,7 +10,8 @@
       "!**/node_modules",
       "!**/.next",
       "!**/public",
-      "!**/.vercel"
+      "!**/.vercel",
+      "!**/generate-icons.html"
     ]
   },
   "vcs": {

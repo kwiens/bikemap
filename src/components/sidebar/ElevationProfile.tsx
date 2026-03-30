@@ -19,6 +19,7 @@ import {
   faChevronDown,
   faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
+import { cn } from '@/lib/utils';
 
 const CHART_HEIGHT = 100;
 const CHART_PADDING_TOP = 4;
@@ -28,6 +29,11 @@ const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 const GRADE_YELLOW = 12;
 const GRADE_RED = 25;
 const MAX_GRADIENT_STOPS = 200;
+
+const CHART_SVG_CLASS =
+  'w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none';
+const ACTION_BTN_CLASS =
+  'bg-transparent border-none cursor-pointer text-gray-400 text-xs px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-50';
 
 export function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
@@ -161,8 +167,6 @@ export function findClosestProfileIndex(
 
 export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
-  const [copyToast, setCopyToast] = useState(false);
-  const [toastFading, setToastFading] = useState(false);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -453,109 +457,110 @@ export function ElevationProfile() {
   const maxDist = points[points.length - 1][0];
 
   return (
-    <>
-      {copyToast && (
-        <div className={`route-toast ${toastFading ? 'fade-out' : ''}`}>
-          Link copied
-        </div>
+    <div
+      className={cn(
+        'absolute bottom-1 left-[296px] right-4 bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-[1700] pointer-events-auto',
+        'max-md:left-2 max-md:right-2 max-md:bottom-[60px] max-md:px-2 max-md:pt-2 max-md:pb-1',
+        sidebarOpen ? 'max-md:hidden' : 'left-4',
+        ridesPanelOpen && 'right-[296px]',
       )}
-      <div
-        className={`elevation-overlay ${sidebarOpen ? 'elevation-overlay-sidebar-open' : 'elevation-overlay-full'} ${ridesPanelOpen ? 'elevation-overlay-rides-open' : ''}`}
-      >
-        <div className="elevation-overlay-header">
-          <span className="elevation-overlay-title">{trailName}</span>
-          <div className="elevation-stats">
-            <span>{(maxDist / 5280).toFixed(1)} mi</span>
-            <span>+{profile.gain.toLocaleString()} ft climbing</span>
-          </div>
-          <div className="elevation-actions">
-            <button
-              type="button"
-              className="elevation-action-btn"
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
-                setCopyToast(true);
-                setToastFading(false);
-                setTimeout(() => setToastFading(true), 2000);
-                setTimeout(() => setCopyToast(false), 2300);
-              }}
-              title="Copy link"
-            >
-              <FontAwesomeIcon icon={faShareAlt} />
-            </button>
-            <button
-              type="button"
-              className="elevation-action-btn"
-              onClick={() => downloadGpx(profile)}
-              title="Download GPX"
-            >
-              <FontAwesomeIcon icon={faDownload} />
-            </button>
-            <button
-              type="button"
-              className="elevation-action-btn"
-              onClick={() => setCollapsed(!collapsed)}
-              title={collapsed ? 'Expand' : 'Collapse'}
-            >
-              <FontAwesomeIcon icon={collapsed ? faChevronUp : faChevronDown} />
-            </button>
-          </div>
+    >
+      <div className="flex items-center gap-3 mb-1">
+        <span className="text-[13px] font-semibold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">
+          {trailName}
+        </span>
+        <div className="flex gap-3 text-[11px] text-gray-500 ml-auto shrink-0">
+          <span>{(maxDist / 5280).toFixed(1)} mi</span>
+          <span>+{profile.gain.toLocaleString()} ft climbing</span>
         </div>
+        <div className="flex gap-1 ml-2 shrink-0">
+          <button
+            type="button"
+            className={ACTION_BTN_CLASS}
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              window.dispatchEvent(
+                new CustomEvent(MAP_EVENTS.TOAST, {
+                  detail: { message: 'Link copied' },
+                }),
+              );
+            }}
+            title="Copy link"
+          >
+            <FontAwesomeIcon icon={faShareAlt} />
+          </button>
+          <button
+            type="button"
+            className={ACTION_BTN_CLASS}
+            onClick={() => downloadGpx(profile)}
+            title="Download GPX"
+          >
+            <FontAwesomeIcon icon={faDownload} />
+          </button>
+          <button
+            type="button"
+            className={ACTION_BTN_CLASS}
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? 'Expand' : 'Collapse'}
+          >
+            <FontAwesomeIcon icon={collapsed ? faChevronUp : faChevronDown} />
+          </button>
+        </div>
+      </div>
 
-        {!collapsed && (
-          <>
-            <div className="elevation-chart-container">
-              <div className="elevation-y-axis">
-                <span className="elevation-y-label elevation-y-max">
-                  {profile.max.toLocaleString()} ft
-                </span>
-                <span className="elevation-y-label elevation-y-min">
-                  {profile.min.toLocaleString()} ft
-                </span>
-              </div>
+      {!collapsed && (
+        <>
+          <div className="flex relative">
+            <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
+              <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
+                {profile.max.toLocaleString()} ft
+              </span>
+              <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
+                {profile.min.toLocaleString()} ft
+              </span>
+            </div>
 
-              <div className="elevation-chart-wrapper">
-                <ElevationSvg
+            <div className="relative flex-1">
+              <ElevationSvg
+                points={points}
+                gradeColors={gradeColors}
+                profile={profile}
+                chartWidth={chartWidth}
+                svgRef={svgRef}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={clearHover}
+                onTouchStart={handleTouch}
+                onTouchMove={handleTouch}
+                onTouchEnd={clearHover}
+              />
+              {locationIndex !== null && (
+                <LocationIndicator
+                  points={points}
+                  profile={profile}
+                  chartWidth={chartWidth}
+                  locationIndex={locationIndex}
+                />
+              )}
+              {hoverIndex !== null && (
+                <HoverIndicator
                   points={points}
                   gradeColors={gradeColors}
                   profile={profile}
                   chartWidth={chartWidth}
-                  svgRef={svgRef}
-                  onMouseMove={handleMouseMove}
-                  onMouseLeave={clearHover}
-                  onTouchStart={handleTouch}
-                  onTouchMove={handleTouch}
-                  onTouchEnd={clearHover}
+                  hoverIndex={hoverIndex}
                 />
-                {locationIndex !== null && (
-                  <LocationIndicator
-                    points={points}
-                    profile={profile}
-                    chartWidth={chartWidth}
-                    locationIndex={locationIndex}
-                  />
-                )}
-                {hoverIndex !== null && (
-                  <HoverIndicator
-                    points={points}
-                    gradeColors={gradeColors}
-                    profile={profile}
-                    chartWidth={chartWidth}
-                    hoverIndex={hoverIndex}
-                  />
-                )}
-              </div>
+              )}
             </div>
+          </div>
 
-            <div className="elevation-tooltip">
-              {hoverIndex !== null
-                ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${points[hoverIndex][1].toLocaleString()} ft`
-                : '\u00A0'}
-            </div>
-          </>
-        )}
-      </div>
-    </>
+          <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
+            {hoverIndex !== null
+              ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${points[hoverIndex][1].toLocaleString()} ft`
+              : '\u00A0'}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -606,7 +611,7 @@ const ElevationSvg = React.memo(function ElevationSvg({
   return (
     <svg
       viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-      className="elevation-chart"
+      className={CHART_SVG_CLASS}
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
       onTouchStart={onTouchStart}
@@ -714,9 +719,8 @@ function HoverIndicator({
   return (
     <svg
       viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-      className="elevation-chart"
+      className={`${CHART_SVG_CLASS} absolute top-0 left-0 pointer-events-none`}
       preserveAspectRatio="none"
-      style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
     >
       <line
         x1={x}
@@ -759,19 +763,8 @@ function LocationIndicator({
 
   return (
     <div
-      style={{
-        position: 'absolute',
-        left: `${leftPct}%`,
-        top: `${topPct}%`,
-        width: 18,
-        height: 18,
-        borderRadius: '50%',
-        backgroundColor: '#4285F4',
-        border: '2px solid white',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-        transform: 'translate(-50%, -50%)',
-        pointerEvents: 'none',
-      }}
+      className="absolute w-[18px] h-[18px] rounded-full bg-[#4285F4] border-2 border-white shadow-[0_1px_4px_rgba(0,0,0,0.4)] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+      style={{ left: `${leftPct}%`, top: `${topPct}%` }}
     />
   );
 }

@@ -1,13 +1,6 @@
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { FlatCompat } from '@eslint/eslintrc';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+import nextConfig from 'eslint-config-next/core-web-vitals';
+import nextTypescript from 'eslint-config-next/typescript';
+import prettierConfig from 'eslint-config-prettier';
 
 const eslintConfig = [
   {
@@ -24,10 +17,11 @@ const eslintConfig = [
       '*.config.ts',
       '*.config.mjs',
       'eslint-rules/**',
-      'next-env.d.ts', // Next.js generated file
+      'next-env.d.ts',
     ],
   },
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  ...nextConfig,
+  ...nextTypescript,
   {
     settings: {
       'import/resolver': {
@@ -37,11 +31,14 @@ const eslintConfig = [
       },
     },
   },
-  ...compat.extends(
-    'plugin:import/recommended',
-    'plugin:import/typescript',
-    'prettier',
-  ),
+  {
+    rules: {
+      // Disable new react-hooks v7 rules until pre-existing patterns are refactored
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/refs': 'off',
+    },
+  },
+  prettierConfig,
 ];
 
 export default eslintConfig;

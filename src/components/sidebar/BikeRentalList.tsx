@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLocationArrow } from '@fortawesome/free-solid-svg-icons';
+import { cn } from '@/lib/utils';
 import {
   fetchStationInformation,
   fetchStationStatus,
   gbfsToBikeRentalLocation,
   type BikeRentalLocation,
 } from '@/data/gbfs';
+import { SidebarCard } from './SidebarCard';
 import type { BikeRentalListProps } from './types';
+
+const BADGE_CLASS = 'bg-gray-200 px-2 py-0.5 rounded text-gray-600';
 
 export function BikeRentalList({
   show,
@@ -52,65 +54,47 @@ export function BikeRentalList({
   }, [show]);
 
   return (
-    <div className={`section-container ${!show ? 'hidden' : ''}`}>
-      <h3 className="section-title">Bike Rentals</h3>
+    <div className={cn('mb-6', !show && 'hidden')}>
+      <h3 className="text-sm font-medium mb-2 text-gray-600">Bike Rentals</h3>
       {isLoading && (
-        <div className="loading">Loading bike rental locations...</div>
+        <div className="p-4 text-center text-gray-500 italic">
+          Loading bike rental locations...
+        </div>
       )}
-      {error && <div className="error">{error}</div>}
+      {error && (
+        <div className="p-4 text-center text-red-500 font-medium">{error}</div>
+      )}
       {!isLoading && !error && (
-        <div className="section-items">
+        <div className="flex flex-col gap-2">
           {rentalLocations.map((location) => (
-            <div
+            <SidebarCard
               key={location.name}
-              className="card card-purple"
+              colorTheme="purple"
+              icon={location.icon}
+              title={location.name}
+              description={location.description}
               onClick={() => onCenterLocation(location)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onCenterLocation(location);
-                }
-              }}
-              role="button"
-              tabIndex={0}
+              showArrow
             >
-              <div className="card-header">
-                <div className="card-icon-container card-icon-purple">
-                  <FontAwesomeIcon
-                    icon={location.icon}
-                    className="card-icon icon-purple"
-                  />
-                </div>
-                <span className="card-title">{location.name}</span>
-              </div>
-              <div className="card-description card-description-flex">
-                <span className="description-text">{location.description}</span>
-                <div className="location-arrow-container-purple">
-                  <FontAwesomeIcon
-                    icon={faLocationArrow}
-                    className="location-arrow-icon"
-                  />
-                </div>
-              </div>
-              <div className="card-details">
-                <span className="detail-item">{location.rentalType}</span>
-                <span className="detail-item">{location.price}</span>
-                <span className="detail-item">{location.hours}</span>
+              <div className="flex flex-wrap gap-2 mt-2 ml-10 text-xs text-gray-500">
+                <span className={BADGE_CLASS}>{location.rentalType}</span>
+                <span className={BADGE_CLASS}>{location.price}</span>
+                <span className={BADGE_CLASS}>{location.hours}</span>
                 {location.availableBikes !== undefined && (
-                  <span className="detail-item">
+                  <span className={BADGE_CLASS}>
                     Bikes: {location.availableBikes}
                   </span>
                 )}
                 {location.availableDocks !== undefined && (
-                  <span className="detail-item">
+                  <span className={BADGE_CLASS}>
                     Docks: {location.availableDocks}
                   </span>
                 )}
                 {location.isChargingStation && (
-                  <span className="detail-item">Charging Available</span>
+                  <span className={BADGE_CLASS}>Charging Available</span>
                 )}
               </div>
-            </div>
+            </SidebarCard>
           ))}
         </div>
       )}

@@ -17,6 +17,8 @@ import {
   type LocationProps,
 } from './sidebar';
 import { getRideStyle } from './WelcomeModal';
+import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
+import { cn } from '@/lib/utils';
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
@@ -285,16 +287,16 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* Toggle button */}
-      <div className="toggle-button-container">
+      <div className="fixed top-4 left-4 z-[1000]">
         <button
           ref={toggleButtonRef}
           onClick={toggle}
-          className="toggle-button"
+          className={TOGGLE_BTN_CLASS}
           type="button"
         >
           <FontAwesomeIcon
             icon={isOpen ? faTimes : faLayerGroup}
-            className="toggle-button-icon"
+            className={TOGGLE_ICON_CLASS}
           />
         </button>
       </div>
@@ -302,21 +304,34 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {/* Sidebar - always in DOM but transforms off-screen when closed */}
       <div
         ref={sidebarRef}
-        className={`sidebar-container ${isOpen ? 'sidebar-visible' : 'sidebar-hidden'}`}
+        className={cn(
+          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-[999] overflow-hidden transition-transform duration-300 ease-in-out max-md:w-full max-md:max-w-[320px]',
+          isOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
       >
         {/* Casual / MTB toggle in header */}
-        <div className="sidebar-header">
+        <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50">
           <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
             <button
               type="button"
-              className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors ${activeSection === 'routes' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={cn(
+                'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
+                activeSection === 'routes'
+                  ? 'bg-white text-gray-800 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700',
+              )}
               onClick={() => setActiveSection('routes')}
             >
               Casual
             </button>
             <button
               type="button"
-              className={`flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors ${activeSection === 'trails' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={cn(
+                'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
+                activeSection === 'trails'
+                  ? 'bg-white text-gray-800 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700',
+              )}
               onClick={() => setActiveSection('trails')}
             >
               MTB
@@ -324,8 +339,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="sidebar-content">
-          <div className="sidebar-inner-content">
+        <div className="overflow-y-auto h-[calc(100%-79px)]">
+          <div className="px-4 pb-4 pt-2">
             {activeSection === 'routes' && (
               <>
                 <BikeRoutes

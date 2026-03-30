@@ -10,6 +10,7 @@ import {
   faPlay,
   faFlagCheckered,
 } from '@fortawesome/free-solid-svg-icons';
+import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
 import { cn } from '@/lib/utils';
 import { useRideRecording, useToast } from '@/hooks';
 import { formatElapsed, formatDistance, formatElevation } from '@/utils/format';
@@ -154,18 +155,18 @@ export function RidesPanel() {
           ref={toggleRef}
           onClick={toggle}
           className={cn(
-            'toggle-button',
+            TOGGLE_BTN_CLASS,
             isRecording &&
               !isOpen &&
-              'animate-recording-pulse [&_.toggle-button-icon]:text-red-500',
-            isRecording && isOpen && '[&_.toggle-button-icon]:text-red-500',
+              'animate-recording-pulse [&_svg]:text-red-500',
+            isRecording && isOpen && '[&_svg]:text-red-500',
           )}
           type="button"
           aria-label={isOpen ? 'Close rides panel' : 'Open rides panel'}
         >
           <FontAwesomeIcon
             icon={isOpen ? faTimes : faStopwatch}
-            className="toggle-button-icon"
+            className={TOGGLE_ICON_CLASS}
           />
         </button>
       </div>

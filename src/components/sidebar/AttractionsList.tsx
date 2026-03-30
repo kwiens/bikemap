@@ -1,6 +1,6 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLocationArrow } from '@fortawesome/free-solid-svg-icons';
+import { cn } from '@/lib/utils';
 import { mapFeatures } from '@/data/geo_data';
+import { SidebarCard } from './SidebarCard';
 import type { AttractionsListProps } from './types';
 
 export function AttractionsList({
@@ -8,42 +8,19 @@ export function AttractionsList({
   onCenterLocation,
 }: AttractionsListProps) {
   return (
-    <div className={`section-container ${!show ? 'hidden' : ''}`}>
-      <h3 className="section-title">Attractions</h3>
-      <div className="section-items">
+    <div className={cn('mb-6', !show && 'hidden')}>
+      <h3 className="text-sm font-medium mb-2 text-gray-600">Attractions</h3>
+      <div className="flex flex-col gap-2">
         {mapFeatures.map((location) => (
-          <div
+          <SidebarCard
             key={location.name}
-            className="card"
+            colorTheme="blue"
+            icon={location.icon}
+            title={location.name}
+            description={location.description}
             onClick={() => onCenterLocation(location)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onCenterLocation(location);
-              }
-            }}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="card-header">
-              <div className="card-icon-container card-icon-blue">
-                <FontAwesomeIcon
-                  icon={location.icon}
-                  className="card-icon icon-blue"
-                />
-              </div>
-              <span className="card-title">{location.name}</span>
-            </div>
-            <div className="card-description card-description-flex">
-              <span className="description-text">{location.description}</span>
-              <div className="location-arrow-container-blue">
-                <FontAwesomeIcon
-                  icon={faLocationArrow}
-                  className="location-arrow-icon"
-                />
-              </div>
-            </div>
-          </div>
+            showArrow
+          />
         ))}
       </div>
     </div>

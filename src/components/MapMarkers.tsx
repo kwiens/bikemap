@@ -132,6 +132,10 @@ function createMarkerElement(
   return el;
 }
 
+function shortAddress(address: string): string {
+  return address.replace(/,\s*Chattanooga.*$/, '');
+}
+
 // Create popup HTML directly
 function createPopupHTML(
   name: string,
@@ -145,7 +149,7 @@ function createPopupHTML(
       <p class="address">
         <strong>Address:</strong>
         <a href="https://maps.google.com/?q=${address}" target="_blank" rel="noopener noreferrer">
-          ${address}
+          ${shortAddress(address)}
         </a>
       </p>
     </div>
@@ -285,7 +289,7 @@ export function createBikeRentalMarker(
       <p class="address">
         <strong>Address:</strong>
         <a href="https://maps.google.com/?q=${location.address}" target="_blank" rel="noopener noreferrer">
-          ${location.address}
+          ${shortAddress(location.address)}
         </a>
       </p>
       <p><strong>Type:</strong> ${location.rentalType}</p>

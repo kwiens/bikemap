@@ -1,7 +1,7 @@
 export function Footer() {
   return (
-    <div className="footer">
-      <h4 className="footer-title">Get Out and Have Fun</h4>
+    <div className="border-t border-gray-200 p-3 text-xs text-center text-gray-500 [&_p]:m-0 [&_p+p]:mt-1">
+      <h4 className="text-sm font-medium mb-2">Get Out and Have Fun</h4>
       <p>
         Pedal your way through Chattanooga&apos;s best spots—feel the river
         breeze, roll up to the Zoo for an up-close animal encounter, explore the

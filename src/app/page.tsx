@@ -2,7 +2,6 @@
 
 import type { ReactElement } from 'react';
 import dynamic from 'next/dynamic';
-import '@/app/map.css';
 import React, { useEffect } from 'react';
 import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
 import { WelcomeModal } from '@/components/WelcomeModal';
