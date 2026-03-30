@@ -78,6 +78,13 @@ export function InformationSection() {
               colorTheme={resource.colorTheme}
               icon={resource.icon}
               title={resource.name}
+              onClick={
+                resource.url.startsWith('/')
+                  ? () => {
+                      window.location.href = resource.url;
+                    }
+                  : undefined
+              }
               description={
                 <>
                   {renderDescriptionWithLink(
