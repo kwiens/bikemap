@@ -150,6 +150,22 @@ export default function AboutPage() {
           </p>
 
           <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+            Stickers
+          </h3>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <LogoCard
+              label="Logo sticker"
+              file="/Bike-Chatt_Logo_Sticker.svg"
+              bg="bg-white"
+            />
+            <LogoCard
+              label="QR sticker"
+              file="/Bike-Chatt_QR_Sticker.svg"
+              bg="bg-white"
+            />
+          </div>
+
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
             Full logo
           </h3>
           <div className="grid grid-cols-3 gap-3 mb-6">
