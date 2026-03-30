@@ -161,10 +161,26 @@ export default function AboutPage() {
           <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
             Icon only
           </h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3 mb-6">
             {ICON_DOWNLOADS.map((icon) => (
               <LogoCard key={icon.file} {...icon} square />
             ))}
+          </div>
+
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+            Stickers
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <LogoCard
+              label="Logo sticker"
+              file="/Bike-Chatt_Logo_Sticker.svg"
+              bg="bg-white"
+            />
+            <LogoCard
+              label="QR sticker"
+              file="/Bike-Chatt_QR_Sticker.svg"
+              bg="bg-white"
+            />
           </div>
         </section>
 
@@ -231,17 +247,20 @@ function LogoCard({
 }) {
   return (
     <div className="group">
-      <div
+      <a
+        href={file}
+        target="_blank"
+        rel="noopener noreferrer"
         className={`${bg} rounded-lg border border-gray-200 flex items-center justify-center p-4 mb-2 aspect-[4/3] ${square ? 'aspect-square' : ''}`}
       >
         <Image
           src={file}
           alt={`Bike Chatt ${label}`}
-          width={square ? 64 : 200}
-          height={64}
-          className={square ? 'w-16 h-16' : 'w-full max-h-16'}
+          width={square ? 128 : 400}
+          height={128}
+          className={square ? 'w-32 h-32' : 'w-full max-h-32'}
         />
-      </div>
+      </a>
       <div className="flex items-center justify-between">
         <span className="text-xs text-gray-500">{label}</span>
         <a
