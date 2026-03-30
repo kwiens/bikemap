@@ -22,19 +22,19 @@ const features: {
     icon: faRoute,
     bg: 'bg-blue-600',
     title: 'Plan Fun Routes',
-    desc: 'Scenic loops to the zoo, aquarium, riverwalk & more',
+    desc: 'Scenic loops to the river and zoo',
   },
   {
     icon: faBicycle,
     bg: 'bg-emerald-600',
     title: 'Find Safe Paths',
-    desc: 'Low-traffic greenways and protected bike trails',
+    desc: 'Low-traffic greenways & bike trails',
   },
   {
     icon: faMapMarkerAlt,
     bg: 'bg-violet-600',
     title: 'Grab a Bike',
-    desc: '24/7 city bike rental stations across downtown',
+    desc: 'Bike rental stations around town',
   },
 ];
 
