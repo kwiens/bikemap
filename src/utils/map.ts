@@ -282,7 +282,11 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
           type: 'line',
           source,
           'source-layer': cfg.sourceLayer,
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+            'line-round-limit': 0.1,
+          },
           paint: {
             'line-color': '#ffffff',
             'line-width': 5,
@@ -300,7 +304,11 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
           type: 'line',
           source,
           'source-layer': cfg.sourceLayer,
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+            'line-round-limit': 0.1,
+          },
           paint: {
             'line-color': '#ffffff',
             'line-width': 0,
@@ -318,7 +326,11 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
         type: 'line',
         source,
         'source-layer': cfg.sourceLayer,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+          'line-round-limit': 0.1,
+        },
         paint: {
           'line-color': 'rgba(0,0,0,0)',
           'line-width': 20,
