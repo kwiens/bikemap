@@ -60,7 +60,7 @@ export function SidebarCard({
   return (
     <div
       className={cn(
-        'p-2 rounded-md transition-all duration-200 border border-transparent shadow-sm cursor-pointer',
+        'px-2 pt-2 pb-1.5 rounded-md transition-all duration-200 border border-transparent shadow-sm cursor-pointer',
         colors.cardHover,
       )}
       onClick={onClick}
