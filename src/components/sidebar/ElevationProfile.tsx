@@ -250,9 +250,12 @@ export function ElevationProfile() {
       }
     };
     const handleRecordingStart = () => {
-      sourceRef.current = 'ride';
-      setTrailName('Recording');
-      setCollapsed(false);
+      // Hide elevation profile during recording — not enough data for a
+      // meaningful chart and the panel just gets in the way.
+      sourceRef.current = null;
+      setTrailName(null);
+      setProfile(null);
+      profileRef.current = null;
     };
     const handleRecordingStop = () => {
       if (sourceRef.current === 'ride') {
