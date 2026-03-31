@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildGpx, type GpxRoute } from './gpx';
+import { buildGpx, buildRideGpx, type GpxRoute } from './gpx';
+import { parseGpxToRidePoints } from './gpx-parser';
+import { mockStoredRidePoint } from '@/test/fixtures';
 
 function lineStringFeature(
   coords: [number, number][],
@@ -149,5 +151,58 @@ describe('buildGpx', () => {
     expect(gpx).toContain('&lt;Loop&gt;');
     expect(gpx).toContain('&quot;Test&quot;');
     expect(gpx).toContain('&apos;s a test');
+  });
+});
+
+describe('buildRideGpx', () => {
+  it('includes elevation element when altitude is present', () => {
+    const gpx = buildRideGpx({
+      name: 'Test Ride',
+      points: [mockStoredRidePoint({ altitude: 200.5 })],
+    });
+    expect(gpx).toContain('<ele>200.5</ele>');
+  });
+
+  it('omits elevation element when altitude is null', () => {
+    const gpx = buildRideGpx({
+      name: 'Test Ride',
+      points: [mockStoredRidePoint({ altitude: null })],
+    });
+    expect(gpx).not.toContain('<ele>');
+  });
+
+  it('formats timestamps as ISO 8601', () => {
+    const ts = new Date('2026-01-15T10:00:00Z').getTime();
+    const gpx = buildRideGpx({
+      name: 'Test Ride',
+      points: [mockStoredRidePoint({ timestamp: ts })],
+    });
+    expect(gpx).toContain('<time>2026-01-15T10:00:00.000Z</time>');
+  });
+
+  it('round-trips through parser', () => {
+    const points = [
+      mockStoredRidePoint({
+        lat: 35.0,
+        lng: -85.3,
+        altitude: 200,
+        timestamp: new Date('2026-01-15T10:00:00Z').getTime(),
+      }),
+      mockStoredRidePoint({
+        lat: 35.01,
+        lng: -85.31,
+        altitude: 210,
+        timestamp: new Date('2026-01-15T10:01:00Z').getTime(),
+      }),
+    ];
+    const gpx = buildRideGpx({ name: 'Round Trip', points });
+    const parsed = parseGpxToRidePoints(gpx);
+
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0].lat).toBe(35.0);
+    expect(parsed[0].lng).toBe(-85.3);
+    expect(parsed[0].altitude).toBe(200.0);
+    expect(parsed[1].lat).toBe(35.01);
+    expect(parsed[1].lng).toBe(-85.31);
   });
 });
