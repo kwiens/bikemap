@@ -35,6 +35,7 @@ interface UseRideRecordingReturn {
   resumeRecording: () => void;
   stopRecording: () => Promise<RecordedRide | null>;
   recoverRide: () => Promise<RecordedRide | null>;
+  continueRide: () => Promise<void>;
   dismissRecovery: () => void;
 }
 
@@ -382,6 +383,176 @@ export function useRideRecording(
     return ride;
   }, []);
 
+  const continueRide = useCallback(async () => {
+    if (isRecording) return;
+    const data = await loadInProgress();
+    if (!data || data.points.length < 2) {
+      await clearInProgress();
+      setHasRecovery(false);
+      return;
+    }
+
+    // Pre-load saved points and restore accumulated stats
+    pointsRef.current = [...data.points];
+    startTimeRef.current = data.startTime;
+    const lastPoint = data.points[data.points.length - 1];
+
+    // Treat the gap between last saved point and now as paused time
+    pausedTimeRef.current = Date.now() - lastPoint.timestamp;
+    pauseStartRef.current = 0;
+    pausedRef.current = false;
+    manualPauseRef.current = false;
+    lowSpeedCountRef.current = 0;
+
+    // Recompute distance and elevation from saved points
+    let dist = 0;
+    let elevGain = 0;
+    let prevAlt: number | null = null;
+    for (let i = 1; i < data.points.length; i++) {
+      const prev = data.points[i - 1];
+      const pt = data.points[i];
+      if (pt.accuracy < MAX_ACCURACY_M && prev.accuracy < MAX_ACCURACY_M) {
+        dist += haversineDistance(prev.lat, prev.lng, pt.lat, pt.lng);
+      }
+      if (pt.altitude !== null) {
+        if (prevAlt !== null) {
+          const delta = pt.altitude - prevAlt;
+          if (delta > 0) elevGain += delta;
+        }
+        prevAlt = pt.altitude;
+      }
+    }
+    distanceRef.current = dist;
+    elevGainRef.current = elevGain;
+    prevAltRef.current = prevAlt;
+
+    setLiveDistance(dist);
+    setLiveElevationGain(elevGain);
+    setHasRecovery(false);
+    setIsRecording(true);
+    setIsPaused(false);
+
+    acquireWakeLock();
+
+    // Draw existing track on map
+    for (const pt of data.points) {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
+          detail: { point: [pt.lng, pt.lat] as [number, number] },
+        }),
+      );
+    }
+
+    // Start GPS watch (same handler as startRecording)
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const speed = position.coords.speed ?? 0;
+        const AUTO_PAUSE_SPEED = 0.5;
+        const AUTO_PAUSE_COUNT = 3;
+
+        if (manualPauseRef.current) return;
+
+        if (pausedRef.current) {
+          if (speed >= AUTO_PAUSE_SPEED) {
+            pausedTimeRef.current += Date.now() - pauseStartRef.current;
+            pausedRef.current = false;
+            lowSpeedCountRef.current = 0;
+          }
+          return;
+        }
+
+        if (speed < AUTO_PAUSE_SPEED) {
+          lowSpeedCountRef.current++;
+          if (lowSpeedCountRef.current >= AUTO_PAUSE_COUNT) {
+            pausedRef.current = true;
+            pauseStartRef.current = Date.now();
+            return;
+          }
+        } else {
+          lowSpeedCountRef.current = 0;
+        }
+
+        const point: RidePoint = {
+          lng: position.coords.longitude,
+          lat: position.coords.latitude,
+          altitude: position.coords.altitude,
+          accuracy: position.coords.accuracy,
+          speed: position.coords.speed,
+          timestamp: position.timestamp,
+        };
+        const prev = pointsRef.current[pointsRef.current.length - 1];
+        pointsRef.current.push(point);
+
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
+            detail: { point: [point.lng, point.lat] as [number, number] },
+          }),
+        );
+
+        if (
+          prev &&
+          point.accuracy < MAX_ACCURACY_M &&
+          prev.accuracy < MAX_ACCURACY_M
+        ) {
+          distanceRef.current += haversineDistance(
+            prev.lat,
+            prev.lng,
+            point.lat,
+            point.lng,
+          );
+          setLiveDistance(distanceRef.current);
+        }
+
+        if (point.altitude !== null) {
+          if (prevAltRef.current !== null) {
+            const delta = point.altitude - prevAltRef.current;
+            if (delta > 0) {
+              elevGainRef.current += delta;
+              setLiveElevationGain(elevGainRef.current);
+            }
+          }
+          prevAltRef.current = point.altitude;
+        }
+      },
+      (error) => {
+        const messages: Record<number, string> = {
+          1: 'Location permission denied — cannot record ride',
+          2: 'GPS unavailable — check your device settings',
+          3: 'GPS timed out — trying again...',
+        };
+        const msg = messages[error.code] ?? 'GPS error';
+        if (error.code !== 3) {
+          cleanup();
+          onNotify?.(msg);
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 },
+    );
+
+    // Start elapsed time counter
+    timerRef.current = setInterval(() => {
+      const paused = pausedRef.current
+        ? pausedTimeRef.current + (Date.now() - pauseStartRef.current)
+        : pausedTimeRef.current;
+      const next = Math.floor(
+        (Date.now() - startTimeRef.current - paused) / 1000,
+      );
+      setElapsedTime((prev) => (prev === next ? prev : next));
+    }, 1000);
+
+    // Periodically save in-progress data
+    saveIntervalRef.current = setInterval(() => {
+      if (pointsRef.current.length > 0) {
+        saveInProgress({
+          startTime: startTimeRef.current,
+          points: pointsRef.current,
+        }).catch(() => {});
+      }
+    }, 10_000);
+
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
+  }, [isRecording, acquireWakeLock, cleanup, onNotify]);
+
   const dismissRecovery = useCallback(() => {
     void clearInProgress();
     setHasRecovery(false);
@@ -411,6 +582,7 @@ export function useRideRecording(
     resumeRecording,
     stopRecording,
     recoverRide,
+    continueRide,
     dismissRecovery,
   };
 }
