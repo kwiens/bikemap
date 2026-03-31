@@ -471,7 +471,7 @@ export function ElevationProfile() {
         </span>
         <div className="flex gap-3 text-[11px] text-gray-500 ml-auto shrink-0">
           <span>{(maxDist / 5280).toFixed(1)} mi</span>
-          <span>+{profile.gain.toLocaleString()} ft climbing</span>
+          <span>+{Math.round(profile.gain).toLocaleString()} ft climbing</span>
         </div>
         <div className="flex gap-1 ml-2 shrink-0">
           <button
@@ -513,10 +513,10 @@ export function ElevationProfile() {
           <div className="flex relative">
             <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
               <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
-                {profile.max.toLocaleString()} ft
+                {Math.round(profile.max).toLocaleString()} ft
               </span>
               <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
-                {profile.min.toLocaleString()} ft
+                {Math.round(profile.min).toLocaleString()} ft
               </span>
             </div>
 
@@ -555,7 +555,7 @@ export function ElevationProfile() {
 
           <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
             {hoverIndex !== null
-              ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${points[hoverIndex][1].toLocaleString()} ft`
+              ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft`
               : '\u00A0'}
           </div>
         </>
