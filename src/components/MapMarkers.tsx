@@ -235,6 +235,7 @@ export function createLocationMarker(
 
   // Create inner elements
   el.innerHTML = `
+    <div class="location-accuracy"></div>
     <div class="location-dot"></div>
     <div class="location-pulse"></div>
   `;
@@ -244,6 +245,40 @@ export function createLocationMarker(
     element: el,
     anchor: 'center',
   }).setLngLat([longitude, latitude]);
+}
+
+/** Convert GPS accuracy (meters) to pixel diameter at a given lat/zoom */
+function accuracyToPixels(
+  meters: number,
+  latitude: number,
+  zoom: number,
+): number {
+  const metersPerPixel =
+    (156543.03392 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoom);
+  return meters / metersPerPixel;
+}
+
+/** Update the accuracy circle size on the location marker */
+export function updateAccuracyCircle(
+  marker: mapboxgl.Marker,
+  accuracy: number,
+  zoom: number,
+): void {
+  const el = marker
+    .getElement()
+    .querySelector('.location-accuracy') as HTMLElement | null;
+  if (!el) return;
+  const { lat } = marker.getLngLat();
+  // accuracy is a radius in meters; convert to diameter in pixels
+  const diameter = accuracyToPixels(accuracy * 2, lat, zoom);
+  // Hide if smaller than the dot
+  if (diameter < 22) {
+    el.style.display = 'none';
+  } else {
+    el.style.display = '';
+    el.style.width = `${diameter}px`;
+    el.style.height = `${diameter}px`;
+  }
 }
 
 // Helper function to create highlight marker

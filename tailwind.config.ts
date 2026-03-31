@@ -68,9 +68,9 @@ const config: Config = {
       },
       animation: {
         'location-pulse': 'location-pulse 2s ease-out infinite',
-        'recording-pulse': 'recording-pulse 1.5s ease-in-out infinite',
+        'recording-pulse': 'recording-pulse 3s ease-in-out infinite',
         'toast-slide-in': 'toast-slide-in 0.2s ease',
-        'pulse-dot': 'pulse-dot 1.5s ease-in-out infinite',
+        'pulse-dot': 'pulse-dot 3s ease-in-out infinite',
         'toast-fade-in': 'toast-fade-in 0.3s ease-out',
         'toast-fade-out': 'toast-fade-out 0.3s ease-out forwards',
         'welcome-fade-in': 'welcome-fade-in 0.4s ease-out',
