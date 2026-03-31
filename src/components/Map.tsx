@@ -225,7 +225,8 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
-    // When user interacts with map, disable location tracking
+    // When user drags/pans the map, disable location tracking.
+    // Using dragstart instead of click so route-layer taps aren't swallowed.
     const disableTracking = () => {
       setWatchingLocation(false);
       if (locationWatch.current) {
@@ -238,9 +239,7 @@ const MapboxMap = memo(function MapboxMap() {
       }
     };
 
-    map.current.on('click', disableTracking);
-    map.current.on('touch', disableTracking);
-    map.current.on('touchend', disableTracking);
+    map.current.on('dragstart', disableTracking);
   }
 
   // Handle route selection events - outside the map initialization
@@ -957,19 +956,18 @@ const MapboxMap = memo(function MapboxMap() {
         });
       }
 
-      // Then continuously track position (preserving zoom)
+      // Continuously re-center on current position using jumpTo (no animation)
+      // so the map is never mid-flight, which would block route-layer tap events.
       locationWatch.current = setInterval(() => {
         if (!map.current || !locationMarker.current) {
           return;
         }
 
         const lngLat = locationMarker.current.getLngLat();
-        map.current.flyTo({
+        map.current.jumpTo({
           center: [lngLat.lng, lngLat.lat],
-          essential: true,
-          duration: 1000,
         });
-      }, 500);
+      }, 1000);
     } else {
       // When disabled: stop tracking
       if (locationWatch.current) {

@@ -73,9 +73,7 @@ export function useLocationTracking({
       }
     };
 
-    map.current.on('click', disableTracking);
-    map.current.on('touch', disableTracking);
-    map.current.on('touchend', disableTracking);
+    map.current.on('dragstart', disableTracking);
   }, [map]);
 
   const setLocationWatch = useCallback(
@@ -93,19 +91,18 @@ export function useLocationTracking({
           });
         }
 
-        // Then continuously track position
+        // Continuously re-center using jumpTo (no animation) so the map is
+        // never mid-flight, which would block route-layer tap events.
         locationWatch.current = setInterval(() => {
           if (!map.current || !locationMarker.current) {
             return;
           }
 
           const lngLat = locationMarker.current.getLngLat();
-          map.current.flyTo({
+          map.current.jumpTo({
             center: [lngLat.lng, lngLat.lat],
-            essential: true,
-            duration: 1000,
           });
-        }, 500);
+        }, 1000);
       } else {
         // When disabled: stop tracking
         if (locationWatch.current) {
