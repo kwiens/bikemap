@@ -228,21 +228,22 @@ describe('useRideRecording', () => {
     expect(result.current.isRecording).toBe(false);
   });
 
-  it('auto-pauses after consecutive low-speed readings', () => {
+  it('auto-pauses silently without updating UI isPaused state', () => {
     const { result } = renderHook(() => useRideRecording());
 
     act(() => {
       result.current.startRecording();
     });
 
-    // 3 consecutive low-speed readings trigger auto-pause
+    // 3 consecutive low-speed readings trigger auto-pause (silent — refs only)
     act(() => {
       simulatePosition(-85.3, 35.0, { speed: 0.1 });
       simulatePosition(-85.3, 35.0, { speed: 0.1 });
       simulatePosition(-85.3, 35.0, { speed: 0.1 });
     });
 
-    expect(result.current.isPaused).toBe(true);
+    // Auto-pause doesn't flip isPaused — only manual pause does
+    expect(result.current.isPaused).toBe(false);
   });
 
   it('cleans up on GPS permission error', () => {

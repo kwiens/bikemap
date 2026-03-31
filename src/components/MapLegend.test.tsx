@@ -208,6 +208,9 @@ describe('MapLegendProvider', () => {
     const trailDeselectIdx = eventTypes.indexOf(MAP_EVENTS.TRAIL_DESELECT);
     const areaSelectIdx = eventTypes.indexOf(MAP_EVENTS.AREA_SELECT);
 
+    expect(deselectIdx).not.toBe(-1);
+    expect(trailDeselectIdx).not.toBe(-1);
+    expect(areaSelectIdx).not.toBe(-1);
     expect(deselectIdx).toBeLessThan(areaSelectIdx);
     expect(trailDeselectIdx).toBeLessThan(areaSelectIdx);
   });
