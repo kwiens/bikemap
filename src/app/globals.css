@@ -32,14 +32,10 @@ body > div,
 
 /* Fix for Mapbox controls - ensure they're visible */
 .mapboxgl-ctrl-top-right {
-  z-index: 1500 !important;
-  top: 58px !important;
-  right: 10px !important;
   position: absolute !important;
 }
 
 .mapboxgl-ctrl-group {
-  z-index: 1500 !important;
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;

@@ -459,7 +459,7 @@ export function ElevationProfile() {
   return (
     <div
       className={cn(
-        'absolute bottom-1 left-[296px] right-4 bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-[1700] pointer-events-auto',
+        'absolute bottom-1 left-[296px] right-4 bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-[600] pointer-events-auto',
         'max-md:left-2 max-md:right-2 max-md:bottom-[60px] max-md:px-2 max-md:pt-2 max-md:pb-1',
         sidebarOpen ? 'max-md:hidden' : 'left-4',
         ridesPanelOpen && 'right-[296px]',

@@ -139,7 +139,7 @@ export function useRideRecording(
     void clearInProgress();
     releaseWakeLock();
     setIsRecording(false);
-
+    setIsPaused(false);
     setElapsedTime(0);
     setLiveDistance(0);
     setLiveElevationGain(0);
@@ -177,15 +177,13 @@ export function useRideRecording(
         // Manual pause — skip everything
         if (manualPauseRef.current) return;
 
-        // Auto-pause logic
+        // Auto-pause logic (silent — doesn't update UI isPaused state)
         if (pausedRef.current) {
           // Currently auto-paused — check if moving again
           if (speed >= AUTO_PAUSE_SPEED) {
-            // Resume
             pausedTimeRef.current += Date.now() - pauseStartRef.current;
             pausedRef.current = false;
             lowSpeedCountRef.current = 0;
-            setIsPaused(false);
           }
           return;
         }
@@ -196,7 +194,6 @@ export function useRideRecording(
           if (lowSpeedCountRef.current >= AUTO_PAUSE_COUNT) {
             pausedRef.current = true;
             pauseStartRef.current = Date.now();
-            setIsPaused(true);
             return;
           }
         } else {
@@ -335,8 +332,10 @@ export function useRideRecording(
   }
 
   const stopRecording = useCallback(async (): Promise<RecordedRide | null> => {
-    if (!isRecording || pointsRef.current.length < 2) {
+    if (!isRecording) return null;
+    if (pointsRef.current.length < 2) {
       cleanup();
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
       return null;
     }
 
