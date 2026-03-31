@@ -158,30 +158,8 @@ export function useRideRecording(
     setLiveElevationGain(0);
   }, [releaseWakeLock]);
 
-  const startRecording = useCallback(() => {
-    if (isRecording) return;
-
-    pointsRef.current = [];
-    startTimeRef.current = Date.now();
-    distanceRef.current = 0;
-    elevGainRef.current = 0;
-    altBufferRef.current = [];
-    smoothedAltRef.current = null;
-    pausedRef.current = false;
-    manualPauseRef.current = false;
-    pausedTimeRef.current = 0;
-    pauseStartRef.current = 0;
-    lowSpeedCountRef.current = 0;
-
-    setElapsedTime(0);
-    setLiveDistance(0);
-    setLiveElevationGain(0);
-    setIsRecording(true);
-    setIsPaused(false);
-
-    acquireWakeLock();
-
-    // Start GPS watch
+  // Shared: start GPS watch, elapsed timer, and periodic save
+  const startGpsWatchAndTimers = useCallback(() => {
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const speed = position.coords.speed ?? 0;
@@ -309,7 +287,32 @@ export function useRideRecording(
     }, 10_000);
 
     window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
-  }, [isRecording, acquireWakeLock, cleanup, onNotify]);
+  }, [cleanup, onNotify]);
+
+  const startRecording = useCallback(() => {
+    if (isRecording) return;
+
+    pointsRef.current = [];
+    startTimeRef.current = Date.now();
+    distanceRef.current = 0;
+    elevGainRef.current = 0;
+    altBufferRef.current = [];
+    smoothedAltRef.current = null;
+    pausedRef.current = false;
+    manualPauseRef.current = false;
+    pausedTimeRef.current = 0;
+    pauseStartRef.current = 0;
+    lowSpeedCountRef.current = 0;
+
+    setElapsedTime(0);
+    setLiveDistance(0);
+    setLiveElevationGain(0);
+    setIsRecording(true);
+    setIsPaused(false);
+
+    acquireWakeLock();
+    startGpsWatchAndTimers();
+  }, [isRecording, acquireWakeLock, startGpsWatchAndTimers]);
 
   const pauseRecording = useCallback(() => {
     if (!isRecording || manualPauseRef.current) return;
@@ -455,7 +458,7 @@ export function useRideRecording(
         : null;
 
     setLiveDistance(dist);
-    setLiveElevationGain(elevGain);
+    setLiveElevationGain(elev.gain);
     setHasRecovery(false);
     setIsRecording(true);
     setIsPaused(false);
@@ -471,126 +474,8 @@ export function useRideRecording(
       );
     }
 
-    // Start GPS watch (same handler as startRecording)
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const speed = position.coords.speed ?? 0;
-        const AUTO_PAUSE_SPEED = 0.5;
-        const AUTO_PAUSE_COUNT = 3;
-
-        if (manualPauseRef.current) return;
-
-        if (pausedRef.current) {
-          if (speed >= AUTO_PAUSE_SPEED) {
-            pausedTimeRef.current += Date.now() - pauseStartRef.current;
-            pausedRef.current = false;
-            lowSpeedCountRef.current = 0;
-          }
-          return;
-        }
-
-        if (speed < AUTO_PAUSE_SPEED) {
-          lowSpeedCountRef.current++;
-          if (lowSpeedCountRef.current >= AUTO_PAUSE_COUNT) {
-            pausedRef.current = true;
-            pauseStartRef.current = Date.now();
-            return;
-          }
-        } else {
-          lowSpeedCountRef.current = 0;
-        }
-
-        const point: RidePoint = {
-          lng: position.coords.longitude,
-          lat: position.coords.latitude,
-          altitude: position.coords.altitude,
-          accuracy: position.coords.accuracy,
-          speed: position.coords.speed,
-          timestamp: position.timestamp,
-        };
-        const prev = pointsRef.current[pointsRef.current.length - 1];
-        pointsRef.current.push(point);
-
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-            detail: { point: [point.lng, point.lat] as [number, number] },
-          }),
-        );
-
-        if (
-          prev &&
-          point.accuracy < MAX_ACCURACY_M &&
-          prev.accuracy < MAX_ACCURACY_M
-        ) {
-          distanceRef.current += haversineDistance(
-            prev.lat,
-            prev.lng,
-            point.lat,
-            point.lng,
-          );
-          setLiveDistance(distanceRef.current);
-        }
-
-        if (point.altitude !== null) {
-          altBufferRef.current.push(point.altitude);
-          if (altBufferRef.current.length > ALT_SMOOTH_WINDOW) {
-            altBufferRef.current.shift();
-          }
-          if (altBufferRef.current.length === ALT_SMOOTH_WINDOW) {
-            const alt = smoothedAltitude(altBufferRef.current);
-            if (smoothedAltRef.current !== null) {
-              const delta = alt - smoothedAltRef.current;
-              if (delta > ALT_DEADBAND_M) {
-                elevGainRef.current += delta;
-                setLiveElevationGain(elevGainRef.current);
-                smoothedAltRef.current = alt;
-              } else if (delta < -ALT_DEADBAND_M) {
-                smoothedAltRef.current = alt;
-              }
-            } else {
-              smoothedAltRef.current = alt;
-            }
-          }
-        }
-      },
-      (error) => {
-        const messages: Record<number, string> = {
-          1: 'Location permission denied — cannot record ride',
-          2: 'GPS unavailable — check your device settings',
-          3: 'GPS timed out — trying again...',
-        };
-        const msg = messages[error.code] ?? 'GPS error';
-        if (error.code !== 3) {
-          cleanup();
-          onNotify?.(msg);
-        }
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 },
-    );
-
-    // Start elapsed time counter
-    timerRef.current = setInterval(() => {
-      const paused = pausedRef.current
-        ? pausedTimeRef.current + (Date.now() - pauseStartRef.current)
-        : pausedTimeRef.current;
-      const next = Math.floor(
-        (Date.now() - startTimeRef.current - paused) / 1000,
-      );
-      setElapsedTime((prev) => (prev === next ? prev : next));
-    }, 1000);
-
-    // Periodically save in-progress data
-    saveIntervalRef.current = setInterval(() => {
-      if (pointsRef.current.length > 0) {
-        saveInProgress({
-          startTime: startTimeRef.current,
-          points: pointsRef.current,
-        }).catch(() => {});
-      }
-    }, 10_000);
-
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
-  }, [isRecording, acquireWakeLock, cleanup, onNotify]);
+    startGpsWatchAndTimers();
+  }, [isRecording, acquireWakeLock, startGpsWatchAndTimers]);
 
   const dismissRecovery = useCallback(() => {
     void clearInProgress();
