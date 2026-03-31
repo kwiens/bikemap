@@ -1036,7 +1036,7 @@ const MapboxMap = memo(function MapboxMap() {
           role="button"
           tabIndex={0}
           className={cn(
-            'absolute bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[500] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
+            'absolute bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[501] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
             watchingLocation &&
               'bg-[rgb(165,240,255)] active:bg-[rgb(145,220,235)]',
           )}

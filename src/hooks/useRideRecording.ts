@@ -178,7 +178,7 @@ export function useRideRecording(
         if (manualPauseRef.current) return;
 
         // Auto-pause logic (silent — doesn't update UI isPaused state)
-        if (pausedRef.current && !manualPauseRef.current) {
+        if (pausedRef.current) {
           // Currently auto-paused — check if moving again
           if (speed >= AUTO_PAUSE_SPEED) {
             pausedTimeRef.current += Date.now() - pauseStartRef.current;
