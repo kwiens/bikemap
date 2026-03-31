@@ -72,7 +72,7 @@ vi.mock('mapbox-gl', () => ({
   },
 }));
 
-import { MarkerManager } from './MapMarkers';
+import { MarkerManager, updateAccuracyCircle } from './MapMarkers';
 
 describe('MarkerManager', () => {
   let manager: MarkerManager;
@@ -169,5 +169,82 @@ describe('MarkerManager', () => {
       expect(() => manager.openPopupFor(asMarker(nextMarker))).not.toThrow();
       expect(popup.remove).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('updateAccuracyCircle', () => {
+  function makeAccuracyMarker(lat: number) {
+    const el = document.createElement('div');
+    el.innerHTML = '<div class="location-accuracy"></div>';
+    return {
+      getElement: vi.fn(() => el),
+      getLngLat: vi.fn(() => ({ lat, lng: -85.3 })),
+      el,
+    } as unknown as mapboxgl.Marker & { el: HTMLDivElement };
+  }
+
+  it('sets width/height based on accuracy and zoom', () => {
+    const marker = makeAccuracyMarker(35.0);
+    updateAccuracyCircle(marker, 50, 15);
+
+    const circle = marker.el.querySelector('.location-accuracy') as HTMLElement;
+    const size = parseFloat(circle.style.width);
+    expect(size).toBeGreaterThan(0);
+    expect(circle.style.width).toBe(circle.style.height);
+  });
+
+  it('hides circle when accuracy resolves to fewer than 22px', () => {
+    const marker = makeAccuracyMarker(35.0);
+    // Very small accuracy at low zoom = tiny circle
+    updateAccuracyCircle(marker, 1, 5);
+
+    const circle = marker.el.querySelector('.location-accuracy') as HTMLElement;
+    expect(circle.style.display).toBe('none');
+  });
+
+  it('shows circle when accuracy is large enough', () => {
+    const marker = makeAccuracyMarker(35.0);
+    updateAccuracyCircle(marker, 100, 16);
+
+    const circle = marker.el.querySelector('.location-accuracy') as HTMLElement;
+    expect(circle.style.display).toBe('');
+    expect(parseFloat(circle.style.width)).toBeGreaterThan(22);
+  });
+
+  it('grows when zooming in', () => {
+    const marker = makeAccuracyMarker(35.0);
+    const circle = marker.el.querySelector('.location-accuracy') as HTMLElement;
+
+    updateAccuracyCircle(marker, 200, 15);
+    const sizeAtZoom15 = parseFloat(circle.style.width);
+
+    updateAccuracyCircle(marker, 200, 17);
+    const sizeAtZoom17 = parseFloat(circle.style.width);
+
+    expect(sizeAtZoom15).toBeGreaterThan(22);
+    expect(sizeAtZoom17).toBeGreaterThan(sizeAtZoom15);
+    // Each zoom level doubles, so 2 levels = 4x
+    expect(sizeAtZoom17 / sizeAtZoom15).toBeCloseTo(4, 1);
+  });
+
+  it('accounts for latitude in Mercator projection', () => {
+    const equator = makeAccuracyMarker(0);
+    const highLat = makeAccuracyMarker(60);
+
+    updateAccuracyCircle(equator, 200, 16);
+    updateAccuracyCircle(highLat, 200, 16);
+
+    const eqSize = parseFloat(
+      (equator.el.querySelector('.location-accuracy') as HTMLElement).style
+        .width,
+    );
+    const hlSize = parseFloat(
+      (highLat.el.querySelector('.location-accuracy') as HTMLElement).style
+        .width,
+    );
+
+    // At higher latitude, same meters = more pixels (Mercator stretching)
+    expect(eqSize).toBeGreaterThan(22);
+    expect(hlSize).toBeGreaterThan(eqSize);
   });
 });
