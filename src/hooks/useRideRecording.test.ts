@@ -228,6 +228,56 @@ describe('useRideRecording', () => {
     expect(result.current.isRecording).toBe(false);
   });
 
+  it('dispatches RIDE_RECORDING_STOP on successful stop', async () => {
+    const events: string[] = [];
+    const handler = (e: Event) => events.push(e.type);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+
+    try {
+      const { result } = renderHook(() => useRideRecording());
+
+      act(() => {
+        result.current.startRecording();
+      });
+
+      act(() => {
+        simulatePosition(-85.3, 35.0);
+        simulatePosition(-85.31, 35.01);
+      });
+
+      await act(async () => {
+        await result.current.stopRecording();
+      });
+
+      expect(events).toContain(MAP_EVENTS.RIDE_RECORDING_STOP);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    }
+  });
+
+  it('dispatches RIDE_RECORDING_STOP even when ride is too short', async () => {
+    const events: string[] = [];
+    const handler = (e: Event) => events.push(e.type);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+
+    try {
+      const { result } = renderHook(() => useRideRecording());
+
+      act(() => {
+        result.current.startRecording();
+      });
+
+      await act(async () => {
+        const ride = await result.current.stopRecording();
+        expect(ride).toBeNull();
+      });
+
+      expect(events).toContain(MAP_EVENTS.RIDE_RECORDING_STOP);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    }
+  });
+
   it('auto-pauses silently without updating UI isPaused state', () => {
     const { result } = renderHook(() => useRideRecording());
 

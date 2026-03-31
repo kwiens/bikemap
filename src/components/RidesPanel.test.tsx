@@ -160,21 +160,23 @@ describe('RidesPanel', () => {
     const handler = (e: Event) => events.push(e as CustomEvent);
     window.addEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
 
-    render(<RidesPanel />);
-    openPanel(); // opens panel, dispatches isOpen: true
+    try {
+      render(<RidesPanel />);
+      openPanel(); // opens panel, dispatches isOpen: true
 
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
-          detail: { isOpen: true },
-        }),
-      );
-    });
+      act(() => {
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
+            detail: { isOpen: true },
+          }),
+        );
+      });
 
-    // Should have dispatched isOpen: false after the sidebar opened
-    const closeEvent = events.find((e) => e.detail.isOpen === false);
-    expect(closeEvent).toBeDefined();
-
-    window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+      // Should have dispatched isOpen: false after the sidebar opened
+      const closeEvent = events.find((e) => e.detail.isOpen === false);
+      expect(closeEvent).toBeDefined();
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+    }
   });
 });
