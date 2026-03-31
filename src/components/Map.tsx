@@ -12,6 +12,7 @@ import {
 } from '@/data/geo_data';
 import {
   createLocationMarker,
+  updateAccuracyCircle,
   createAttractionMarker,
   createBikeResourceMarker,
   createBikeRentalMarker,
@@ -55,6 +56,7 @@ const MapboxMap = memo(function MapboxMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
+  const locationAccuracy = useRef<number>(0);
   const watchId = useRef<number | null>(null);
   const locationWatch = useRef<NodeJS.Timeout | undefined>(undefined);
   const wakeLock = useRef<WakeLockSentinel | null>(null);
@@ -178,6 +180,16 @@ const MapboxMap = memo(function MapboxMap() {
             lng: position.coords.longitude,
             lat: position.coords.latitude,
           });
+        }
+
+        // Update accuracy circle
+        locationAccuracy.current = position.coords.accuracy;
+        if (locationMarker.current) {
+          updateAccuracyCircle(
+            locationMarker.current,
+            position.coords.accuracy,
+            map.current.getZoom(),
+          );
         }
 
         // Broadcast location for elevation profile tracking
@@ -831,6 +843,17 @@ const MapboxMap = memo(function MapboxMap() {
           );
           bikeResourceMarkers.current.setMarkers(bikeResourceMarkerList);
 
+          // Update accuracy circle on zoom
+          newMap.on('zoom', () => {
+            if (locationMarker.current && locationAccuracy.current > 0) {
+              updateAccuracyCircle(
+                locationMarker.current,
+                locationAccuracy.current,
+                newMap.getZoom(),
+              );
+            }
+          });
+
           // Add error handler
           newMap.on('error', (event: { error: Error }) => {
             console.error('Map error:', event.error);
@@ -942,9 +965,16 @@ const MapboxMap = memo(function MapboxMap() {
   };
 
   // Enable location tracking when recording starts, disable when it stops
+  // Also toggle CSS class on map container for Mapbox control positioning
   useEffect(() => {
-    const handleStart = () => setLocationWatch(true);
-    const handleStop = () => setLocationWatch(false);
+    const handleStart = () => {
+      setLocationWatch(true);
+      mapContainer.current?.classList.add('recording-active');
+    };
+    const handleStop = () => {
+      setLocationWatch(false);
+      mapContainer.current?.classList.remove('recording-active');
+    };
 
     window.addEventListener(MAP_EVENTS.RIDE_RECORDING_START, handleStart);
     window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handleStop);
@@ -962,7 +992,7 @@ const MapboxMap = memo(function MapboxMap() {
       {toastMessage && (
         <div
           className={cn(
-            'absolute top-5 left-1/2 -translate-x-1/2 bg-black/65 text-white px-6 py-3 rounded-lg text-base font-medium z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none animate-toast-fade-in',
+            'absolute top-5 left-1/2 -translate-x-1/2 bg-black/65 text-white px-6 py-3 rounded-lg text-base font-medium z-[800] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none animate-toast-fade-in',
             toastFadingOut && 'animate-toast-fade-out',
           )}
         >
@@ -985,7 +1015,7 @@ const MapboxMap = memo(function MapboxMap() {
           role="button"
           tabIndex={0}
           className={cn(
-            'absolute bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[1600] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
+            'absolute bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[500] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
             watchingLocation &&
               'bg-[rgb(165,240,255)] active:bg-[rgb(145,220,235)]',
           )}

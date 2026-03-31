@@ -287,7 +287,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* Toggle button */}
-      <div className="fixed top-4 left-4 z-[1000]">
+      <div className={cn('fixed top-4 left-4', isOpen ? 'z-[960]' : 'z-[900]')}>
         <button
           ref={toggleButtonRef}
           onClick={toggle}
@@ -305,7 +305,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       <div
         ref={sidebarRef}
         className={cn(
-          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-[999] overflow-hidden transition-transform duration-300 ease-in-out max-md:w-full max-md:max-w-[320px]',
+          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-[950] overflow-hidden transition-transform duration-300 ease-in-out max-md:w-full max-md:max-w-[320px]',
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
