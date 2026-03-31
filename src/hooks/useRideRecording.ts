@@ -9,9 +9,14 @@ type NotifyCallback = (message: string) => void;
 
 // If no GPS point arrives for this long, the app was likely backgrounded
 const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
+// Rolling window size for live altitude smoothing (must collect this many before computing)
+const ALT_SMOOTH_WINDOW = 5;
+// Minimum altitude change (meters) to count as real elevation gain (deadband)
+const ALT_DEADBAND_M = 2;
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
+  computeElevation,
   computeRideStats,
   haversineDistance,
   MAX_ACCURACY_M,
@@ -22,6 +27,12 @@ import {
   clearInProgress,
   loadInProgress,
 } from '../utils/ride-storage';
+
+/** Average the last N altitude readings to smooth GPS noise. */
+function smoothedAltitude(buffer: number[]): number {
+  const sum = buffer.reduce((a, b) => a + b, 0);
+  return sum / buffer.length;
+}
 
 interface UseRideRecordingReturn {
   isRecording: boolean;
@@ -51,7 +62,8 @@ export function useRideRecording(
   const [liveElevationGain, setLiveElevationGain] = useState(0);
   const distanceRef = useRef(0);
   const elevGainRef = useRef(0);
-  const prevAltRef = useRef<number | null>(null);
+  const altBufferRef = useRef<number[]>([]); // rolling window for smoothing
+  const smoothedAltRef = useRef<number | null>(null); // last smoothed altitude
   const pausedRef = useRef(false);
   const manualPauseRef = useRef(false); // true when user explicitly paused
   const pausedTimeRef = useRef(0); // accumulated paused ms
@@ -153,7 +165,8 @@ export function useRideRecording(
     startTimeRef.current = Date.now();
     distanceRef.current = 0;
     elevGainRef.current = 0;
-    prevAltRef.current = null;
+    altBufferRef.current = [];
+    smoothedAltRef.current = null;
     pausedRef.current = false;
     manualPauseRef.current = false;
     pausedTimeRef.current = 0;
@@ -233,14 +246,25 @@ export function useRideRecording(
         }
 
         if (point.altitude !== null) {
-          if (prevAltRef.current !== null) {
-            const delta = point.altitude - prevAltRef.current;
-            if (delta > 0) {
-              elevGainRef.current += delta;
-              setLiveElevationGain(elevGainRef.current);
+          altBufferRef.current.push(point.altitude);
+          if (altBufferRef.current.length > ALT_SMOOTH_WINDOW) {
+            altBufferRef.current.shift();
+          }
+          if (altBufferRef.current.length === ALT_SMOOTH_WINDOW) {
+            const alt = smoothedAltitude(altBufferRef.current);
+            if (smoothedAltRef.current !== null) {
+              const delta = alt - smoothedAltRef.current;
+              if (delta > ALT_DEADBAND_M) {
+                elevGainRef.current += delta;
+                setLiveElevationGain(elevGainRef.current);
+                smoothedAltRef.current = alt;
+              } else if (delta < -ALT_DEADBAND_M) {
+                smoothedAltRef.current = alt;
+              }
+            } else {
+              smoothedAltRef.current = alt;
             }
           }
-          prevAltRef.current = point.altitude;
         }
       },
       (error) => {
@@ -404,27 +428,31 @@ export function useRideRecording(
     manualPauseRef.current = false;
     lowSpeedCountRef.current = 0;
 
-    // Recompute distance and elevation from saved points
+    // Recompute distance from saved points
     let dist = 0;
-    let elevGain = 0;
-    let prevAlt: number | null = null;
     for (let i = 1; i < data.points.length; i++) {
       const prev = data.points[i - 1];
       const pt = data.points[i];
       if (pt.accuracy < MAX_ACCURACY_M && prev.accuracy < MAX_ACCURACY_M) {
         dist += haversineDistance(prev.lat, prev.lng, pt.lat, pt.lng);
       }
-      if (pt.altitude !== null) {
-        if (prevAlt !== null) {
-          const delta = pt.altitude - prevAlt;
-          if (delta > 0) elevGain += delta;
-        }
-        prevAlt = pt.altitude;
-      }
     }
     distanceRef.current = dist;
-    elevGainRef.current = elevGain;
-    prevAltRef.current = prevAlt;
+
+    // Use smoothed elevation computation (matches saved ride stats)
+    const elev = computeElevation(data.points);
+    elevGainRef.current = elev.gain;
+
+    // Seed the altitude buffer from the tail of saved points for live smoothing
+    const recentAlts = data.points
+      .slice(-ALT_SMOOTH_WINDOW)
+      .map((p) => p.altitude)
+      .filter((a): a is number => a !== null);
+    altBufferRef.current = recentAlts;
+    smoothedAltRef.current =
+      recentAlts.length === ALT_SMOOTH_WINDOW
+        ? smoothedAltitude(recentAlts)
+        : null;
 
     setLiveDistance(dist);
     setLiveElevationGain(elevGain);
@@ -504,14 +532,25 @@ export function useRideRecording(
         }
 
         if (point.altitude !== null) {
-          if (prevAltRef.current !== null) {
-            const delta = point.altitude - prevAltRef.current;
-            if (delta > 0) {
-              elevGainRef.current += delta;
-              setLiveElevationGain(elevGainRef.current);
+          altBufferRef.current.push(point.altitude);
+          if (altBufferRef.current.length > ALT_SMOOTH_WINDOW) {
+            altBufferRef.current.shift();
+          }
+          if (altBufferRef.current.length === ALT_SMOOTH_WINDOW) {
+            const alt = smoothedAltitude(altBufferRef.current);
+            if (smoothedAltRef.current !== null) {
+              const delta = alt - smoothedAltRef.current;
+              if (delta > ALT_DEADBAND_M) {
+                elevGainRef.current += delta;
+                setLiveElevationGain(elevGainRef.current);
+                smoothedAltRef.current = alt;
+              } else if (delta < -ALT_DEADBAND_M) {
+                smoothedAltRef.current = alt;
+              }
+            } else {
+              smoothedAltRef.current = alt;
             }
           }
-          prevAltRef.current = point.altitude;
         }
       },
       (error) => {
