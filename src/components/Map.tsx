@@ -864,15 +864,19 @@ const MapboxMap = memo(function MapboxMap() {
           );
           bikeResourceMarkers.current.setMarkers(bikeResourceMarkerList);
 
-          // Update accuracy circle on zoom
+          // Update accuracy circle on zoom (batched to avoid jank during pinch-zoom)
+          let zoomRaf = 0;
           newMap.on('zoom', () => {
-            if (locationMarker.current && locationAccuracy.current > 0) {
-              updateAccuracyCircle(
-                locationMarker.current,
-                locationAccuracy.current,
-                newMap.getZoom(),
-              );
-            }
+            cancelAnimationFrame(zoomRaf);
+            zoomRaf = requestAnimationFrame(() => {
+              if (locationMarker.current && locationAccuracy.current > 0) {
+                updateAccuracyCircle(
+                  locationMarker.current,
+                  locationAccuracy.current,
+                  newMap.getZoom(),
+                );
+              }
+            });
           });
 
           // Add error handler

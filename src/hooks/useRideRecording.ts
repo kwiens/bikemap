@@ -139,7 +139,7 @@ export function useRideRecording(
     void clearInProgress();
     releaseWakeLock();
     setIsRecording(false);
-
+    setIsPaused(false);
     setElapsedTime(0);
     setLiveDistance(0);
     setLiveElevationGain(0);
@@ -332,7 +332,8 @@ export function useRideRecording(
   }
 
   const stopRecording = useCallback(async (): Promise<RecordedRide | null> => {
-    if (!isRecording || pointsRef.current.length < 2) {
+    if (!isRecording) return null;
+    if (pointsRef.current.length < 2) {
       cleanup();
       window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
       return null;
