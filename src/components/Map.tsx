@@ -336,9 +336,11 @@ const MapboxMap = memo(function MapboxMap() {
       const { trailName, autoDetected } = event.detail;
       const trail = mountainBikeTrails.find((t) => t.trailName === trailName);
 
-      // Manual selection during recording disables auto-detect
+      // Manual selection during recording disables auto-detect and clears
+      // any prior auto-detected trail so stop doesn't deselect the manual pick.
       if (!autoDetected && isRecordingRef.current) {
         autoDetectEnabledRef.current = false;
+        autoDetectedTrailRef.current = null;
       }
 
       if (trail) {
