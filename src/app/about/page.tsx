@@ -93,7 +93,7 @@ export default function AboutPage() {
           />
           <p className="text-gray-600 text-lg leading-relaxed max-w-md">
             A free, open-source interactive map of Chattanooga bike routes,
-            mountain bike trails, and cycling resources — built by the local
+            mountain bike trails, and cycling resources, built by the local
             riding community.
           </p>
         </div>
