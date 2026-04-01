@@ -154,6 +154,8 @@ export function useRideRecording(
     if (preserveProgressRef.current) {
       preserveProgressRef.current = false;
       setHasRecovery(true); // re-show recovery banner so user can retry or save
+      // Clear the map's live ride layer so a retry doesn't double-append points
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
     } else {
       void clearInProgress();
     }
