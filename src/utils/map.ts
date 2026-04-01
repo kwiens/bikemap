@@ -563,6 +563,52 @@ export function removeRideLayer(map: mapboxgl.Map): void {
   if (map.getSource(RIDE_SOURCE_ID)) map.removeSource(RIDE_SOURCE_ID);
 }
 
+// Trail auto-detection: given a GPS coordinate, returns the trail name at that
+// point (using the invisible hit-test layers), or null if not on any trail.
+export function detectTrailAtPoint(
+  map: mapboxgl.Map,
+  lngLat: [number, number],
+): string | null {
+  const point = map.project(new mapboxgl.LngLat(lngLat[0], lngLat[1]));
+
+  // If the point is off-screen, we can't query rendered features
+  const canvas = map.getCanvas();
+  if (
+    point.x < 0 ||
+    point.y < 0 ||
+    point.x > canvas.width ||
+    point.y > canvas.height
+  ) {
+    return null;
+  }
+
+  const hitLayerIds = TRAIL_LAYERS.map((cfg) => hitId(cfg.layerId));
+
+  // Only query layers that actually exist on the map
+  const activeLayers = hitLayerIds.filter((id) => map.getLayer(id));
+  if (activeLayers.length === 0) return null;
+
+  const features = map.queryRenderedFeatures(point, {
+    layers: activeLayers,
+  });
+  if (features.length === 0) return null;
+
+  const feature = features[0];
+  const layerId = feature.layer.id;
+
+  // Find the matching TRAIL_LAYERS config to get the correct property name
+  const cfg = TRAIL_LAYERS.find((c) => hitId(c.layerId) === layerId);
+  if (!cfg) return null;
+
+  const rawName = feature.properties?.[cfg.trailProp];
+  if (!rawName) return null;
+
+  // Map through TRAIL_METADATA for display name (Godsey Ridge trails use raw
+  // names like "Green as built" that need mapping)
+  const meta = TRAIL_METADATA[rawName];
+  return meta?.displayName ?? rawName;
+}
+
 // Geocoding utility
 export async function geocodeAddress(
   address: string,
