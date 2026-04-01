@@ -138,7 +138,16 @@ const MapboxMap = memo(function MapboxMap() {
 
     const updateHandler = (e: Event) => {
       if (!map.current) return;
-      const { point } = (e as CustomEvent).detail;
+      const detail = (e as CustomEvent).detail;
+
+      // Batch restore (continueRide) — push all points and render once
+      if (detail.points) {
+        liveCoords.push(...(detail.points as [number, number][]));
+        updateRideLayer(map.current, liveCoords);
+        return;
+      }
+
+      const { point } = detail;
       liveCoords.push(point);
       // Throttle Mapbox setData to every 3rd point
       updateSkip++;

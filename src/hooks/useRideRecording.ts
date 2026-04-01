@@ -16,6 +16,7 @@ const ALT_DEADBAND_M = 2;
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
+  computeDistance,
   computeElevation,
   computeRideStats,
   haversineDistance,
@@ -432,14 +433,7 @@ export function useRideRecording(
     lowSpeedCountRef.current = 0;
 
     // Recompute distance from saved points
-    let dist = 0;
-    for (let i = 1; i < data.points.length; i++) {
-      const prev = data.points[i - 1];
-      const pt = data.points[i];
-      if (pt.accuracy < MAX_ACCURACY_M && prev.accuracy < MAX_ACCURACY_M) {
-        dist += haversineDistance(prev.lat, prev.lng, pt.lat, pt.lng);
-      }
-    }
+    const dist = computeDistance(data.points);
     distanceRef.current = dist;
 
     // Use smoothed elevation computation (matches saved ride stats)
@@ -465,14 +459,15 @@ export function useRideRecording(
 
     acquireWakeLock();
 
-    // Draw existing track on map
-    for (const pt of data.points) {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-          detail: { point: [pt.lng, pt.lat] as [number, number] },
-        }),
-      );
-    }
+    // Draw existing track on map in a single batch
+    const coords = data.points.map(
+      (pt) => [pt.lng, pt.lat] as [number, number],
+    );
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
+        detail: { points: coords },
+      }),
+    );
 
     startGpsWatchAndTimers();
   }, [isRecording, acquireWakeLock, startGpsWatchAndTimers]);
