@@ -70,6 +70,7 @@ export function useRideRecording(
   const pausedTimeRef = useRef(0); // accumulated paused ms
   const pauseStartRef = useRef(0);
   const lowSpeedCountRef = useRef(0); // consecutive low-speed GPS readings
+  const preserveProgressRef = useRef(false); // keep in-progress data if GPS fails during continue
 
   const saveIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(
     undefined,
@@ -150,7 +151,12 @@ export function useRideRecording(
       clearInterval(saveIntervalRef.current);
       saveIntervalRef.current = undefined;
     }
-    void clearInProgress();
+    if (preserveProgressRef.current) {
+      preserveProgressRef.current = false;
+      setHasRecovery(true); // re-show recovery banner so user can retry or save
+    } else {
+      void clearInProgress();
+    }
     releaseWakeLock();
     setIsRecording(false);
     setIsPaused(false);
@@ -203,6 +209,9 @@ export function useRideRecording(
         };
         const prev = pointsRef.current[pointsRef.current.length - 1];
         pointsRef.current.push(point);
+
+        // GPS is confirmed working — safe to clear progress on future cleanup
+        preserveProgressRef.current = false;
 
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
@@ -456,6 +465,11 @@ export function useRideRecording(
     setHasRecovery(false);
     setIsRecording(true);
     setIsPaused(false);
+
+    // Preserve in-progress data until GPS confirms working — if GPS fails
+    // immediately, cleanup won't wipe the saved ride so the user can still
+    // fall back to "Save it".
+    preserveProgressRef.current = true;
 
     acquireWakeLock();
 
