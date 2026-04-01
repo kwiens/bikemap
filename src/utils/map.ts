@@ -594,7 +594,8 @@ export function detectTrailAtPoint(
   if (features.length === 0) return null;
 
   const feature = features[0];
-  const layerId = feature.layer.id;
+  const layerId = feature.layer?.id;
+  if (!layerId) return null;
 
   // Find the matching TRAIL_LAYERS config to get the correct property name
   const cfg = TRAIL_LAYERS.find((c) => hitId(c.layerId) === layerId);
