@@ -8,6 +8,7 @@ import {
   updateMtnBikeOpacity,
   highlightMtnBikeArea,
   initMtnBikeColors,
+  detectTrailAtPoint,
   TRAIL_LAYERS,
 } from './map';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
@@ -761,5 +762,95 @@ describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
       'line-opacity',
       ['case', ['==', ['get', 'Name'], 'Green as built'], 0.9, 0.15],
     );
+  });
+});
+
+describe('detectTrailAtPoint', () => {
+  function createMockMap(
+    overrides: Record<string, unknown> = {},
+  ): mapboxgl.Map {
+    return {
+      project: vi.fn().mockReturnValue({ x: 100, y: 100 }),
+      getCanvas: vi.fn().mockReturnValue({ width: 800, height: 600 }),
+      getLayer: vi.fn().mockReturnValue(true),
+      queryRenderedFeatures: vi.fn().mockReturnValue([]),
+      ...overrides,
+    } as unknown as mapboxgl.Map;
+  }
+
+  it('returns trail name when GPS point is on a SORBA trail', () => {
+    const mockMap = createMockMap({
+      queryRenderedFeatures: vi.fn().mockReturnValue([
+        {
+          layer: { id: 'SORBA Regional Trails Hit' },
+          properties: { Trail: 'Big Forest' },
+        },
+      ]),
+    });
+
+    const result = detectTrailAtPoint(mockMap, [-85.3, 35.0]);
+    expect(result).toBe('Big Forest');
+    expect(mockMap.project).toHaveBeenCalled();
+    expect(mockMap.queryRenderedFeatures).toHaveBeenCalledWith(
+      { x: 100, y: 100 },
+      { layers: expect.arrayContaining(['SORBA Regional Trails Hit']) },
+    );
+  });
+
+  it('returns display name for Godsey Ridge trails via TRAIL_METADATA', () => {
+    const mockMap = createMockMap({
+      queryRenderedFeatures: vi.fn().mockReturnValue([
+        {
+          layer: { id: 'Godsey Ridge Trails Hit' },
+          properties: { Name: 'Green as built' },
+        },
+      ]),
+    });
+
+    const result = detectTrailAtPoint(mockMap, [-85.3, 35.0]);
+    // TRAIL_METADATA maps 'Green as built' -> displayName
+    const expected =
+      TRAIL_METADATA['Green as built']?.displayName ?? 'Green as built';
+    expect(result).toBe(expected);
+  });
+
+  it('returns null when no features found', () => {
+    const mockMap = createMockMap();
+    const result = detectTrailAtPoint(mockMap, [-85.3, 35.0]);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when point is off-screen', () => {
+    const mockMap = createMockMap({
+      project: vi.fn().mockReturnValue({ x: -10, y: 100 }),
+    });
+
+    const result = detectTrailAtPoint(mockMap, [-85.3, 35.0]);
+    expect(result).toBeNull();
+    expect(mockMap.queryRenderedFeatures).not.toHaveBeenCalled();
+  });
+
+  it('returns null when hit layers do not exist on map', () => {
+    const mockMap = createMockMap({
+      getLayer: vi.fn().mockReturnValue(undefined),
+    });
+
+    const result = detectTrailAtPoint(mockMap, [-85.3, 35.0]);
+    expect(result).toBeNull();
+    expect(mockMap.queryRenderedFeatures).not.toHaveBeenCalled();
+  });
+
+  it('returns null when feature has no trail property', () => {
+    const mockMap = createMockMap({
+      queryRenderedFeatures: vi.fn().mockReturnValue([
+        {
+          layer: { id: 'SORBA Regional Trails Hit' },
+          properties: {},
+        },
+      ]),
+    });
+
+    const result = detectTrailAtPoint(mockMap, [-85.3, 35.0]);
+    expect(result).toBeNull();
   });
 });

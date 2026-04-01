@@ -47,6 +47,7 @@ import {
   addRideLayer,
   updateRideLayer,
   removeRideLayer,
+  detectTrailAtPoint,
 } from '@/utils/map';
 import { loadRide } from '@/utils/ride-storage';
 import { mapConfig } from '@/config/map.config';
@@ -74,6 +75,14 @@ const MapboxMap = memo(function MapboxMap() {
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
+
+  // Trail auto-detection during ride recording
+  const autoDetectEnabledRef = useRef(false);
+  const autoDetectedTrailRef = useRef<string | null>(null);
+  const lastDetectTimeRef = useRef(0);
+  const detectCandidateRef = useRef<string | null>(null);
+  const detectConfirmCountRef = useRef(0);
+  const isRecordingRef = useRef(false);
 
   // Use custom hooks
   const {
@@ -123,15 +132,61 @@ const MapboxMap = memo(function MapboxMap() {
     const deselectHandler = () => handleRideDeselect();
     const liveCoords: [number, number][] = [];
     let updateSkip = 0;
+    const DETECT_INTERVAL_MS = 3000;
+    const DETECT_CONFIRM_COUNT = 2; // ~6s before first auto-select
+    const DETECT_SWITCH_COUNT = 4; // ~12s before switching or clearing
+
     const updateHandler = (e: Event) => {
       if (!map.current) return;
-      const { point } = (e as CustomEvent).detail;
+      const detail = (e as CustomEvent).detail;
+
+      // Batch restore (continueRide) — push all points and render once
+      if (detail.points) {
+        liveCoords.push(...(detail.points as [number, number][]));
+        updateRideLayer(map.current, liveCoords);
+        return;
+      }
+
+      const { point } = detail;
       liveCoords.push(point);
       // Throttle Mapbox setData to every 3rd point
       updateSkip++;
       if (liveCoords.length >= 2 && updateSkip >= 3) {
         updateRideLayer(map.current, liveCoords);
         updateSkip = 0;
+      }
+
+      // Trail auto-detection (throttled)
+      if (!autoDetectEnabledRef.current) return;
+      const now = Date.now();
+      if (now - lastDetectTimeRef.current < DETECT_INTERVAL_MS) return;
+      lastDetectTimeRef.current = now;
+
+      const detected = detectTrailAtPoint(map.current, point);
+      const threshold =
+        autoDetectedTrailRef.current === null
+          ? DETECT_CONFIRM_COUNT
+          : DETECT_SWITCH_COUNT;
+
+      if (detected === detectCandidateRef.current) {
+        detectConfirmCountRef.current++;
+      } else {
+        detectCandidateRef.current = detected;
+        detectConfirmCountRef.current = 1;
+      }
+
+      if (detectConfirmCountRef.current < threshold) return;
+
+      if (detected !== null && detected !== autoDetectedTrailRef.current) {
+        autoDetectedTrailRef.current = detected;
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
+            detail: { trailName: detected, autoDetected: true },
+          }),
+        );
+      } else if (detected === null && autoDetectedTrailRef.current !== null) {
+        autoDetectedTrailRef.current = null;
+        window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
       }
     };
     const stopHandler = () => {
@@ -225,7 +280,8 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
-    // When user interacts with map, disable location tracking
+    // When user drags/pans the map, disable location tracking.
+    // Using dragstart instead of click so route-layer taps aren't swallowed.
     const disableTracking = () => {
       setWatchingLocation(false);
       if (locationWatch.current) {
@@ -238,9 +294,7 @@ const MapboxMap = memo(function MapboxMap() {
       }
     };
 
-    map.current.on('click', disableTracking);
-    map.current.on('touch', disableTracking);
-    map.current.on('touchend', disableTracking);
+    map.current.on('dragstart', disableTracking);
   }
 
   // Handle route selection events - outside the map initialization
@@ -279,8 +333,15 @@ const MapboxMap = memo(function MapboxMap() {
     (event: CustomEvent) => {
       if (!map.current) return;
 
-      const { trailName } = event.detail;
+      const { trailName, autoDetected } = event.detail;
       const trail = mountainBikeTrails.find((t) => t.trailName === trailName);
+
+      // Manual selection during recording disables auto-detect and clears
+      // any prior auto-detected trail so stop doesn't deselect the manual pick.
+      if (!autoDetected && isRecordingRef.current) {
+        autoDetectEnabledRef.current = false;
+        autoDetectedTrailRef.current = null;
+      }
 
       if (trail) {
         showToast(trail.displayName);
@@ -299,7 +360,8 @@ const MapboxMap = memo(function MapboxMap() {
           calculateTrailBounds(map.current, trailName) ?? undefined;
       }
 
-      if (trail?.bounds) {
+      // Skip flyToBounds for auto-detected trails (map already follows user)
+      if (!autoDetected && trail?.bounds) {
         flyToBounds(map.current, trail.bounds);
       }
     },
@@ -309,6 +371,14 @@ const MapboxMap = memo(function MapboxMap() {
   const handleTrailDeselect = useCallback(() => {
     if (!map.current) return;
     updateMtnBikeOpacity(map.current, null);
+
+    // Re-enable auto-detect if recording is active
+    if (isRecordingRef.current) {
+      autoDetectEnabledRef.current = true;
+      autoDetectedTrailRef.current = null;
+      detectCandidateRef.current = null;
+      detectConfirmCountRef.current = 0;
+    }
   }, []);
 
   // Handle area (rec area heading) selection — zoom to area bounds
@@ -957,19 +1027,18 @@ const MapboxMap = memo(function MapboxMap() {
         });
       }
 
-      // Then continuously track position (preserving zoom)
+      // Continuously re-center on current position using jumpTo (no animation)
+      // so the map is never mid-flight, which would block route-layer tap events.
       locationWatch.current = setInterval(() => {
         if (!map.current || !locationMarker.current) {
           return;
         }
 
         const lngLat = locationMarker.current.getLngLat();
-        map.current.flyTo({
+        map.current.jumpTo({
           center: [lngLat.lng, lngLat.lat],
-          essential: true,
-          duration: 1000,
         });
-      }, 500);
+      }, 1000);
     } else {
       // When disabled: stop tracking
       if (locationWatch.current) {
@@ -995,10 +1064,26 @@ const MapboxMap = memo(function MapboxMap() {
     const handleStart = () => {
       setLocationWatch(true);
       mapContainer.current?.classList.add('recording-active');
+      // Enable trail auto-detection
+      isRecordingRef.current = true;
+      autoDetectEnabledRef.current = true;
+      autoDetectedTrailRef.current = null;
+      detectCandidateRef.current = null;
+      detectConfirmCountRef.current = 0;
+      lastDetectTimeRef.current = 0;
     };
     const handleStop = () => {
       setLocationWatch(false);
       mapContainer.current?.classList.remove('recording-active');
+      // Clean up auto-detected trail selection
+      isRecordingRef.current = false;
+      if (autoDetectedTrailRef.current !== null) {
+        window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+      }
+      autoDetectEnabledRef.current = false;
+      autoDetectedTrailRef.current = null;
+      detectCandidateRef.current = null;
+      detectConfirmCountRef.current = 0;
     };
 
     window.addEventListener(MAP_EVENTS.RIDE_RECORDING_START, handleStart);

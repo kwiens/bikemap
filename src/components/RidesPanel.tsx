@@ -45,6 +45,7 @@ export function RidesPanel() {
     resumeRecording,
     stopRecording,
     recoverRide,
+    continueRide,
     dismissRecovery,
   } = useRideRecording(showToast);
 
@@ -75,6 +76,11 @@ export function RidesPanel() {
       );
     }
   }, [recoverRide, showToast]);
+
+  const handleContinueRide = useCallback(async () => {
+    await continueRide();
+    showToast('Ride resumed — keep going!');
+  }, [continueRide, showToast]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -247,6 +253,13 @@ export function RidesPanel() {
                 Unfinished ride found
               </p>
               <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-1.5 bg-green-500 text-white rounded text-xs font-medium hover:bg-green-600"
+                  onClick={handleContinueRide}
+                >
+                  Continue
+                </button>
                 <button
                   type="button"
                   className="flex-1 px-3 py-1.5 bg-amber-500 text-white rounded text-xs font-medium hover:bg-amber-600"
