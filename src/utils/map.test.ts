@@ -510,12 +510,12 @@ describe('updateMtnBikeOpacity', () => {
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       'SORBA Regional Trails',
       'line-opacity',
-      ['case', ['==', ['get', 'Trail'], 'Five Points'], 0.9, 0.15],
+      ['case', ['==', ['get', 'Trail'], 'Five Points'], 0.9, 0.5],
     );
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       'SORBA Regional Trails',
       'line-width',
-      ['case', ['==', ['get', 'Trail'], 'Five Points'], 4, 2],
+      ['case', ['==', ['get', 'Trail'], 'Five Points'], 4, 3],
     );
   });
 
@@ -530,12 +530,12 @@ describe('updateMtnBikeOpacity', () => {
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       'SORBA Regional Trails',
       'line-opacity',
-      0.15,
+      0.5,
     );
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       'SORBA Regional Trails',
       'line-width',
-      2,
+      3,
     );
   });
 
@@ -628,12 +628,12 @@ describe('highlightMtnBikeArea', () => {
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       'SORBA Regional Trails',
       'line-opacity',
-      ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 0.9, 0.1],
+      ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 0.9, 0.4],
     );
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       'SORBA Regional Trails',
       'line-width',
-      ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 3, 2],
+      ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 3, 3],
     );
   });
 
@@ -760,7 +760,7 @@ describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       'Godsey Ridge Trails',
       'line-opacity',
-      ['case', ['==', ['get', 'Name'], 'Green as built'], 0.9, 0.15],
+      ['case', ['==', ['get', 'Name'], 'Green as built'], 0.9, 0.5],
     );
   });
 });
