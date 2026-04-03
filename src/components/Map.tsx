@@ -869,8 +869,8 @@ const MapboxMap = memo(function MapboxMap() {
           for (const cfg of TRAIL_LAYERS) {
             if (!newMap.getLayer(cfg.layerId)) continue;
 
-            newMap.setPaintProperty(cfg.layerId, 'line-opacity', 0.15);
-            newMap.setPaintProperty(cfg.layerId, 'line-width', 2);
+            newMap.setPaintProperty(cfg.layerId, 'line-opacity', 0.35);
+            newMap.setPaintProperty(cfg.layerId, 'line-width', 3);
 
             // Click handler on hit-test layer for easier tapping
             const hId = `${cfg.layerId} Hit`;
@@ -1103,7 +1103,7 @@ const MapboxMap = memo(function MapboxMap() {
       {toastMessage && (
         <div
           className={cn(
-            'absolute top-5 left-1/2 -translate-x-1/2 bg-black/65 text-white px-6 py-3 rounded-lg text-base font-medium z-[800] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none animate-toast-fade-in',
+            'absolute left-1/2 -translate-x-1/2 bg-black/65 text-white px-6 py-3 rounded-lg text-base font-medium z-[800] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none animate-toast-fade-in top-[calc(1.25rem+env(safe-area-inset-top))]',
             toastFadingOut && 'animate-toast-fade-out',
           )}
         >
@@ -1156,7 +1156,7 @@ const MapboxMap = memo(function MapboxMap() {
 export default function BikeMap() {
   return (
     <MapLegendProvider>
-      <div className="w-screen h-screen relative overflow-visible">
+      <div className="w-screen h-dvh relative overflow-visible">
         <MapboxMap />
         <RidesPanel />
       </div>

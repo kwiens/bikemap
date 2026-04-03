@@ -164,7 +164,7 @@ export function RidesPanel() {
       {/* Toggle button */}
       <div
         className={cn(
-          'fixed top-5 right-4',
+          'fixed right-4 top-[calc(1.25rem+env(safe-area-inset-top))]',
           isOpen ? 'z-[960]' : 'z-[900]',
           isRecording && !isOpen && 'animate-recording-pulse rounded-full',
         )}
@@ -188,7 +188,7 @@ export function RidesPanel() {
 
       {/* Floating recording HUD — visible when recording with panel closed */}
       {isRecording && !isOpen && (
-        <div className="fixed top-[22px] left-1/2 -translate-x-1/2 z-[800] bg-white rounded-xl shadow-lg h-10 px-3 flex items-center gap-2.5 text-sm max-md:top-[76px] max-md:left-2 max-md:right-2 max-md:translate-x-0">
+        <div className="fixed top-[calc(22px+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[800] bg-white rounded-xl shadow-lg h-10 px-3 flex items-center gap-2.5 text-sm max-md:top-[calc(76px+env(safe-area-inset-top))] max-md:left-2 max-md:right-2 max-md:translate-x-0">
           <PulseDot />
           <span className="font-bold tabular-nums text-gray-700">
             {formatElapsed(elapsedTime)}
@@ -229,7 +229,7 @@ export function RidesPanel() {
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
         )}
       >
-        <div className="px-4 pt-4 pb-2 border-b border-gray-200">
+        <div className="px-4 pb-2 border-b border-gray-200 pt-[calc(1rem+env(safe-area-inset-top))]">
           <h2 className="m-0 text-base font-semibold text-gray-700">
             My Rides
           </h2>

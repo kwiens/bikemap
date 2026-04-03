@@ -287,7 +287,12 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* Toggle button */}
-      <div className={cn('fixed top-4 left-4', isOpen ? 'z-[960]' : 'z-[900]')}>
+      <div
+        className={cn(
+          'fixed left-4 top-[calc(1rem+env(safe-area-inset-top))]',
+          isOpen ? 'z-[960]' : 'z-[900]',
+        )}
+      >
         <button
           ref={toggleButtonRef}
           onClick={toggle}
@@ -310,7 +315,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         )}
       >
         {/* Casual / MTB toggle in header */}
-        <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
           <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
             <button
               type="button"
