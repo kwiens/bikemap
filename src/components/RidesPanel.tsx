@@ -233,7 +233,7 @@ export function RidesPanel() {
           {toastMessage && (
             <div
               className={cn(
-                'absolute top-2 left-4 right-4 px-3 py-2 bg-gray-700 text-white rounded-md text-[13px] text-center animate-toast-slide-in z-10',
+                'absolute top-2 left-4 right-4 px-3 py-2 bg-gray-700 text-white rounded-md text-[13px] text-center animate-toast-slide-in z-10 pointer-events-none',
                 toastFadingOut &&
                   'opacity-0 transition-opacity duration-300 ease-in',
               )}
