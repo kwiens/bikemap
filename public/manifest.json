@@ -4,6 +4,7 @@
   "description": "Paths and routes for cyclists in Chattanooga, TN",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#c3f44d",
   "theme_color": "#ffffff",
   "icons": [
