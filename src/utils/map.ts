@@ -368,13 +368,13 @@ function setTrailOpacity(
       'case',
       ['==', ['get', prop], matchValue],
       0.9,
-      0.15,
+      0.5,
     ]);
     map.setPaintProperty(cfg.layerId, 'line-width', [
       'case',
       ['==', ['get', prop], matchValue],
       4,
-      2,
+      3,
     ]);
 
     if (map.getLayer(cId)) {
@@ -382,13 +382,13 @@ function setTrailOpacity(
         'case',
         ['==', ['get', prop], matchValue],
         0.9,
-        0.25,
+        0.5,
       ]);
       map.setPaintProperty(cId, 'line-width', [
         'case',
         ['==', ['get', prop], matchValue],
         6,
-        4,
+        5,
       ]);
     }
 
@@ -407,12 +407,12 @@ function setTrailOpacity(
       ]);
     }
   } else {
-    map.setPaintProperty(cfg.layerId, 'line-opacity', 0.15);
-    map.setPaintProperty(cfg.layerId, 'line-width', 2);
+    map.setPaintProperty(cfg.layerId, 'line-opacity', 0.5);
+    map.setPaintProperty(cfg.layerId, 'line-width', 3);
 
     if (map.getLayer(cId)) {
-      map.setPaintProperty(cId, 'line-opacity', 0.25);
-      map.setPaintProperty(cId, 'line-width', 4);
+      map.setPaintProperty(cId, 'line-opacity', 0.5);
+      map.setPaintProperty(cId, 'line-width', 5);
     }
 
     if (map.getLayer(gId)) {
@@ -470,14 +470,14 @@ export function highlightMtnBikeArea(
         ['get', cfg.trailProp],
         rawNames,
         0.9,
-        0.1,
+        0.4,
       ]);
       map.setPaintProperty(cfg.layerId, 'line-width', [
         'match',
         ['get', cfg.trailProp],
         rawNames,
         3,
-        2,
+        3,
       ]);
 
       if (map.getLayer(cId)) {
@@ -486,14 +486,14 @@ export function highlightMtnBikeArea(
           ['get', cfg.trailProp],
           rawNames,
           0.6,
-          0.1,
+          0.4,
         ]);
         map.setPaintProperty(cId, 'line-width', [
           'match',
           ['get', cfg.trailProp],
           rawNames,
           5,
-          4,
+          5,
         ]);
       }
 

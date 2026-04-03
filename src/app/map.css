@@ -1,6 +1,6 @@
 /* Shift Mapbox zoom/compass controls down to align with toggle buttons */
 .mapboxgl-ctrl-top-right {
-  top: 68px !important;
+  top: calc(68px + env(safe-area-inset-top)) !important;
   right: 12px !important;
   z-index: 900 !important;
   transition: top 0.2s ease;
@@ -9,7 +9,7 @@
 /* On mobile, push controls below the recording HUD */
 @media (max-width: 767px) {
   .recording-active .mapboxgl-ctrl-top-right {
-    top: 128px !important;
+    top: calc(128px + env(safe-area-inset-top)) !important;
   }
 }
 
