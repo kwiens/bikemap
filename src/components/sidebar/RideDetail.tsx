@@ -72,21 +72,14 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
 
   return (
     <div className="p-3">
-      <div
-        className="flex items-center gap-1.5 text-[13px] text-blue-500 cursor-pointer mb-2.5 py-0.5 hover:text-blue-600"
+      <button
+        type="button"
+        className="flex items-center gap-1.5 text-[13px] text-blue-500 cursor-pointer mb-2.5 py-2 px-1 -ml-1 bg-transparent border-none hover:text-blue-600"
         onClick={onClose}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onClose();
-          }
-        }}
-        role="button"
-        tabIndex={0}
       >
         <FontAwesomeIcon icon={faChevronLeft} />
         <span>Back</span>
-      </div>
+      </button>
 
       <div className="flex items-center justify-between gap-2 mb-1">
         {editing ? (

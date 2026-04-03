@@ -159,8 +159,8 @@ export function findClosestProfileIndex(
     }
   }
 
-  // Only show if within ~200 meters (~0.002 degrees)
-  if (bestDist > 0.002 * 0.002) return null;
+  // Only show if within ~500 meters (~0.005 degrees)
+  if (bestDist > 0.005 * 0.005) return null;
 
   return bestIdx;
 }
