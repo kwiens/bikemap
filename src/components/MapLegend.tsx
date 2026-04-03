@@ -310,7 +310,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       <div
         ref={sidebarRef}
         className={cn(
-          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-[950] overflow-hidden transition-transform duration-300 ease-in-out max-md:w-full max-md:max-w-[320px]',
+          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-[950] overflow-hidden transition-transform duration-300 ease-in-out flex flex-col max-md:w-full max-md:max-w-[320px]',
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -344,7 +344,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="overflow-y-auto h-[calc(100%-79px)]">
+        <div className="overflow-y-auto flex-1 min-h-0">
           <div className="px-4 pb-4 pt-2">
             {activeSection === 'routes' && (
               <>
