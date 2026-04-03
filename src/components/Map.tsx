@@ -281,8 +281,8 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
-    // When user drags/pans the map, disable location tracking (but not during recording).
-    // Using dragstart instead of click so route-layer taps aren't swallowed.
+    // When user intentionally moves the map, disable location tracking (but not during recording).
+    // Using dragstart/dblclick/wheel instead of click so route-layer taps aren't swallowed.
     const disableTracking = () => {
       if (recordingActive.current) return;
       setWatchingLocation(false);
@@ -297,6 +297,8 @@ const MapboxMap = memo(function MapboxMap() {
     };
 
     map.current.on('dragstart', disableTracking);
+    map.current.on('dblclick', disableTracking);
+    map.current.on('wheel', disableTracking);
   }
 
   // Handle route selection events - outside the map initialization
