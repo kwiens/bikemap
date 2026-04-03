@@ -17,6 +17,8 @@ html {
   margin: 0;
   overflow: hidden;
   position: fixed;
+  /* Prevent browser pinch-zoom (iOS Safari ignores user-scalable=no) */
+  touch-action: pan-x pan-y;
 }
 
 body {
