@@ -9,9 +9,15 @@ type NotifyCallback = (message: string) => void;
 
 // If no GPS point arrives for this long, the app was likely backgrounded
 const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
+// Rolling window size for live altitude smoothing (must collect this many before computing)
+const ALT_SMOOTH_WINDOW = 5;
+// Minimum altitude change (meters) to count as real elevation gain (deadband)
+const ALT_DEADBAND_M = 2;
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
+  computeDistance,
+  computeElevation,
   computeRideStats,
   haversineDistance,
   MAX_ACCURACY_M,
@@ -22,6 +28,12 @@ import {
   clearInProgress,
   loadInProgress,
 } from '../utils/ride-storage';
+
+/** Average the last N altitude readings to smooth GPS noise. */
+function smoothedAltitude(buffer: number[]): number {
+  const sum = buffer.reduce((a, b) => a + b, 0);
+  return sum / buffer.length;
+}
 
 interface UseRideRecordingReturn {
   isRecording: boolean;
@@ -35,6 +47,7 @@ interface UseRideRecordingReturn {
   resumeRecording: () => void;
   stopRecording: () => Promise<RecordedRide | null>;
   recoverRide: () => Promise<RecordedRide | null>;
+  continueRide: () => Promise<void>;
   dismissRecovery: () => void;
 }
 
@@ -50,12 +63,14 @@ export function useRideRecording(
   const [liveElevationGain, setLiveElevationGain] = useState(0);
   const distanceRef = useRef(0);
   const elevGainRef = useRef(0);
-  const prevAltRef = useRef<number | null>(null);
+  const altBufferRef = useRef<number[]>([]); // rolling window for smoothing
+  const smoothedAltRef = useRef<number | null>(null); // last smoothed altitude
   const pausedRef = useRef(false);
   const manualPauseRef = useRef(false); // true when user explicitly paused
   const pausedTimeRef = useRef(0); // accumulated paused ms
   const pauseStartRef = useRef(0);
   const lowSpeedCountRef = useRef(0); // consecutive low-speed GPS readings
+  const preserveProgressRef = useRef(false); // keep in-progress data if GPS fails during continue
 
   const saveIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(
     undefined,
@@ -136,7 +151,14 @@ export function useRideRecording(
       clearInterval(saveIntervalRef.current);
       saveIntervalRef.current = undefined;
     }
-    void clearInProgress();
+    if (preserveProgressRef.current) {
+      preserveProgressRef.current = false;
+      setHasRecovery(true); // re-show recovery banner so user can retry or save
+      // Clear the map's live ride layer so a retry doesn't double-append points
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
+    } else {
+      void clearInProgress();
+    }
     releaseWakeLock();
     setIsRecording(false);
     setIsPaused(false);
@@ -145,29 +167,8 @@ export function useRideRecording(
     setLiveElevationGain(0);
   }, [releaseWakeLock]);
 
-  const startRecording = useCallback(() => {
-    if (isRecording) return;
-
-    pointsRef.current = [];
-    startTimeRef.current = Date.now();
-    distanceRef.current = 0;
-    elevGainRef.current = 0;
-    prevAltRef.current = null;
-    pausedRef.current = false;
-    manualPauseRef.current = false;
-    pausedTimeRef.current = 0;
-    pauseStartRef.current = 0;
-    lowSpeedCountRef.current = 0;
-
-    setElapsedTime(0);
-    setLiveDistance(0);
-    setLiveElevationGain(0);
-    setIsRecording(true);
-    setIsPaused(false);
-
-    acquireWakeLock();
-
-    // Start GPS watch
+  // Shared: start GPS watch, elapsed timer, and periodic save
+  const startGpsWatchAndTimers = useCallback(() => {
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const speed = position.coords.speed ?? 0;
@@ -211,6 +212,9 @@ export function useRideRecording(
         const prev = pointsRef.current[pointsRef.current.length - 1];
         pointsRef.current.push(point);
 
+        // GPS is confirmed working — safe to clear progress on future cleanup
+        preserveProgressRef.current = false;
+
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
             detail: { point: [point.lng, point.lat] as [number, number] },
@@ -232,14 +236,25 @@ export function useRideRecording(
         }
 
         if (point.altitude !== null) {
-          if (prevAltRef.current !== null) {
-            const delta = point.altitude - prevAltRef.current;
-            if (delta > 0) {
-              elevGainRef.current += delta;
-              setLiveElevationGain(elevGainRef.current);
+          altBufferRef.current.push(point.altitude);
+          if (altBufferRef.current.length > ALT_SMOOTH_WINDOW) {
+            altBufferRef.current.shift();
+          }
+          if (altBufferRef.current.length === ALT_SMOOTH_WINDOW) {
+            const alt = smoothedAltitude(altBufferRef.current);
+            if (smoothedAltRef.current !== null) {
+              const delta = alt - smoothedAltRef.current;
+              if (delta > ALT_DEADBAND_M) {
+                elevGainRef.current += delta;
+                setLiveElevationGain(elevGainRef.current);
+                smoothedAltRef.current = alt;
+              } else if (delta < -ALT_DEADBAND_M) {
+                smoothedAltRef.current = alt;
+              }
+            } else {
+              smoothedAltRef.current = alt;
             }
           }
-          prevAltRef.current = point.altitude;
         }
       },
       (error) => {
@@ -284,7 +299,32 @@ export function useRideRecording(
     }, 10_000);
 
     window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
-  }, [isRecording, acquireWakeLock, cleanup, onNotify]);
+  }, [cleanup, onNotify]);
+
+  const startRecording = useCallback(() => {
+    if (isRecording) return;
+
+    pointsRef.current = [];
+    startTimeRef.current = Date.now();
+    distanceRef.current = 0;
+    elevGainRef.current = 0;
+    altBufferRef.current = [];
+    smoothedAltRef.current = null;
+    pausedRef.current = false;
+    manualPauseRef.current = false;
+    pausedTimeRef.current = 0;
+    pauseStartRef.current = 0;
+    lowSpeedCountRef.current = 0;
+
+    setElapsedTime(0);
+    setLiveDistance(0);
+    setLiveElevationGain(0);
+    setIsRecording(true);
+    setIsPaused(false);
+
+    acquireWakeLock();
+    startGpsWatchAndTimers();
+  }, [isRecording, acquireWakeLock, startGpsWatchAndTimers]);
 
   const pauseRecording = useCallback(() => {
     if (!isRecording || manualPauseRef.current) return;
@@ -382,6 +422,72 @@ export function useRideRecording(
     return ride;
   }, []);
 
+  const continueRide = useCallback(async () => {
+    if (isRecording) return;
+    const data = await loadInProgress();
+    if (!data || data.points.length < 2) {
+      await clearInProgress();
+      setHasRecovery(false);
+      return;
+    }
+
+    // Pre-load saved points and restore accumulated stats
+    pointsRef.current = [...data.points];
+    startTimeRef.current = data.startTime;
+    const lastPoint = data.points[data.points.length - 1];
+
+    // Treat the gap between last saved point and now as paused time
+    pausedTimeRef.current = Date.now() - lastPoint.timestamp;
+    pauseStartRef.current = 0;
+    pausedRef.current = false;
+    manualPauseRef.current = false;
+    lowSpeedCountRef.current = 0;
+
+    // Recompute distance from saved points
+    const dist = computeDistance(data.points);
+    distanceRef.current = dist;
+
+    // Use smoothed elevation computation (matches saved ride stats)
+    const elev = computeElevation(data.points);
+    elevGainRef.current = elev.gain;
+
+    // Seed the altitude buffer from the tail of saved points for live smoothing
+    const recentAlts = data.points
+      .slice(-ALT_SMOOTH_WINDOW)
+      .map((p) => p.altitude)
+      .filter((a): a is number => a !== null);
+    altBufferRef.current = recentAlts;
+    smoothedAltRef.current =
+      recentAlts.length === ALT_SMOOTH_WINDOW
+        ? smoothedAltitude(recentAlts)
+        : null;
+
+    setLiveDistance(dist);
+    setLiveElevationGain(elev.gain);
+    setHasRecovery(false);
+    setIsRecording(true);
+    setIsPaused(false);
+
+    // Preserve in-progress data until GPS confirms working — if GPS fails
+    // immediately, cleanup won't wipe the saved ride so the user can still
+    // fall back to "Save it".
+    preserveProgressRef.current = true;
+
+    acquireWakeLock();
+
+    // Draw existing track on map in a single batch
+    const coords = data.points.map(
+      (pt) => [pt.lng, pt.lat] as [number, number],
+    );
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
+        detail: { points: coords },
+      }),
+    );
+
+    startGpsWatchAndTimers();
+  }, [isRecording, acquireWakeLock, startGpsWatchAndTimers]);
+
   const dismissRecovery = useCallback(() => {
     void clearInProgress();
     setHasRecovery(false);
@@ -411,6 +517,7 @@ export function useRideRecording(
     resumeRecording,
     stopRecording,
     recoverRide,
+    continueRide,
     dismissRecovery,
   };
 }
