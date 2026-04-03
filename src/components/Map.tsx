@@ -66,6 +66,7 @@ const MapboxMap = memo(function MapboxMap() {
   const locationWatch = useRef<NodeJS.Timeout | undefined>(undefined);
   const wakeLock = useRef<WakeLockSentinel | null>(null);
   const [watchingLocation, setWatchingLocation] = useState(false);
+  const recordingActive = useRef(false);
 
   // Track markers for attractions and bike resources
   const attractionMarkers = useRef<MarkerManager>(new MarkerManager());
@@ -225,8 +226,9 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
-    // When user interacts with map, disable location tracking
+    // When user interacts with map, disable location tracking (but not during recording)
     const disableTracking = () => {
+      if (recordingActive.current) return;
       setWatchingLocation(false);
       if (locationWatch.current) {
         clearInterval(locationWatch.current);
@@ -864,19 +866,16 @@ const MapboxMap = memo(function MapboxMap() {
           );
           bikeResourceMarkers.current.setMarkers(bikeResourceMarkerList);
 
-          // Update accuracy circle on zoom (batched to avoid jank during pinch-zoom)
-          let zoomRaf = 0;
+          // Update accuracy circle on zoom — synchronous so circle resizes in
+          // the same frame as the map (RAF batching caused a 1-frame lag)
           newMap.on('zoom', () => {
-            cancelAnimationFrame(zoomRaf);
-            zoomRaf = requestAnimationFrame(() => {
-              if (locationMarker.current && locationAccuracy.current > 0) {
-                updateAccuracyCircle(
-                  locationMarker.current,
-                  locationAccuracy.current,
-                  newMap.getZoom(),
-                );
-              }
-            });
+            if (locationMarker.current && locationAccuracy.current > 0) {
+              updateAccuracyCircle(
+                locationMarker.current,
+                locationAccuracy.current,
+                newMap.getZoom(),
+              );
+            }
           });
 
           // Add error handler
@@ -993,10 +992,12 @@ const MapboxMap = memo(function MapboxMap() {
   // Also toggle CSS class on map container for Mapbox control positioning
   useEffect(() => {
     const handleStart = () => {
+      recordingActive.current = true;
       setLocationWatch(true);
       mapContainer.current?.classList.add('recording-active');
     };
     const handleStop = () => {
+      recordingActive.current = false;
       setLocationWatch(false);
       mapContainer.current?.classList.remove('recording-active');
     };
