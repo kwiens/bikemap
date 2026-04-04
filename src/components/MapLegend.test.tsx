@@ -46,7 +46,6 @@ vi.mock('./sidebar', () => ({
   BikeResourcesList: () => <div data-testid="bike-resources" />,
   BikeRentalList: () => <div data-testid="bike-rentals" />,
   InformationSection: () => <div data-testid="info" />,
-  Footer: () => <div data-testid="footer" />,
 }));
 
 vi.mock('./styles', () => ({

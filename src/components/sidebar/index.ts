@@ -8,7 +8,6 @@ export { AttractionsList } from './AttractionsList';
 export { BikeResourcesList } from './BikeResourcesList';
 export { BikeRentalList } from './BikeRentalList';
 export { InformationSection } from './InformationSection';
-export { Footer } from './Footer';
 export { SidebarCard } from './SidebarCard';
 
 // Types
