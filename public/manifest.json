@@ -3,7 +3,8 @@
   "short_name": "Bike Chatt",
   "description": "Paths and routes for cyclists in Chattanooga, TN",
   "start_url": "/",
-  "display": "fullscreen",
+  "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#c3f44d",
   "theme_color": "#c3f44d",
   "icons": [

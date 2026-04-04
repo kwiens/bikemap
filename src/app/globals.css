@@ -11,31 +11,40 @@
 }
 
 html {
-  min-height: calc(100% + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  height: 100%;
   width: 100%;
   margin: 0;
   overflow: hidden;
   position: fixed;
+  inset: 0;
+  /* Prevent browser pinch-zoom (iOS Safari ignores user-scalable=no) */
+  touch-action: pan-x pan-y;
+  /* Prevent pull-to-refresh and elastic bounce */
+  overscroll-behavior: none;
+  /* Remove tap highlight on iOS/Android */
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent text selection on UI elements */
+  user-select: none;
+  /* Prevent long-press context menu */
+  -webkit-touch-callout: none;
 }
 
 body {
-  height: 100dvh;
-  width: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
   position: fixed;
+  inset: 0;
+  overscroll-behavior: none;
 }
 
 /* Next.js app wrapper */
 body > div,
 #__next,
 #root {
-  height: 100dvh;
-  width: 100%;
   overflow: hidden;
   position: fixed;
+  inset: 0;
 }
 
 /* Fix for Mapbox controls - ensure they're visible */
