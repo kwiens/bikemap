@@ -13,7 +13,6 @@ import {
   BikeResourcesList,
   BikeRentalList,
   InformationSection,
-  Footer,
   type LocationProps,
 } from './sidebar';
 import { getRideStyle } from './WelcomeModal';
@@ -390,8 +389,6 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             <InformationSection />
           </div>
         </div>
-
-        <Footer />
       </div>
     </>
   );
