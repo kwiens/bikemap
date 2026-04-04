@@ -19,6 +19,14 @@ html {
   inset: 0;
   /* Prevent browser pinch-zoom (iOS Safari ignores user-scalable=no) */
   touch-action: pan-x pan-y;
+  /* Prevent pull-to-refresh and elastic bounce */
+  overscroll-behavior: none;
+  /* Remove tap highlight on iOS/Android */
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent text selection on UI elements */
+  user-select: none;
+  /* Prevent long-press context menu */
+  -webkit-touch-callout: none;
 }
 
 body {
@@ -27,6 +35,7 @@ body {
   overflow: hidden;
   position: fixed;
   inset: 0;
+  overscroll-behavior: none;
 }
 
 /* Next.js app wrapper */
