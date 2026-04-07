@@ -798,14 +798,14 @@ const MapboxMap = memo(function MapboxMap() {
             });
           });
 
-          // Find the first symbol/label layer — route lines will be
-          // inserted below it so street names remain visible on top.
+          // Find the road-label layer — route lines will be inserted
+          // just below it so street names remain visible on top of routes.
           const style = newMap.getStyle();
-          let firstSymbolId: string | undefined;
+          let firstLabelId: string | undefined;
           if (style?.layers) {
             for (const l of style.layers) {
-              if (l.type === 'symbol') {
-                firstSymbolId = l.id;
+              if (l.id === 'road-label') {
+                firstLabelId = l.id;
                 break;
               }
             }
@@ -827,9 +827,9 @@ const MapboxMap = memo(function MapboxMap() {
                   newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
                   newMap.setLayoutProperty(layer.id, 'line-join', 'round');
 
-                  // Move route layer below labels so street names show
-                  if (firstSymbolId) {
-                    newMap.moveLayer(layer.id, firstSymbolId);
+                  // Move route layer below road labels so street names show
+                  if (firstLabelId) {
+                    newMap.moveLayer(layer.id, firstLabelId);
                   }
 
                   // Add white casing layer beneath the route
