@@ -798,8 +798,20 @@ const MapboxMap = memo(function MapboxMap() {
             });
           });
 
-          // Set initial line width for specific layers
+          // Find the first symbol/label layer — route lines will be
+          // inserted below it so street names remain visible on top.
           const style = newMap.getStyle();
+          let firstSymbolId: string | undefined;
+          if (style?.layers) {
+            for (const l of style.layers) {
+              if (l.type === 'symbol') {
+                firstSymbolId = l.id;
+                break;
+              }
+            }
+          }
+
+          // Set initial line width for specific layers
           if (style?.layers) {
             style.layers.forEach((layer) => {
               if (layer.type === 'line') {
@@ -814,6 +826,11 @@ const MapboxMap = memo(function MapboxMap() {
                   newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
                   newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
                   newMap.setLayoutProperty(layer.id, 'line-join', 'round');
+
+                  // Move route layer below labels so street names show
+                  if (firstSymbolId) {
+                    newMap.moveLayer(layer.id, firstSymbolId);
+                  }
 
                   // Add white casing layer beneath the route
                   const casingId = `${layer.id}-casing`;
@@ -841,7 +858,7 @@ const MapboxMap = memo(function MapboxMap() {
                         },
                         ...(layer.filter ? { filter: layer.filter } : {}),
                       },
-                      layer.id,
+                      layer.id, // casing goes directly below route
                     );
                   }
 
