@@ -1154,22 +1154,30 @@ const MapboxMap = memo(function MapboxMap() {
 
       compassHeading.current = heading;
 
-      if (map.current && !map.current.isMoving() && !map.current.isZooming()) {
+      // Always apply bearing — don't gate on isMoving/isZooming since the
+      // user expects the map to track their heading continuously.
+      if (map.current) {
         map.current.jumpTo({ bearing: heading });
       }
     };
 
-    // Prefer 'deviceorientationabsolute' (Android Chrome) which gives
-    // compass-relative values.  Fall back to 'deviceorientation' (iOS,
-    // other browsers) which provides webkitCompassHeading on iOS.
-    const useAbsolute = 'ondeviceorientationabsolute' in window;
-    const eventName = useAbsolute
-      ? 'deviceorientationabsolute'
-      : 'deviceorientation';
+    // Listen to both event types when available.  Android Chrome fires
+    // 'deviceorientationabsolute' with compass-relative alpha; iOS fires
+    // 'deviceorientation' with webkitCompassHeading.  If the device
+    // supports absolute, also listen to the standard event as a fallback.
+    const events: string[] = [];
+    if ('ondeviceorientationabsolute' in window) {
+      events.push('deviceorientationabsolute');
+    }
+    events.push('deviceorientation');
 
-    window.addEventListener(eventName, handler as EventListener, true);
+    for (const evt of events) {
+      window.addEventListener(evt, handler as EventListener);
+    }
     compassCleanup.current = () => {
-      window.removeEventListener(eventName, handler as EventListener, true);
+      for (const evt of events) {
+        window.removeEventListener(evt, handler as EventListener);
+      }
     };
     setCompassMode(true);
   };
