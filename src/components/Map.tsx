@@ -1128,23 +1128,9 @@ const MapboxMap = memo(function MapboxMap() {
     }
   };
 
-  // Start compass (device orientation) to rotate the map bearing.
-  // Applies bearing directly in the orientation handler for smooth rotation
-  // instead of waiting for the 1-second setInterval.
-  const startCompass = async () => {
-    // iOS 13+ requires explicit permission
-    const DOE = DeviceOrientationEvent as unknown as {
-      requestPermission?: () => Promise<string>;
-    };
-    if (DOE.requestPermission) {
-      try {
-        const permission = await DOE.requestPermission();
-        if (permission !== 'granted') return;
-      } catch {
-        return;
-      }
-    }
-
+  // Attach compass (device orientation) listener to rotate the map bearing.
+  // Applies bearing directly in the orientation handler for smooth rotation.
+  const attachCompassListener = () => {
     const handler = (e: DeviceOrientationEvent) => {
       // iOS provides webkitCompassHeading (degrees from north, clockwise)
       const evt = e as DeviceOrientationEvent & {
@@ -1154,15 +1140,12 @@ const MapboxMap = memo(function MapboxMap() {
       if (typeof evt.webkitCompassHeading === 'number') {
         heading = evt.webkitCompassHeading;
       } else if (typeof e.alpha === 'number') {
-        // Standard API: alpha is degrees counterclockwise from north
-        // when absolute, or from an arbitrary reference when not.
-        // Either way, (360 - alpha) gives a clockwise-from-north bearing.
         heading = (360 - e.alpha) % 360;
       }
       if (heading === null) return;
 
-      // Skip tiny changes (< 2°) to avoid excessive jumpTo calls (~60 Hz).
-      // The > 358 check handles wraparound (e.g. 359° → 1° is only 2°).
+      // Skip tiny changes (< 2°) to reduce jumpTo calls.
+      // The > 358 check handles wraparound (e.g. 359° → 1° = 2°).
       const prev = compassHeading.current;
       if (prev !== null) {
         const diff = Math.abs(heading - prev);
@@ -1171,7 +1154,6 @@ const MapboxMap = memo(function MapboxMap() {
 
       compassHeading.current = heading;
 
-      // Apply bearing immediately for smooth rotation
       if (map.current && !map.current.isMoving() && !map.current.isZooming()) {
         map.current.jumpTo({ bearing: heading });
       }
@@ -1179,8 +1161,7 @@ const MapboxMap = memo(function MapboxMap() {
 
     // Prefer 'deviceorientationabsolute' (Android Chrome) which gives
     // compass-relative values.  Fall back to 'deviceorientation' (iOS,
-    // other browsers) which provides webkitCompassHeading on iOS and
-    // may give relative-only alpha on some Android devices.
+    // other browsers) which provides webkitCompassHeading on iOS.
     const useAbsolute = 'ondeviceorientationabsolute' in window;
     const eventName = useAbsolute
       ? 'deviceorientationabsolute'
@@ -1193,14 +1174,32 @@ const MapboxMap = memo(function MapboxMap() {
     setCompassMode(true);
   };
 
-  // Toggle location tracking: off → tracking (north-up) → compass (heading-up) → off
-  const toggleWatchLocation = () => {
+  // Toggle location tracking: off → tracking (north-up) → compass (heading-up) → off.
+  // The permission request for iOS is done inline (not in a nested async) so it
+  // stays within the user-gesture context that Safari requires.
+  const toggleWatchLocation = async () => {
     if (!watchingLocation) {
       // off → tracking
       setLocationWatch(true);
     } else if (!compassMode) {
-      // tracking → compass
-      startCompass();
+      // tracking → compass: request permission (iOS), then attach listener
+      const DOE = DeviceOrientationEvent as unknown as {
+        requestPermission?: () => Promise<string>;
+      };
+      if (DOE.requestPermission) {
+        try {
+          const permission = await DOE.requestPermission();
+          if (permission !== 'granted') {
+            // Permission denied — fall through to off
+            setLocationWatch(false);
+            return;
+          }
+        } catch {
+          setLocationWatch(false);
+          return;
+        }
+      }
+      attachCompassListener();
     } else {
       // compass → off
       setLocationWatch(false);
