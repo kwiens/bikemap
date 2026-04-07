@@ -1133,8 +1133,8 @@ const MapboxMap = memo(function MapboxMap() {
   // phone is held upright (gimbal lock region).
   const attachCompassListener = () => {
     // Low-pass filter weight: 0 = ignore new readings, 1 = no smoothing.
-    // 0.15 gives a smooth ~200ms response while damping oscillation.
-    const SMOOTHING = 0.15;
+    // 0.08 gives a smooth ~300ms response while damping jitter on iOS.
+    const SMOOTHING = 0.08;
     let smoothed: number | null = null;
 
     const handler = (e: DeviceOrientationEvent) => {
@@ -1171,7 +1171,11 @@ const MapboxMap = memo(function MapboxMap() {
 
       compassHeading.current = smoothed;
       if (map.current) {
-        map.current.jumpTo({ bearing: smoothed });
+        map.current.easeTo({
+          bearing: smoothed,
+          duration: 100,
+          easing: (t) => t,
+        });
       }
     };
 
