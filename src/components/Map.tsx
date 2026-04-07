@@ -1131,6 +1131,8 @@ const MapboxMap = memo(function MapboxMap() {
   // Attach compass (device orientation) listener to rotate the map bearing.
   // Applies bearing directly in the orientation handler for smooth rotation.
   const attachCompassListener = () => {
+    let receivedFirst = false;
+
     const handler = (e: DeviceOrientationEvent) => {
       // iOS provides webkitCompassHeading (degrees from north, clockwise)
       const evt = e as DeviceOrientationEvent & {
@@ -1143,6 +1145,11 @@ const MapboxMap = memo(function MapboxMap() {
         heading = (360 - e.alpha) % 360;
       }
       if (heading === null) return;
+
+      if (!receivedFirst) {
+        receivedFirst = true;
+        showToast(`Compass: ${Math.round(heading)}°`);
+      }
 
       // Skip tiny changes (< 2°) to reduce jumpTo calls.
       // The > 358 check handles wraparound (e.g. 359° → 1° = 2°).
@@ -1179,6 +1186,16 @@ const MapboxMap = memo(function MapboxMap() {
         window.removeEventListener(evt, handler as EventListener);
       }
     };
+
+    showToast(`Compass: listening on ${events.join(', ')}`);
+
+    // If no data after 3 seconds, notify
+    setTimeout(() => {
+      if (!receivedFirst && compassHeading.current === null) {
+        showToast('No compass data — sensor may not be available');
+      }
+    }, 3000);
+
     setCompassMode(true);
   };
 
@@ -1197,8 +1214,8 @@ const MapboxMap = memo(function MapboxMap() {
       if (DOE.requestPermission) {
         try {
           const permission = await DOE.requestPermission();
+          showToast(`Orientation permission: ${permission}`);
           if (permission !== 'granted') {
-            // Permission denied — fall through to off
             setLocationWatch(false);
             return;
           }
