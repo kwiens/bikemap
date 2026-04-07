@@ -284,10 +284,11 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
-    // When user intentionally moves the map, disable location tracking (but not during recording).
+    // When user intentionally moves the map, pause auto-center.
+    // During recording this only pauses centering (keeps wake lock & recording);
+    // user can tap the location button to resume.
     // Using dragstart/dblclick/wheel instead of click so route-layer taps aren't swallowed.
     const disableTracking = () => {
-      if (recordingActive.current) return;
       setWatchingLocation(false);
       setCompassMode(false);
       if (compassCleanup.current) {
@@ -299,7 +300,8 @@ const MapboxMap = memo(function MapboxMap() {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
       }
-      if (wakeLock.current) {
+      // Keep wake lock alive during recording so the screen stays on
+      if (!recordingActive.current && wakeLock.current) {
         wakeLock.current.release();
         wakeLock.current = null;
       }

@@ -25,6 +25,10 @@ const STOP_DURATION_MS = 10_000;
 const MAX_PLAUSIBLE_SPEED = 30;
 // Smoothing window for elevation (points on each side)
 const ELEVATION_SMOOTH_WINDOW = 2;
+// Dead-band threshold for elevation gain/loss (meters).  Accumulated
+// elevation change must exceed this before it counts as gain or loss.
+// Filters GPS altitude jitter that otherwise inflates totals ~3-4×.
+const ELEVATION_DEAD_BAND = 3;
 
 export function haversineDistance(
   lat1: number,
@@ -142,18 +146,27 @@ export function computeElevation(points: AnyRidePoint[]): {
   let loss = 0;
   let min = Infinity;
   let max = -Infinity;
-  let prevValid: number | null = null;
+
+  // Dead-band accumulator: track the last "committed" altitude and
+  // only count gain/loss once the change exceeds the threshold.
+  let anchor: number | null = null;
 
   for (const alt of smoothed) {
     if (Number.isNaN(alt)) continue;
     if (alt < min) min = alt;
     if (alt > max) max = alt;
-    if (prevValid !== null) {
-      const delta = alt - prevValid;
-      if (delta > 0) gain += delta;
-      else loss += Math.abs(delta);
+    if (anchor === null) {
+      anchor = alt;
+      continue;
     }
-    prevValid = alt;
+    const delta = alt - anchor;
+    if (delta > ELEVATION_DEAD_BAND) {
+      gain += delta;
+      anchor = alt;
+    } else if (delta < -ELEVATION_DEAD_BAND) {
+      loss += Math.abs(delta);
+      anchor = alt;
+    }
   }
 
   if (min === Infinity) min = 0;
