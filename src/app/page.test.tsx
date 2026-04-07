@@ -64,8 +64,9 @@ describe('Home — share link URL parameter handling', () => {
   afterEach(() => {
     cleanup();
     dispatchSpy.mockRestore();
-    // Reset URL
+    // Reset URL and __mapReady flag
     window.history.replaceState(null, '', '/');
+    delete (window as unknown as Record<string, boolean>).__mapReady;
   });
 
   it('dispatches TRAIL_SELECT on MAP_READY when ?trail= matches', () => {
@@ -151,6 +152,25 @@ describe('Home — share link URL parameter handling', () => {
       ([e]) => (e as Event).type === MAP_EVENTS.TRAIL_SELECT,
     );
     expect(trailEvents).toHaveLength(1);
+  });
+
+  it('selects immediately via __mapReady flag without waiting for event', () => {
+    (window as unknown as Record<string, boolean>).__mapReady = true;
+    window.history.replaceState(
+      null,
+      '',
+      '/?trail=mouse-creek-greenway-phase-1',
+    );
+    render(<Home />);
+
+    // Should have dispatched immediately, without needing MAP_READY event
+    const trailEvents = dispatchSpy.mock.calls.filter(
+      ([e]) => (e as Event).type === MAP_EVENTS.TRAIL_SELECT,
+    );
+    expect(trailEvents).toHaveLength(1);
+    expect((trailEvents[0][0] as CustomEvent).detail.trailName).toBe(
+      'Mouse Creek Greenway Phase 1',
+    );
   });
 
   it('prefers trail param when both trail and route are present', () => {

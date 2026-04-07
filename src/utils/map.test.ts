@@ -9,6 +9,7 @@ import {
   highlightMtnBikeArea,
   initMtnBikeColors,
   detectTrailAtPoint,
+  toLngLatBounds,
   TRAIL_LAYERS,
 } from './map';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
@@ -852,5 +853,20 @@ describe('detectTrailAtPoint', () => {
 
     const result = detectTrailAtPoint(mockMap, [-85.3, 35.0]);
     expect(result).toBeNull();
+  });
+});
+
+describe('toLngLatBounds', () => {
+  it('returns undefined for undefined input', () => {
+    expect(toLngLatBounds(undefined)).toBeUndefined();
+  });
+
+  it('returns LngLatBounds for a valid tuple', () => {
+    const bounds = toLngLatBounds([-85.33, 35.03, -85.28, 35.06]);
+    expect(bounds).toBeDefined();
+    expect(bounds?.getWest()).toBeCloseTo(-85.33);
+    expect(bounds?.getSouth()).toBeCloseTo(35.03);
+    expect(bounds?.getEast()).toBeCloseTo(-85.28);
+    expect(bounds?.getNorth()).toBeCloseTo(35.06);
   });
 });

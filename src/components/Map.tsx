@@ -71,6 +71,7 @@ const MapboxMap = memo(function MapboxMap() {
   const [compassMode, setCompassMode] = useState(false);
   const compassHeading = useRef<number | null>(null);
   const compassCleanup = useRef<(() => void) | null>(null);
+  const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
   const recordingActive = useRef(false);
 
   // Track markers for attractions and bike resources
@@ -1056,6 +1057,7 @@ const MapboxMap = memo(function MapboxMap() {
         });
       } else if (map.current) {
         const onFirstLocation = (e: Event) => {
+          pendingLocationListener.current = null;
           const { lng, lat } = (e as CustomEvent).detail;
           map.current?.flyTo({
             center: [lng, lat],
@@ -1063,6 +1065,7 @@ const MapboxMap = memo(function MapboxMap() {
             duration: 1000,
           });
         };
+        pendingLocationListener.current = onFirstLocation;
         window.addEventListener(MAP_EVENTS.LOCATION_UPDATE, onFirstLocation, {
           once: true,
         });
@@ -1095,6 +1098,14 @@ const MapboxMap = memo(function MapboxMap() {
       if (locationWatch.current) {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
+      }
+      // Cancel pending GPS-first-fix listener so it doesn't flyTo after disable
+      if (pendingLocationListener.current) {
+        window.removeEventListener(
+          MAP_EVENTS.LOCATION_UPDATE,
+          pendingLocationListener.current,
+        );
+        pendingLocationListener.current = null;
       }
       if (compassCleanup.current) {
         compassCleanup.current();
@@ -1150,14 +1161,13 @@ const MapboxMap = memo(function MapboxMap() {
       }
       if (heading === null) return;
 
-      // Skip tiny changes (< 2°) to avoid excessive jumpTo calls (~60 Hz)
+      // Skip tiny changes (< 2°) to avoid excessive jumpTo calls (~60 Hz).
+      // The > 358 check handles wraparound (e.g. 359° → 1° is only 2°).
       const prev = compassHeading.current;
-      if (
-        prev !== null &&
-        Math.abs(heading - prev) < 2 &&
-        Math.abs(heading - prev) < 358
-      )
-        return;
+      if (prev !== null) {
+        const diff = Math.abs(heading - prev);
+        if (diff < 2 || diff > 358) return;
+      }
 
       compassHeading.current = heading;
 
