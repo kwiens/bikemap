@@ -52,7 +52,12 @@ export default function Home(): ReactElement {
       }
     };
 
-    // Wait for the map to be fully initialized before selecting
+    // If the map already initialized before this effect ran, select now.
+    // Otherwise wait for the MAP_READY event.
+    if ((window as unknown as Record<string, boolean>).__mapReady) {
+      selectFromUrl();
+      return;
+    }
     window.addEventListener(MAP_EVENTS.MAP_READY, selectFromUrl, {
       once: true,
     });

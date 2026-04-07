@@ -48,6 +48,7 @@ import {
   updateRideLayer,
   removeRideLayer,
   detectTrailAtPoint,
+  toLngLatBounds,
 } from '@/utils/map';
 import { loadRide } from '@/utils/ride-storage';
 import { mapConfig } from '@/config/map.config';
@@ -338,13 +339,7 @@ const MapboxMap = memo(function MapboxMap() {
 
       // Fall back to defaultBounds when runtime bounds aren't available
       const bounds =
-        selectedRoute?.bounds ??
-        (selectedRoute?.defaultBounds
-          ? new mapboxgl.LngLatBounds(
-              [selectedRoute.defaultBounds[0], selectedRoute.defaultBounds[1]],
-              [selectedRoute.defaultBounds[2], selectedRoute.defaultBounds[3]],
-            )
-          : undefined);
+        selectedRoute?.bounds ?? toLngLatBounds(selectedRoute?.defaultBounds);
 
       if (bounds) {
         flyToBounds(map.current, bounds);
@@ -387,14 +382,7 @@ const MapboxMap = memo(function MapboxMap() {
 
       // Fall back to defaultBounds when runtime bounds aren't available
       // (e.g. trail tiles not loaded for the current viewport)
-      const bounds =
-        trail?.bounds ??
-        (trail?.defaultBounds
-          ? new mapboxgl.LngLatBounds(
-              [trail.defaultBounds[0], trail.defaultBounds[1]],
-              [trail.defaultBounds[2], trail.defaultBounds[3]],
-            )
-          : undefined);
+      const bounds = trail?.bounds ?? toLngLatBounds(trail?.defaultBounds);
 
       // Skip flyToBounds for auto-detected trails (map already follows user)
       if (!autoDetected && bounds) {
@@ -987,7 +975,10 @@ const MapboxMap = memo(function MapboxMap() {
             console.error('Map error:', event.error);
           });
 
-          // Signal that the map is fully initialized and ready for events
+          // Signal that the map is fully initialized and ready for events.
+          // Set a flag first so late listeners (e.g. page.tsx useEffect that
+          // registers after this fires) can detect they missed the event.
+          (window as unknown as Record<string, boolean>).__mapReady = true;
           window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
         } catch (error) {
           console.error('Error initializing map:', error);
@@ -1053,13 +1044,27 @@ const MapboxMap = memo(function MapboxMap() {
           .catch(() => {});
       }
 
-      // When enabled: immediately center on current location (preserving zoom)
+      // When enabled: immediately center on current location (preserving zoom).
+      // If GPS hasn't fired yet (locationMarker null), wait for the first
+      // LOCATION_UPDATE and then fly there — fixes iOS cold-start delay.
       if (map.current && locationMarker.current) {
         const lngLat = locationMarker.current.getLngLat();
         map.current.flyTo({
           center: [lngLat.lng, lngLat.lat],
           essential: true,
           duration: 1000,
+        });
+      } else if (map.current) {
+        const onFirstLocation = (e: Event) => {
+          const { lng, lat } = (e as CustomEvent).detail;
+          map.current?.flyTo({
+            center: [lng, lat],
+            essential: true,
+            duration: 1000,
+          });
+        };
+        window.addEventListener(MAP_EVENTS.LOCATION_UPDATE, onFirstLocation, {
+          once: true,
         });
       }
 
@@ -1144,6 +1149,15 @@ const MapboxMap = memo(function MapboxMap() {
         heading = (360 - e.alpha) % 360;
       }
       if (heading === null) return;
+
+      // Skip tiny changes (< 2°) to avoid excessive jumpTo calls (~60 Hz)
+      const prev = compassHeading.current;
+      if (
+        prev !== null &&
+        Math.abs(heading - prev) < 2 &&
+        Math.abs(heading - prev) < 358
+      )
+        return;
 
       compassHeading.current = heading;
 
