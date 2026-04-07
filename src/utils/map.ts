@@ -342,7 +342,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
         },
         paint: {
           'line-color': 'rgba(0,0,0,0)',
-          'line-width': 20,
+          'line-width': 10,
           'line-opacity': 0,
         },
       });

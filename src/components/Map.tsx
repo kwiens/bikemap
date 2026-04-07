@@ -139,8 +139,8 @@ const MapboxMap = memo(function MapboxMap() {
     const liveCoords: [number, number][] = [];
     let updateSkip = 0;
     const DETECT_INTERVAL_MS = 3000;
-    const DETECT_CONFIRM_COUNT = 2; // ~6s before first auto-select
-    const DETECT_SWITCH_COUNT = 4; // ~12s before switching or clearing
+    const DETECT_CONFIRM_COUNT = 3; // ~9s before first auto-select
+    const DETECT_SWITCH_COUNT = 5; // ~15s before switching or clearing
 
     const updateHandler = (e: Event) => {
       if (!map.current) return;
