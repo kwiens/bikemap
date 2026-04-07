@@ -1120,8 +1120,8 @@ const MapboxMap = memo(function MapboxMap() {
           duration: 500,
         });
       }
-      // Release wake lock
-      if (wakeLock.current) {
+      // Keep wake lock alive during recording so the screen stays on
+      if (!recordingActive.current && wakeLock.current) {
         wakeLock.current.release();
         wakeLock.current = null;
       }
