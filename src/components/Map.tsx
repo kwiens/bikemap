@@ -1112,7 +1112,9 @@ const MapboxMap = memo(function MapboxMap() {
     }
   };
 
-  // Start compass (device orientation) to rotate the map bearing
+  // Start compass (device orientation) to rotate the map bearing.
+  // Applies bearing directly in the orientation handler for smooth rotation
+  // instead of waiting for the 1-second setInterval.
   const startCompass = async () => {
     // iOS 13+ requires explicit permission
     const DOE = DeviceOrientationEvent as unknown as {
@@ -1129,24 +1131,40 @@ const MapboxMap = memo(function MapboxMap() {
 
     const handler = (e: DeviceOrientationEvent) => {
       // iOS provides webkitCompassHeading (degrees from north, clockwise)
-      // Android/standard uses alpha (degrees, counterclockwise from north)
       const evt = e as DeviceOrientationEvent & {
         webkitCompassHeading?: number;
       };
       let heading: number | null = null;
       if (typeof evt.webkitCompassHeading === 'number') {
         heading = evt.webkitCompassHeading;
-      } else if (typeof e.alpha === 'number' && e.absolute) {
+      } else if (typeof e.alpha === 'number') {
+        // Standard API: alpha is degrees counterclockwise from north
+        // when absolute, or from an arbitrary reference when not.
+        // Either way, (360 - alpha) gives a clockwise-from-north bearing.
         heading = (360 - e.alpha) % 360;
       }
-      if (heading !== null) {
-        compassHeading.current = heading;
+      if (heading === null) return;
+
+      compassHeading.current = heading;
+
+      // Apply bearing immediately for smooth rotation
+      if (map.current && !map.current.isMoving() && !map.current.isZooming()) {
+        map.current.jumpTo({ bearing: heading });
       }
     };
 
-    window.addEventListener('deviceorientation', handler, true);
+    // Prefer 'deviceorientationabsolute' (Android Chrome) which gives
+    // compass-relative values.  Fall back to 'deviceorientation' (iOS,
+    // other browsers) which provides webkitCompassHeading on iOS and
+    // may give relative-only alpha on some Android devices.
+    const useAbsolute = 'ondeviceorientationabsolute' in window;
+    const eventName = useAbsolute
+      ? 'deviceorientationabsolute'
+      : 'deviceorientation';
+
+    window.addEventListener(eventName, handler as EventListener, true);
     compassCleanup.current = () => {
-      window.removeEventListener('deviceorientation', handler, true);
+      window.removeEventListener(eventName, handler as EventListener, true);
     };
     setCompassMode(true);
   };
