@@ -149,6 +149,15 @@ export function calculateTrailBounds(
   return null;
 }
 
+/** Convert a [swLng, swLat, neLng, neLat] tuple to LngLatBounds, or return undefined. */
+export function toLngLatBounds(
+  defaultBounds: [number, number, number, number] | undefined,
+): mapboxgl.LngLatBounds | undefined {
+  if (!defaultBounds) return undefined;
+  const [swLng, swLat, neLng, neLat] = defaultBounds;
+  return new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+}
+
 export function initTrailBoundsFromDefaults(trails: MountainBikeTrail[]): void {
   for (const trail of trails) {
     if (!trail.bounds && trail.defaultBounds) {
@@ -333,7 +342,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
         },
         paint: {
           'line-color': 'rgba(0,0,0,0)',
-          'line-width': 20,
+          'line-width': 10,
           'line-opacity': 0,
         },
       });

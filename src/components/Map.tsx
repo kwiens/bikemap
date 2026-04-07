@@ -48,6 +48,7 @@ import {
   updateRideLayer,
   removeRideLayer,
   detectTrailAtPoint,
+  toLngLatBounds,
 } from '@/utils/map';
 import { loadRide } from '@/utils/ride-storage';
 import { mapConfig } from '@/config/map.config';
@@ -67,6 +68,10 @@ const MapboxMap = memo(function MapboxMap() {
   const locationWatch = useRef<NodeJS.Timeout | undefined>(undefined);
   const wakeLock = useRef<WakeLockSentinel | null>(null);
   const [watchingLocation, setWatchingLocation] = useState(false);
+  const [compassMode, setCompassMode] = useState(false);
+  const compassHeading = useRef<number | null>(null);
+  const compassCleanup = useRef<(() => void) | null>(null);
+  const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
   const recordingActive = useRef(false);
 
   // Track markers for attractions and bike resources
@@ -134,8 +139,8 @@ const MapboxMap = memo(function MapboxMap() {
     const liveCoords: [number, number][] = [];
     let updateSkip = 0;
     const DETECT_INTERVAL_MS = 3000;
-    const DETECT_CONFIRM_COUNT = 2; // ~6s before first auto-select
-    const DETECT_SWITCH_COUNT = 4; // ~12s before switching or clearing
+    const DETECT_CONFIRM_COUNT = 3; // ~9s before first auto-select
+    const DETECT_SWITCH_COUNT = 5; // ~15s before switching or clearing
 
     const updateHandler = (e: Event) => {
       if (!map.current) return;
@@ -281,16 +286,24 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
-    // When user intentionally moves the map, disable location tracking (but not during recording).
+    // When user intentionally moves the map, pause auto-center.
+    // During recording this only pauses centering (keeps wake lock & recording);
+    // user can tap the location button to resume.
     // Using dragstart/dblclick/wheel instead of click so route-layer taps aren't swallowed.
     const disableTracking = () => {
-      if (recordingActive.current) return;
       setWatchingLocation(false);
+      setCompassMode(false);
+      if (compassCleanup.current) {
+        compassCleanup.current();
+        compassCleanup.current = null;
+      }
+      compassHeading.current = null;
       if (locationWatch.current) {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
       }
-      if (wakeLock.current) {
+      // Keep wake lock alive during recording so the screen stays on
+      if (!recordingActive.current && wakeLock.current) {
         wakeLock.current.release();
         wakeLock.current = null;
       }
@@ -325,8 +338,12 @@ const MapboxMap = memo(function MapboxMap() {
       });
       updateMtnBikeOpacity(map.current, null);
 
-      if (selectedRoute?.bounds) {
-        flyToBounds(map.current, selectedRoute.bounds);
+      // Fall back to defaultBounds when runtime bounds aren't available
+      const bounds =
+        selectedRoute?.bounds ?? toLngLatBounds(selectedRoute?.defaultBounds);
+
+      if (bounds) {
+        flyToBounds(map.current, bounds);
       }
     },
     [showToast],
@@ -364,9 +381,13 @@ const MapboxMap = memo(function MapboxMap() {
           calculateTrailBounds(map.current, trailName) ?? undefined;
       }
 
+      // Fall back to defaultBounds when runtime bounds aren't available
+      // (e.g. trail tiles not loaded for the current viewport)
+      const bounds = trail?.bounds ?? toLngLatBounds(trail?.defaultBounds);
+
       // Skip flyToBounds for auto-detected trails (map already follows user)
-      if (!autoDetected && trail?.bounds) {
-        flyToBounds(map.current, trail.bounds);
+      if (!autoDetected && bounds) {
+        flyToBounds(map.current, bounds);
       }
     },
     [showToast],
@@ -777,8 +798,20 @@ const MapboxMap = memo(function MapboxMap() {
             });
           });
 
-          // Set initial line width for specific layers
+          // Find the road-label layer — route lines will be inserted
+          // just below it so street names remain visible on top of routes.
           const style = newMap.getStyle();
+          let firstLabelId: string | undefined;
+          if (style?.layers) {
+            for (const l of style.layers) {
+              if (l.id === 'road-label') {
+                firstLabelId = l.id;
+                break;
+              }
+            }
+          }
+
+          // Set initial line width for specific layers
           if (style?.layers) {
             style.layers.forEach((layer) => {
               if (layer.type === 'line') {
@@ -793,6 +826,11 @@ const MapboxMap = memo(function MapboxMap() {
                   newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
                   newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
                   newMap.setLayoutProperty(layer.id, 'line-join', 'round');
+
+                  // Move route layer below road labels so street names show
+                  if (firstLabelId) {
+                    newMap.moveLayer(layer.id, firstLabelId);
+                  }
 
                   // Add white casing layer beneath the route
                   const casingId = `${layer.id}-casing`;
@@ -820,7 +858,7 @@ const MapboxMap = memo(function MapboxMap() {
                         },
                         ...(layer.filter ? { filter: layer.filter } : {}),
                       },
-                      layer.id,
+                      layer.id, // casing goes directly below route
                     );
                   }
 
@@ -954,6 +992,12 @@ const MapboxMap = memo(function MapboxMap() {
           newMap.on('error', (event: { error: Error }) => {
             console.error('Map error:', event.error);
           });
+
+          // Signal that the map is fully initialized and ready for events.
+          // Set a flag first so late listeners (e.g. page.tsx useEffect that
+          // registers after this fires) can detect they missed the event.
+          (window as unknown as Record<string, boolean>).__mapReady = true;
+          window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
         } catch (error) {
           console.error('Error initializing map:', error);
         }
@@ -1018,7 +1062,9 @@ const MapboxMap = memo(function MapboxMap() {
           .catch(() => {});
       }
 
-      // When enabled: immediately center on current location (preserving zoom)
+      // When enabled: immediately center on current location (preserving zoom).
+      // If GPS hasn't fired yet (locationMarker null), wait for the first
+      // LOCATION_UPDATE and then fly there — fixes iOS cold-start delay.
       if (map.current && locationMarker.current) {
         const lngLat = locationMarker.current.getLngLat();
         map.current.flyTo({
@@ -1026,37 +1072,176 @@ const MapboxMap = memo(function MapboxMap() {
           essential: true,
           duration: 1000,
         });
+      } else if (map.current) {
+        const onFirstLocation = (e: Event) => {
+          pendingLocationListener.current = null;
+          const { lng, lat } = (e as CustomEvent).detail;
+          map.current?.flyTo({
+            center: [lng, lat],
+            essential: true,
+            duration: 1000,
+          });
+        };
+        pendingLocationListener.current = onFirstLocation;
+        window.addEventListener(MAP_EVENTS.LOCATION_UPDATE, onFirstLocation, {
+          once: true,
+        });
       }
 
       // Continuously re-center on current position using jumpTo (no animation)
       // so the map is never mid-flight, which would block route-layer tap events.
+      // Skip when the user is mid-gesture (pinch-zoom, drag) so we don't
+      // interrupt and snap the zoom back — this was causing #57.
       locationWatch.current = setInterval(() => {
         if (!map.current || !locationMarker.current) {
           return;
         }
+        if (map.current.isMoving() || map.current.isZooming()) {
+          return;
+        }
 
         const lngLat = locationMarker.current.getLngLat();
-        map.current.jumpTo({
+        const jumpOpts: mapboxgl.CameraOptions = {
           center: [lngLat.lng, lngLat.lat],
-        });
+        };
+        // In compass mode, rotate the map to match device heading
+        if (compassHeading.current !== null) {
+          jumpOpts.bearing = compassHeading.current;
+        }
+        map.current.jumpTo(jumpOpts);
       }, 1000);
     } else {
-      // When disabled: stop tracking
+      // When disabled: stop tracking and compass
       if (locationWatch.current) {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
       }
-      // Release wake lock
-      if (wakeLock.current) {
+      // Cancel pending GPS-first-fix listener so it doesn't flyTo after disable
+      if (pendingLocationListener.current) {
+        window.removeEventListener(
+          MAP_EVENTS.LOCATION_UPDATE,
+          pendingLocationListener.current,
+        );
+        pendingLocationListener.current = null;
+      }
+      if (compassCleanup.current) {
+        compassCleanup.current();
+        compassCleanup.current = null;
+      }
+      compassHeading.current = null;
+      setCompassMode(false);
+      // Reset bearing to default
+      if (map.current) {
+        map.current.easeTo({
+          bearing: mapConfig.defaultView.bearing,
+          duration: 500,
+        });
+      }
+      // Keep wake lock alive during recording so the screen stays on
+      if (!recordingActive.current && wakeLock.current) {
         wakeLock.current.release();
         wakeLock.current = null;
       }
     }
   };
 
-  // Toggle location tracking
-  const toggleWatchLocation = () => {
-    setLocationWatch(!watchingLocation);
+  // Attach compass (device orientation) listener to rotate the map bearing.
+  // Uses a low-pass filter to smooth heading and prevent jitter when the
+  // phone is held upright (gimbal lock region).
+  const attachCompassListener = () => {
+    // Low-pass filter weight: 0 = ignore new readings, 1 = no smoothing.
+    const SMOOTHING = 0.2;
+    let smoothed: number | null = null;
+
+    const handler = (e: DeviceOrientationEvent) => {
+      const evt = e as DeviceOrientationEvent & {
+        webkitCompassHeading?: number;
+      };
+      let raw: number | null = null;
+      if (typeof evt.webkitCompassHeading === 'number') {
+        raw = evt.webkitCompassHeading;
+      } else if (typeof e.alpha === 'number') {
+        raw = (360 - e.alpha) % 360;
+      }
+      if (raw === null) return;
+
+      // Low-pass filter using circular (angular) interpolation to avoid
+      // the 359°→1° wraparound jump.
+      if (smoothed === null) {
+        smoothed = raw;
+      } else {
+        let delta = raw - smoothed;
+        // Shortest-path wraparound
+        if (delta > 180) delta -= 360;
+        else if (delta < -180) delta += 360;
+        smoothed = (smoothed + SMOOTHING * delta + 360) % 360;
+      }
+
+      // Only update map when the smoothed heading changes enough
+      const prev = compassHeading.current;
+      if (prev !== null) {
+        let diff = Math.abs(smoothed - prev);
+        if (diff > 180) diff = 360 - diff;
+        if (diff < 1) return;
+      }
+
+      compassHeading.current = smoothed;
+      if (map.current) {
+        map.current.easeTo({
+          bearing: smoothed,
+          duration: 50,
+          easing: (t) => t,
+        });
+      }
+    };
+
+    // Listen to both event types when available.
+    const events: string[] = [];
+    if ('ondeviceorientationabsolute' in window) {
+      events.push('deviceorientationabsolute');
+    }
+    events.push('deviceorientation');
+
+    for (const evt of events) {
+      window.addEventListener(evt, handler as EventListener);
+    }
+    compassCleanup.current = () => {
+      for (const evt of events) {
+        window.removeEventListener(evt, handler as EventListener);
+      }
+    };
+    setCompassMode(true);
+  };
+
+  // Toggle location tracking: off → tracking (north-up) → compass (heading-up) → off.
+  // The permission request for iOS is done inline (not in a nested async) so it
+  // stays within the user-gesture context that Safari requires.
+  const toggleWatchLocation = async () => {
+    if (!watchingLocation) {
+      // off → tracking
+      setLocationWatch(true);
+    } else if (!compassMode) {
+      // tracking → compass: request permission (iOS), then attach listener
+      const DOE = DeviceOrientationEvent as unknown as {
+        requestPermission?: () => Promise<string>;
+      };
+      if (DOE.requestPermission) {
+        try {
+          const permission = await DOE.requestPermission();
+          if (permission !== 'granted') {
+            setLocationWatch(false);
+            return;
+          }
+        } catch {
+          setLocationWatch(false);
+          return;
+        }
+      }
+      attachCompassListener();
+    } else {
+      // compass → off
+      setLocationWatch(false);
+    }
   };
 
   // Enable location tracking when recording starts, disable when it stops
@@ -1130,24 +1315,48 @@ const MapboxMap = memo(function MapboxMap() {
           className={cn(
             'absolute bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[501] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
             watchingLocation &&
+              !compassMode &&
               'bg-[rgb(165,240,255)] active:bg-[rgb(145,220,235)]',
+            compassMode && 'bg-[rgb(100,200,255)] active:bg-[rgb(80,180,235)]',
           )}
         >
-          <svg
-            viewBox="0 0 100 100"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-            role="img"
-            preserveAspectRatio="xMidYMid meet"
-            fill="#000000"
-          >
-            <g>
-              <path
-                d="M87.13 0a2.386 2.386 0 0 0-.64.088a2.386 2.386 0 0 0-.883.463L11.34 62.373a2.386 2.386 0 0 0 1.619 4.219l37.959-1.479l17.697 33.614a2.386 2.386 0 0 0 4.465-.707L89.486 2.79A2.386 2.386 0 0 0 87.131 0z"
+          {compassMode ? (
+            /* Compass icon for heading-up mode */
+            <svg
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+              role="img"
+              fill="none"
+              stroke="#000000"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polygon
+                points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"
                 fill="#000000"
-              ></path>
-            </g>
-          </svg>
+              />
+            </svg>
+          ) : (
+            /* Navigation arrow for center/off mode */
+            <svg
+              viewBox="0 0 100 100"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+              role="img"
+              preserveAspectRatio="xMidYMid meet"
+              fill="#000000"
+            >
+              <g>
+                <path
+                  d="M87.13 0a2.386 2.386 0 0 0-.64.088a2.386 2.386 0 0 0-.883.463L11.34 62.373a2.386 2.386 0 0 0 1.619 4.219l37.959-1.479l17.697 33.614a2.386 2.386 0 0 0 4.465-.707L89.486 2.79A2.386 2.386 0 0 0 87.131 0z"
+                  fill="#000000"
+                />
+              </g>
+            </svg>
+          )}
         </div>
       )}
     </>

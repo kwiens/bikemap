@@ -211,6 +211,31 @@ describe('computeElevation', () => {
     expect(max).toBeLessThanOrEqual(200);
     expect(max).toBeGreaterThan(min);
   });
+
+  it('filters GPS jitter below the dead-band threshold', () => {
+    // Simulate noisy GPS: altitude oscillates ±1m around 200m.
+    // Real elevation is flat, so gain and loss should be 0.
+    const points: RidePoint[] = Array.from({ length: 50 }, (_, i) => ({
+      lng: -85.3 + i * 0.0001,
+      lat: 35.05 + i * 0.0001,
+      altitude: 200 + (i % 2 === 0 ? 1 : -1),
+      accuracy: 5,
+      speed: 5,
+      timestamp: 1700000000000 + i * 1000,
+    }));
+    const { gain, loss } = computeElevation(points);
+    expect(gain).toBe(0);
+    expect(loss).toBe(0);
+  });
+
+  it('counts genuine climbs that exceed the dead band', () => {
+    // 20 points climbing 5m each = 95m total climb, well above threshold
+    const points = makeTrack(20, { startAlt: 100, altStep: 5 });
+    const { gain, loss } = computeElevation(points);
+    // After smoothing + dead-band, gain should still capture most of the climb
+    expect(gain).toBeGreaterThan(50);
+    expect(loss).toBe(0);
+  });
 });
 
 // --- computeMaxSpeed ---

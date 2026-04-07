@@ -26,32 +26,43 @@ export default function Home(): ReactElement {
     const trailSlug = params.get('trail');
     const routeSlug = params.get('route');
 
-    if (trailSlug) {
-      const found = mountainBikeTrails.find(
-        (t) => slugify(t.trailName) === trailSlug,
-      );
-      if (found) {
-        // Delay to let the map initialize
-        setTimeout(() => {
+    if (!trailSlug && !routeSlug) return;
+
+    const selectFromUrl = () => {
+      if (trailSlug) {
+        const found = mountainBikeTrails.find(
+          (t) => slugify(t.trailName) === trailSlug,
+        );
+        if (found) {
           window.dispatchEvent(
             new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
               detail: { trailName: found.trailName },
             }),
           );
-        }, 2000);
-      }
-    } else if (routeSlug) {
-      const found = bikeRoutes.find((r) => slugify(r.name) === routeSlug);
-      if (found) {
-        setTimeout(() => {
+        }
+      } else if (routeSlug) {
+        const found = bikeRoutes.find((r) => slugify(r.name) === routeSlug);
+        if (found) {
           window.dispatchEvent(
             new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
               detail: { routeId: found.id },
             }),
           );
-        }, 2000);
+        }
       }
+    };
+
+    // If the map already initialized before this effect ran, select now.
+    // Otherwise wait for the MAP_READY event.
+    if ((window as unknown as Record<string, boolean>).__mapReady) {
+      selectFromUrl();
+      return;
     }
+    window.addEventListener(MAP_EVENTS.MAP_READY, selectFromUrl, {
+      once: true,
+    });
+    return () =>
+      window.removeEventListener(MAP_EVENTS.MAP_READY, selectFromUrl);
   }, []);
 
   return (
