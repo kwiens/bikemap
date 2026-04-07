@@ -1129,49 +1129,53 @@ const MapboxMap = memo(function MapboxMap() {
   };
 
   // Attach compass (device orientation) listener to rotate the map bearing.
-  // Applies bearing directly in the orientation handler for smooth rotation.
+  // Uses a low-pass filter to smooth heading and prevent jitter when the
+  // phone is held upright (gimbal lock region).
   const attachCompassListener = () => {
-    let receivedFirst = false;
+    // Low-pass filter weight: 0 = ignore new readings, 1 = no smoothing.
+    // 0.15 gives a smooth ~200ms response while damping oscillation.
+    const SMOOTHING = 0.15;
+    let smoothed: number | null = null;
 
     const handler = (e: DeviceOrientationEvent) => {
-      // iOS provides webkitCompassHeading (degrees from north, clockwise)
       const evt = e as DeviceOrientationEvent & {
         webkitCompassHeading?: number;
       };
-      let heading: number | null = null;
+      let raw: number | null = null;
       if (typeof evt.webkitCompassHeading === 'number') {
-        heading = evt.webkitCompassHeading;
+        raw = evt.webkitCompassHeading;
       } else if (typeof e.alpha === 'number') {
-        heading = (360 - e.alpha) % 360;
+        raw = (360 - e.alpha) % 360;
       }
-      if (heading === null) return;
+      if (raw === null) return;
 
-      if (!receivedFirst) {
-        receivedFirst = true;
-        showToast(`Compass: ${Math.round(heading)}°`);
+      // Low-pass filter using circular (angular) interpolation to avoid
+      // the 359°→1° wraparound jump.
+      if (smoothed === null) {
+        smoothed = raw;
+      } else {
+        let delta = raw - smoothed;
+        // Shortest-path wraparound
+        if (delta > 180) delta -= 360;
+        else if (delta < -180) delta += 360;
+        smoothed = (smoothed + SMOOTHING * delta + 360) % 360;
       }
 
-      // Skip tiny changes (< 2°) to reduce jumpTo calls.
-      // The > 358 check handles wraparound (e.g. 359° → 1° = 2°).
+      // Only update map when the smoothed heading changes enough
       const prev = compassHeading.current;
       if (prev !== null) {
-        const diff = Math.abs(heading - prev);
-        if (diff < 2 || diff > 358) return;
+        let diff = Math.abs(smoothed - prev);
+        if (diff > 180) diff = 360 - diff;
+        if (diff < 1) return;
       }
 
-      compassHeading.current = heading;
-
-      // Always apply bearing — don't gate on isMoving/isZooming since the
-      // user expects the map to track their heading continuously.
+      compassHeading.current = smoothed;
       if (map.current) {
-        map.current.jumpTo({ bearing: heading });
+        map.current.jumpTo({ bearing: smoothed });
       }
     };
 
-    // Listen to both event types when available.  Android Chrome fires
-    // 'deviceorientationabsolute' with compass-relative alpha; iOS fires
-    // 'deviceorientation' with webkitCompassHeading.  If the device
-    // supports absolute, also listen to the standard event as a fallback.
+    // Listen to both event types when available.
     const events: string[] = [];
     if ('ondeviceorientationabsolute' in window) {
       events.push('deviceorientationabsolute');
@@ -1186,16 +1190,6 @@ const MapboxMap = memo(function MapboxMap() {
         window.removeEventListener(evt, handler as EventListener);
       }
     };
-
-    showToast(`Compass: listening on ${events.join(', ')}`);
-
-    // If no data after 3 seconds, notify
-    setTimeout(() => {
-      if (!receivedFirst && compassHeading.current === null) {
-        showToast('No compass data — sensor may not be available');
-      }
-    }, 3000);
-
     setCompassMode(true);
   };
 
@@ -1214,7 +1208,6 @@ const MapboxMap = memo(function MapboxMap() {
       if (DOE.requestPermission) {
         try {
           const permission = await DOE.requestPermission();
-          showToast(`Orientation permission: ${permission}`);
           if (permission !== 'granted') {
             setLocationWatch(false);
             return;
