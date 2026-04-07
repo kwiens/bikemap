@@ -67,6 +67,9 @@ const MapboxMap = memo(function MapboxMap() {
   const locationWatch = useRef<NodeJS.Timeout | undefined>(undefined);
   const wakeLock = useRef<WakeLockSentinel | null>(null);
   const [watchingLocation, setWatchingLocation] = useState(false);
+  const [compassMode, setCompassMode] = useState(false);
+  const compassHeading = useRef<number | null>(null);
+  const compassCleanup = useRef<(() => void) | null>(null);
   const recordingActive = useRef(false);
 
   // Track markers for attractions and bike resources
@@ -286,6 +289,12 @@ const MapboxMap = memo(function MapboxMap() {
     const disableTracking = () => {
       if (recordingActive.current) return;
       setWatchingLocation(false);
+      setCompassMode(false);
+      if (compassCleanup.current) {
+        compassCleanup.current();
+        compassCleanup.current = null;
+      }
+      compassHeading.current = null;
       if (locationWatch.current) {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
@@ -1065,15 +1074,33 @@ const MapboxMap = memo(function MapboxMap() {
         }
 
         const lngLat = locationMarker.current.getLngLat();
-        map.current.jumpTo({
+        const jumpOpts: mapboxgl.CameraOptions = {
           center: [lngLat.lng, lngLat.lat],
-        });
+        };
+        // In compass mode, rotate the map to match device heading
+        if (compassHeading.current !== null) {
+          jumpOpts.bearing = compassHeading.current;
+        }
+        map.current.jumpTo(jumpOpts);
       }, 1000);
     } else {
-      // When disabled: stop tracking
+      // When disabled: stop tracking and compass
       if (locationWatch.current) {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
+      }
+      if (compassCleanup.current) {
+        compassCleanup.current();
+        compassCleanup.current = null;
+      }
+      compassHeading.current = null;
+      setCompassMode(false);
+      // Reset bearing to default
+      if (map.current) {
+        map.current.easeTo({
+          bearing: mapConfig.defaultView.bearing,
+          duration: 500,
+        });
       }
       // Release wake lock
       if (wakeLock.current) {
@@ -1083,9 +1110,57 @@ const MapboxMap = memo(function MapboxMap() {
     }
   };
 
-  // Toggle location tracking
+  // Start compass (device orientation) to rotate the map bearing
+  const startCompass = async () => {
+    // iOS 13+ requires explicit permission
+    const DOE = DeviceOrientationEvent as unknown as {
+      requestPermission?: () => Promise<string>;
+    };
+    if (DOE.requestPermission) {
+      try {
+        const permission = await DOE.requestPermission();
+        if (permission !== 'granted') return;
+      } catch {
+        return;
+      }
+    }
+
+    const handler = (e: DeviceOrientationEvent) => {
+      // iOS provides webkitCompassHeading (degrees from north, clockwise)
+      // Android/standard uses alpha (degrees, counterclockwise from north)
+      const evt = e as DeviceOrientationEvent & {
+        webkitCompassHeading?: number;
+      };
+      let heading: number | null = null;
+      if (typeof evt.webkitCompassHeading === 'number') {
+        heading = evt.webkitCompassHeading;
+      } else if (typeof e.alpha === 'number' && e.absolute) {
+        heading = (360 - e.alpha) % 360;
+      }
+      if (heading !== null) {
+        compassHeading.current = heading;
+      }
+    };
+
+    window.addEventListener('deviceorientation', handler, true);
+    compassCleanup.current = () => {
+      window.removeEventListener('deviceorientation', handler, true);
+    };
+    setCompassMode(true);
+  };
+
+  // Toggle location tracking: off → tracking (north-up) → compass (heading-up) → off
   const toggleWatchLocation = () => {
-    setLocationWatch(!watchingLocation);
+    if (!watchingLocation) {
+      // off → tracking
+      setLocationWatch(true);
+    } else if (!compassMode) {
+      // tracking → compass
+      startCompass();
+    } else {
+      // compass → off
+      setLocationWatch(false);
+    }
   };
 
   // Enable location tracking when recording starts, disable when it stops
@@ -1159,24 +1234,48 @@ const MapboxMap = memo(function MapboxMap() {
           className={cn(
             'absolute bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[501] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
             watchingLocation &&
+              !compassMode &&
               'bg-[rgb(165,240,255)] active:bg-[rgb(145,220,235)]',
+            compassMode && 'bg-[rgb(100,200,255)] active:bg-[rgb(80,180,235)]',
           )}
         >
-          <svg
-            viewBox="0 0 100 100"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-            role="img"
-            preserveAspectRatio="xMidYMid meet"
-            fill="#000000"
-          >
-            <g>
-              <path
-                d="M87.13 0a2.386 2.386 0 0 0-.64.088a2.386 2.386 0 0 0-.883.463L11.34 62.373a2.386 2.386 0 0 0 1.619 4.219l37.959-1.479l17.697 33.614a2.386 2.386 0 0 0 4.465-.707L89.486 2.79A2.386 2.386 0 0 0 87.131 0z"
+          {compassMode ? (
+            /* Compass icon for heading-up mode */
+            <svg
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+              role="img"
+              fill="none"
+              stroke="#000000"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polygon
+                points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"
                 fill="#000000"
-              ></path>
-            </g>
-          </svg>
+              />
+            </svg>
+          ) : (
+            /* Navigation arrow for center/off mode */
+            <svg
+              viewBox="0 0 100 100"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+              role="img"
+              preserveAspectRatio="xMidYMid meet"
+              fill="#000000"
+            >
+              <g>
+                <path
+                  d="M87.13 0a2.386 2.386 0 0 0-.64.088a2.386 2.386 0 0 0-.883.463L11.34 62.373a2.386 2.386 0 0 0 1.619 4.219l37.959-1.479l17.697 33.614a2.386 2.386 0 0 0 4.465-.707L89.486 2.79A2.386 2.386 0 0 0 87.131 0z"
+                  fill="#000000"
+                />
+              </g>
+            </svg>
+          )}
         </div>
       )}
     </>
