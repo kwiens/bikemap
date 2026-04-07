@@ -325,8 +325,18 @@ const MapboxMap = memo(function MapboxMap() {
       });
       updateMtnBikeOpacity(map.current, null);
 
-      if (selectedRoute?.bounds) {
-        flyToBounds(map.current, selectedRoute.bounds);
+      // Fall back to defaultBounds when runtime bounds aren't available
+      const bounds =
+        selectedRoute?.bounds ??
+        (selectedRoute?.defaultBounds
+          ? new mapboxgl.LngLatBounds(
+              [selectedRoute.defaultBounds[0], selectedRoute.defaultBounds[1]],
+              [selectedRoute.defaultBounds[2], selectedRoute.defaultBounds[3]],
+            )
+          : undefined);
+
+      if (bounds) {
+        flyToBounds(map.current, bounds);
       }
     },
     [showToast],
@@ -364,9 +374,20 @@ const MapboxMap = memo(function MapboxMap() {
           calculateTrailBounds(map.current, trailName) ?? undefined;
       }
 
+      // Fall back to defaultBounds when runtime bounds aren't available
+      // (e.g. trail tiles not loaded for the current viewport)
+      const bounds =
+        trail?.bounds ??
+        (trail?.defaultBounds
+          ? new mapboxgl.LngLatBounds(
+              [trail.defaultBounds[0], trail.defaultBounds[1]],
+              [trail.defaultBounds[2], trail.defaultBounds[3]],
+            )
+          : undefined);
+
       // Skip flyToBounds for auto-detected trails (map already follows user)
-      if (!autoDetected && trail?.bounds) {
-        flyToBounds(map.current, trail.bounds);
+      if (!autoDetected && bounds) {
+        flyToBounds(map.current, bounds);
       }
     },
     [showToast],
@@ -954,6 +975,9 @@ const MapboxMap = memo(function MapboxMap() {
           newMap.on('error', (event: { error: Error }) => {
             console.error('Map error:', event.error);
           });
+
+          // Signal that the map is fully initialized and ready for events
+          window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
         } catch (error) {
           console.error('Error initializing map:', error);
         }
@@ -1030,8 +1054,13 @@ const MapboxMap = memo(function MapboxMap() {
 
       // Continuously re-center on current position using jumpTo (no animation)
       // so the map is never mid-flight, which would block route-layer tap events.
+      // Skip when the user is mid-gesture (pinch-zoom, drag) so we don't
+      // interrupt and snap the zoom back — this was causing #57.
       locationWatch.current = setInterval(() => {
         if (!map.current || !locationMarker.current) {
+          return;
+        }
+        if (map.current.isMoving() || map.current.isZooming()) {
           return;
         }
 
