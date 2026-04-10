@@ -39,7 +39,7 @@ def _read_mapbox_token():
     return match.group(1)
 
 MAPBOX_TOKEN = _read_mapbox_token()
-MVT_TILESET = 'swuller.cnjx44gk'
+MVT_TILESET = 'swuller.ccfw1cmr'
 TRAIL_BBOX = (-85.48, 34.76, -84.85, 35.21)
 MVT_ZOOM = 12
 TERRAIN_ZOOM = 15
@@ -48,7 +48,7 @@ SAMPLE_STEP_FT = 25
 METERS_TO_FEET = 3.28084
 EARTH_RADIUS_FT = 20902231.0
 OUTPUT_DIR = 'public/data/elevation'
-GEO_DATA_PATH = 'src/data/geo_data.ts'
+GEO_DATA_PATH = 'src/data/mountain-bike-trails.ts'
 TILE_CACHE_DIR = 'scripts/.tile_cache'
 
 # --- Caches ---
@@ -686,36 +686,50 @@ def update_geo_data(trail_data):
 # ============================================================
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--trail', help='Process only the named trail')
+    args = parser.parse_args()
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # Step 1: Extract trail geometries from MVT tiles
     print("Fetching trail geometries from vector tiles...")
     all_trails = extract_all_trails(MVT_ZOOM, TRAIL_BBOX)
 
-    # Check for missing trails and retry at z14
-    known = get_known_trails()
-    found = set(all_trails.keys())
-    missing = set(known.keys()) - found
+    # Filter to single trail if requested
+    if args.trail:
+        if args.trail in all_trails:
+            all_trails = {args.trail: all_trails[args.trail]}
+        else:
+            print(f"Trail '{args.trail}' not found in MVT tiles.")
+            print(f"Available trails: {sorted(all_trails.keys())}")
+            sys.exit(1)
+    else:
+        # Check for missing trails and retry at z14
+        known = get_known_trails()
+        found = set(all_trails.keys())
+        missing = set(known.keys()) - found
 
-    if missing:
-        print(f"\n{len(missing)} trails not found at z{MVT_ZOOM}, retrying at z14...")
-        for name in list(missing):
-            bounds = known.get(name)
-            if not bounds:
-                continue
-            # Expand bounds slightly for tile coverage
-            expanded = (bounds[0] - 0.005, bounds[1] - 0.005,
-                        bounds[2] + 0.005, bounds[3] + 0.005)
-            trail_data = extract_all_trails(14, expanded)
-            if name in trail_data:
-                all_trails[name] = trail_data[name]
-                missing.discard(name)
-                print(f"  Found {name} at z14")
+        if missing:
+            print(f"\n{len(missing)} trails not found at z{MVT_ZOOM}, retrying at z14...")
+            for name in list(missing):
+                bounds = known.get(name)
+                if not bounds:
+                    continue
+                # Expand bounds slightly for tile coverage
+                expanded = (bounds[0] - 0.005, bounds[1] - 0.005,
+                            bounds[2] + 0.005, bounds[3] + 0.005)
+                trail_data = extract_all_trails(14, expanded)
+                if name in trail_data:
+                    all_trails[name] = trail_data[name]
+                    missing.discard(name)
+                    print(f"  Found {name} at z14")
 
-    if missing:
-        print(f"\n{len(missing)} trails still not found:")
-        for name in sorted(missing):
-            print(f"  - {name}")
+        if missing:
+            print(f"\n{len(missing)} trails still not found:")
+            for name in sorted(missing):
+                print(f"  - {name}")
 
     # Step 2: Generate elevation profiles
     print(f"\nGenerating elevation profiles for {len(all_trails)} trails...")
@@ -744,10 +758,10 @@ def main():
     print(f"\nDone! {len(trail_results)} profiles in {time.time() - start_time:.1f}s")
     print(f"Terrain tiles: {len(terrain_cache)}, MVT tiles: {len(mvt_cache)}")
 
-    # Step 3: Update geo_data.ts
-    print("\nUpdating geo_data.ts...")
+    # Step 3: Update mountain-bike-trails.ts
+    print("\nUpdating mountain-bike-trails.ts...")
     updated = update_geo_data(trail_results)
-    print(f"Updated {updated} trails in geo_data.ts")
+    print(f"Updated {updated} trails in mountain-bike-trails.ts")
 
 
 if __name__ == '__main__':
