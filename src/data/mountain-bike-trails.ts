@@ -6,7 +6,7 @@ import {
 
 // Mapbox tileset layer identifiers (must match Mapbox Studio names)
 export const MTN_BIKE_LAYER_ID = 'SORBA Regional Trails';
-export const MTN_BIKE_SOURCE_LAYER = 'SORBA_Regional_Trails-1oj4dx';
+export const MTN_BIKE_SOURCE_LAYER = 'Chattanooga_Regional_Trails_4-dhs2zs';
 
 export const GODSEY_LAYER_ID = 'Godsey Ridge Trails';
 export const GODSEY_SOURCE_LAYER = 'LineStrings';
@@ -2801,6 +2801,20 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
     elevationMin: 1301,
     elevationMax: 1421,
     defaultBounds: [-85.312958, 35.143213, -85.311584, 35.145459],
+    icon: faMountain,
+  },
+  {
+    trailName: 'Waldens Godsey Connector',
+    displayName: 'Waldens Godsey Connector',
+    recArea: 'Walden Ridge Park',
+    rating: '',
+    color: trailColor('', false),
+    distance: 1.4,
+    elevationGain: 121,
+    elevationLoss: 156,
+    elevationMin: 699,
+    elevationMax: 815,
+    defaultBounds: [-85.306971, 35.123588, -85.300156, 35.136076],
     icon: faMountain,
   },
   // White Oak Mountain
