@@ -99,9 +99,74 @@ Routes are styled via Mapbox Studio (referenced by layer IDs like `riverwalk-loo
 
 ### Mountain Bike Trails
 
-The mountain bike trails layer is a single Mapbox layer (`SORBA Regional Trails`, source layer `SORBA_Regional_Trails-1oj4dx`) containing 220+ trails identified by the `Trail` feature property. Trail data is defined in `src/data/mountain-bike-trails.ts` (re-exported from `src/data/geo_data.ts`) with precalculated `defaultBounds` for zoom-to-fit and `distance` in miles. Code uses `MTN_BIKE_*` constants and `mountainBikeTrails` array — the `SORBA` prefix only appears in Mapbox tileset string values.
+The mountain bike trails layer is a single Mapbox layer (`SORBA Regional Trails`) containing 220+ trails identified by the `Trail` feature property. Trail data is defined in `src/data/mountain-bike-trails.ts` (re-exported from `src/data/geo_data.ts`) with precalculated `defaultBounds` for zoom-to-fit and `distance` in miles. Code uses `MTN_BIKE_*` constants and `mountainBikeTrails` array — the `SORBA` prefix only appears in Mapbox tileset string values.
 
-When trails are added or modified in the Mapbox tileset, run `scripts/add_trail_bounds.py` to recalculate bounding boxes and distances. The script takes raw coordinate data extracted from the Mapbox layer via Chrome DevTools console (see the script header for the extraction snippet) and computes both `defaultBounds` and `distance` fields in `geo_data.ts`.
+The source layer name and tileset ID change whenever GIS data is re-uploaded to Mapbox Studio. The constants `MTN_BIKE_SOURCE_LAYER` (in `mountain-bike-trails.ts`) and `MVT_TILESET` (in `scripts/add_trail_elevation.py`) must match the current tileset.
+
+When trails are added or modified in the Mapbox tileset, run `scripts/add_trail_bounds.py` to recalculate bounding boxes and distances. The script takes raw coordinate data extracted from the Mapbox layer via Chrome DevTools console (see the script header for the extraction snippet) and computes both `defaultBounds` and `distance` fields.
+
+#### Debugging Trails in Chrome DevTools
+
+The map instance is exposed as `window.__map`. Use it to inspect layers and query trail features.
+
+**Find the current source layer name** (needed when GIS data is re-uploaded):
+```js
+// Check what source-layer the SORBA style layer uses
+__map.getStyle().layers.find(l => l.id === 'SORBA Regional Trails')
+
+// List all source-layers in the composite source
+[...new Set(__map.getStyle().layers.filter(l => l.source === 'composite').map(l => l['source-layer']))].sort()
+```
+
+**Find which tileset contains a source layer** (needed to update `MVT_TILESET` in the elevation script):
+```js
+// Fetch the current style to get tileset IDs
+fetch('https://api.mapbox.com/styles/v1/swuller/cm91zy289001p01qu4cdsdcgt?access_token=<TOKEN>')
+  .then(r => r.json()).then(d => console.log(d.sources.composite.url))
+
+// Then query each swuller.* tileset to find the one matching the source layer
+const token = '<TOKEN from map.config.ts>';
+['id1','id2','...'].forEach(id =>
+  fetch(`https://api.mapbox.com/v4/swuller.${id}.json?access_token=${token}`)
+    .then(r=>r.json()).then(d=>console.log(id, d.vector_layers?.map(l=>l.id))))
+```
+
+**List all trail names** (pan to the area first — `querySourceFeatures` only returns loaded tiles):
+```js
+[...new Set(__map.querySourceFeatures('composite',
+  {sourceLayer: '<CURRENT_SOURCE_LAYER>'}).map(f => f.properties.Trail))].sort()
+```
+
+**Inspect a specific trail's properties**:
+```js
+__map.querySourceFeatures('composite', {sourceLayer: '<CURRENT_SOURCE_LAYER>'})
+  .filter(f => f.properties.Trail === 'Trail Name').map(f => f.properties)
+```
+
+#### Generating Elevation Profiles
+
+The script `scripts/add_trail_elevation.py` fetches trail geometry from Mapbox Vector Tiles and samples elevation from Terrain-RGB tiles.
+
+```bash
+# Generate elevation for a single trail
+python scripts/add_trail_elevation.py --trail "Trail Name"
+
+# Generate elevation for all trails
+python scripts/add_trail_elevation.py
+```
+
+**Important**: Short trails (under ~0.5 mi) may not appear at the default z12 zoom level. The script retries at z14 for missing trails, but very short trails may require z15. When running the script for a single trail and it reports "not found", fetch the geometry manually at z15 with an expanded bounding box covering the trail's area (see the script source for `extract_all_trails(zoom, bbox)`).
+
+The script outputs:
+- `public/data/elevation/{slug}.json` — per-trail elevation profile (distance, gain, loss, min, max, coordinate samples)
+- Updates `src/data/mountain-bike-trails.ts` — summary stats (distance, elevationGain, elevationLoss, elevationMin, elevationMax)
+
+#### Adding a New Trail
+
+1. Find the trail name in Chrome DevTools (see above)
+2. Add an entry to the `mountainBikeTrails` array in `src/data/mountain-bike-trails.ts` with `trailName`, `displayName`, `recArea`, `rating`, `color`, and `icon`
+3. Run `scripts/add_trail_elevation.py --trail "Trail Name"` to generate elevation data and populate `distance`, elevation stats, and `defaultBounds`
+4. If the trail is in a new `recArea`, add it to `REGION_MAP` in `mountain-bike-trails.ts`
 
 ### Mapbox UI Overlays
 

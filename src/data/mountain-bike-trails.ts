@@ -45,7 +45,7 @@ const REGION_MAP: Record<string, string> = {
   'Lula Lake': 'Lookout Mountain',
   'Lookout Mountain': 'Lookout Mountain',
   'Cloudland Canyon State Park': 'Lookout Mountain',
-  'Walden Ridge Park': 'North Shore & Red Bank',
+  "Walden's Ridge Park": 'North Shore & Red Bank',
   'Stringers Ridge': 'North Shore & Red Bank',
   'Greenway Farms': 'North Shore & Red Bank',
   'Raccoon Mountain': 'Raccoon Mountain',
@@ -2536,11 +2536,11 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
     defaultBounds: [-85.314331, 35.079601, -85.308151, 35.086905],
     icon: faMountain,
   },
-  // Walden Ridge Park
+  // Walden's Ridge Park
   {
     trailName: 'Biscuits & Gravy',
     displayName: 'Biscuits & Gravy',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'intermediate',
     color: trailColor('intermediate', false),
     distance: 0.6,
@@ -2554,7 +2554,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Bread & Butter',
     displayName: 'Bread & Butter',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'intermediate',
     color: trailColor('intermediate', false),
     distance: 0.4,
@@ -2568,7 +2568,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Bullwinkle',
     displayName: 'Bullwinkle',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'advanced',
     color: trailColor('advanced', false),
     distance: 0.3,
@@ -2582,7 +2582,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Clear Eyes',
     displayName: 'Clear Eyes',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'advanced',
     color: trailColor('advanced', false),
     distance: 0.1,
@@ -2596,7 +2596,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Dale Bermhardt',
     displayName: 'Dale Bermhardt',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'advanced',
     color: trailColor('advanced', false),
     distance: 0.5,
@@ -2610,7 +2610,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'DeVito',
     displayName: 'DeVito',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'advanced',
     color: trailColor('advanced', false),
     distance: 0.0,
@@ -2624,7 +2624,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Escalator',
     displayName: 'Escalator',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'easy',
     color: trailColor('easy', false),
     distance: 2.4,
@@ -2638,7 +2638,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Falls Connector',
     displayName: 'Falls Connector',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: '',
     color: trailColor('', false),
     distance: 0.1,
@@ -2652,7 +2652,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Gambler',
     displayName: 'Gambler',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'advanced',
     color: trailColor('advanced', false),
     distance: 0.4,
@@ -2666,7 +2666,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Lower Lift Ticket',
     displayName: 'Lower Lift Ticket',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'easy',
     color: trailColor('easy', false),
     distance: 1.1,
@@ -2680,7 +2680,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Middle Traverse',
     displayName: 'Middle Traverse',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'intermediate',
     color: trailColor('intermediate', false),
     distance: 0.4,
@@ -2694,7 +2694,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Ollie',
     displayName: 'Ollie',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'intermediate',
     color: trailColor('intermediate', false),
     distance: 0.4,
@@ -2708,7 +2708,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Pocket Rockets',
     displayName: 'Pocket Rockets',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'advanced',
     color: trailColor('advanced', false),
     distance: 0.4,
@@ -2722,7 +2722,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Stone Mason',
     displayName: 'Stone Mason',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'expert',
     color: trailColor('expert', false),
     distance: 0.1,
@@ -2736,7 +2736,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Thrasher',
     displayName: 'Thrasher',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'intermediate',
     color: trailColor('intermediate', false),
     distance: 0.4,
@@ -2750,7 +2750,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Upper Lift Ticket',
     displayName: 'Upper Lift Ticket',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'advanced',
     color: trailColor('advanced', false),
     distance: 0.7,
@@ -2764,7 +2764,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Upper Traverse',
     displayName: 'Upper Traverse',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'intermediate',
     color: trailColor('intermediate', false),
     distance: 0.4,
@@ -2778,7 +2778,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'W Trail',
     displayName: 'W Trail',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: 'intermediate',
     color: trailColor('intermediate', false),
     distance: 0.5,
@@ -2792,7 +2792,7 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   {
     trailName: 'Walden Falls',
     displayName: 'Walden Falls',
-    recArea: 'Walden Ridge Park',
+    recArea: "Walden's Ridge Park",
     rating: '',
     color: trailColor('', false),
     distance: 0.3,
@@ -2805,8 +2805,8 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
   },
   {
     trailName: 'Waldens Godsey Connector',
-    displayName: 'Waldens Godsey Connector',
-    recArea: 'Walden Ridge Park',
+    displayName: "Walden's Godsey Connector",
+    recArea: "Walden's Ridge Park",
     rating: '',
     color: trailColor('', false),
     distance: 1.4,
