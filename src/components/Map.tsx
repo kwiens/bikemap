@@ -71,7 +71,7 @@ const MapboxMap = memo(function MapboxMap() {
   const compassHeading = useRef<number | null>(null);
   const compassCleanup = useRef<(() => void) | null>(null);
   // GPS heading/speed for velocity-aware compass smoothing
-  const _gpsHeading = useRef<{ heading: number; speed: number } | null>(null);
+  const gpsHeading = useRef<{ heading: number; speed: number } | null>(null);
   const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
   const recordingActiveRef = useRef(false);
@@ -270,12 +270,12 @@ const MapboxMap = memo(function MapboxMap() {
           position.coords.heading !== null &&
           position.coords.speed > 0
         ) {
-          _gpsHeading.current = {
+          gpsHeading.current = {
             heading: position.coords.heading,
             speed: position.coords.speed,
           };
         } else {
-          _gpsHeading.current = null;
+          gpsHeading.current = null;
         }
 
         // Broadcast location for elevation profile tracking
@@ -1167,7 +1167,7 @@ const MapboxMap = memo(function MapboxMap() {
     const handler = (e: DeviceOrientationEvent) => {
       // If GPS heading is available and speed is above threshold, use it
       // directly — it's more stable than the magnetometer while riding.
-      const gps = _gpsHeading.current;
+      const gps = gpsHeading.current;
       if (gps && gps.speed >= GPS_SPEED_THRESHOLD) {
         smoothed = gps.heading;
       } else {
