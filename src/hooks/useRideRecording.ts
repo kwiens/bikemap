@@ -9,10 +9,10 @@ type NotifyCallback = (message: string) => void;
 
 // If no GPS point arrives for this long, the app was likely backgrounded
 const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
-// Rolling window size for live altitude smoothing (must collect this many before computing)
-const ALT_SMOOTH_WINDOW = 5;
+// EMA smoothing factor for live altitude (matches ride-stats.ts)
+const ALT_EMA_ALPHA = 0.1;
 // Minimum altitude change (meters) to count as real elevation gain (deadband)
-const ALT_DEADBAND_M = 2;
+const ALT_DEADBAND_M = 3;
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
@@ -28,12 +28,6 @@ import {
   clearInProgress,
   loadInProgress,
 } from '../utils/ride-storage';
-
-/** Average the last N altitude readings to smooth GPS noise. */
-function smoothedAltitude(buffer: number[]): number {
-  const sum = buffer.reduce((a, b) => a + b, 0);
-  return sum / buffer.length;
-}
 
 interface UseRideRecordingReturn {
   isRecording: boolean;
@@ -63,8 +57,8 @@ export function useRideRecording(
   const [liveElevationGain, setLiveElevationGain] = useState(0);
   const distanceRef = useRef(0);
   const elevGainRef = useRef(0);
-  const altBufferRef = useRef<number[]>([]); // rolling window for smoothing
-  const smoothedAltRef = useRef<number | null>(null); // last smoothed altitude
+  const emaAltRef = useRef<number | null>(null); // EMA-smoothed altitude
+  const altAnchorRef = useRef<number | null>(null); // last committed altitude for deadband
   const pausedRef = useRef(false);
   const manualPauseRef = useRef(false); // true when user explicitly paused
   const pausedTimeRef = useRef(0); // accumulated paused ms
@@ -216,23 +210,21 @@ export function useRideRecording(
         }
 
         if (point.altitude !== null) {
-          altBufferRef.current.push(point.altitude);
-          if (altBufferRef.current.length > ALT_SMOOTH_WINDOW) {
-            altBufferRef.current.shift();
-          }
-          if (altBufferRef.current.length === ALT_SMOOTH_WINDOW) {
-            const alt = smoothedAltitude(altBufferRef.current);
-            if (smoothedAltRef.current !== null) {
-              const delta = alt - smoothedAltRef.current;
-              if (delta > ALT_DEADBAND_M) {
-                elevGainRef.current += delta;
-                setLiveElevationGain(elevGainRef.current);
-                smoothedAltRef.current = alt;
-              } else if (delta < -ALT_DEADBAND_M) {
-                smoothedAltRef.current = alt;
-              }
-            } else {
-              smoothedAltRef.current = alt;
+          // EMA smoothing: update exponential moving average
+          if (emaAltRef.current === null) {
+            emaAltRef.current = point.altitude;
+            altAnchorRef.current = point.altitude;
+          } else {
+            emaAltRef.current =
+              ALT_EMA_ALPHA * point.altitude +
+              (1 - ALT_EMA_ALPHA) * emaAltRef.current;
+            const delta = emaAltRef.current - altAnchorRef.current!;
+            if (delta > ALT_DEADBAND_M) {
+              elevGainRef.current += delta;
+              setLiveElevationGain(elevGainRef.current);
+              altAnchorRef.current = emaAltRef.current;
+            } else if (delta < -ALT_DEADBAND_M) {
+              altAnchorRef.current = emaAltRef.current;
             }
           }
         }
@@ -288,8 +280,8 @@ export function useRideRecording(
     startTimeRef.current = Date.now();
     distanceRef.current = 0;
     elevGainRef.current = 0;
-    altBufferRef.current = [];
-    smoothedAltRef.current = null;
+    emaAltRef.current = null;
+    altAnchorRef.current = null;
     pausedRef.current = false;
     manualPauseRef.current = false;
     pausedTimeRef.current = 0;
@@ -430,16 +422,12 @@ export function useRideRecording(
     const elev = computeElevation(data.points);
     elevGainRef.current = elev.gain;
 
-    // Seed the altitude buffer from the tail of saved points for live smoothing
-    const recentAlts = data.points
-      .slice(-ALT_SMOOTH_WINDOW)
-      .map((p) => p.altitude)
-      .filter((a): a is number => a !== null);
-    altBufferRef.current = recentAlts;
-    smoothedAltRef.current =
-      recentAlts.length === ALT_SMOOTH_WINDOW
-        ? smoothedAltitude(recentAlts)
-        : null;
+    // Seed EMA from the last altitude in saved points for live smoothing
+    const lastAlt =
+      [...data.points].reverse().find((p) => p.altitude !== null)?.altitude ??
+      null;
+    emaAltRef.current = lastAlt;
+    altAnchorRef.current = lastAlt;
 
     setLiveDistance(dist);
     setLiveElevationGain(elev.gain);

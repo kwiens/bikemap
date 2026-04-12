@@ -23,8 +23,9 @@ const STOP_SPEED = 0.5;
 const STOP_DURATION_MS = 10_000;
 // Max plausible cycling speed (m/s, ~67 mph)
 const MAX_PLAUSIBLE_SPEED = 30;
-// Smoothing window for elevation (points on each side)
-const ELEVATION_SMOOTH_WINDOW = 2;
+// EMA smoothing factor for elevation (0–1).  Lower = heavier smoothing.
+// 0.1 filters GPS altitude noise well while preserving real climbs.
+const ELEVATION_EMA_ALPHA = 0.1;
 // Dead-band threshold for elevation gain/loss (meters).  Accumulated
 // elevation change must exceed this before it counts as gain or loss.
 // Filters GPS altitude jitter that otherwise inflates totals ~3-4×.
@@ -108,31 +109,48 @@ export function computeMovingTime(points: AnyRidePoint[]): number {
   return movingMs;
 }
 
+/**
+ * Smooth altitudes using a forward-backward EMA pass.
+ * Running EMA forward then backward and averaging eliminates the phase lag
+ * of a single-pass EMA, producing a centered smooth without look-ahead.
+ */
 function smoothAltitudes(points: { altitude: number | null }[]): number[] {
-  const altitudes = points.map((p) => p.altitude);
-  const smoothed: number[] = [];
+  const alts = points.map((p) => p.altitude);
+  const result: number[] = new Array(alts.length).fill(Number.NaN);
 
-  for (let i = 0; i < altitudes.length; i++) {
-    if (altitudes[i] === null) {
-      smoothed.push(Number.NaN);
-      continue;
+  // Collect non-null indices and values
+  const vals: number[] = [];
+  const idxs: number[] = [];
+  for (let i = 0; i < alts.length; i++) {
+    if (alts[i] !== null) {
+      vals.push(alts[i] as number);
+      idxs.push(i);
     }
-    let sum = 0;
-    let count = 0;
-    for (
-      let j = Math.max(0, i - ELEVATION_SMOOTH_WINDOW);
-      j <= Math.min(altitudes.length - 1, i + ELEVATION_SMOOTH_WINDOW);
-      j++
-    ) {
-      if (altitudes[j] !== null) {
-        sum += altitudes[j] as number;
-        count++;
-      }
-    }
-    smoothed.push(count > 0 ? sum / count : Number.NaN);
+  }
+  if (vals.length === 0) return result;
+
+  // Forward EMA pass
+  const fwd: number[] = [vals[0]];
+  for (let i = 1; i < vals.length; i++) {
+    fwd.push(
+      ELEVATION_EMA_ALPHA * vals[i] + (1 - ELEVATION_EMA_ALPHA) * fwd[i - 1],
+    );
   }
 
-  return smoothed;
+  // Backward EMA pass
+  const bwd: number[] = new Array(vals.length);
+  bwd[vals.length - 1] = vals[vals.length - 1];
+  for (let i = vals.length - 2; i >= 0; i--) {
+    bwd[i] =
+      ELEVATION_EMA_ALPHA * vals[i] + (1 - ELEVATION_EMA_ALPHA) * bwd[i + 1];
+  }
+
+  // Average forward and backward passes
+  for (let i = 0; i < vals.length; i++) {
+    result[idxs[i]] = (fwd[i] + bwd[i]) / 2;
+  }
+
+  return result;
 }
 
 export function computeElevation(points: AnyRidePoint[]): {
