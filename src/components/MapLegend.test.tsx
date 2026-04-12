@@ -197,6 +197,30 @@ describe('MapLegendProvider', () => {
     );
   });
 
+  it('clicking empty map area clears both route and trail selection', () => {
+    render(
+      <MapLegendProvider>
+        <div />
+      </MapLegendProvider>,
+    );
+
+    // Select a route
+    dispatch(MAP_EVENTS.ROUTE_SELECT, { routeId: 'route-1' });
+    expect(screen.getByTestId('bike-routes')).toHaveAttribute(
+      'data-selected-route',
+      'route-1',
+    );
+
+    // Simulate what Map.tsx does on empty-area click: dispatch both deselects
+    dispatch(MAP_EVENTS.ROUTE_DESELECT);
+    dispatch(MAP_EVENTS.TRAIL_DESELECT);
+
+    expect(screen.getByTestId('bike-routes')).toHaveAttribute(
+      'data-selected-route',
+      '',
+    );
+  });
+
   it('area select dispatches deselect events before area-select', () => {
     mockRideStyle = 'mountain';
     render(
