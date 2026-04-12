@@ -11,20 +11,23 @@ vi.mock('@/utils/ride-storage', () => ({
   loadInProgress: vi.fn().mockResolvedValue(null),
 }));
 
-// Mock ride-stats
-vi.mock('@/utils/ride-stats', () => ({
-  computeRideStats: vi.fn().mockReturnValue({
-    distance: 1000,
-    movingTime: 600000,
-    avgSpeed: 1.67,
-    maxSpeed: 3.0,
-    elevationGain: 50,
-    elevationLoss: 30,
-  }),
-  computeBounds: vi.fn().mockReturnValue([-85.3, 35.0, -85.2, 35.1]),
-  haversineDistance: vi.fn().mockReturnValue(100),
-  MAX_ACCURACY_M: 20,
-}));
+// Mock ride-stats — use importOriginal to preserve exported constants
+vi.mock('@/utils/ride-stats', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/ride-stats')>();
+  return {
+    ...actual,
+    computeRideStats: vi.fn().mockReturnValue({
+      distance: 1000,
+      movingTime: 600000,
+      avgSpeed: 1.67,
+      maxSpeed: 3.0,
+      elevationGain: 50,
+      elevationLoss: 30,
+    }),
+    computeBounds: vi.fn().mockReturnValue([-85.3, 35.0, -85.2, 35.1]),
+    haversineDistance: vi.fn().mockReturnValue(100),
+  };
+});
 
 // Mock ride data
 vi.mock('@/data/ride', () => ({

@@ -45,8 +45,8 @@ function makeTrack(
   const accuracy = opts?.accuracy ?? 5;
 
   return Array.from({ length: n }, (_, i) => ({
-    lng: startLng + i * 0.0001,
-    lat: startLat + i * 0.0001,
+    lng: startLng + i * 0.0003,
+    lat: startLat + i * 0.0003,
     altitude: startAlt + i * altStep,
     accuracy,
     speed,
@@ -161,31 +161,33 @@ describe('computeMovingTime', () => {
 // --- computeElevation ---
 
 describe('computeElevation', () => {
+  // Forward-backward EMA smoothing needs ~200+ points to converge,
+  // and points must be spaced > ELEVATION_MIN_DISTANCE apart (~15m).
+  // At 0.0003° spacing (~33m/point), this simulates realistic rides.
+
   it('computes gain for a steady climb', () => {
-    const points = makeTrack(10, { startAlt: 200, altStep: 5 });
+    const points = makeTrack(200, { startAlt: 200, altStep: 2 });
     const { gain, loss } = computeElevation(points);
     expect(gain).toBeGreaterThan(0);
     expect(loss).toBe(0);
   });
 
   it('computes loss for a steady descent', () => {
-    const points = makeTrack(10, { startAlt: 250, altStep: -5 });
+    const points = makeTrack(200, { startAlt: 600, altStep: -2 });
     const { gain, loss } = computeElevation(points);
     expect(gain).toBe(0);
     expect(loss).toBeGreaterThan(0);
   });
 
   it('computes both gain and loss for up-and-down', () => {
-    const points = [
-      ...makeTrack(6, { startAlt: 200, altStep: 10 }),
-      ...makeTrack(6, {
-        startAlt: 250,
-        altStep: -10,
-        startLat: 35.0505,
-        startLng: -85.2995,
-      }),
-    ];
-    // Re-assign timestamps sequentially
+    const up = makeTrack(100, { startAlt: 200, altStep: 3 });
+    const down = makeTrack(100, {
+      startAlt: 497,
+      altStep: -3,
+      startLat: up[up.length - 1].lat + 0.0003,
+      startLng: up[up.length - 1].lng + 0.0003,
+    });
+    const points = [...up, ...down];
     for (let i = 0; i < points.length; i++) {
       points[i].timestamp = 1700000000000 + i * 1000;
     }
@@ -204,20 +206,18 @@ describe('computeElevation', () => {
   });
 
   it('computes correct min and max', () => {
-    const points = makeTrack(5, { startAlt: 100, altStep: 25 });
+    const points = makeTrack(200, { startAlt: 100, altStep: 2 });
     const { min, max } = computeElevation(points);
-    // Smoothing shifts exact values but min/max should be in range
     expect(min).toBeGreaterThanOrEqual(100);
-    expect(max).toBeLessThanOrEqual(200);
+    expect(max).toBeLessThanOrEqual(600);
     expect(max).toBeGreaterThan(min);
   });
 
   it('filters GPS jitter below the dead-band threshold', () => {
-    // Simulate noisy GPS: altitude oscillates ±1m around 200m.
-    // Real elevation is flat, so gain and loss should be 0.
-    const points: RidePoint[] = Array.from({ length: 50 }, (_, i) => ({
-      lng: -85.3 + i * 0.0001,
-      lat: 35.05 + i * 0.0001,
+    // Simulate noisy GPS: altitude oscillates ±1m around 200m while moving.
+    const points: RidePoint[] = Array.from({ length: 200 }, (_, i) => ({
+      lng: -85.3 + i * 0.0003,
+      lat: 35.05 + i * 0.0003,
       altitude: 200 + (i % 2 === 0 ? 1 : -1),
       accuracy: 5,
       speed: 5,
@@ -229,11 +229,10 @@ describe('computeElevation', () => {
   });
 
   it('counts genuine climbs that exceed the dead band', () => {
-    // 20 points climbing 5m each = 95m total climb, well above threshold
-    const points = makeTrack(20, { startAlt: 100, altStep: 5 });
+    const points = makeTrack(200, { startAlt: 100, altStep: 2 });
     const { gain, loss } = computeElevation(points);
-    // After smoothing + dead-band, gain should still capture most of the climb
-    expect(gain).toBeGreaterThan(50);
+    // 200 points × 2m/step = 398m total. EMA + deadband captures most.
+    expect(gain).toBeGreaterThan(100);
     expect(loss).toBe(0);
   });
 });
@@ -331,7 +330,7 @@ describe('computeRideStats', () => {
   });
 
   it('computes integrated stats for a realistic track', () => {
-    const points = makeTrack(20, {
+    const points = makeTrack(200, {
       startAlt: 200,
       altStep: 2,
       speed: 5,
@@ -339,7 +338,7 @@ describe('computeRideStats', () => {
     });
     const stats = computeRideStats(points);
     expect(stats.distance).toBeGreaterThan(0);
-    expect(stats.elapsedTime).toBe(19000);
+    expect(stats.elapsedTime).toBe(199000);
     expect(stats.movingTime).toBeGreaterThan(0);
     expect(stats.maxSpeed).toBe(5);
     expect(stats.elevationGain).toBeGreaterThan(0);

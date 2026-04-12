@@ -9,10 +9,13 @@ type NotifyCallback = (message: string) => void;
 
 // If no GPS point arrives for this long, the app was likely backgrounded
 const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
-// EMA smoothing factor for live altitude (matches ride-stats.ts)
-const ALT_EMA_ALPHA = 0.1;
-// Minimum altitude change (meters) to count as real elevation gain (deadband)
-const ALT_DEADBAND_M = 3;
+import {
+  ELEVATION_EMA_ALPHA as ALT_EMA_ALPHA,
+  ELEVATION_DEAD_BAND as ALT_DEADBAND_M,
+  ELEVATION_SPIKE_THRESHOLD as ALT_SPIKE_M,
+  ELEVATION_MIN_DISTANCE as ALT_MIN_DIST_M,
+  ELEVATION_MAX_ALT_ACCURACY as ALT_MAX_ACCURACY,
+} from '../utils/ride-stats';
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
@@ -59,6 +62,7 @@ export function useRideRecording(
   const elevGainRef = useRef(0);
   const emaAltRef = useRef<number | null>(null); // EMA-smoothed altitude
   const altAnchorRef = useRef<number | null>(null); // last committed altitude for deadband
+  const distSinceAnchorRef = useRef(0); // horizontal meters since last anchor update
   const pausedRef = useRef(false);
   const manualPauseRef = useRef(false); // true when user explicitly paused
   const pausedTimeRef = useRef(0); // accumulated paused ms
@@ -209,22 +213,51 @@ export function useRideRecording(
           setLiveDistance(distanceRef.current);
         }
 
-        if (point.altitude !== null) {
-          // EMA smoothing: update exponential moving average
+        // Accumulate horizontal distance for min-distance check
+        if (prev) {
+          distSinceAnchorRef.current += haversineDistance(
+            prev.lat,
+            prev.lng,
+            point.lat,
+            point.lng,
+          );
+        }
+
+        // Filter 1: skip readings with poor altitude accuracy
+        const altAccuracy = position.coords.altitudeAccuracy;
+        const altUsable =
+          point.altitude !== null &&
+          (altAccuracy === null || altAccuracy <= ALT_MAX_ACCURACY);
+
+        if (altUsable) {
+          let alt = point.altitude!;
+
+          // Filter 2: spike rejection — replace outlier jumps with current EMA
+          if (
+            emaAltRef.current !== null &&
+            Math.abs(alt - emaAltRef.current) > ALT_SPIKE_M
+          ) {
+            alt = emaAltRef.current;
+          }
+
+          // EMA smoothing
           if (emaAltRef.current === null) {
-            emaAltRef.current = point.altitude;
-            altAnchorRef.current = point.altitude;
+            emaAltRef.current = alt;
+            altAnchorRef.current = alt;
           } else {
             emaAltRef.current =
-              ALT_EMA_ALPHA * point.altitude +
-              (1 - ALT_EMA_ALPHA) * emaAltRef.current;
-            const delta = emaAltRef.current - altAnchorRef.current!;
-            if (delta > ALT_DEADBAND_M) {
-              elevGainRef.current += delta;
-              setLiveElevationGain(elevGainRef.current);
-              altAnchorRef.current = emaAltRef.current;
-            } else if (delta < -ALT_DEADBAND_M) {
-              altAnchorRef.current = emaAltRef.current;
+              ALT_EMA_ALPHA * alt + (1 - ALT_EMA_ALPHA) * emaAltRef.current;
+
+            // Filter 3: require minimum horizontal distance before anchor update
+            if (distSinceAnchorRef.current >= ALT_MIN_DIST_M) {
+              const delta = emaAltRef.current - altAnchorRef.current!;
+              if (delta > ALT_DEADBAND_M) {
+                elevGainRef.current += delta;
+                setLiveElevationGain(elevGainRef.current);
+                altAnchorRef.current = emaAltRef.current;
+              } else if (delta < -ALT_DEADBAND_M) {
+                altAnchorRef.current = emaAltRef.current;
+              }
             }
           }
         }
@@ -282,6 +315,7 @@ export function useRideRecording(
     elevGainRef.current = 0;
     emaAltRef.current = null;
     altAnchorRef.current = null;
+    distSinceAnchorRef.current = 0;
     pausedRef.current = false;
     manualPauseRef.current = false;
     pausedTimeRef.current = 0;
@@ -428,6 +462,7 @@ export function useRideRecording(
       null;
     emaAltRef.current = lastAlt;
     altAnchorRef.current = lastAlt;
+    distSinceAnchorRef.current = 0;
 
     setLiveDistance(dist);
     setLiveElevationGain(elev.gain);
