@@ -888,14 +888,41 @@ const MapboxMap = memo(function MapboxMap() {
             });
           }
 
-          // Add click handlers to route layers
+          // Add invisible hit-test layers and click handlers for routes.
+          // The hit layer is wider than the visible route to make tapping
+          // easier on phones — same pattern used for mountain bike trails.
           bikeRoutes.forEach((route) => {
-            // Make route layer clickable
-            newMap.on('click', route.id, (e) => {
-              // Prevent default map click behavior
-              e.preventDefault();
+            const hitId = `${route.id}-hit`;
+            const routeLayer = style?.layers?.find((l) => l.id === route.id) as
+              | { source?: string; 'source-layer'?: string; filter?: unknown }
+              | undefined;
 
-              // Dispatch route-select event (same as clicking in legend)
+            if (routeLayer && !newMap.getLayer(hitId)) {
+              newMap.addLayer({
+                id: hitId,
+                type: 'line',
+                source: routeLayer.source ?? 'composite',
+                ...(routeLayer['source-layer']
+                  ? { 'source-layer': routeLayer['source-layer'] }
+                  : {}),
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: {
+                  'line-color': '#000000',
+                  'line-width': 24,
+                  'line-opacity': 0,
+                },
+                ...(routeLayer.filter
+                  ? {
+                      filter: routeLayer.filter as mapboxgl.FilterSpecification,
+                    }
+                  : {}),
+              });
+            }
+
+            const clickTarget = newMap.getLayer(hitId) ? hitId : route.id;
+
+            newMap.on('click', clickTarget, (e) => {
+              e.preventDefault();
               window.dispatchEvent(
                 new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
                   detail: { routeId: route.id },
@@ -903,13 +930,11 @@ const MapboxMap = memo(function MapboxMap() {
               );
             });
 
-            // Change cursor to pointer when hovering over route
-            newMap.on('mouseenter', route.id, () => {
+            newMap.on('mouseenter', clickTarget, () => {
               newMap.getCanvas().style.cursor = 'pointer';
             });
 
-            // Change cursor back when leaving route
-            newMap.on('mouseleave', route.id, () => {
+            newMap.on('mouseleave', clickTarget, () => {
               newMap.getCanvas().style.cursor = '';
             });
           });
