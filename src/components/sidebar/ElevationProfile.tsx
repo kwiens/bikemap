@@ -478,8 +478,8 @@ export function ElevationProfile() {
   return (
     <div
       className={cn(
-        'absolute bottom-4 w-[450px] bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-[600] pointer-events-auto transition-all duration-300',
-        'max-md:w-[calc(100%-1rem)] max-md:left-2 max-md:bottom-[60px] max-md:px-2 max-md:pt-2 max-md:pb-1',
+        'absolute bottom-4 right-4 bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-[600] pointer-events-auto transition-all duration-300',
+        'max-md:left-2 max-md:right-2 max-md:bottom-[60px] max-md:px-2 max-md:pt-2 max-md:pb-1',
         sidebarOpen ? 'left-[296px] max-md:hidden' : 'left-4',
       )}
     >
