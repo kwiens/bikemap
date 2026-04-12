@@ -70,6 +70,8 @@ const MapboxMap = memo(function MapboxMap() {
   const [compassMode, setCompassMode] = useState(false);
   const compassHeading = useRef<number | null>(null);
   const compassCleanup = useRef<(() => void) | null>(null);
+  // GPS heading/speed for velocity-aware compass smoothing
+  const _gpsHeading = useRef<{ heading: number; speed: number } | null>(null);
   const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
   const recordingActiveRef = useRef(false);
@@ -260,6 +262,20 @@ const MapboxMap = memo(function MapboxMap() {
             position.coords.accuracy,
             map.current.getZoom(),
           );
+        }
+
+        // Store GPS heading/speed for velocity-aware compass smoothing
+        if (
+          position.coords.speed !== null &&
+          position.coords.heading !== null &&
+          position.coords.speed > 0
+        ) {
+          _gpsHeading.current = {
+            heading: position.coords.heading,
+            speed: position.coords.speed,
+          };
+        } else {
+          _gpsHeading.current = null;
         }
 
         // Broadcast location for elevation profile tracking
@@ -937,6 +953,13 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
+          // Click on empty map area deselects routes and trails
+          newMap.on('click', (e) => {
+            if (e.defaultPrevented) return; // a route/trail layer handled it
+            window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
+            window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+          });
+
           // Force a resize to ensure proper display
           setTimeout(() => {
             if (map.current) {
@@ -1120,38 +1143,59 @@ const MapboxMap = memo(function MapboxMap() {
   };
 
   // Attach compass (device orientation) listener to rotate the map bearing.
-  // Uses a low-pass filter to smooth heading and prevent jitter when the
-  // phone is held upright (gimbal lock region).
+  // Uses velocity-aware heading: at riding speed (≥3 m/s / ~7 mph) the GPS
+  // course-over-ground is used (immune to magnetic interference); at low
+  // speed, an adaptive-rate low-pass filter on the magnetometer kicks in
+  // (small jitter gets heavy filtering, real turns pass through quickly).
   const attachCompassListener = () => {
-    // Low-pass filter weight: 0 = ignore new readings, 1 = no smoothing.
-    const SMOOTHING = 0.2;
+    // Speed threshold (m/s) above which GPS heading is preferred
+    const GPS_SPEED_THRESHOLD = 3;
+    // Adaptive low-pass: alpha scales from MIN (jitter) to MAX (real turn)
+    // based on how large the delta is, reaching MAX at TURN_DEGREES°.
+    const ALPHA_MIN = 0.05;
+    const ALPHA_MAX = 0.5;
+    const TURN_DEGREES = 30;
     let smoothed: number | null = null;
 
+    const shortestDelta = (from: number, to: number) => {
+      let d = to - from;
+      if (d > 180) d -= 360;
+      else if (d < -180) d += 360;
+      return d;
+    };
+
     const handler = (e: DeviceOrientationEvent) => {
-      const evt = e as DeviceOrientationEvent & {
-        webkitCompassHeading?: number;
-      };
-      let raw: number | null = null;
-      if (typeof evt.webkitCompassHeading === 'number') {
-        raw = evt.webkitCompassHeading;
-      } else if (typeof e.alpha === 'number') {
-        raw = (360 - e.alpha) % 360;
-      }
-      if (raw === null) return;
-
-      // Low-pass filter using circular (angular) interpolation to avoid
-      // the 359°→1° wraparound jump.
-      if (smoothed === null) {
-        smoothed = raw;
+      // If GPS heading is available and speed is above threshold, use it
+      // directly — it's more stable than the magnetometer while riding.
+      const gps = _gpsHeading.current;
+      if (gps && gps.speed >= GPS_SPEED_THRESHOLD) {
+        smoothed = gps.heading;
       } else {
-        let delta = raw - smoothed;
-        // Shortest-path wraparound
-        if (delta > 180) delta -= 360;
-        else if (delta < -180) delta += 360;
-        smoothed = (smoothed + SMOOTHING * delta + 360) % 360;
+        // Fall back to magnetometer with adaptive-rate smoothing
+        const evt = e as DeviceOrientationEvent & {
+          webkitCompassHeading?: number;
+        };
+        let raw: number | null = null;
+        if (typeof evt.webkitCompassHeading === 'number') {
+          raw = evt.webkitCompassHeading;
+        } else if (typeof e.alpha === 'number') {
+          raw = (360 - e.alpha) % 360;
+        }
+        if (raw === null) return;
+
+        if (smoothed === null) {
+          smoothed = raw;
+        } else {
+          const delta = shortestDelta(smoothed, raw);
+          // Scale alpha: small deltas (jitter) → heavy filtering,
+          // large deltas (turns) → responsive
+          const t = Math.min(Math.abs(delta) / TURN_DEGREES, 1);
+          const alpha = ALPHA_MIN + (ALPHA_MAX - ALPHA_MIN) * t;
+          smoothed = (smoothed + alpha * delta + 360) % 360;
+        }
       }
 
-      // Only update map when the smoothed heading changes enough
+      // Only update map when the heading changes enough
       const prev = compassHeading.current;
       if (prev !== null) {
         let diff = Math.abs(smoothed - prev);
