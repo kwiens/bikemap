@@ -22,7 +22,7 @@ import {
 } from '@/components/MapMarkers';
 import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
 import { cn } from '@/lib/utils';
-import { useToast, useMapResize } from '@/hooks';
+import { useToast, useMapResize, useWakeLock } from '@/hooks';
 import {
   fetchStationInformation,
   fetchStationStatus,
@@ -66,13 +66,13 @@ const MapboxMap = memo(function MapboxMap() {
   const locationAccuracy = useRef<number>(0);
   const watchId = useRef<number | null>(null);
   const locationWatch = useRef<NodeJS.Timeout | undefined>(undefined);
-  const wakeLock = useRef<WakeLockSentinel | null>(null);
   const [watchingLocation, setWatchingLocation] = useState(false);
   const [compassMode, setCompassMode] = useState(false);
   const compassHeading = useRef<number | null>(null);
   const compassCleanup = useRef<(() => void) | null>(null);
   const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
-  const recordingActive = useRef(false);
+  const [recordingActive, setRecordingActive] = useState(false);
+  const recordingActiveRef = useRef(false);
 
   // Track markers for attractions and bike resources
   const attractionMarkers = useRef<MarkerManager>(new MarkerManager());
@@ -97,6 +97,10 @@ const MapboxMap = memo(function MapboxMap() {
     showToast,
   } = useToast();
   useMapResize({ map });
+  // Keep screen awake while location tracking or recording is active.
+  // Both are needed: recording keeps the lock even when the user drags the map
+  // (which sets watchingLocation=false to stop auto-centering).
+  useWakeLock(watchingLocation || recordingActive);
 
   // Handle ride select — show ride on map
   const handleRideSelect = useCallback(async (event: CustomEvent) => {
@@ -301,11 +305,6 @@ const MapboxMap = memo(function MapboxMap() {
       if (locationWatch.current) {
         clearInterval(locationWatch.current);
         locationWatch.current = undefined;
-      }
-      // Keep wake lock alive during recording so the screen stays on
-      if (!recordingActive.current && wakeLock.current) {
-        wakeLock.current.release();
-        wakeLock.current = null;
       }
     };
 
@@ -1022,12 +1021,6 @@ const MapboxMap = memo(function MapboxMap() {
         locationWatch.current = undefined;
       }
 
-      // Release wake lock
-      if (wakeLock.current) {
-        wakeLock.current.release();
-        wakeLock.current = null;
-      }
-
       // Clean up all markers before removing the map
       if (locationMarker.current) {
         locationMarker.current.remove();
@@ -1048,20 +1041,6 @@ const MapboxMap = memo(function MapboxMap() {
     setWatchingLocation(value);
 
     if (value) {
-      // Keep screen awake while tracking
-      if ('wakeLock' in navigator) {
-        navigator.wakeLock
-          .request('screen')
-          .then((lock) => {
-            if (locationWatch.current !== undefined) {
-              wakeLock.current = lock;
-            } else {
-              lock.release();
-            }
-          })
-          .catch(() => {});
-      }
-
       // When enabled: immediately center on current location (preserving zoom).
       // If GPS hasn't fired yet (locationMarker null), wait for the first
       // LOCATION_UPDATE and then fly there — fixes iOS cold-start delay.
@@ -1136,11 +1115,6 @@ const MapboxMap = memo(function MapboxMap() {
           bearing: mapConfig.defaultView.bearing,
           duration: 500,
         });
-      }
-      // Keep wake lock alive during recording so the screen stays on
-      if (!recordingActive.current && wakeLock.current) {
-        wakeLock.current.release();
-        wakeLock.current = null;
       }
     }
   };
@@ -1244,11 +1218,28 @@ const MapboxMap = memo(function MapboxMap() {
     }
   };
 
+  // Reset trail detection state when returning from background so detection
+  // starts fresh instead of requiring stale confirmation counts
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!autoDetectEnabledRef.current) return;
+
+      detectCandidateRef.current = null;
+      detectConfirmCountRef.current = 0;
+      lastDetectTimeRef.current = 0;
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () =>
+      document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
   // Enable location tracking when recording starts, disable when it stops
   // Also toggle CSS class on map container for Mapbox control positioning
   useEffect(() => {
     const handleStart = () => {
-      recordingActive.current = true;
+      recordingActiveRef.current = true;
+      setRecordingActive(true);
       setLocationWatch(true);
       mapContainer.current?.classList.add('recording-active');
       // Enable trail auto-detection
@@ -1260,7 +1251,8 @@ const MapboxMap = memo(function MapboxMap() {
       lastDetectTimeRef.current = 0;
     };
     const handleStop = () => {
-      recordingActive.current = false;
+      recordingActiveRef.current = false;
+      setRecordingActive(false);
       setLocationWatch(false);
       mapContainer.current?.classList.remove('recording-active');
       // Clean up auto-detected trail selection

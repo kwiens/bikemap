@@ -85,17 +85,6 @@ describe('useRideRecording', () => {
     positionCallback = null;
     errorCallback = null;
 
-    // Mock wakeLock
-    Object.defineProperty(navigator, 'wakeLock', {
-      value: {
-        request: vi.fn().mockResolvedValue({
-          release: vi.fn(),
-        }),
-      },
-      writable: true,
-      configurable: true,
-    });
-
     // Mock crypto.randomUUID
     vi.stubGlobal('crypto', {
       randomUUID: vi.fn().mockReturnValue('test-uuid'),

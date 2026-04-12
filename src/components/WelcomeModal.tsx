@@ -11,6 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { MAP_EVENTS } from '@/events';
+import { getSetting, setSetting, type RideStyle } from '@/utils/settings';
 
 const features: {
   icon: IconDefinition;
@@ -62,21 +63,9 @@ const choices: {
 ];
 
 const STORAGE_KEY = 'bikechatt-welcome-dismissed';
-const RIDE_STYLE_COOKIE = 'bikechatt-ride-style';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
-
-export type RideStyle = 'casual' | 'mountain';
 
 export function getRideStyle(): RideStyle | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(
-    new RegExp(`(?:^|; )${RIDE_STYLE_COOKIE}=([^;]*)`),
-  );
-  return (match?.[1] as RideStyle) ?? null;
-}
-
-function setRideStyleCookie(style: RideStyle) {
-  document.cookie = `${RIDE_STYLE_COOKIE}=${style}; path=/; max-age=${COOKIE_MAX_AGE}`;
+  return getSetting('rideStyle') ?? null;
 }
 
 export function WelcomeModal() {
@@ -91,7 +80,7 @@ export function WelcomeModal() {
 
   const choose = (style: RideStyle) => {
     localStorage.setItem(STORAGE_KEY, '1');
-    setRideStyleCookie(style);
+    setSetting('rideStyle', style);
     window.dispatchEvent(
       new CustomEvent(MAP_EVENTS.RIDE_STYLE_CHOSEN, {
         detail: { style },

@@ -16,13 +16,14 @@ import {
   type LocationProps,
 } from './sidebar';
 import { getRideStyle } from './WelcomeModal';
+import { getSetting, setSetting } from '@/utils/settings';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
 import { cn } from '@/lib/utils';
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   // Track state in this parent component
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(() => getSetting('sidebarOpen') ?? true);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(() =>
@@ -41,6 +42,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const toggle = useCallback(() => {
     const next = !isOpenRef.current;
     setIsOpen(next);
+    setSetting('sidebarOpen', next);
     window.dispatchEvent(
       new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
         detail: { isOpen: next },

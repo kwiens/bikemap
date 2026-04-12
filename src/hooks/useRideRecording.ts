@@ -81,31 +81,12 @@ export function useRideRecording(
     undefined,
   );
   const startTimeRef = useRef<number>(0);
-  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
-  const acquireWakeLock = useCallback(async () => {
-    if (!('wakeLock' in navigator)) return;
-    try {
-      wakeLockRef.current = await navigator.wakeLock.request('screen');
-    } catch {
-      // Wake lock not available or denied
-    }
-  }, []);
-
-  const releaseWakeLock = useCallback(() => {
-    if (wakeLockRef.current) {
-      wakeLockRef.current.release();
-      wakeLockRef.current = null;
-    }
-  }, []);
-
-  // Re-acquire wake lock and detect GPS gaps when page becomes visible
+  // Detect GPS gaps and request immediate fix when page becomes visible
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState !== 'visible' || !isRecording) return;
       if (pausedRef.current) return;
-
-      acquireWakeLock();
 
       // Check for background gap
       const lastPoint = pointsRef.current[pointsRef.current.length - 1];
@@ -126,7 +107,7 @@ export function useRideRecording(
     document.addEventListener('visibilitychange', handleVisibility);
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility);
-  }, [isRecording, acquireWakeLock, onNotify]);
+  }, [isRecording, onNotify]);
 
   // Warn before closing tab while recording
   useEffect(() => {
@@ -159,13 +140,12 @@ export function useRideRecording(
     } else {
       void clearInProgress();
     }
-    releaseWakeLock();
     setIsRecording(false);
     setIsPaused(false);
     setElapsedTime(0);
     setLiveDistance(0);
     setLiveElevationGain(0);
-  }, [releaseWakeLock]);
+  }, []);
 
   // Shared: start GPS watch, elapsed timer, and periodic save
   const startGpsWatchAndTimers = useCallback(() => {
@@ -322,9 +302,8 @@ export function useRideRecording(
     setIsRecording(true);
     setIsPaused(false);
 
-    acquireWakeLock();
     startGpsWatchAndTimers();
-  }, [isRecording, acquireWakeLock, startGpsWatchAndTimers]);
+  }, [isRecording, startGpsWatchAndTimers]);
 
   const pauseRecording = useCallback(() => {
     if (!isRecording || manualPauseRef.current) return;
@@ -473,8 +452,6 @@ export function useRideRecording(
     // fall back to "Save it".
     preserveProgressRef.current = true;
 
-    acquireWakeLock();
-
     // Draw existing track on map in a single batch
     const coords = data.points.map(
       (pt) => [pt.lng, pt.lat] as [number, number],
@@ -486,7 +463,7 @@ export function useRideRecording(
     );
 
     startGpsWatchAndTimers();
-  }, [isRecording, acquireWakeLock, startGpsWatchAndTimers]);
+  }, [isRecording, startGpsWatchAndTimers]);
 
   const dismissRecovery = useCallback(() => {
     void clearInProgress();
@@ -501,7 +478,6 @@ export function useRideRecording(
       if (timerRef.current !== undefined) clearInterval(timerRef.current);
       if (saveIntervalRef.current !== undefined)
         clearInterval(saveIntervalRef.current);
-      wakeLockRef.current?.release();
     };
   }, []);
 
