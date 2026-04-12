@@ -16,10 +16,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faDownload,
   faShareAlt,
-  faChevronDown,
-  faChevronUp,
+  faMountain,
+  faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
+import { getSetting } from '@/utils/settings';
+import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
 
 const CHART_HEIGHT = 100;
 const CHART_PADDING_TOP = 4;
@@ -172,8 +174,9 @@ export function ElevationProfile() {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [locationIndex, setLocationIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [ridesPanelOpen, setRidesPanelOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => getSetting('sidebarOpen') ?? true,
+  );
   const svgRef = useRef<SVGSVGElement>(null);
   // Track whether current profile is from a route, trail, or ride selection
   const sourceRef = useRef<'trail' | 'route' | 'ride' | null>(null);
@@ -214,9 +217,6 @@ export function ElevationProfile() {
     };
     const handleSidebarToggle = (e: Event) => {
       setSidebarOpen((e as CustomEvent).detail.isOpen);
-    };
-    const handleRidesPanelToggle = (e: Event) => {
-      setRidesPanelOpen((e as CustomEvent).detail.isOpen);
     };
     let latestRideId: string | null = null;
     const handleRideSelect = async (e: Event) => {
@@ -271,10 +271,6 @@ export function ElevationProfile() {
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
     window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
     window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
-    window.addEventListener(
-      MAP_EVENTS.RIDES_PANEL_TOGGLE,
-      handleRidesPanelToggle,
-    );
     window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
     window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
     window.addEventListener(
@@ -300,10 +296,6 @@ export function ElevationProfile() {
       window.removeEventListener(
         MAP_EVENTS.SIDEBAR_TOGGLE,
         handleSidebarToggle,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.RIDES_PANEL_TOGGLE,
-        handleRidesPanelToggle,
       );
       window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
       window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
@@ -452,20 +444,43 @@ export function ElevationProfile() {
     [profile],
   );
 
-  if (!trailName || loading || !profile || profile.profile.length < 2) {
+  const hasProfile =
+    !!trailName && !loading && !!profile && profile.profile.length >= 2;
+
+  if (!hasProfile) {
     return null;
   }
 
   const points = profile.profile;
   const maxDist = points[points.length - 1][0];
 
+  // Mountain icon toggle button (visible when collapsed)
+  if (collapsed) {
+    return (
+      <div
+        className={cn(
+          'absolute bottom-[60px] z-[600] pointer-events-auto',
+          sidebarOpen ? 'left-[296px] max-md:left-4' : 'left-4',
+        )}
+      >
+        <button
+          onClick={() => setCollapsed(false)}
+          className={TOGGLE_BTN_CLASS}
+          type="button"
+          title="Show elevation profile"
+        >
+          <FontAwesomeIcon icon={faMountain} className={TOGGLE_ICON_CLASS} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        'absolute bottom-1 left-[296px] right-4 bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-[600] pointer-events-auto',
-        'max-md:left-2 max-md:right-2 max-md:bottom-[60px] max-md:px-2 max-md:pt-2 max-md:pb-1',
-        sidebarOpen ? 'max-md:hidden' : 'left-4',
-        ridesPanelOpen && 'right-[296px]',
+        'absolute bottom-4 w-[450px] bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-[600] pointer-events-auto transition-all duration-300',
+        'max-md:w-[calc(100%-1rem)] max-md:left-2 max-md:bottom-[60px] max-md:px-2 max-md:pt-2 max-md:pb-1',
+        sidebarOpen ? 'left-[296px] max-md:hidden' : 'left-4',
       )}
     >
       <div className="flex items-center gap-3 mb-1">
@@ -503,66 +518,62 @@ export function ElevationProfile() {
           <button
             type="button"
             className={ACTION_BTN_CLASS}
-            onClick={() => setCollapsed(!collapsed)}
-            title={collapsed ? 'Expand' : 'Collapse'}
+            onClick={() => setCollapsed(true)}
+            title="Collapse"
           >
-            <FontAwesomeIcon icon={collapsed ? faChevronUp : faChevronDown} />
+            <FontAwesomeIcon icon={faTimes} />
           </button>
         </div>
       </div>
 
-      {!collapsed && (
-        <>
-          <div className="flex relative">
-            <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
-              <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
-                {Math.round(profile.max).toLocaleString()} ft
-              </span>
-              <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
-                {Math.round(profile.min).toLocaleString()} ft
-              </span>
-            </div>
+      <div className="flex relative">
+        <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
+          <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
+            {Math.round(profile.max).toLocaleString()} ft
+          </span>
+          <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
+            {Math.round(profile.min).toLocaleString()} ft
+          </span>
+        </div>
 
-            <div className="relative flex-1">
-              <ElevationSvg
-                points={points}
-                gradeColors={gradeColors}
-                profile={profile}
-                chartWidth={chartWidth}
-                svgRef={svgRef}
-                onMouseMove={handleMouseMove}
-                onMouseLeave={clearHover}
-                onTouchStart={handleTouch}
-                onTouchMove={handleTouch}
-                onTouchEnd={clearHover}
-              />
-              {locationIndex !== null && (
-                <LocationIndicator
-                  points={points}
-                  profile={profile}
-                  chartWidth={chartWidth}
-                  locationIndex={locationIndex}
-                />
-              )}
-              {hoverIndex !== null && (
-                <HoverIndicator
-                  points={points}
-                  gradeColors={gradeColors}
-                  profile={profile}
-                  chartWidth={chartWidth}
-                  hoverIndex={hoverIndex}
-                />
-              )}
-            </div>
-          </div>
+        <div className="relative flex-1">
+          <ElevationSvg
+            points={points}
+            gradeColors={gradeColors}
+            profile={profile}
+            chartWidth={chartWidth}
+            svgRef={svgRef}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={clearHover}
+            onTouchStart={handleTouch}
+            onTouchMove={handleTouch}
+            onTouchEnd={clearHover}
+          />
+          {locationIndex !== null && (
+            <LocationIndicator
+              points={points}
+              profile={profile}
+              chartWidth={chartWidth}
+              locationIndex={locationIndex}
+            />
+          )}
+          {hoverIndex !== null && (
+            <HoverIndicator
+              points={points}
+              gradeColors={gradeColors}
+              profile={profile}
+              chartWidth={chartWidth}
+              hoverIndex={hoverIndex}
+            />
+          )}
+        </div>
+      </div>
 
-          <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
-            {hoverIndex !== null
-              ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft`
-              : '\u00A0'}
-          </div>
-        </>
-      )}
+      <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
+        {hoverIndex !== null
+          ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft`
+          : '\u00A0'}
+      </div>
     </div>
   );
 }
