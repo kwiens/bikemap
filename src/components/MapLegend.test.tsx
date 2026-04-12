@@ -64,6 +64,11 @@ describe('MapLegendProvider', () => {
 
   beforeEach(() => {
     mockRideStyle = null;
+    // Clear cookies so activeTab doesn't leak between tests
+    document.cookie.split(';').forEach((c) => {
+      const name = c.split('=')[0].trim();
+      document.cookie = `${name}=; max-age=0; path=/`;
+    });
     events.length = 0;
     handler = (e: Event) => {
       events.push({ type: e.type, detail: (e as CustomEvent).detail });

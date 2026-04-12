@@ -26,8 +26,12 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(() => getSetting('sidebarOpen') ?? true);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(() =>
-    getRideStyle() === 'mountain' ? 'trails' : 'routes',
+  const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
+    () => {
+      const saved = getSetting('activeTab');
+      if (saved === 'routes' || saved === 'trails') return saved;
+      return getRideStyle() === 'mountain' ? 'trails' : 'routes';
+    },
   );
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
@@ -104,7 +108,9 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handler = (e: Event) => {
       const { style } = (e as CustomEvent).detail;
-      setActiveSection(style === 'mountain' ? 'trails' : 'routes');
+      const tab = style === 'mountain' ? 'trails' : 'routes';
+      setActiveSection(tab);
+      setSetting('activeTab', tab);
     };
 
     window.addEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
@@ -326,7 +332,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   ? 'bg-white text-gray-800 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700',
               )}
-              onClick={() => setActiveSection('routes')}
+              onClick={() => {
+                setActiveSection('routes');
+                setSetting('activeTab', 'routes');
+              }}
             >
               Casual
             </button>
@@ -338,7 +347,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   ? 'bg-white text-gray-800 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700',
               )}
-              onClick={() => setActiveSection('trails')}
+              onClick={() => {
+                setActiveSection('trails');
+                setSetting('activeTab', 'trails');
+              }}
             >
               MTB
             </button>

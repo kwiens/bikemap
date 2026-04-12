@@ -6,6 +6,7 @@ export type RideStyle = 'casual' | 'mountain';
 interface Settings {
   rideStyle?: RideStyle;
   sidebarOpen?: boolean;
+  activeTab?: string;
 }
 
 function readCookie(): Settings {
