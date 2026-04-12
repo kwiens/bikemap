@@ -979,9 +979,14 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
-          // Click on empty map area deselects routes and trails
+          // Click on empty map area deselects routes and trails.
+          // Check originalEvent.target to ignore ghost clicks that land on
+          // the canvas after an overlay (e.g. elevation panel) is removed
+          // mid-tap on mobile.
           newMap.on('click', (e) => {
             if (e.defaultPrevented) return; // a route/trail layer handled it
+            const target = e.originalEvent.target as HTMLElement;
+            if (!newMap.getCanvas().contains(target)) return;
             window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
             window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
           });
