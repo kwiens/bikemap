@@ -84,10 +84,21 @@ export async function getElevation(
   );
 }
 
+/** Unique key for a DEM pixel — two points mapping to the same pixel get the same elevation */
+function pixelKey(lat: number, lng: number): string {
+  const { tileX, tileY, pixelX, pixelY } = latLngToTilePixel(lat, lng);
+  return `${tileX}/${tileY}/${pixelX}/${pixelY}`;
+}
+
 /**
  * Correct altitude for an array of ride points using DEM elevation.
  * Returns a new array with corrected altitudes (original points are not modified).
  * Points outside the cached tile area keep their GPS altitude.
+ *
+ * After DEM lookup, consecutive points that map to the same DEM pixel are
+ * collapsed into a single point. This eliminates the staircase noise caused
+ * by horizontal GPS wander between adjacent pixels — the main source of
+ * phantom elevation gain after DEM correction.
  */
 export async function correctElevations<
   T extends { lat: number; lng: number; altitude: number | null },
@@ -106,19 +117,37 @@ export async function correctElevations<
     }),
   );
 
-  // Correct each point
-  return points.map((p) => {
+  // Correct each point with DEM elevation, then deduplicate consecutive
+  // points that land on the same DEM pixel.
+  const result: T[] = [];
+  let prevKey: string | null = null;
+
+  for (const p of points) {
     const { tileX, tileY, pixelX, pixelY } = latLngToTilePixel(p.lat, p.lng);
     const tile = tileCache.get(`${tileX}/${tileY}`);
-    if (!tile) return p;
 
-    const idx = (pixelY * TILE_SIZE + pixelX) * 4;
-    const demAlt = decodeElevation(
-      tile.data[idx],
-      tile.data[idx + 1],
-      tile.data[idx + 2],
-    );
+    let corrected: T;
+    let key: string;
+    if (tile) {
+      const idx = (pixelY * TILE_SIZE + pixelX) * 4;
+      const demAlt = decodeElevation(
+        tile.data[idx],
+        tile.data[idx + 1],
+        tile.data[idx + 2],
+      );
+      corrected = { ...p, altitude: demAlt };
+      key = pixelKey(p.lat, p.lng);
+    } else {
+      corrected = p;
+      key = `gps/${result.length}`; // unique key — never dedup GPS-only points
+    }
 
-    return { ...p, altitude: demAlt };
-  });
+    // Skip consecutive points that map to the same DEM pixel
+    if (key !== prevKey) {
+      result.push(corrected);
+      prevKey = key;
+    }
+  }
+
+  return result;
 }
