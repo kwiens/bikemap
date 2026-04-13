@@ -255,8 +255,10 @@ export function useRideRecording(
                 elevGainRef.current += delta;
                 setLiveElevationGain(elevGainRef.current);
                 altAnchorRef.current = emaAltRef.current;
+                distSinceAnchorRef.current = 0;
               } else if (delta < -ALT_DEADBAND_M) {
                 altAnchorRef.current = emaAltRef.current;
+                distSinceAnchorRef.current = 0;
               }
             }
           }

@@ -177,6 +177,7 @@ export function ElevationProfile() {
   const [sidebarOpen, setSidebarOpen] = useState(
     () => getSetting('sidebarOpen') ?? true,
   );
+  const [ridesPanelOpen, setRidesPanelOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   // Track whether current profile is from a route, trail, or ride selection
   const sourceRef = useRef<'trail' | 'route' | 'ride' | null>(null);
@@ -217,6 +218,9 @@ export function ElevationProfile() {
     };
     const handleSidebarToggle = (e: Event) => {
       setSidebarOpen((e as CustomEvent).detail.isOpen);
+    };
+    const handleRidesPanelToggle = (e: Event) => {
+      setRidesPanelOpen((e as CustomEvent).detail.isOpen);
     };
     let latestRideId: string | null = null;
     const handleRideSelect = async (e: Event) => {
@@ -271,6 +275,10 @@ export function ElevationProfile() {
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
     window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
     window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
+    window.addEventListener(
+      MAP_EVENTS.RIDES_PANEL_TOGGLE,
+      handleRidesPanelToggle,
+    );
     window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
     window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
     window.addEventListener(
@@ -296,6 +304,10 @@ export function ElevationProfile() {
       window.removeEventListener(
         MAP_EVENTS.SIDEBAR_TOGGLE,
         handleSidebarToggle,
+      );
+      window.removeEventListener(
+        MAP_EVENTS.RIDES_PANEL_TOGGLE,
+        handleRidesPanelToggle,
       );
       window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
       window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
@@ -481,6 +493,7 @@ export function ElevationProfile() {
         'absolute bottom-4 right-4 bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-[600] pointer-events-auto transition-all duration-300',
         'max-md:left-2 max-md:right-2 max-md:bottom-[60px] max-md:px-2 max-md:pt-2 max-md:pb-1',
         sidebarOpen ? 'left-[296px] max-md:hidden' : 'left-4',
+        ridesPanelOpen && 'right-[296px]',
       )}
     >
       <div className="flex items-center gap-3 mb-1">

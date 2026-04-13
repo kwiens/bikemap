@@ -218,9 +218,11 @@ export function computeElevation(points: AnyRidePoint[]): {
     if (delta > ELEVATION_DEAD_BAND) {
       gain += delta;
       anchor = alt;
+      distSinceAnchor = 0;
     } else if (delta < -ELEVATION_DEAD_BAND) {
       loss += Math.abs(delta);
       anchor = alt;
+      distSinceAnchor = 0;
     }
   }
 
