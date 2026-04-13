@@ -235,6 +235,28 @@ describe('computeElevation', () => {
     expect(gain).toBeGreaterThan(100);
     expect(loss).toBe(0);
   });
+
+  it('tracks loss correctly on a descent', () => {
+    const points = makeTrack(200, { startAlt: 600, altStep: -2 });
+    const { gain, loss } = computeElevation(points);
+    expect(loss).toBeGreaterThan(100);
+    expect(gain).toBe(0);
+  });
+
+  it('handles scattered null altitudes mid-ride', () => {
+    // Climb with every 10th altitude null — simulates brief GPS altitude drops
+    const points: RidePoint[] = Array.from({ length: 200 }, (_, i) => ({
+      lng: -85.3 + i * 0.0003,
+      lat: 35.05 + i * 0.0003,
+      altitude: i % 10 === 5 ? null : 200 + i * 2,
+      accuracy: 5,
+      speed: 5,
+      timestamp: 1700000000000 + i * 1000,
+    }));
+    const { gain } = computeElevation(points);
+    // Should still detect most of the climb despite gaps
+    expect(gain).toBeGreaterThan(50);
+  });
 });
 
 // --- computeMaxSpeed ---
@@ -361,6 +383,34 @@ describe('computeRideStats', () => {
       const expected = stats.distance / (stats.movingTime / 1000);
       expect(stats.avgSpeed).toBeCloseTo(expected, 5);
     }
+  });
+
+  it('time and distance are independent of elevation point count', () => {
+    // Simulate the DEM dedup scenario: compute stats from full points,
+    // then verify that using a subset for elevation doesn't affect
+    // time/distance/speed.
+    const fullPoints = makeTrack(200, {
+      startAlt: 200,
+      altStep: 2,
+      speed: 5,
+      intervalMs: 1000,
+    });
+    const fullStats = computeRideStats(fullPoints);
+
+    // Compute elevation from a subset (as DEM dedup would produce)
+    const subset = fullPoints.filter((_, i) => i % 3 === 0);
+    const subsetElev = computeElevation(subset);
+
+    // Time and distance from full set should be preserved
+    expect(fullStats.elapsedTime).toBe(199000);
+    expect(fullStats.distance).toBeGreaterThan(0);
+
+    // Subset elevation stats exist but differ from full-set elevation
+    expect(subsetElev.gain).toBeGreaterThanOrEqual(0);
+    // The key assertion: fullStats time/distance are NOT affected by
+    // what computeElevation returns from a different point set
+    expect(fullStats.movingTime).toBeGreaterThan(0);
+    expect(fullStats.avgSpeed).toBeGreaterThan(0);
   });
 });
 

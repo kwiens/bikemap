@@ -202,4 +202,25 @@ describe('DEM pixel deduplication', () => {
     // Most points should survive since each is on a different pixel
     expect(corrected.length).toBeGreaterThan(15);
   });
+
+  it('deduplication drops points that carry timestamp/distance data', async () => {
+    // 50 points stopped at one location (same pixel) — simulates a traffic light
+    const points = Array.from({ length: 50 }, (_, i) => ({
+      lat: 35.05 + i * 0.0000001, // ~0.01m jitter, same pixel
+      lng: -85.3,
+      altitude: 200 + i * 0.1,
+      timestamp: 1000 + i * 1000,
+    }));
+
+    const corrected = await correctElevations(points);
+
+    // All 50 points collapse to ~1 since they're on the same pixel
+    expect(corrected.length).toBeLessThan(5);
+
+    // The original set has 50 points spanning 49 seconds — if you computed
+    // elapsed time from the deduplicated set, you'd lose nearly all of it.
+    // This is why buildRide must use original points for time/distance stats.
+    expect(points.length).toBe(50);
+    expect(points[49].timestamp - points[0].timestamp).toBe(49000);
+  });
 });
