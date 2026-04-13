@@ -384,7 +384,15 @@ export function useRideRecording(
       return null;
     }
 
-    const points = [...pointsRef.current];
+    const rawPoints = [...pointsRef.current];
+    // Apply DEM elevation correction before computing final stats
+    let points: RidePoint[];
+    try {
+      const { correctElevations } = await import('../utils/dem');
+      points = await correctElevations(rawPoints);
+    } catch {
+      points = rawPoints; // Fall back to GPS altitude if DEM unavailable
+    }
     const ride = buildRide(points, startTimeRef.current, Date.now());
 
     await saveRide(ride);
@@ -415,10 +423,17 @@ export function useRideRecording(
       return null;
     }
 
+    let points = data.points;
+    try {
+      const { correctElevations } = await import('../utils/dem');
+      points = await correctElevations(points);
+    } catch {
+      // Fall back to GPS altitude
+    }
     const ride = buildRide(
-      data.points,
+      points,
       data.startTime,
-      data.points[data.points.length - 1].timestamp,
+      points[points.length - 1].timestamp,
     );
 
     await saveRide(ride);
