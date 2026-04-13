@@ -75,7 +75,6 @@ const MapboxMap = memo(function MapboxMap() {
   const gpsHeading = useRef<{ heading: number; speed: number } | null>(null);
   const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
-  const recordingActiveRef = useRef(false);
 
   // Track markers for attractions and bike resources
   const attractionMarkers = useRef<MarkerManager>(new MarkerManager());
@@ -1280,7 +1279,6 @@ const MapboxMap = memo(function MapboxMap() {
   // Also toggle CSS class on map container for Mapbox control positioning
   useEffect(() => {
     const handleStart = () => {
-      recordingActiveRef.current = true;
       setRecordingActive(true);
       setLocationWatch(true);
       mapContainer.current?.classList.add('recording-active');
@@ -1293,7 +1291,6 @@ const MapboxMap = memo(function MapboxMap() {
       lastDetectTimeRef.current = 0;
     };
     const handleStop = () => {
-      recordingActiveRef.current = false;
       setRecordingActive(false);
       setLocationWatch(false);
       mapContainer.current?.classList.remove('recording-active');
