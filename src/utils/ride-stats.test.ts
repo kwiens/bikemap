@@ -253,13 +253,22 @@ describe('computeMaxSpeed', () => {
     expect(computeMaxSpeed(points)).toBe(8);
   });
 
-  it('filters out implausible speeds (>= 30 m/s)', () => {
+  it('filters out implausible speeds (>= 40 m/s)', () => {
     const points = [
       makePoint({ speed: 5 }),
       makePoint({ speed: 50 }), // GPS glitch
       makePoint({ speed: 10 }),
     ];
     expect(computeMaxSpeed(points)).toBe(10);
+  });
+
+  it('allows high but plausible speeds (< 40 m/s)', () => {
+    const points = [
+      makePoint({ speed: 5 }),
+      makePoint({ speed: 35 }), // fast downhill, ~78 mph
+      makePoint({ speed: 10 }),
+    ];
+    expect(computeMaxSpeed(points)).toBe(35);
   });
 
   it('ignores null speeds', () => {

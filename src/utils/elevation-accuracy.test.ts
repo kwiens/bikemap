@@ -112,6 +112,122 @@ describe('elevation accuracy vs Strava (real GPS data)', () => {
     expect(gain).toBe(0);
   });
 
+  it('consecutive spikes (tunnel entry/exit) are suppressed', () => {
+    // Simulate GPS losing satellite lock in a tunnel: 5 consecutive spike readings
+    const pts: RidePoint[] = Array.from({ length: 100 }, (_, i) => {
+      const inTunnel = i >= 40 && i < 45;
+      return {
+        lat: 35.05 + i * 0.0003,
+        lng: -85.3 + i * 0.0003,
+        altitude: inTunnel ? 200 + (i - 40) * 30 : 200, // spikes to 320m
+        accuracy: 5,
+        speed: 5,
+        timestamp: 1700000000000 + i * 1000,
+      };
+    });
+    const { gain } = computeElevation(pts);
+    expect(gain).toBeLessThan(10);
+  });
+
+  it('spike at ride start does not corrupt anchor', () => {
+    // First reading is a GPS spike before the EMA has established
+    const pts: RidePoint[] = [
+      {
+        lat: 35.05,
+        lng: -85.3,
+        altitude: 250,
+        accuracy: 5,
+        speed: 3,
+        timestamp: 1700000000000,
+      },
+      ...Array.from({ length: 99 }, (_, i) => ({
+        lat: 35.05 + (i + 1) * 0.0003,
+        lng: -85.3 + (i + 1) * 0.0003,
+        altitude: 200 as number | null,
+        accuracy: 5,
+        speed: 3,
+        timestamp: 1700000000000 + (i + 1) * 1000,
+      })),
+    ];
+    const { gain } = computeElevation(pts);
+    // The 50m initial spike shouldn't cause 50m of "loss"
+    expect(gain).toBeLessThan(10);
+  });
+
+  it('null altitude gaps mid-ride do not reset elevation tracking', () => {
+    // Climb, then gap, then more climb — total should accumulate
+    const pts: RidePoint[] = Array.from({ length: 200 }, (_, i) => ({
+      lat: 35.05 + i * 0.0003,
+      lng: -85.3 + i * 0.0003,
+      altitude: i >= 80 && i < 100 ? null : 200 + i * 2,
+      accuracy: 5,
+      speed: 5,
+      timestamp: 1700000000000 + i * 1000,
+    }));
+    const { gain } = computeElevation(pts);
+    // Should still capture most of the 400m climb despite the gap
+    expect(gain).toBeGreaterThan(100);
+  });
+
+  it('stopped then moving: jitter while stopped is not counted', () => {
+    // 30 points stopped with noisy altitude, then 100 points climbing
+    const stopped: RidePoint[] = Array.from({ length: 30 }, (_, i) => ({
+      lat: 35.05,
+      lng: -85.3,
+      altitude: 200 + (i % 2 === 0 ? 4 : -4),
+      accuracy: 5,
+      speed: 0,
+      timestamp: 1700000000000 + i * 1000,
+    }));
+    const moving: RidePoint[] = Array.from({ length: 150 }, (_, i) => ({
+      lat: 35.05 + (i + 1) * 0.0003,
+      lng: -85.3 + (i + 1) * 0.0003,
+      altitude: 200 + i * 2,
+      accuracy: 5,
+      speed: 5,
+      timestamp: 1700000000000 + (30 + i) * 1000,
+    }));
+    const pts = [...stopped, ...moving];
+    const { gain } = computeElevation(pts);
+    // Should count the climb but not the stopped jitter
+    expect(gain).toBeGreaterThan(50);
+    // Gain should be close to the moving portion only (~300m climb)
+    // not inflated by stopped jitter
+    expect(gain).toBeLessThan(350);
+  });
+
+  it('gradual climb with superimposed noise is not over-counted', () => {
+    // Realistic scenario: 2m/point climb with ±1.5m GPS noise
+    const pts: RidePoint[] = Array.from({ length: 200 }, (_, i) => ({
+      lat: 35.05 + i * 0.0003,
+      lng: -85.3 + i * 0.0003,
+      altitude: 200 + i * 2 + Math.sin(i * 0.7) * 1.5,
+      accuracy: 5,
+      speed: 5,
+      timestamp: 1700000000000 + i * 1000,
+    }));
+    const { gain } = computeElevation(pts);
+    const trueGain = 199 * 2; // 398m
+    // Should be within 50% of the true gain
+    expect(gain).toBeGreaterThan(trueGain * 0.5);
+    expect(gain).toBeLessThan(trueGain * 1.5);
+  });
+
+  it('flat ride with large noise does not accumulate phantom gain', () => {
+    // Flat ride with ±3m noise — common in urban canyons
+    const pts: RidePoint[] = Array.from({ length: 200 }, (_, i) => ({
+      lat: 35.05 + i * 0.0003,
+      lng: -85.3 + i * 0.0003,
+      altitude: 200 + Math.sin(i * 0.5) * 3,
+      accuracy: 5,
+      speed: 5,
+      timestamp: 1700000000000 + i * 1000,
+    }));
+    const { gain } = computeElevation(pts);
+    // Real elevation is flat — gain should be minimal
+    expect(gain).toBeLessThan(20);
+  });
+
   it('live recording does not exceed 2x the post-ride result', () => {
     for (const pts of [ride1Bc, ride2Bc, ride3Bc] as GpxPoint[][]) {
       const postRide = computeElevation(toRidePoints(pts)).gain;
