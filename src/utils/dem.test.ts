@@ -28,8 +28,6 @@ function encodeElevation(elev: number): [number, number, number] {
 /**
  * Create a mock tile where elevation varies by pixel column.
  * Column 0 = baseElev, column 1 = baseElev + step, etc.
- * This lets us test that different DEM pixels produce different elevations
- * and that deduplication collapses same-pixel points.
  */
 function createGradientTile(baseElev: number, step: number): ImageData {
   const data = new Uint8ClampedArray(256 * 256 * 4);
@@ -49,7 +47,6 @@ function createGradientTile(baseElev: number, step: number): ImageData {
 
 // Mock the browser APIs with a gradient tile
 beforeAll(() => {
-  // 500m base, +2m per pixel column
   const mockTile = createGradientTile(500, 2);
 
   vi.stubGlobal(
@@ -90,16 +87,28 @@ describe('DEM elevation', () => {
       { lat: 35.05, lng: -85.3, altitude: 999 },
       { lat: 35.06, lng: -85.31, altitude: null },
     ];
-    const corrected = await correctElevations(points);
+    const { corrected } = await correctElevations(points);
     expect(corrected[0].altitude).toBeGreaterThanOrEqual(500);
     expect(corrected[1].altitude).toBeGreaterThanOrEqual(500);
     // Original unchanged
     expect(points[0].altitude).toBe(999);
   });
 
+  it('corrected array preserves all points', async () => {
+    const points = Array.from({ length: 10 }, (_, i) => ({
+      lat: 35.05 + i * 0.0000001, // same pixel
+      lng: -85.3,
+      altitude: 200 + i,
+    }));
+    const { corrected, deduplicated } = await correctElevations(points);
+    // corrected keeps every point; deduplicated collapses them
+    expect(corrected.length).toBe(10);
+    expect(deduplicated.length).toBe(1);
+  });
+
   it('correctElevations does not modify original array', async () => {
     const original = [{ lat: 35.05, lng: -85.3, altitude: 200 }];
-    const corrected = await correctElevations(original);
+    const { corrected } = await correctElevations(original);
     expect(original[0].altitude).toBe(200);
     expect(corrected[0].altitude).toBeGreaterThanOrEqual(500);
   });
@@ -115,50 +124,44 @@ describe('DEM elevation', () => {
 
 describe('DEM pixel deduplication', () => {
   it('collapses consecutive points on the same DEM pixel', async () => {
-    // 10 points at nearly identical coordinates — all map to the same pixel
     const points = Array.from({ length: 10 }, (_, i) => ({
-      lat: 35.05 + i * 0.0000001, // ~0.01m apart
+      lat: 35.05 + i * 0.0000001,
       lng: -85.3,
       altitude: 200 + i,
     }));
-    const corrected = await correctElevations(points);
-    // Should collapse to 1 point since all land on the same DEM pixel
-    expect(corrected.length).toBe(1);
+    const { deduplicated } = await correctElevations(points);
+    expect(deduplicated.length).toBe(1);
   });
 
   it('keeps points that land on different DEM pixels', async () => {
-    // Points spread far enough apart to hit different pixels
-    // At z13, each pixel covers ~16m. 0.001° ≈ 111m = ~7 pixels apart.
     const points = [
       { lat: 35.05, lng: -85.3, altitude: 200 },
       { lat: 35.051, lng: -85.3, altitude: 200 },
       { lat: 35.052, lng: -85.3, altitude: 200 },
     ];
-    const corrected = await correctElevations(points);
-    expect(corrected.length).toBe(3);
+    const { deduplicated } = await correctElevations(points);
+    expect(deduplicated.length).toBe(3);
   });
 
   it('deduplicates oscillating points between two pixels', async () => {
-    // Simulate GPS wander: points alternate between two nearby positions
-    // that map to different pixels, then come back — the classic staircase
-    const a = { lat: 35.05, lng: -85.3 }; // pixel A
-    const b = { lat: 35.0502, lng: -85.3 }; // pixel B (~22m away)
+    const a = { lat: 35.05, lng: -85.3 };
+    const b = { lat: 35.0502, lng: -85.3 };
     const points = [
       { ...a, altitude: 200 },
-      { ...a, altitude: 201 }, // same pixel as prev -> dedup
-      { ...b, altitude: 202 }, // new pixel -> keep
-      { ...b, altitude: 203 }, // same pixel as prev -> dedup
-      { ...a, altitude: 204 }, // back to pixel A -> keep
-      { ...a, altitude: 205 }, // same pixel -> dedup
-      { ...b, altitude: 206 }, // back to pixel B -> keep
+      { ...a, altitude: 201 },
+      { ...b, altitude: 202 },
+      { ...b, altitude: 203 },
+      { ...a, altitude: 204 },
+      { ...a, altitude: 205 },
+      { ...b, altitude: 206 },
     ];
-    const corrected = await correctElevations(points);
-    // Should keep: A, B, A, B = 4 points (one per pixel transition)
-    expect(corrected.length).toBe(4);
+    const { corrected, deduplicated } = await correctElevations(points);
+    // corrected keeps all 7; deduplicated keeps A, B, A, B = 4
+    expect(corrected.length).toBe(7);
+    expect(deduplicated.length).toBe(4);
   });
 
   it('never deduplicates GPS-only points (outside tile area)', async () => {
-    // Mock fetch to fail for specific coordinates
     const origFetch = globalThis.fetch;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 
@@ -167,60 +170,52 @@ describe('DEM pixel deduplication', () => {
       { lat: 0.0, lng: 0.0, altitude: 101 },
       { lat: 0.0, lng: 0.0, altitude: 102 },
     ];
-    const corrected = await correctElevations(points);
-    // All points should be preserved — no dedup for GPS-only fallback
+    const { corrected, deduplicated } = await correctElevations(points);
+    // Both arrays preserve all points — no dedup for GPS-only fallback
     expect(corrected.length).toBe(3);
+    expect(deduplicated.length).toBe(3);
     expect(corrected[0].altitude).toBe(100);
-    expect(corrected[1].altitude).toBe(101);
-    expect(corrected[2].altitude).toBe(102);
 
-    // Restore fetch
     vi.stubGlobal('fetch', origFetch);
   });
 
   it('reduces point count significantly for stationary GPS wander', async () => {
-    // 100 points at the same spot with minor jitter — simulates stopped at a light
     const points = Array.from({ length: 100 }, (_, i) => ({
-      lat: 35.05 + Math.sin(i) * 0.00001, // ~1m jitter
+      lat: 35.05 + Math.sin(i) * 0.00001,
       lng: -85.3 + Math.cos(i) * 0.00001,
       altitude: 500 + i * 0.1,
     }));
-    const corrected = await correctElevations(points);
-    // Most points should collapse — 100 points within ~2m should be very few unique pixels
-    expect(corrected.length).toBeLessThan(10);
+    const { corrected, deduplicated } = await correctElevations(points);
+    expect(corrected.length).toBe(100); // all preserved
+    expect(deduplicated.length).toBeLessThan(10); // most collapsed
   });
 
   it('preserves all points when track moves steadily across pixels', async () => {
-    // Points moving in a straight line, each hitting a new pixel
-    // 0.0003° ≈ 33m per step, well beyond 16m pixel size
     const points = Array.from({ length: 20 }, (_, i) => ({
       lat: 35.05 + i * 0.0003,
       lng: -85.3,
       altitude: 200,
     }));
-    const corrected = await correctElevations(points);
-    // Most points should survive since each is on a different pixel
-    expect(corrected.length).toBeGreaterThan(15);
+    const { deduplicated } = await correctElevations(points);
+    expect(deduplicated.length).toBeGreaterThan(15);
   });
 
   it('deduplication drops points that carry timestamp/distance data', async () => {
-    // 50 points stopped at one location (same pixel) — simulates a traffic light
     const points = Array.from({ length: 50 }, (_, i) => ({
-      lat: 35.05 + i * 0.0000001, // ~0.01m jitter, same pixel
+      lat: 35.05 + i * 0.0000001,
       lng: -85.3,
       altitude: 200 + i * 0.1,
       timestamp: 1000 + i * 1000,
     }));
 
-    const corrected = await correctElevations(points);
+    const { corrected, deduplicated } = await correctElevations(points);
 
-    // All 50 points collapse to ~1 since they're on the same pixel
-    expect(corrected.length).toBeLessThan(5);
+    // corrected keeps all 50; deduplicated collapses to ~1
+    expect(corrected.length).toBe(50);
+    expect(deduplicated.length).toBeLessThan(5);
 
-    // The original set has 50 points spanning 49 seconds — if you computed
-    // elapsed time from the deduplicated set, you'd lose nearly all of it.
-    // This is why buildRide must use original points for time/distance stats.
-    expect(points.length).toBe(50);
+    // This confirms why buildRide must use corrected for storage
+    // and deduplicated only for elevation stats
     expect(points[49].timestamp - points[0].timestamp).toBe(49000);
   });
 });

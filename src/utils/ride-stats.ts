@@ -125,7 +125,7 @@ export function computeMovingTime(points: AnyRidePoint[]): number {
  * 1. Reject altitude spikes (>ELEVATION_SPIKE_THRESHOLD from running EMA)
  * 2. Apply centered moving average (window = 2 * SMOOTH_HALF + 1 points)
  */
-const ELEVATION_SMOOTH_HALF = 5; // 11-point centered window
+export const ELEVATION_SMOOTH_HALF = 5; // 11-point centered window
 
 function smoothAltitudes(points: { altitude: number | null }[]): number[] {
   const alts = points.map((p) => p.altitude);

@@ -347,23 +347,28 @@ export function useRideRecording(
 
   /**
    * Build a RecordedRide from GPS points.
-   * @param points     Full GPS points (used for time, distance, speed, bounds, and stored track)
-   * @param demPoints  Optional DEM-corrected points (used only for elevation stats).
-   *                   May be a subset due to pixel deduplication — must not be used
-   *                   for time/distance/bounds calculations.
+   * @param points        Full GPS points (used for time, distance, speed, and bounds)
+   * @param demCorrected  Optional: all points with DEM altitude (stored in the ride)
+   * @param demDeduped    Optional: pixel-deduplicated subset (used for elevation stats only)
    */
   function buildRide(
     points: RidePoint[],
     startTime: number,
     endTime: number,
-    demPoints?: { lat: number; lng: number; altitude: number | null }[],
+    demCorrected?: {
+      lat: number;
+      lng: number;
+      altitude: number | null;
+      timestamp: number;
+    }[],
+    demDeduped?: { lat: number; lng: number; altitude: number | null }[],
   ): RecordedRide {
     const stats = computeRideStats(points);
 
-    // If DEM-corrected points are available, override elevation stats only
-    if (demPoints && demPoints.length >= 2) {
+    // Override elevation stats from deduplicated DEM points
+    if (demDeduped && demDeduped.length >= 2) {
       const elev = computeElevation(
-        demPoints.map((p, i) => ({
+        demDeduped.map((p, i) => ({
           ...p,
           accuracy: 5,
           speed: 3,
@@ -377,7 +382,10 @@ export function useRideRecording(
     }
 
     const bounds = computeBounds(points) ?? [0, 0, 0, 0];
-    const storedPoints: StoredRidePoint[] = points.map(
+    // Store DEM-corrected altitudes when available so saved rides
+    // and elevation profiles use terrain elevation, not noisy GPS.
+    const source = demCorrected ?? points;
+    const storedPoints: StoredRidePoint[] = source.map(
       ({ lng, lat, altitude, timestamp }) => ({
         lng,
         lat,
@@ -405,17 +413,25 @@ export function useRideRecording(
     }
 
     const points = [...pointsRef.current];
-    // Apply DEM correction for elevation stats only — the full point set
-    // is still used for time, distance, speed, and bounds so that pixel
-    // deduplication doesn't drop timestamps or shorten the track.
-    let demPoints: typeof points | undefined;
+    // DEM correction returns two sets: corrected (full, for storage) and
+    // deduplicated (for elevation stats). GPS points drive time/distance.
+    let demCorrected: typeof points | undefined;
+    let demDeduped: typeof points | undefined;
     try {
       const { correctElevations } = await import('../utils/dem');
-      demPoints = await correctElevations(points);
+      const dem = await correctElevations(points);
+      demCorrected = dem.corrected;
+      demDeduped = dem.deduplicated;
     } catch {
       // Fall back to GPS altitude if DEM unavailable
     }
-    const ride = buildRide(points, startTimeRef.current, Date.now(), demPoints);
+    const ride = buildRide(
+      points,
+      startTimeRef.current,
+      Date.now(),
+      demCorrected,
+      demDeduped,
+    );
 
     await saveRide(ride);
     cleanup();
@@ -446,10 +462,13 @@ export function useRideRecording(
     }
 
     const points = data.points;
-    let demPoints: typeof points | undefined;
+    let demCorrected: typeof points | undefined;
+    let demDeduped: typeof points | undefined;
     try {
       const { correctElevations } = await import('../utils/dem');
-      demPoints = await correctElevations(points);
+      const dem = await correctElevations(points);
+      demCorrected = dem.corrected;
+      demDeduped = dem.deduplicated;
     } catch {
       // Fall back to GPS altitude
     }
@@ -457,7 +476,8 @@ export function useRideRecording(
       points,
       data.startTime,
       points[points.length - 1].timestamp,
-      demPoints,
+      demCorrected,
+      demDeduped,
     );
 
     await saveRide(ride);
