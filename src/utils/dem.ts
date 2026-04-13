@@ -84,12 +84,6 @@ export async function getElevation(
   );
 }
 
-/** Unique key for a DEM pixel — two points mapping to the same pixel get the same elevation */
-function pixelKey(lat: number, lng: number): string {
-  const { tileX, tileY, pixelX, pixelY } = latLngToTilePixel(lat, lng);
-  return `${tileX}/${tileY}/${pixelX}/${pixelY}`;
-}
-
 /**
  * Correct altitude for an array of ride points using DEM elevation.
  * Returns a new array with corrected altitudes (original points are not modified).
@@ -136,7 +130,7 @@ export async function correctElevations<
         tile.data[idx + 2],
       );
       corrected = { ...p, altitude: demAlt };
-      key = pixelKey(p.lat, p.lng);
+      key = `${tileX}/${tileY}/${pixelX}/${pixelY}`;
     } else {
       corrected = p;
       key = `gps/${result.length}`; // unique key — never dedup GPS-only points

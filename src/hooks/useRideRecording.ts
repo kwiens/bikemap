@@ -9,13 +9,6 @@ type NotifyCallback = (message: string) => void;
 
 // If no GPS point arrives for this long, the app was likely backgrounded
 const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
-import {
-  ELEVATION_EMA_ALPHA as ALT_EMA_ALPHA,
-  ELEVATION_DEAD_BAND as ALT_DEADBAND_M,
-  ELEVATION_SPIKE_THRESHOLD as ALT_SPIKE_M,
-  ELEVATION_MIN_DISTANCE as ALT_MIN_DIST_M,
-  ELEVATION_MAX_ALT_ACCURACY as ALT_MAX_ACCURACY,
-} from '../utils/ride-stats';
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
@@ -24,6 +17,11 @@ import {
   computeRideStats,
   haversineDistance,
   MAX_ACCURACY_M,
+  ELEVATION_EMA_ALPHA as ALT_EMA_ALPHA,
+  ELEVATION_DEAD_BAND as ALT_DEADBAND_M,
+  ELEVATION_SPIKE_THRESHOLD as ALT_SPIKE_M,
+  ELEVATION_MIN_DISTANCE as ALT_MIN_DIST_M,
+  ELEVATION_MAX_ALT_ACCURACY as ALT_MAX_ACCURACY,
 } from '../utils/ride-stats';
 import {
   saveRide,
@@ -199,28 +197,23 @@ export function useRideRecording(
           }),
         );
 
-        if (
-          prev &&
-          point.accuracy < MAX_ACCURACY_M &&
-          prev.accuracy < MAX_ACCURACY_M
-        ) {
-          distanceRef.current += haversineDistance(
-            prev.lat,
-            prev.lng,
-            point.lat,
-            point.lng,
-          );
-          setLiveDistance(distanceRef.current);
-        }
-
-        // Accumulate horizontal distance for min-distance check
+        // Compute horizontal distance once and reuse for both
+        // distance tracking and elevation min-distance filter
         if (prev) {
-          distSinceAnchorRef.current += haversineDistance(
+          const segDist = haversineDistance(
             prev.lat,
             prev.lng,
             point.lat,
             point.lng,
           );
+          distSinceAnchorRef.current += segDist;
+          if (
+            point.accuracy < MAX_ACCURACY_M &&
+            prev.accuracy < MAX_ACCURACY_M
+          ) {
+            distanceRef.current += segDist;
+            setLiveDistance(distanceRef.current);
+          }
         }
 
         // Filter 1: skip readings with poor altitude accuracy
