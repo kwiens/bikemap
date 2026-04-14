@@ -968,6 +968,22 @@ const MapboxMap = memo(function MapboxMap() {
             window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
           });
 
+          // Tapping the Mapbox north-arrow compass button should exit
+          // compass (heading-up) mode so the bearing stays north.
+          const compassBtn = newMap
+            .getContainer()
+            .querySelector('.mapboxgl-ctrl-compass');
+          if (compassBtn) {
+            compassBtn.addEventListener('click', () => {
+              if (compassCleanup.current) {
+                compassCleanup.current();
+                compassCleanup.current = null;
+              }
+              compassHeading.current = null;
+              setCompassMode(false);
+            });
+          }
+
           // Force a resize to ensure proper display
           setTimeout(() => {
             if (map.current) {
@@ -1325,7 +1341,7 @@ const MapboxMap = memo(function MapboxMap() {
           role="button"
           tabIndex={0}
           className={cn(
-            'absolute bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[501] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
+            'fixed bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[501] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
             watchingLocation &&
               !compassMode &&
               'bg-[rgb(165,240,255)] active:bg-[rgb(145,220,235)]',
