@@ -113,8 +113,16 @@ export function RidesPanel() {
 
   useEffect(() => {
     const handleSelect = (e: Event) => {
-      const { rideId } = (e as CustomEvent).detail;
+      const { rideId, openPanel } = (e as CustomEvent).detail;
       setSelectedRideId(rideId);
+      if (openPanel && !isOpenRef.current) {
+        setIsOpen(true);
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, {
+            detail: { isOpen: true },
+          }),
+        );
+      }
     };
     const handleDeselect = () => setSelectedRideId(null);
 

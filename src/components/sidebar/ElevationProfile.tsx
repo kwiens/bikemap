@@ -181,6 +181,7 @@ export function ElevationProfile() {
   const svgRef = useRef<SVGSVGElement>(null);
   // Track whether current profile is from a route, trail, or ride selection
   const sourceRef = useRef<'trail' | 'route' | 'ride' | null>(null);
+  const rideIdRef = useRef<string | null>(null);
   // Keep profile in a ref so location handler always sees latest
   const profileRef = useRef<ElevationProfileData | null>(null);
 
@@ -190,6 +191,7 @@ export function ElevationProfile() {
     const handleTrailSelect = (e: Event) => {
       const { trailName: name } = (e as CustomEvent).detail;
       sourceRef.current = 'trail';
+      rideIdRef.current = null;
       setTrailName(name);
       window.history.replaceState(null, '', `?trail=${slugify(name)}`);
     };
@@ -230,6 +232,7 @@ export function ElevationProfile() {
       if (!ride || latestRideId !== rideId) return; // stale check
       const elevProfile = rideToElevationProfile(ride);
       sourceRef.current = 'ride';
+      rideIdRef.current = rideId;
       if (elevProfile) {
         setTrailName(ride.name);
         profileCache.set(ride.name, elevProfile);
@@ -497,9 +500,25 @@ export function ElevationProfile() {
       )}
     >
       <div className="flex items-center gap-3 mb-1">
-        <span className="text-[13px] font-semibold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">
-          {trailName}
-        </span>
+        {sourceRef.current === 'ride' && rideIdRef.current ? (
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
+                  detail: { rideId: rideIdRef.current, openPanel: true },
+                }),
+              );
+            }}
+            className="text-[13px] font-semibold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis bg-transparent border-none cursor-pointer p-0 hover:text-blue-700 hover:underline"
+          >
+            {trailName}
+          </button>
+        ) : (
+          <span className="text-[13px] font-semibold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">
+            {trailName}
+          </span>
+        )}
         <div className="flex gap-3 text-[11px] text-gray-500 ml-auto shrink-0">
           <span>{(maxDist / 5280).toFixed(1)} mi</span>
           <span>+{Math.round(profile.gain).toLocaleString()} ft climbing</span>
