@@ -11,6 +11,7 @@ export interface BikeRoute {
   icon: IconDefinition; // Route icon
   defaultWidth: number; // Default line width
   opacity: number; // Line opacity (0-1)
+  distance: number; // Route distance in miles
   defaultBounds?: [number, number, number, number]; // [swLng, swLat, neLng, neLat] fallback
   bounds?: mapboxgl.LngLatBounds; // Runtime-calculated bounds
 }
@@ -24,6 +25,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    distance: 7.7,
     defaultBounds: [-85.326925, 35.028003, -85.301479, 35.061734],
   },
   {
@@ -35,6 +37,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    distance: 5.4,
     defaultBounds: [-85.307614, 35.037548, -85.281097, 35.061733],
   },
   {
@@ -46,6 +49,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    distance: 14.1,
     defaultBounds: [-85.328424, 35.009749, -85.230088, 35.102443],
   },
   {
@@ -56,6 +60,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    distance: 9.9,
     defaultBounds: [-85.260157, 35.042472, -85.212365, 35.089989],
   },
   {
@@ -66,6 +71,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    distance: 6.5,
     defaultBounds: [-85.320807, 35.060177, -85.300536, 35.089277],
   },
   {
@@ -76,6 +82,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    distance: 2.3,
     defaultBounds: [-85.333107, 35.052837, -85.305119, 35.062845],
   },
 ];

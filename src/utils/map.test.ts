@@ -154,6 +154,7 @@ describe('Mapbox Geo Integration', () => {
           icon: {} as IconDefinition,
           defaultWidth: 8,
           opacity: 1.0,
+          distance: 5.0,
         },
         {
           id: 'route2',
@@ -163,6 +164,7 @@ describe('Mapbox Geo Integration', () => {
           icon: {} as IconDefinition,
           defaultWidth: 8,
           opacity: 1.0,
+          distance: 5.0,
         },
         {
           id: 'route3',
@@ -172,6 +174,7 @@ describe('Mapbox Geo Integration', () => {
           icon: {} as IconDefinition,
           defaultWidth: 8,
           opacity: 1.0,
+          distance: 5.0,
         },
       ];
 
@@ -213,6 +216,7 @@ describe('Mapbox Geo Integration', () => {
           icon: {} as IconDefinition,
           defaultWidth: 8,
           opacity: 1.0,
+          distance: 5.0,
         },
         {
           id: 'route2',
@@ -222,6 +226,7 @@ describe('Mapbox Geo Integration', () => {
           icon: {} as IconDefinition,
           defaultWidth: 8,
           opacity: 1.0,
+          distance: 5.0,
         },
       ];
 
@@ -258,6 +263,7 @@ describe('Mapbox Geo Integration', () => {
           icon: {} as IconDefinition,
           defaultWidth: 8,
           opacity: 1.0,
+          distance: 5.0,
         },
       ];
 

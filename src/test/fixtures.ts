@@ -33,6 +33,7 @@ export function mockBikeRoute(overrides: Partial<BikeRoute> = {}): BikeRoute {
     icon: STUB_ICON,
     defaultWidth: 8,
     opacity: 1.0,
+    distance: 5.0,
     ...overrides,
   };
 }
