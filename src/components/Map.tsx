@@ -91,6 +91,7 @@ const MapboxMap = memo(function MapboxMap() {
   const detectCandidateRef = useRef<string | null>(null);
   const detectConfirmCountRef = useRef(0);
   const isRecordingRef = useRef(false);
+  const pauseRecenterUntil = useRef<number>(0);
 
   // Use custom hooks
   const {
@@ -124,6 +125,7 @@ const MapboxMap = memo(function MapboxMap() {
     // Fly to ride bounds
     const [swLng, swLat, neLng, neLat] = ride.bounds;
     const bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+    pauseRecenterUntil.current = Date.now() + 5000;
     flyToBounds(map.current, bounds);
   }, []);
 
@@ -301,34 +303,6 @@ const MapboxMap = memo(function MapboxMap() {
     watchId.current = id;
   }
 
-  function initializeGestureWatch() {
-    if (!map.current) {
-      return;
-    }
-
-    // When user intentionally moves the map, pause auto-center.
-    // During recording this only pauses centering (keeps wake lock & recording);
-    // user can tap the location button to resume.
-    // Using dragstart/dblclick/wheel instead of click so route-layer taps aren't swallowed.
-    const disableTracking = () => {
-      setWatchingLocation(false);
-      setCompassMode(false);
-      if (compassCleanup.current) {
-        compassCleanup.current();
-        compassCleanup.current = null;
-      }
-      compassHeading.current = null;
-      if (locationWatch.current) {
-        clearInterval(locationWatch.current);
-        locationWatch.current = undefined;
-      }
-    };
-
-    map.current.on('dragstart', disableTracking);
-    map.current.on('dblclick', disableTracking);
-    map.current.on('wheel', disableTracking);
-  }
-
   // Handle route selection events - outside the map initialization
   const handleRouteSelect = useCallback(
     (event: CustomEvent) => {
@@ -358,6 +332,7 @@ const MapboxMap = memo(function MapboxMap() {
         selectedRoute?.bounds ?? toLngLatBounds(selectedRoute?.defaultBounds);
 
       if (bounds) {
+        pauseRecenterUntil.current = Date.now() + 5000;
         flyToBounds(map.current, bounds);
       }
     },
@@ -402,6 +377,7 @@ const MapboxMap = memo(function MapboxMap() {
 
       // Skip flyToBounds for auto-detected trails (map already follows user)
       if (!autoDetected && bounds) {
+        pauseRecenterUntil.current = Date.now() + 5000;
         flyToBounds(map.current, bounds);
       }
     },
@@ -439,6 +415,7 @@ const MapboxMap = memo(function MapboxMap() {
       highlightMtnBikeArea(map.current, mountainBikeTrails, areaName);
 
       if (bounds) {
+        pauseRecenterUntil.current = Date.now() + 5000;
         flyToBounds(map.current, bounds);
       }
     },
@@ -569,6 +546,7 @@ const MapboxMap = memo(function MapboxMap() {
 
       if (coordinates) {
         // Fly to the location
+        pauseRecenterUntil.current = Date.now() + 5000;
         map.current.flyTo({
           center: coordinates,
           zoom: 17,
@@ -998,7 +976,6 @@ const MapboxMap = memo(function MapboxMap() {
           }, 100);
 
           initializeLocationMarker();
-          initializeGestureWatch();
 
           // Debug: click map to simulate GPS location
           if (mapConfig.debug.simulateLocation) {
@@ -1129,6 +1106,10 @@ const MapboxMap = memo(function MapboxMap() {
           return;
         }
         if (map.current.isMoving() || map.current.isZooming()) {
+          return;
+        }
+        // Skip re-centering during cooldown after programmatic fly-to
+        if (Date.now() < pauseRecenterUntil.current) {
           return;
         }
 
@@ -1398,7 +1379,7 @@ const MapboxMap = memo(function MapboxMap() {
 export default function BikeMap() {
   return (
     <MapLegendProvider>
-      <div className="w-screen h-dvh relative overflow-visible">
+      <div className="w-screen h-full relative overflow-visible">
         <MapboxMap />
         <RidesPanel />
       </div>
