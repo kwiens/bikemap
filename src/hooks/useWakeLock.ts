@@ -31,6 +31,11 @@ export function useWakeLock(active: boolean) {
           lock.addEventListener('release', () => {
             if (lockRef.current === lock) {
               lockRef.current = null;
+              // OS may silently release the lock (e.g. Android battery
+              // optimization) while the page is still visible — re-acquire.
+              if (!cancelled && document.visibilityState === 'visible') {
+                acquire();
+              }
             }
           });
         })

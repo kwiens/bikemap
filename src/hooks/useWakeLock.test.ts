@@ -83,27 +83,20 @@ describe('useWakeLock', () => {
     expect(currentLock.release).toHaveBeenCalled();
   });
 
-  it('re-acquires wake lock on visibilitychange after OS release', async () => {
+  it('re-acquires wake lock immediately when OS releases it', async () => {
     renderHook(() => useWakeLock(true));
 
     await vi.waitFor(() => {
       expect(requestMock).toHaveBeenCalledTimes(1);
     });
 
-    // Simulate OS releasing the lock (Android backgrounding)
-    currentLock._simulateOSRelease();
-
     // Prepare a fresh lock for re-acquisition
     const freshLock = createMockLock();
     requestMock.mockResolvedValue(freshLock);
 
-    // Simulate page becoming visible again
-    Object.defineProperty(document, 'visibilityState', {
-      value: 'visible',
-      writable: true,
-      configurable: true,
-    });
-    document.dispatchEvent(new Event('visibilitychange'));
+    // Simulate OS releasing the lock (Android battery optimization)
+    // while page is still visible — should re-acquire immediately
+    currentLock._simulateOSRelease();
 
     await vi.waitFor(() => {
       expect(requestMock).toHaveBeenCalledTimes(2);
