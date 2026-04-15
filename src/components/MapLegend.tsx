@@ -33,6 +33,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       return getRideStyle() === 'mountain' ? 'trails' : 'routes';
     },
   );
+  const switchTab = (tab: 'routes' | 'trails') => {
+    setActiveSection(tab);
+    setSetting('activeTab', tab);
+  };
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
@@ -109,8 +113,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     const handler = (e: Event) => {
       const { style } = (e as CustomEvent).detail;
       const tab = style === 'mountain' ? 'trails' : 'routes';
-      setActiveSection(tab);
-      setSetting('activeTab', tab);
+      switchTab(tab);
     };
 
     window.addEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
@@ -332,10 +335,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   ? 'bg-white text-gray-800 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700',
               )}
-              onClick={() => {
-                setActiveSection('routes');
-                setSetting('activeTab', 'routes');
-              }}
+              onClick={() => switchTab('routes')}
             >
               Casual
             </button>
@@ -347,10 +347,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   ? 'bg-white text-gray-800 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700',
               )}
-              onClick={() => {
-                setActiveSection('trails');
-                setSetting('activeTab', 'trails');
-              }}
+              onClick={() => switchTab('trails')}
             >
               MTB
             </button>

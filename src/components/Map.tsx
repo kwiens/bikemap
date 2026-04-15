@@ -56,6 +56,11 @@ import { MAP_EVENTS } from '@/events';
 import { TRAIL_METADATA } from '@/data/trail-metadata';
 import { HeadingSmoother } from '@/utils/compass';
 
+// Recenter pause durations: how long to suppress auto-centering after
+// programmatic fly-to animations vs user gestures (drag, zoom, scroll).
+const PAUSE_FLY_MS = 5000;
+const PAUSE_GESTURE_MS = 10000;
+
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
 
@@ -125,7 +130,7 @@ const MapboxMap = memo(function MapboxMap() {
     // Fly to ride bounds
     const [swLng, swLat, neLng, neLat] = ride.bounds;
     const bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
-    pauseRecenterUntil.current = Date.now() + 5000;
+    pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
     flyToBounds(map.current, bounds);
   }, []);
 
@@ -313,7 +318,7 @@ const MapboxMap = memo(function MapboxMap() {
     if (!map.current) return;
 
     const pauseRecenter = () => {
-      pauseRecenterUntil.current = Date.now() + 10000;
+      pauseRecenterUntil.current = Date.now() + PAUSE_GESTURE_MS;
     };
 
     map.current.on('dragstart', pauseRecenter);
@@ -349,7 +354,7 @@ const MapboxMap = memo(function MapboxMap() {
         selectedRoute?.bounds ?? toLngLatBounds(selectedRoute?.defaultBounds);
 
       if (bounds) {
-        pauseRecenterUntil.current = Date.now() + 5000;
+        pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
         flyToBounds(map.current, bounds);
       }
     },
@@ -394,7 +399,7 @@ const MapboxMap = memo(function MapboxMap() {
 
       // Skip flyToBounds for auto-detected trails (map already follows user)
       if (!autoDetected && bounds) {
-        pauseRecenterUntil.current = Date.now() + 5000;
+        pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
         flyToBounds(map.current, bounds);
       }
     },
@@ -432,7 +437,7 @@ const MapboxMap = memo(function MapboxMap() {
       highlightMtnBikeArea(map.current, mountainBikeTrails, areaName);
 
       if (bounds) {
-        pauseRecenterUntil.current = Date.now() + 5000;
+        pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
         flyToBounds(map.current, bounds);
       }
     },
@@ -562,8 +567,7 @@ const MapboxMap = memo(function MapboxMap() {
       }
 
       if (coordinates) {
-        // Fly to the location
-        pauseRecenterUntil.current = Date.now() + 5000;
+        pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
         map.current.flyTo({
           center: coordinates,
           zoom: 17,

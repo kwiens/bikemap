@@ -30,6 +30,16 @@ import {
   loadInProgress,
 } from '../utils/ride-storage';
 
+async function tryDemCorrection(points: StoredRidePoint[]) {
+  try {
+    const { correctElevations } = await import('../utils/dem');
+    const dem = await correctElevations(points);
+    return { corrected: dem.corrected, deduplicated: dem.deduplicated };
+  } catch {
+    return { corrected: undefined, deduplicated: undefined };
+  }
+}
+
 interface UseRideRecordingReturn {
   isRecording: boolean;
   isPaused: boolean;
@@ -413,24 +423,13 @@ export function useRideRecording(
     }
 
     const points = [...pointsRef.current];
-    // DEM correction returns two sets: corrected (full, for storage) and
-    // deduplicated (for elevation stats). GPS points drive time/distance.
-    let demCorrected: typeof points | undefined;
-    let demDeduped: typeof points | undefined;
-    try {
-      const { correctElevations } = await import('../utils/dem');
-      const dem = await correctElevations(points);
-      demCorrected = dem.corrected;
-      demDeduped = dem.deduplicated;
-    } catch {
-      // Fall back to GPS altitude if DEM unavailable
-    }
+    const { corrected, deduplicated } = await tryDemCorrection(points);
     const ride = buildRide(
       points,
       startTimeRef.current,
       Date.now(),
-      demCorrected,
-      demDeduped,
+      corrected,
+      deduplicated,
     );
 
     await saveRide(ride);
@@ -462,22 +461,13 @@ export function useRideRecording(
     }
 
     const points = data.points;
-    let demCorrected: typeof points | undefined;
-    let demDeduped: typeof points | undefined;
-    try {
-      const { correctElevations } = await import('../utils/dem');
-      const dem = await correctElevations(points);
-      demCorrected = dem.corrected;
-      demDeduped = dem.deduplicated;
-    } catch {
-      // Fall back to GPS altitude
-    }
+    const { corrected, deduplicated } = await tryDemCorrection(points);
     const ride = buildRide(
       points,
       data.startTime,
       points[points.length - 1].timestamp,
-      demCorrected,
-      demDeduped,
+      corrected,
+      deduplicated,
     );
 
     await saveRide(ride);
