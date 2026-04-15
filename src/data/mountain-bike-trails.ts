@@ -300,20 +300,6 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
     defaultBounds: [-85.313473, 35.056418, -85.306606, 35.062741],
     icon: faRoute,
   },
-  {
-    trailName: 'South Chick Greenway',
-    displayName: 'South Chick Greenway',
-    recArea: 'Chattanooga Greenways',
-    rating: '',
-    color: trailColor('', true),
-    distance: 8.1,
-    elevationGain: 833,
-    elevationLoss: 797,
-    elevationMin: 638,
-    elevationMax: 773,
-    defaultBounds: [-85.260086, 35.042506, -85.212364, 35.089996],
-    icon: faRoute,
-  },
   // Chickamauga Battlefield National Military Park
   {
     trailName: 'BLUE Trail',
@@ -2322,21 +2308,6 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
     elevationMax: 993,
     defaultBounds: [-85.335102, 35.011299, -85.328236, 35.015798],
     icon: faMountain,
-  },
-  // South Chickamauga Creek Greenway
-  {
-    trailName: 'South Chickamauga Creek Greenway',
-    displayName: 'South Chickamauga Creek Greenway',
-    recArea: 'Chattanooga Greenways',
-    rating: '',
-    color: trailColor('', true),
-    distance: 0.7,
-    elevationGain: 69,
-    elevationLoss: 44,
-    elevationMin: 682,
-    elevationMax: 718,
-    defaultBounds: [-85.215797, 35.051078, -85.212879, 35.059369],
-    icon: faRoute,
   },
   // St. Elmo community
   {
