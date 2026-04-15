@@ -145,10 +145,15 @@ function smoothAltitudes(points: { altitude: number | null }[]): number[] {
   // Spike rejection: replace readings that jump >threshold from running EMA.
   // Uses a faster EMA (alpha=0.3) than the main smoothing so it tracks
   // sustained climbs/descents without false-triggering on slopes.
+  // Seed the EMA from the median of the first few readings so a single
+  // bad startup value doesn't poison the entire series.
   const SPIKE_EMA_ALPHA = 0.3;
-  const vals: number[] = [rawVals[0]];
-  let spikeEma = rawVals[0];
-  for (let i = 1; i < rawVals.length; i++) {
+  const SEED_COUNT = Math.min(5, rawVals.length);
+  const seedSlice = rawVals.slice(0, SEED_COUNT).sort((a, b) => a - b);
+  const seedMedian = seedSlice[Math.floor(seedSlice.length / 2)];
+  let spikeEma = seedMedian;
+  const vals: number[] = [];
+  for (let i = 0; i < rawVals.length; i++) {
     if (Math.abs(rawVals[i] - spikeEma) > ELEVATION_SPIKE_THRESHOLD) {
       vals.push(spikeEma); // replace spike with current EMA
     } else {

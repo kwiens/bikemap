@@ -303,6 +303,19 @@ const MapboxMap = memo(function MapboxMap() {
     watchId.current = id;
   }
 
+  // Pause auto-centering (but keep tracking/compass mode active) when the
+  // user interacts with the map via drag, pinch-zoom, or scroll-wheel.
+  function initializeGestureWatch() {
+    if (!map.current) return;
+
+    const pauseRecenter = () => {
+      pauseRecenterUntil.current = Date.now() + 10000;
+    };
+
+    map.current.on('dragstart', pauseRecenter);
+    map.current.on('wheel', pauseRecenter);
+  }
+
   // Handle route selection events - outside the map initialization
   const handleRouteSelect = useCallback(
     (event: CustomEvent) => {
@@ -999,6 +1012,7 @@ const MapboxMap = memo(function MapboxMap() {
           }, 100);
 
           initializeLocationMarker();
+          initializeGestureWatch();
 
           // Debug: click map to simulate GPS location
           if (mapConfig.debug.simulateLocation) {
