@@ -2337,20 +2337,6 @@ export const mountainBikeTrails: MountainBikeTrail[] = [
     defaultBounds: [-85.335102, 35.011299, -85.328236, 35.015798],
     icon: faMountain,
   },
-  {
-    trailName: 'Tennessee Riverwalk',
-    displayName: 'Tennessee Riverwalk',
-    recArea: 'Lookout Mountain',
-    rating: 'easy',
-    color: trailColor('easy', true),
-    distance: 0.3,
-    elevationGain: 15,
-    elevationLoss: 11,
-    elevationMin: 668,
-    elevationMax: 682,
-    defaultBounds: [-85.328064, 35.00919, -85.327377, 35.013267],
-    icon: faRoute,
-  },
   // South Chickamauga Creek Greenway
   {
     trailName: 'South Chickamauga Creek Greenway',
