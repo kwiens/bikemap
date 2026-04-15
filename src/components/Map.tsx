@@ -492,7 +492,7 @@ const MapboxMap = memo(function MapboxMap() {
       setShowBikeResources(visible);
 
       if (visible) {
-        bikeResourceMarkers.current.hide();
+        attractionMarkers.current.hide();
 
         if (bikeResourceMarkers.current.length === 0) {
           const markers = bikeResources.map((resource) =>
