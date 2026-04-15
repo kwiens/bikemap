@@ -919,6 +919,13 @@ const MapboxMap = memo(function MapboxMap() {
           // Fill in default bounds for any routes that couldn't be calculated at runtime
           initRouteBoundsFromDefaults(bikeRoutes);
 
+          // Ensure all route layers are visible (some may be hidden in Mapbox Studio)
+          for (const route of bikeRoutes) {
+            if (newMap.getLayer(route.id)) {
+              newMap.setLayoutProperty(route.id, 'visibility', 'visible');
+            }
+          }
+
           // Initialize all mountain bike trail layers
           initMtnBikeColors(newMap);
           initMtnBikeLayers(newMap);
