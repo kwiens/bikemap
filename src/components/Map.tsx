@@ -204,6 +204,10 @@ const MapboxMap = memo(function MapboxMap() {
       }
     };
     const stopHandler = () => {
+      // Flush any unrendered points so the full route is briefly visible
+      if (map.current && liveCoords.length >= 2) {
+        updateRideLayer(map.current, liveCoords);
+      }
       liveCoords.length = 0;
       if (map.current) removeRideLayer(map.current);
     };

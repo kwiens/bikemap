@@ -14,6 +14,7 @@ export function useWakeLock(active: boolean) {
     if (!active || !navigator.wakeLock) return;
 
     let cancelled = false;
+    let reacquireTimer: ReturnType<typeof setTimeout> | null = null;
 
     function acquire() {
       if (cancelled) return;
@@ -32,9 +33,10 @@ export function useWakeLock(active: boolean) {
             if (lockRef.current === lock) {
               lockRef.current = null;
               // OS may silently release the lock (e.g. Android battery
-              // optimization) while the page is still visible — re-acquire.
+              // optimization) while the page is still visible — re-acquire
+              // after a short delay to avoid rapid retry loops.
               if (!cancelled && document.visibilityState === 'visible') {
-                acquire();
+                reacquireTimer = setTimeout(acquire, 1000);
               }
             }
           });
@@ -53,6 +55,7 @@ export function useWakeLock(active: boolean) {
 
     return () => {
       cancelled = true;
+      if (reacquireTimer) clearTimeout(reacquireTimer);
       document.removeEventListener('visibilitychange', handleVisibility);
       if (lockRef.current) {
         lockRef.current.release();

@@ -83,7 +83,8 @@ describe('useWakeLock', () => {
     expect(currentLock.release).toHaveBeenCalled();
   });
 
-  it('re-acquires wake lock immediately when OS releases it', async () => {
+  it('re-acquires wake lock after delay when OS releases it', async () => {
+    vi.useFakeTimers();
     renderHook(() => useWakeLock(true));
 
     await vi.waitFor(() => {
@@ -95,12 +96,20 @@ describe('useWakeLock', () => {
     requestMock.mockResolvedValue(freshLock);
 
     // Simulate OS releasing the lock (Android battery optimization)
-    // while page is still visible — should re-acquire immediately
+    // while page is still visible — should re-acquire after 1s debounce
     currentLock._simulateOSRelease();
+
+    // Not yet — debounce hasn't fired
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // Advance past the 1s debounce
+    vi.advanceTimersByTime(1000);
 
     await vi.waitFor(() => {
       expect(requestMock).toHaveBeenCalledTimes(2);
     });
+
+    vi.useRealTimers();
   });
 
   it('does not re-acquire if lock is still held on visibilitychange', async () => {
