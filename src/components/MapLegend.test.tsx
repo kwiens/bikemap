@@ -64,6 +64,11 @@ describe('MapLegendProvider', () => {
 
   beforeEach(() => {
     mockRideStyle = null;
+    // Clear cookies so activeTab doesn't leak between tests
+    document.cookie.split(';').forEach((c) => {
+      const name = c.split('=')[0].trim();
+      document.cookie = `${name}=; max-age=0; path=/`;
+    });
     events.length = 0;
     handler = (e: Event) => {
       events.push({ type: e.type, detail: (e as CustomEvent).detail });
@@ -188,6 +193,30 @@ describe('MapLegendProvider', () => {
     dispatch(MAP_EVENTS.TRAIL_DESELECT);
     expect(screen.getByTestId('mountain-bike-trails')).toHaveAttribute(
       'data-selected-trail',
+      '',
+    );
+  });
+
+  it('clicking empty map area clears both route and trail selection', () => {
+    render(
+      <MapLegendProvider>
+        <div />
+      </MapLegendProvider>,
+    );
+
+    // Select a route
+    dispatch(MAP_EVENTS.ROUTE_SELECT, { routeId: 'route-1' });
+    expect(screen.getByTestId('bike-routes')).toHaveAttribute(
+      'data-selected-route',
+      'route-1',
+    );
+
+    // Simulate what Map.tsx does on empty-area click: dispatch both deselects
+    dispatch(MAP_EVENTS.ROUTE_DESELECT);
+    dispatch(MAP_EVENTS.TRAIL_DESELECT);
+
+    expect(screen.getByTestId('bike-routes')).toHaveAttribute(
+      'data-selected-route',
       '',
     );
   });

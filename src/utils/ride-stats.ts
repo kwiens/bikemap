@@ -21,14 +21,26 @@ export const MAX_ACCURACY_M = 30;
 const STOP_SPEED = 0.5;
 // Duration threshold: must be stopped for this long to count (ms)
 const STOP_DURATION_MS = 10_000;
-// Max plausible cycling speed (m/s, ~67 mph)
-const MAX_PLAUSIBLE_SPEED = 30;
-// Smoothing window for elevation (points on each side)
-const ELEVATION_SMOOTH_WINDOW = 2;
+// Max plausible cycling speed (m/s, ~89 mph)
+const MAX_PLAUSIBLE_SPEED = 40;
+// EMA smoothing factor for elevation (0–1).  Lower = heavier smoothing.
+// 0.1 filters GPS altitude noise well while preserving real climbs.
+export const ELEVATION_EMA_ALPHA = 0.1;
 // Dead-band threshold for elevation gain/loss (meters).  Accumulated
 // elevation change must exceed this before it counts as gain or loss.
 // Filters GPS altitude jitter that otherwise inflates totals ~3-4×.
-const ELEVATION_DEAD_BAND = 3;
+export const ELEVATION_DEAD_BAND = 3;
+// Max plausible single-point altitude jump (meters).  Readings that
+// differ from the running EMA by more than this are GPS spikes and
+// are replaced with the current EMA value before smoothing.
+// Must be high enough to allow sustained climbs (EMA lags on slopes).
+export const ELEVATION_SPIKE_THRESHOLD = 25;
+// Minimum horizontal distance (meters) between deadband anchor updates.
+// Prevents counting altitude jitter while stopped or barely moving.
+export const ELEVATION_MIN_DISTANCE = 15;
+// Maximum altitude accuracy (meters) to trust a GPS reading.
+// Readings with worse accuracy are treated as null.
+export const ELEVATION_MAX_ALT_ACCURACY = 15;
 
 export function haversineDistance(
   lat1: number,
@@ -108,31 +120,58 @@ export function computeMovingTime(points: AnyRidePoint[]): number {
   return movingMs;
 }
 
-function smoothAltitudes(points: { altitude: number | null }[]): number[] {
-  const altitudes = points.map((p) => p.altitude);
-  const smoothed: number[] = [];
+/**
+ * Smooth altitudes with spike rejection + centered moving average.
+ * 1. Reject altitude spikes (>ELEVATION_SPIKE_THRESHOLD from running EMA)
+ * 2. Apply centered moving average (window = 2 * SMOOTH_HALF + 1 points)
+ */
+export const ELEVATION_SMOOTH_HALF = 5; // 11-point centered window
 
-  for (let i = 0; i < altitudes.length; i++) {
-    if (altitudes[i] === null) {
-      smoothed.push(Number.NaN);
-      continue;
+function smoothAltitudes(points: { altitude: number | null }[]): number[] {
+  const alts = points.map((p) => p.altitude);
+  const result: number[] = new Array(alts.length).fill(Number.NaN);
+
+  // Collect non-null indices and values
+  const rawVals: number[] = [];
+  const idxs: number[] = [];
+  for (let i = 0; i < alts.length; i++) {
+    if (alts[i] !== null) {
+      rawVals.push(alts[i] as number);
+      idxs.push(i);
     }
-    let sum = 0;
-    let count = 0;
-    for (
-      let j = Math.max(0, i - ELEVATION_SMOOTH_WINDOW);
-      j <= Math.min(altitudes.length - 1, i + ELEVATION_SMOOTH_WINDOW);
-      j++
-    ) {
-      if (altitudes[j] !== null) {
-        sum += altitudes[j] as number;
-        count++;
-      }
+  }
+  if (rawVals.length === 0) return result;
+
+  // Spike rejection: replace readings that jump >threshold from running EMA.
+  // Uses a faster EMA (alpha=0.3) than the main smoothing so it tracks
+  // sustained climbs/descents without false-triggering on slopes.
+  // Seed the EMA from the median of the first few readings so a single
+  // bad startup value doesn't poison the entire series.
+  const SPIKE_EMA_ALPHA = 0.3;
+  const SEED_COUNT = Math.min(5, rawVals.length);
+  const seedSlice = rawVals.slice(0, SEED_COUNT).sort((a, b) => a - b);
+  const seedMedian = seedSlice[Math.floor(seedSlice.length / 2)];
+  let spikeEma = seedMedian;
+  const vals: number[] = [];
+  for (let i = 0; i < rawVals.length; i++) {
+    if (Math.abs(rawVals[i] - spikeEma) > ELEVATION_SPIKE_THRESHOLD) {
+      vals.push(spikeEma); // replace spike with current EMA
+    } else {
+      vals.push(rawVals[i]);
     }
-    smoothed.push(count > 0 ? sum / count : Number.NaN);
+    spikeEma = SPIKE_EMA_ALPHA * vals[i] + (1 - SPIKE_EMA_ALPHA) * spikeEma;
   }
 
-  return smoothed;
+  // Centered moving average
+  for (let i = 0; i < vals.length; i++) {
+    const lo = Math.max(0, i - ELEVATION_SMOOTH_HALF);
+    const hi = Math.min(vals.length - 1, i + ELEVATION_SMOOTH_HALF);
+    let sum = 0;
+    for (let j = lo; j <= hi; j++) sum += vals[j];
+    result[idxs[i]] = sum / (hi - lo + 1);
+  }
+
+  return result;
 }
 
 export function computeElevation(points: AnyRidePoint[]): {
@@ -149,23 +188,46 @@ export function computeElevation(points: AnyRidePoint[]): {
 
   // Dead-band accumulator: track the last "committed" altitude and
   // only count gain/loss once the change exceeds the threshold.
+  // Also require minimum horizontal distance since last anchor update
+  // to prevent counting altitude jitter while stopped.
   let anchor: number | null = null;
 
-  for (const alt of smoothed) {
+  let distSinceAnchor = 0;
+
+  for (let i = 0; i < smoothed.length; i++) {
+    const alt = smoothed[i];
     if (Number.isNaN(alt)) continue;
     if (alt < min) min = alt;
     if (alt > max) max = alt;
+
+    // Accumulate horizontal distance since last anchor update
+    if (anchor !== null && i > 0) {
+      distSinceAnchor += haversineDistance(
+        points[i - 1].lat,
+        points[i - 1].lng,
+        points[i].lat,
+        points[i].lng,
+      );
+    }
+
     if (anchor === null) {
       anchor = alt;
+
       continue;
     }
+
     const delta = alt - anchor;
+    // Only update anchor if we've traveled enough horizontally
+    if (distSinceAnchor < ELEVATION_MIN_DISTANCE) continue;
+
     if (delta > ELEVATION_DEAD_BAND) {
       gain += delta;
       anchor = alt;
+      distSinceAnchor = 0;
     } else if (delta < -ELEVATION_DEAD_BAND) {
       loss += Math.abs(delta);
       anchor = alt;
+      distSinceAnchor = 0;
     }
   }
 

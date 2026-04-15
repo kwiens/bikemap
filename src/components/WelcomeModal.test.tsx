@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getRideStyle } from './WelcomeModal';
+import { setSetting } from '@/utils/settings';
 
 describe('getRideStyle', () => {
   beforeEach(() => {
@@ -14,19 +15,19 @@ describe('getRideStyle', () => {
     expect(getRideStyle()).toBeNull();
   });
 
-  it('returns casual when cookie is set to casual', () => {
-    document.cookie = 'bikechatt-ride-style=casual; path=/';
+  it('returns casual when setting is casual', () => {
+    setSetting('rideStyle', 'casual');
     expect(getRideStyle()).toBe('casual');
   });
 
-  it('returns mountain when cookie is set to mountain', () => {
-    document.cookie = 'bikechatt-ride-style=mountain; path=/';
+  it('returns mountain when setting is mountain', () => {
+    setSetting('rideStyle', 'mountain');
     expect(getRideStyle()).toBe('mountain');
   });
 
   it('reads correctly when other cookies are present', () => {
     document.cookie = 'other-cookie=value; path=/';
-    document.cookie = 'bikechatt-ride-style=mountain; path=/';
+    setSetting('rideStyle', 'mountain');
     document.cookie = 'another=thing; path=/';
     expect(getRideStyle()).toBe('mountain');
   });

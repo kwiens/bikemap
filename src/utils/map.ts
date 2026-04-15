@@ -230,6 +230,15 @@ const RATING_COLOR_EXPRESSION: mapboxgl.Expression = [
   UNRATED_COLOR,
 ];
 
+// Trails in the SORBA tileset that overlap with bike route layers and should
+// be hidden so they don't intercept clicks or render on top of routes.
+const HIDDEN_TRAILS = [
+  'Tennessee Riverwalk',
+  'River Walk',
+  'South Chick Greenway',
+  'South Chickamauga Creek Greenway',
+];
+
 const TRAIL_LAYERS: TrailLayerConfig[] = [
   {
     layerId: MTN_BIKE_LAYER_ID,
@@ -351,6 +360,19 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
     map.setLayoutProperty(cfg.layerId, 'line-cap', 'round');
     map.setLayoutProperty(cfg.layerId, 'line-join', 'round');
     map.setLayoutProperty(cfg.layerId, 'line-round-limit', 0.1);
+
+    // Hide trails that overlap with bike route layers
+    if (HIDDEN_TRAILS.length > 0) {
+      const filter: mapboxgl.FilterSpecification = [
+        '!',
+        ['in', ['get', cfg.trailProp], ['literal', HIDDEN_TRAILS]],
+      ];
+      for (const id of [cfg.layerId, cId, gId, hId]) {
+        if (map.getLayer(id)) {
+          map.setFilter(id, filter);
+        }
+      }
+    }
   }
 }
 

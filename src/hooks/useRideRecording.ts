@@ -9,10 +9,6 @@ type NotifyCallback = (message: string) => void;
 
 // If no GPS point arrives for this long, the app was likely backgrounded
 const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
-// Rolling window size for live altitude smoothing (must collect this many before computing)
-const ALT_SMOOTH_WINDOW = 5;
-// Minimum altitude change (meters) to count as real elevation gain (deadband)
-const ALT_DEADBAND_M = 2;
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
@@ -21,6 +17,11 @@ import {
   computeRideStats,
   haversineDistance,
   MAX_ACCURACY_M,
+  ELEVATION_EMA_ALPHA as ALT_EMA_ALPHA,
+  ELEVATION_DEAD_BAND as ALT_DEADBAND_M,
+  ELEVATION_SPIKE_THRESHOLD as ALT_SPIKE_M,
+  ELEVATION_MIN_DISTANCE as ALT_MIN_DIST_M,
+  ELEVATION_MAX_ALT_ACCURACY as ALT_MAX_ACCURACY,
 } from '../utils/ride-stats';
 import {
   saveRide,
@@ -29,10 +30,14 @@ import {
   loadInProgress,
 } from '../utils/ride-storage';
 
-/** Average the last N altitude readings to smooth GPS noise. */
-function smoothedAltitude(buffer: number[]): number {
-  const sum = buffer.reduce((a, b) => a + b, 0);
-  return sum / buffer.length;
+async function tryDemCorrection(points: StoredRidePoint[]) {
+  try {
+    const { correctElevations } = await import('../utils/dem');
+    const dem = await correctElevations(points);
+    return { corrected: dem.corrected, deduplicated: dem.deduplicated };
+  } catch {
+    return { corrected: undefined, deduplicated: undefined };
+  }
 }
 
 interface UseRideRecordingReturn {
@@ -63,8 +68,9 @@ export function useRideRecording(
   const [liveElevationGain, setLiveElevationGain] = useState(0);
   const distanceRef = useRef(0);
   const elevGainRef = useRef(0);
-  const altBufferRef = useRef<number[]>([]); // rolling window for smoothing
-  const smoothedAltRef = useRef<number | null>(null); // last smoothed altitude
+  const emaAltRef = useRef<number | null>(null); // EMA-smoothed altitude
+  const altAnchorRef = useRef<number | null>(null); // last committed altitude for deadband
+  const distSinceAnchorRef = useRef(0); // horizontal meters since last anchor update
   const pausedRef = useRef(false);
   const manualPauseRef = useRef(false); // true when user explicitly paused
   const pausedTimeRef = useRef(0); // accumulated paused ms
@@ -81,31 +87,12 @@ export function useRideRecording(
     undefined,
   );
   const startTimeRef = useRef<number>(0);
-  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
-  const acquireWakeLock = useCallback(async () => {
-    if (!('wakeLock' in navigator)) return;
-    try {
-      wakeLockRef.current = await navigator.wakeLock.request('screen');
-    } catch {
-      // Wake lock not available or denied
-    }
-  }, []);
-
-  const releaseWakeLock = useCallback(() => {
-    if (wakeLockRef.current) {
-      wakeLockRef.current.release();
-      wakeLockRef.current = null;
-    }
-  }, []);
-
-  // Re-acquire wake lock and detect GPS gaps when page becomes visible
+  // Detect GPS gaps and request immediate fix when page becomes visible
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState !== 'visible' || !isRecording) return;
       if (pausedRef.current) return;
-
-      acquireWakeLock();
 
       // Check for background gap
       const lastPoint = pointsRef.current[pointsRef.current.length - 1];
@@ -126,7 +113,7 @@ export function useRideRecording(
     document.addEventListener('visibilitychange', handleVisibility);
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility);
-  }, [isRecording, acquireWakeLock, onNotify]);
+  }, [isRecording, onNotify]);
 
   // Warn before closing tab while recording
   useEffect(() => {
@@ -159,13 +146,12 @@ export function useRideRecording(
     } else {
       void clearInProgress();
     }
-    releaseWakeLock();
     setIsRecording(false);
     setIsPaused(false);
     setElapsedTime(0);
     setLiveDistance(0);
     setLiveElevationGain(0);
-  }, [releaseWakeLock]);
+  }, []);
 
   // Shared: start GPS watch, elapsed timer, and periodic save
   const startGpsWatchAndTimers = useCallback(() => {
@@ -221,38 +207,62 @@ export function useRideRecording(
           }),
         );
 
-        if (
-          prev &&
-          point.accuracy < MAX_ACCURACY_M &&
-          prev.accuracy < MAX_ACCURACY_M
-        ) {
-          distanceRef.current += haversineDistance(
+        // Compute horizontal distance once and reuse for both
+        // distance tracking and elevation min-distance filter
+        if (prev) {
+          const segDist = haversineDistance(
             prev.lat,
             prev.lng,
             point.lat,
             point.lng,
           );
-          setLiveDistance(distanceRef.current);
+          distSinceAnchorRef.current += segDist;
+          if (
+            point.accuracy < MAX_ACCURACY_M &&
+            prev.accuracy < MAX_ACCURACY_M
+          ) {
+            distanceRef.current += segDist;
+            setLiveDistance(distanceRef.current);
+          }
         }
 
-        if (point.altitude !== null) {
-          altBufferRef.current.push(point.altitude);
-          if (altBufferRef.current.length > ALT_SMOOTH_WINDOW) {
-            altBufferRef.current.shift();
+        // Filter 1: skip readings with poor altitude accuracy
+        const altAccuracy = position.coords.altitudeAccuracy;
+        const altUsable =
+          point.altitude !== null &&
+          (altAccuracy === null || altAccuracy <= ALT_MAX_ACCURACY);
+
+        if (altUsable) {
+          let alt = point.altitude!;
+
+          // Filter 2: spike rejection — replace outlier jumps with current EMA
+          if (
+            emaAltRef.current !== null &&
+            Math.abs(alt - emaAltRef.current) > ALT_SPIKE_M
+          ) {
+            alt = emaAltRef.current;
           }
-          if (altBufferRef.current.length === ALT_SMOOTH_WINDOW) {
-            const alt = smoothedAltitude(altBufferRef.current);
-            if (smoothedAltRef.current !== null) {
-              const delta = alt - smoothedAltRef.current;
+
+          // EMA smoothing
+          if (emaAltRef.current === null) {
+            emaAltRef.current = alt;
+            altAnchorRef.current = alt;
+          } else {
+            emaAltRef.current =
+              ALT_EMA_ALPHA * alt + (1 - ALT_EMA_ALPHA) * emaAltRef.current;
+
+            // Filter 3: require minimum horizontal distance before anchor update
+            if (distSinceAnchorRef.current >= ALT_MIN_DIST_M) {
+              const delta = emaAltRef.current - altAnchorRef.current!;
               if (delta > ALT_DEADBAND_M) {
                 elevGainRef.current += delta;
                 setLiveElevationGain(elevGainRef.current);
-                smoothedAltRef.current = alt;
+                altAnchorRef.current = emaAltRef.current;
+                distSinceAnchorRef.current = 0;
               } else if (delta < -ALT_DEADBAND_M) {
-                smoothedAltRef.current = alt;
+                altAnchorRef.current = emaAltRef.current;
+                distSinceAnchorRef.current = 0;
               }
-            } else {
-              smoothedAltRef.current = alt;
             }
           }
         }
@@ -308,8 +318,9 @@ export function useRideRecording(
     startTimeRef.current = Date.now();
     distanceRef.current = 0;
     elevGainRef.current = 0;
-    altBufferRef.current = [];
-    smoothedAltRef.current = null;
+    emaAltRef.current = null;
+    altAnchorRef.current = null;
+    distSinceAnchorRef.current = 0;
     pausedRef.current = false;
     manualPauseRef.current = false;
     pausedTimeRef.current = 0;
@@ -322,9 +333,8 @@ export function useRideRecording(
     setIsRecording(true);
     setIsPaused(false);
 
-    acquireWakeLock();
     startGpsWatchAndTimers();
-  }, [isRecording, acquireWakeLock, startGpsWatchAndTimers]);
+  }, [isRecording, startGpsWatchAndTimers]);
 
   const pauseRecording = useCallback(() => {
     if (!isRecording || manualPauseRef.current) return;
@@ -345,14 +355,47 @@ export function useRideRecording(
     setIsPaused(false);
   }, [isRecording]);
 
+  /**
+   * Build a RecordedRide from GPS points.
+   * @param points        Full GPS points (used for time, distance, speed, and bounds)
+   * @param demCorrected  Optional: all points with DEM altitude (stored in the ride)
+   * @param demDeduped    Optional: pixel-deduplicated subset (used for elevation stats only)
+   */
   function buildRide(
     points: RidePoint[],
     startTime: number,
     endTime: number,
+    demCorrected?: {
+      lat: number;
+      lng: number;
+      altitude: number | null;
+      timestamp: number;
+    }[],
+    demDeduped?: { lat: number; lng: number; altitude: number | null }[],
   ): RecordedRide {
     const stats = computeRideStats(points);
+
+    // Override elevation stats from deduplicated DEM points
+    if (demDeduped && demDeduped.length >= 2) {
+      const elev = computeElevation(
+        demDeduped.map((p, i) => ({
+          ...p,
+          accuracy: 5,
+          speed: 3,
+          timestamp: i,
+        })),
+      );
+      stats.elevationGain = elev.gain;
+      stats.elevationLoss = elev.loss;
+      stats.elevationMin = elev.min;
+      stats.elevationMax = elev.max;
+    }
+
     const bounds = computeBounds(points) ?? [0, 0, 0, 0];
-    const storedPoints: StoredRidePoint[] = points.map(
+    // Store DEM-corrected altitudes when available so saved rides
+    // and elevation profiles use terrain elevation, not noisy GPS.
+    const source = demCorrected ?? points;
+    const storedPoints: StoredRidePoint[] = source.map(
       ({ lng, lat, altitude, timestamp }) => ({
         lng,
         lat,
@@ -380,7 +423,14 @@ export function useRideRecording(
     }
 
     const points = [...pointsRef.current];
-    const ride = buildRide(points, startTimeRef.current, Date.now());
+    const { corrected, deduplicated } = await tryDemCorrection(points);
+    const ride = buildRide(
+      points,
+      startTimeRef.current,
+      Date.now(),
+      corrected,
+      deduplicated,
+    );
 
     await saveRide(ride);
     cleanup();
@@ -410,10 +460,14 @@ export function useRideRecording(
       return null;
     }
 
+    const points = data.points;
+    const { corrected, deduplicated } = await tryDemCorrection(points);
     const ride = buildRide(
-      data.points,
+      points,
       data.startTime,
-      data.points[data.points.length - 1].timestamp,
+      points[points.length - 1].timestamp,
+      corrected,
+      deduplicated,
     );
 
     await saveRide(ride);
@@ -451,16 +505,13 @@ export function useRideRecording(
     const elev = computeElevation(data.points);
     elevGainRef.current = elev.gain;
 
-    // Seed the altitude buffer from the tail of saved points for live smoothing
-    const recentAlts = data.points
-      .slice(-ALT_SMOOTH_WINDOW)
-      .map((p) => p.altitude)
-      .filter((a): a is number => a !== null);
-    altBufferRef.current = recentAlts;
-    smoothedAltRef.current =
-      recentAlts.length === ALT_SMOOTH_WINDOW
-        ? smoothedAltitude(recentAlts)
-        : null;
+    // Seed EMA from the last altitude in saved points for live smoothing
+    const lastAlt =
+      [...data.points].reverse().find((p) => p.altitude !== null)?.altitude ??
+      null;
+    emaAltRef.current = lastAlt;
+    altAnchorRef.current = lastAlt;
+    distSinceAnchorRef.current = 0;
 
     setLiveDistance(dist);
     setLiveElevationGain(elev.gain);
@@ -473,8 +524,6 @@ export function useRideRecording(
     // fall back to "Save it".
     preserveProgressRef.current = true;
 
-    acquireWakeLock();
-
     // Draw existing track on map in a single batch
     const coords = data.points.map(
       (pt) => [pt.lng, pt.lat] as [number, number],
@@ -486,7 +535,7 @@ export function useRideRecording(
     );
 
     startGpsWatchAndTimers();
-  }, [isRecording, acquireWakeLock, startGpsWatchAndTimers]);
+  }, [isRecording, startGpsWatchAndTimers]);
 
   const dismissRecovery = useCallback(() => {
     void clearInProgress();
@@ -501,7 +550,6 @@ export function useRideRecording(
       if (timerRef.current !== undefined) clearInterval(timerRef.current);
       if (saveIntervalRef.current !== undefined)
         clearInterval(saveIntervalRef.current);
-      wakeLockRef.current?.release();
     };
   }, []);
 

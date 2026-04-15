@@ -63,9 +63,9 @@ export const bikeResources: BikeResource[] = [
     icon: faHandsHelping,
   },
   {
-    name: 'Pedego Electric Bikes Chattanooga',
+    name: 'Loblolly Bike Shop',
     description:
-      'Specializing in electric bike sales, rentals, and services, offering a variety of models for all riders.',
+      'Bike sales, rentals, and services, offering a variety of models for all riders.',
     address: '191 River St, Chattanooga, TN 37405',
     latitude: 35.0625,
     longitude: -85.3077,
