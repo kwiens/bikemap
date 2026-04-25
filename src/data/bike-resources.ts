@@ -1,15 +1,9 @@
-import {
-  faBicycle,
-  type IconDefinition,
-} from '@fortawesome/free-solid-svg-icons';
-
 export interface BikeResource {
   name: string;
   description: string;
   address: string;
   latitude: number;
   longitude: number;
-  icon: IconDefinition;
 }
 
 export const bikeResources: BikeResource[] = [
@@ -20,7 +14,6 @@ export const bikeResources: BikeResource[] = [
     address: '630 W Bell Avenue, Chattanooga, TN 37405',
     latitude: 35.0735,
     longitude: -85.3188,
-    icon: faBicycle,
   },
   {
     name: 'East Ridge Bicycles',
@@ -29,7 +22,6 @@ export const bikeResources: BikeResource[] = [
     address: '5910 Ringgold Road, Chattanooga, TN 37412',
     latitude: 34.9899,
     longitude: -85.1992,
-    icon: faBicycle,
   },
   {
     name: 'Trek Bicycle Store',
@@ -38,7 +30,6 @@ export const bikeResources: BikeResource[] = [
     address: '307 Manufacturers Rd #117, Chattanooga, TN 37405',
     latitude: 35.0628386,
     longitude: -85.3138755,
-    icon: faBicycle,
   },
   {
     name: 'Chatt eBikes',
@@ -47,7 +38,6 @@ export const bikeResources: BikeResource[] = [
     address: '1404 McCallie Avenue, Suite 102, Chattanooga, TN 37404',
     latitude: 35.03825275443797,
     longitude: -85.28125452877657,
-    icon: faBicycle,
   },
   {
     name: 'Two Bikes Chattanooga',
@@ -56,7 +46,6 @@ export const bikeResources: BikeResource[] = [
     address: '1810 E. Main Street, Suite 100, Chattanooga, TN 37404',
     latitude: 35.026111,
     longitude: -85.281111,
-    icon: faBicycle,
   },
   {
     name: 'Loblolly Bike Shop',
@@ -65,7 +54,6 @@ export const bikeResources: BikeResource[] = [
     address: '191 River St, Chattanooga, TN 37405',
     latitude: 35.0625,
     longitude: -85.3077,
-    icon: faBicycle,
   },
   {
     name: 'Mountaintown Bicycles',
@@ -74,7 +62,6 @@ export const bikeResources: BikeResource[] = [
     address: '5337 Ringgold Road, Chattanooga, TN 37412',
     latitude: 34.9949081,
     longitude: -85.2322395,
-    icon: faBicycle,
   },
   {
     name: 'Owen Cyclery',
@@ -83,6 +70,5 @@ export const bikeResources: BikeResource[] = [
     address: '1920 Northpoint Blvd, Hixson, TN 37343',
     latitude: 35.126,
     longitude: -85.249,
-    icon: faBicycle,
   },
 ];
