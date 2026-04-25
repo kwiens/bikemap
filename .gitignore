@@ -46,3 +46,6 @@ yarn-error.log*
 .auth/
 .env.test
 scripts/.tile_cache/
+
+# scratch / local-only files
+tmp/

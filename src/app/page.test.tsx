@@ -42,7 +42,7 @@ vi.mock('@/data/geo_data', () => ({
     {
       id: 'zoo-loop-v2-full-public',
       name: 'Zoo Loop',
-      color: '#DC2626',
+      color: '#F97316',
       description: 'Zoo route',
       defaultWidth: 8,
       opacity: 1.0,

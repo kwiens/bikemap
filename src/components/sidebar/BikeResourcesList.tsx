@@ -1,3 +1,4 @@
+import { faBicycle } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { bikeResources } from '@/data/geo_data';
 import { SidebarCard } from './SidebarCard';
@@ -15,7 +16,7 @@ export function BikeResourcesList({
           <SidebarCard
             key={location.name}
             colorTheme="green"
-            icon={location.icon}
+            icon={faBicycle}
             title={location.name}
             description={location.description}
             onClick={() => onCenterLocation(location)}

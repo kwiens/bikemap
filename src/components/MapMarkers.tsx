@@ -193,18 +193,9 @@ export function createAttractionMarker(feature: MapFeature): mapboxgl.Marker {
 export function createBikeResourceMarker(
   resource: BikeResource,
 ): mapboxgl.Marker {
-  // Get icon class - default to bicycle
-  let iconClass = 'fa-bicycle';
-
-  if (resource.icon?.iconName) {
-    // Automatically construct the FontAwesome class from the icon name
-    iconClass = `fa-${resource.icon.iconName}`;
-  }
-
-  // Create element
   const el = createMarkerElement(
     'map-marker bike-marker',
-    iconClass,
+    'fa-bicycle',
     '#34d399',
   );
 
