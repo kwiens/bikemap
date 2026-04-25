@@ -16,7 +16,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faDownload,
   faShareAlt,
-  faMountain,
+  faChartArea,
   faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
@@ -35,7 +35,7 @@ const MAX_GRADIENT_STOPS = 200;
 const CHART_SVG_CLASS =
   'w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none';
 const ACTION_BTN_CLASS =
-  'bg-transparent border-none cursor-pointer text-gray-400 text-xs px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-50';
+  'bg-transparent border-none cursor-pointer text-gray-400 text-2xl px-2 py-1 rounded hover:text-gray-600 hover:bg-gray-50';
 
 export function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
@@ -484,7 +484,7 @@ export function ElevationProfile() {
           type="button"
           title="Show elevation profile"
         >
-          <FontAwesomeIcon icon={faMountain} className={TOGGLE_ICON_CLASS} />
+          <FontAwesomeIcon icon={faChartArea} className={TOGGLE_ICON_CLASS} />
         </button>
       </div>
     );

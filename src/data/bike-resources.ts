@@ -1,9 +1,5 @@
 import {
-  faMountain,
   faBicycle,
-  faRoad,
-  faBolt,
-  faHandsHelping,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -24,7 +20,7 @@ export const bikeResources: BikeResource[] = [
     address: '630 W Bell Avenue, Chattanooga, TN 37405',
     latitude: 35.0735,
     longitude: -85.3188,
-    icon: faMountain,
+    icon: faBicycle,
   },
   {
     name: 'East Ridge Bicycles',
@@ -39,10 +35,10 @@ export const bikeResources: BikeResource[] = [
     name: 'Trek Bicycle Store',
     description:
       'Official retailer offering a range of Trek bikes, accessories, and professional maintenance services.',
-    address: '307 Manufacturers Road, Suite 117, Chattanooga, TN 37405',
-    latitude: 35.0524,
-    longitude: -85.3108,
-    icon: faRoad,
+    address: '307 Manufacturers Rd #117, Chattanooga, TN 37405',
+    latitude: 35.0628386,
+    longitude: -85.3138755,
+    icon: faBicycle,
   },
   {
     name: 'Chatt eBikes',
@@ -51,7 +47,7 @@ export const bikeResources: BikeResource[] = [
     address: '1404 McCallie Avenue, Suite 102, Chattanooga, TN 37404',
     latitude: 35.03825275443797,
     longitude: -85.28125452877657,
-    icon: faBolt,
+    icon: faBicycle,
   },
   {
     name: 'Two Bikes Chattanooga',
@@ -60,7 +56,7 @@ export const bikeResources: BikeResource[] = [
     address: '1810 E. Main Street, Suite 100, Chattanooga, TN 37404',
     latitude: 35.026111,
     longitude: -85.281111,
-    icon: faHandsHelping,
+    icon: faBicycle,
   },
   {
     name: 'Loblolly Bike Shop',
@@ -69,7 +65,16 @@ export const bikeResources: BikeResource[] = [
     address: '191 River St, Chattanooga, TN 37405',
     latitude: 35.0625,
     longitude: -85.3077,
-    icon: faBolt,
+    icon: faBicycle,
+  },
+  {
+    name: 'Mountaintown Bicycles',
+    description:
+      'Certified dealer offering an extensive selection of new bicycles and e-bikes with professional repair services.',
+    address: '5337 Ringgold Road, Chattanooga, TN 37412',
+    latitude: 34.9949081,
+    longitude: -85.2322395,
+    icon: faBicycle,
   },
   {
     name: 'Owen Cyclery',
