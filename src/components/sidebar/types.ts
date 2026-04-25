@@ -3,7 +3,7 @@ import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 export interface LocationProps {
   name: string;
   description: string;
-  icon: IconDefinition;
+  icon?: IconDefinition;
   latitude?: number;
   longitude?: number;
   address?: string;
