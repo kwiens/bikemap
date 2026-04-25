@@ -15,6 +15,7 @@ import {
   formatDurationShort,
   formatDate,
   formatBytes,
+  formatElevation,
 } from '@/utils/format';
 import { cn } from '@/lib/utils';
 import { RideDetail } from './RideDetail';
@@ -136,6 +137,9 @@ export function RideHistory({
             {formatDate(s.startTime)} &middot;{' '}
             {formatDistance(s.stats.distance)} &middot;{' '}
             {formatDurationShort(s.stats.elapsedTime)}
+            {s.stats.elevationGain > 0 && (
+              <> &middot; &uarr;{formatElevation(s.stats.elevationGain)}</>
+            )}
           </div>
         </div>
       ))}
