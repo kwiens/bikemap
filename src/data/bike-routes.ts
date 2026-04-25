@@ -31,7 +31,7 @@ export const bikeRoutes: BikeRoute[] = [
   {
     id: 'zoo-loop-v2-full-public',
     name: 'Zoo Loop',
-    color: '#DC2626',
+    color: '#F97316',
     description:
       'Fun route through the university to visit the zoo and a nearby park. Moderate traffic.',
     icon: faRoute,
@@ -77,7 +77,7 @@ export const bikeRoutes: BikeRoute[] = [
   {
     id: 'Moccasin Bend Route',
     name: 'Moccasin Bend Route',
-    color: '#F97316',
+    color: '#DC2626',
     description: 'Scenic route around Moccasin Bend with river views.',
     icon: faRoute,
     defaultWidth: 8,
