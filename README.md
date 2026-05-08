@@ -1,8 +1,14 @@
 # Open Bike Map
 
+<p align="center">
+  <a href="https://bikechatt.com">
+    <img src="https://img.shields.io/badge/%E2%96%B6%20Live%20Demo-bikechatt.com-2563EB?style=for-the-badge&labelColor=111827" alt="Live Demo: bikechatt.com" height="48">
+  </a>
+</p>
+
 An open-source trail and bike-route platform for any community. Browse curated road and greenway routes, hundreds of mountain bike trails with elevation profiles, real-time bike share availability, and record your own rides with GPS — all in a fast, mobile-first web app you can install to your home screen.
 
-The Chattanooga, TN deployment is the reference implementation. The codebase is built so a new community can fork it, swap configuration and data, and ship.
+The included reference deployment is configured for [Chattanooga, TN](https://bikechatt.com), but the codebase is built so a new community can fork it, swap configuration and data, and ship.
 
 <p align="center">
   <img src="public/screenshot-splash.png" alt="Open Bike Map main view" width="45%">
@@ -20,14 +26,14 @@ Open Bike Map is designed to be re-skinned for a new community in an afternoon, 
 - **Bring-your-own bike share (or skip it).** If your city publishes a [GBFS](https://gbfs.org/) feed, change one URL. If it doesn't, hide the layer.
 - **Brand it.** Replace logos in `public/`, swap the welcome copy in `WelcomeModal.tsx`, adjust the brand colors in `tailwind.config.ts` (`app-primary` / `app-secondary`).
 
-A community fork is a fork-and-edit, not a rewrite. The Chattanooga build is just one set of inputs to a generic engine — see [Deploying for your community](#deploying-for-your-community) below for the step-by-step.
+A community fork is a fork-and-edit, not a rewrite. The included build is just one set of inputs to a generic engine — see [Deploying for your community](#deploying-for-your-community) below for the step-by-step.
 
 ## Features
 
 ### For riders
 
 - **Curated bike routes** — Hand-picked road, greenway, and connector routes styled in Mapbox Studio with descriptions, distance, and zoom-to-fit bounds.
-- **Mountain bike trails** — 225+ trails in the Chattanooga deployment, grouped by recreation area and region, color-coded by difficulty, with per-trail elevation profiles (gain/loss/min/max and a sampled distance-vs-elevation chart).
+- **Mountain bike trails** — 225+ trails in the reference deployment, grouped by recreation area and region, color-coded by difficulty, with per-trail elevation profiles (gain/loss/min/max and a sampled distance-vs-elevation chart).
 - **Real-time bike share** — Live station availability via the [GBFS](https://gbfs.org/) standard, configurable per region.
 - **Points of interest** — Attractions, bike shops, rentals, and local resources as toggleable map layers.
 - **Live location & compass** — Tracks position and heading, with a smoothed compass heading derived from GPS readings.
@@ -77,7 +83,7 @@ src/
 ├── config/map.config.ts   Geo-specific configuration (Mapbox, GBFS, region)
 ├── data/
 │   ├── bike-routes.ts             Curated road/greenway routes
-│   ├── mountain-bike-trails.ts    Trail manifest (225+ in Chattanooga)
+│   ├── mountain-bike-trails.ts    Trail manifest (225+ in the reference build)
 │   ├── bike-resources.ts          Shops & repair stations
 │   ├── local-resources.ts         Community resources
 │   ├── map-features.ts            Attractions / POIs
@@ -98,7 +104,7 @@ scripts/                   Python tooling for trails & elevation
 
 ### Configuration model
 
-Everything geography-specific lives in `src/config/map.config.ts`. The Chattanooga config is the reference; a new community ships by:
+Everything geography-specific lives in `src/config/map.config.ts`. The included config is the reference; a new community ships by:
 
 1. Replacing the Mapbox style URL and access token (or sourcing them from env).
 2. Updating `defaultView` (center/zoom/pitch/bearing) for the area you want to land on.
@@ -202,7 +208,7 @@ The plan is to ship a thin native wrapper around the existing web app — most l
 
 What the wrapper buys us beyond the PWA:
 
-- **Discoverability** in the platform stores so a community deployment shows up for "Chattanooga bike map" searches.
+- **Discoverability** in the platform stores so a community deployment shows up for "[your city] bike map" searches.
 - **Better background GPS** for long rides, where mobile browsers throttle or suspend `geolocation` watchers.
 - **More reliable wake lock** and screen-on behavior across devices.
 - **Native share sheets** for exporting GPX rides into Strava, Komoot, etc.
@@ -233,7 +239,7 @@ This project is dedicated to the memory of our friend and collaborator Yoseph. I
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+GNU GPL v3 — see [LICENSE](LICENSE).
 
 ## Acknowledgments
 
@@ -244,4 +250,4 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
-Made with ❤️ in Chattanooga, TN — and ready for your community next.
+Built for community trail networks, everywhere.
