@@ -1,13 +1,26 @@
-# BikeMap
+# Open Bike Map
 
 An open-source trail and bike-route platform for any community. Browse curated road and greenway routes, hundreds of mountain bike trails with elevation profiles, real-time bike share availability, and record your own rides with GPS — all in a fast, mobile-first web app you can install to your home screen.
 
 The Chattanooga, TN deployment is the reference implementation. The codebase is built so a new community can fork it, swap configuration and data, and ship.
 
 <p align="center">
-  <img src="public/screenshot-splash.png" alt="BikeMap main view" width="45%">
+  <img src="public/screenshot-splash.png" alt="Open Bike Map main view" width="45%">
   <img src="public/screenshot-route.png" alt="Route selection view" width="45%">
 </p>
+
+## Make it yours
+
+Open Bike Map is designed to be re-skinned for a new community in an afternoon, not a quarter. Every piece a community would want to control is intentionally pulled out of the code and into a small, well-marked set of files:
+
+- **One config file for your geography.** `src/config/map.config.ts` holds the Mapbox style, default map view, GBFS feed, and region metadata. Point it at your area and the map opens there.
+- **Plain TypeScript data, not a CMS.** Routes, mountain bike trails, attractions, bike shops, and local resources are typed arrays in `src/data/`. Add an entry, ship a PR — no database, no admin panel, no backend.
+- **Style your routes in Mapbox Studio.** Curate route lines visually, then reference the layer IDs from `bike-routes.ts`. Trails come from a vector tileset you control.
+- **Trail data is automated.** Drop your trail tileset in, run `scripts/add_trail_elevation.py`, and the script generates per-trail elevation profiles, distances, and bounding boxes from Mapbox Vector Tiles + Terrain-RGB. No manual GPX wrangling.
+- **Bring-your-own bike share (or skip it).** If your city publishes a [GBFS](https://gbfs.org/) feed, change one URL. If it doesn't, hide the layer.
+- **Brand it.** Replace logos in `public/`, swap the welcome copy in `WelcomeModal.tsx`, adjust the brand colors in `tailwind.config.ts` (`app-primary` / `app-secondary`).
+
+A community fork is a fork-and-edit, not a rewrite. The Chattanooga build is just one set of inputs to a generic engine — see [Deploying for your community](#deploying-for-your-community) below for the step-by-step.
 
 ## Features
 
@@ -174,6 +187,36 @@ The fastest path:
 4. Style your routes and trails in Mapbox Studio; update layer IDs in the data files.
 5. Run the trail elevation script if you have mountain bike trails.
 6. Deploy on any Node host. Vercel works out of the box.
+
+## Future work
+
+### Native app wrapper for the App Store and Google Play
+
+Open Bike Map is already a Progressive Web App — it installs to the home screen, runs offline-friendly via a service worker, requests GPS / wake-lock / motion permissions, and ships custom splash screens. PWA install covers the technical case well, but it doesn't match how most riders look for a bike app: they search the App Store or Google Play.
+
+The plan is to ship a thin native wrapper around the existing web app — most likely [Capacitor](https://capacitorjs.com/) — so the same codebase ships to:
+
+- **iOS App Store** (Capacitor → native iOS shell)
+- **Google Play** (Capacitor → native Android shell)
+- **Web** (the current PWA, unchanged)
+
+What the wrapper buys us beyond the PWA:
+
+- **Discoverability** in the platform stores so a community deployment shows up for "Chattanooga bike map" searches.
+- **Better background GPS** for long rides, where mobile browsers throttle or suspend `geolocation` watchers.
+- **More reliable wake lock** and screen-on behavior across devices.
+- **Native share sheets** for exporting GPX rides into Strava, Komoot, etc.
+- **Push notifications** down the road — trail-condition alerts, new-route announcements per community.
+- **Apple Maps / Google Maps deep links** for "navigate to this trailhead."
+
+The architectural bet here is that the web app stays the source of truth and the wrapper is mechanical. Each community deployment can then choose: PWA-only (free, instant) or store-listed (one-time native build pipeline per community brand).
+
+### Other things on the roadmap
+
+- **Multi-community switcher** — host several cities from one deployment by selecting `mapConfig` per route or subdomain.
+- **Trail conditions / closures** — community-curated overlay so locals can flag a trail as wet, closed, or rerouted.
+- **Cloud ride sync (opt-in)** — rides are local-only today; an optional account would let riders see history across devices.
+- **Heatmaps from recorded rides** — anonymized aggregate to surface which informal connectors riders actually use.
 
 ## Contributing
 
