@@ -99,9 +99,28 @@ Routes are styled via Mapbox Studio (referenced by layer IDs like `riverwalk-loo
 
 ### Mountain Bike Trails
 
-The mountain bike trails layer is a single Mapbox layer (`SORBA Regional Trails`) containing 220+ trails identified by the `Trail` feature property. Trail data is defined in `src/data/mountain-bike-trails.ts` (re-exported from `src/data/geo_data.ts`) with precalculated `defaultBounds` for zoom-to-fit and `distance` in miles. Code uses `MTN_BIKE_*` constants and `mountainBikeTrails` array — the `SORBA` prefix only appears in Mapbox tileset string values.
+The mountain bike trails layer (`SORBA Regional Trails`) contains 220+ trails identified by the `Trail` feature property. Trail data is defined in `src/data/mountain-bike-trails.ts` (re-exported from `src/data/geo_data.ts`) with precalculated `defaultBounds` for zoom-to-fit and `distance` in miles. Code uses `MTN_BIKE_*` constants and `mountainBikeTrails` array — the `SORBA` prefix only appears in Mapbox tileset string values.
 
-The source layer name and tileset ID change whenever GIS data is re-uploaded to Mapbox Studio. The constants `MTN_BIKE_SOURCE_LAYER` (in `mountain-bike-trails.ts`) and `MVT_TILESET` (in `scripts/add_trail_elevation.py`) must match the current tileset.
+#### The Mapbox style ≠ the SORBA tileset
+
+The Mapbox Studio style does **not** include the SORBA tileset. We attach it ourselves at runtime via `ensureMtnBikeSource(map)` (in `utils/map.ts`), called during `style.load` before `initMtnBikeColors` / `initMtnBikeLayers`. The source is added as `MTN_BIKE_SOURCE_ID` pointing at `MTN_BIKE_TILESET_URL` (currently `mapbox://swuller.ccfw1cmr`), with the main `SORBA Regional Trails` layer attached on top. Everything downstream (color expression, casing/glow/hit, filter, opacity, selection, hit-testing) assumes the layer is named `MTN_BIKE_LAYER_ID` regardless of how it was attached.
+
+The Godsey Ridge trails layer (`Godsey Ridge Trails`, source-layer `LineStrings`) *is* baked into the Mapbox Studio style, so it doesn't need a runtime `addSource` — only the casing/glow/hit sublayers are added.
+
+#### When a tileset gets renamed
+
+GIS layers in Mapbox Studio get re-uploaded and renamed periodically. When that happens you'll see one of:
+
+- The `MTN_BIKE_LAYER_ID` layer is missing from `getStyle().layers` → **this is normal**, the layer is attached at runtime. Don't conclude it was removed/renamed without first checking whether `ensureMtnBikeSource` ran successfully (look for `map.getSource('sorba-trails')` and `map.getLayer('SORBA Regional Trails')` after style load).
+- The `Trail` property values in the rendered features look unfamiliar (e.g. greenways or OHV trails instead of MTB trails) → **the underlying tileset was swapped**. Don't auto-update `MTN_BIKE_TILESET_URL` / `MTN_BIKE_SOURCE_LAYER` to whatever new tileset shows up in the style — the new tileset is often a different curated dataset (e.g. TPL paved greenways), not a rename of SORBA. Verify the tileset's `vector_layers` and feature properties (`rating`, `Rec_Area`, `Trail`) match what the app expects before pointing the constants at it.
+- The constants `MTN_BIKE_SOURCE_LAYER` (in `mountain-bike-trails.ts`) and `MVT_TILESET` (in `scripts/add_trail_elevation.py`) need to stay in sync with the **same** SORBA tileset — both reference it independently.
+
+To confirm a tileset is the SORBA one:
+```bash
+curl -s "https://api.mapbox.com/v4/<TILESET_ID>.json?access_token=<TOKEN>" \
+  | jq '.vector_layers[0].fields | keys'
+```
+Expect to see `Trail`, `Rec_Area`, `rating`, `Use_` among the fields.
 
 When trails are added or modified in the Mapbox tileset, run `scripts/add_trail_bounds.py` to recalculate bounding boxes and distances. The script takes raw coordinate data extracted from the Mapbox layer via Chrome DevTools console (see the script header for the extraction snippet) and computes both `defaultBounds` and `distance` fields.
 
@@ -111,10 +130,15 @@ The map instance is exposed as `window.__map`. Use it to inspect layers and quer
 
 **Find the current source layer name** (needed when GIS data is re-uploaded):
 ```js
-// Check what source-layer the SORBA style layer uses
-__map.getStyle().layers.find(l => l.id === 'SORBA Regional Trails')
+// SORBA is attached at runtime — confirm the source + layer are in place
+__map.getSource('sorba-trails')
+__map.getLayer('SORBA Regional Trails')
 
-// List all source-layers in the composite source
+// What source-layer is the runtime-attached SORBA layer reading?
+__map.getStyle().layers.find(l => l.id === 'SORBA Regional Trails')?.['source-layer']
+
+// List all source-layers in the (Mapbox-Studio-managed) composite source — useful
+// when checking what other layers are in the style, but SORBA won't appear here
 [...new Set(__map.getStyle().layers.filter(l => l.source === 'composite').map(l => l['source-layer']))].sort()
 ```
 
@@ -131,15 +155,15 @@ const token = '<TOKEN from map.config.ts>';
     .then(r=>r.json()).then(d=>console.log(id, d.vector_layers?.map(l=>l.id))))
 ```
 
-**List all trail names** (pan to the area first — `querySourceFeatures` only returns loaded tiles):
+**List all trail names** (pan to the area first — `querySourceFeatures` only returns loaded tiles). SORBA is its own source (`sorba-trails`), not `composite`:
 ```js
-[...new Set(__map.querySourceFeatures('composite',
+[...new Set(__map.querySourceFeatures('sorba-trails',
   {sourceLayer: '<CURRENT_SOURCE_LAYER>'}).map(f => f.properties.Trail))].sort()
 ```
 
 **Inspect a specific trail's properties**:
 ```js
-__map.querySourceFeatures('composite', {sourceLayer: '<CURRENT_SOURCE_LAYER>'})
+__map.querySourceFeatures('sorba-trails', {sourceLayer: '<CURRENT_SOURCE_LAYER>'})
   .filter(f => f.properties.Trail === 'Trail Name').map(f => f.properties)
 ```
 
