@@ -1169,11 +1169,7 @@ const MapboxMap = memo(function MapboxMap() {
               }),
             );
           },
-          (err) => {
-            console.warn(
-              `Cached getCurrentPosition failed (${err.code}): ${err.message}. Falling back to watchPosition.`,
-            );
-          },
+          () => {},
           { enableHighAccuracy: false, maximumAge: 60_000, timeout: 5_000 },
         );
       }
