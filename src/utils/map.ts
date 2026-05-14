@@ -3,8 +3,11 @@ import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import {
   MTN_BIKE_LAYER_ID,
   MTN_BIKE_SOURCE_LAYER,
+  MTN_BIKE_TILESET_URL,
+  MTN_BIKE_SOURCE_ID,
   GODSEY_LAYER_ID,
   GODSEY_SOURCE_LAYER,
+  mountainBikeTrails,
   regionFor,
 } from '@/data/geo_data';
 import {
@@ -204,33 +207,54 @@ interface TrailLayerConfig {
   layerId: string;
   sourceLayer: string;
   trailProp: string; // feature property containing the trail name
-  // If the tileset has a 'rating' property, use it directly for colors.
-  // Otherwise set to false and colors are derived from TRAIL_METADATA.
-  hasRatingProp: boolean;
+  // Maps the raw feature-property value (e.g. tileset 'Trail' name) to the
+  // line color. Falls back to UNRATED_COLOR for anything unlisted.
+  colorMap: Record<string, string>;
+  // Maps the user-facing displayName to the raw feature value used for
+  // selection/highlight match expressions. Identity for layers whose tileset
+  // trail names already match our displayNames.
+  toRawName: (displayName: string) => string;
 }
 
-// Build a color expression from TRAIL_METADATA for layers without a rating property
-function buildMetadataColorExpression(trailProp: string): mapboxgl.Expression {
+function buildColorExpression(
+  trailProp: string,
+  colorMap: Record<string, string>,
+): mapboxgl.Expression {
   const entries: (string | mapboxgl.Expression)[] = [
     'match',
     ['get', trailProp],
   ];
-  for (const [rawName, meta] of Object.entries(TRAIL_METADATA)) {
-    entries.push(rawName);
-    entries.push(RATING_COLORS[meta.rating] ?? UNRATED_COLOR);
+  for (const [name, color] of Object.entries(colorMap)) {
+    entries.push(name);
+    entries.push(color);
   }
   entries.push(UNRATED_COLOR);
   return entries as mapboxgl.Expression;
 }
 
-const RATING_COLOR_EXPRESSION: mapboxgl.Expression = [
-  'match',
-  ['get', 'rating'],
-  ...Object.entries(RATING_COLORS).flat(),
-  UNRATED_COLOR,
-];
+// TPL trail tileset: Trail name is the raw feature value; colors come from
+// the per-trail color computed in mountainBikeTrails (driven by rating).
+const MTN_BIKE_COLOR_MAP: Record<string, string> = Object.fromEntries(
+  mountainBikeTrails.map((t) => [t.trailName, t.color]),
+);
 
-// Trails in the SORBA tileset that overlap with bike route layers and should
+// Godsey tileset: raw 'Name' property values map to a display name + rating
+// via TRAIL_METADATA. Build a raw-name → rating-color map.
+const GODSEY_COLOR_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(TRAIL_METADATA).map(([rawName, meta]) => [
+    rawName,
+    RATING_COLORS[meta.rating] ?? UNRATED_COLOR,
+  ]),
+);
+
+const GODSEY_DISPLAY_TO_RAW: Record<string, string> = Object.fromEntries(
+  Object.entries(TRAIL_METADATA).map(([rawName, meta]) => [
+    meta.displayName,
+    rawName,
+  ]),
+);
+
+// Trails in the trail tileset that overlap with bike route layers and should
 // be hidden so they don't intercept clicks or render on top of routes.
 const HIDDEN_TRAILS = [
   'Tennessee Riverwalk',
@@ -244,13 +268,15 @@ const TRAIL_LAYERS: TrailLayerConfig[] = [
     layerId: MTN_BIKE_LAYER_ID,
     sourceLayer: MTN_BIKE_SOURCE_LAYER,
     trailProp: 'Trail',
-    hasRatingProp: true,
+    colorMap: MTN_BIKE_COLOR_MAP,
+    toRawName: (name) => name,
   },
   {
     layerId: GODSEY_LAYER_ID,
     sourceLayer: GODSEY_SOURCE_LAYER,
     trailProp: 'Name',
-    hasRatingProp: false,
+    colorMap: GODSEY_COLOR_MAP,
+    toRawName: (name) => GODSEY_DISPLAY_TO_RAW[name] ?? name,
   },
 ];
 
@@ -266,14 +292,48 @@ function hitId(layerId: string): string {
 
 export { TRAIL_LAYERS };
 
+// The Mapbox Studio style no longer includes the MTB trails tileset, so
+// attach it ourselves. Idempotent: skips if the source/layer already exist.
+export function ensureMtnBikeSource(map: mapboxgl.Map): void {
+  try {
+    if (!map.getSource(MTN_BIKE_SOURCE_ID)) {
+      map.addSource(MTN_BIKE_SOURCE_ID, {
+        type: 'vector',
+        url: MTN_BIKE_TILESET_URL,
+      });
+    }
+    if (!map.getLayer(MTN_BIKE_LAYER_ID)) {
+      map.addLayer({
+        id: MTN_BIKE_LAYER_ID,
+        type: 'line',
+        source: MTN_BIKE_SOURCE_ID,
+        'source-layer': MTN_BIKE_SOURCE_LAYER,
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+          'line-round-limit': 0.1,
+        },
+        paint: {
+          'line-color': UNRATED_COLOR,
+          'line-width': 3,
+          'line-opacity': 0.5,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Failed to attach MTB trail source/layer:', error);
+  }
+}
+
 export function initMtnBikeColors(map: mapboxgl.Map): void {
   for (const cfg of TRAIL_LAYERS) {
     try {
       if (map.getLayer(cfg.layerId)) {
-        const colorExpr = cfg.hasRatingProp
-          ? RATING_COLOR_EXPRESSION
-          : buildMetadataColorExpression(cfg.trailProp);
-        map.setPaintProperty(cfg.layerId, 'line-color', colorExpr);
+        map.setPaintProperty(
+          cfg.layerId,
+          'line-color',
+          buildColorExpression(cfg.trailProp, cfg.colorMap),
+        );
       }
     } catch {
       // Layer may not exist yet
@@ -308,7 +368,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
           paint: {
             'line-color': '#ffffff',
             'line-width': 5,
-            'line-opacity': 0.25,
+            'line-opacity': 0.5,
           },
         },
         cfg.layerId,
@@ -382,14 +442,9 @@ function setTrailOpacity(
   selectedTrailName: string | null,
 ): void {
   const prop = cfg.trailProp;
-  // For layers using metadata mapping, find the raw feature value
-  let matchValue = selectedTrailName;
-  if (selectedTrailName && !cfg.hasRatingProp) {
-    const entry = Object.entries(TRAIL_METADATA).find(
-      ([, meta]) => meta.displayName === selectedTrailName,
-    );
-    matchValue = entry ? entry[0] : selectedTrailName;
-  }
+  const matchValue = selectedTrailName
+    ? cfg.toRawName(selectedTrailName)
+    : null;
 
   const cId = casingId(cfg.layerId);
   const gId = glowId(cfg.layerId);
@@ -482,15 +537,7 @@ export function highlightMtnBikeArea(
     if (!map.getLayer(cfg.layerId)) continue;
 
     // Map our trail names to raw feature property values
-    const rawNames = matchedTrails.map((t) => {
-      if (!cfg.hasRatingProp) {
-        const entry = Object.entries(TRAIL_METADATA).find(
-          ([, meta]) => meta.displayName === t.trailName,
-        );
-        return entry ? entry[0] : t.trailName;
-      }
-      return t.trailName;
-    });
+    const rawNames = matchedTrails.map((t) => cfg.toRawName(t.trailName));
 
     const cId = casingId(cfg.layerId);
     const gId = glowId(cfg.layerId);
