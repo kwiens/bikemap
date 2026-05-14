@@ -1,5 +1,5 @@
 """
-Compute granular elevation profiles for all SORBA trails.
+Compute granular elevation profiles for all MTB trails.
 
 Fetches trail geometry directly from Mapbox Vector Tiles and samples elevation
 from Terrain-RGB tiles. No browser extraction needed.

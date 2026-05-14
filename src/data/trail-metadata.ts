@@ -36,7 +36,7 @@ export const TRAIL_METADATA: Record<string, TrailMeta> = {
   },
 };
 
-// Rating-to-color mapping (shared with SORBA color expression)
+// Rating-to-color mapping (shared with MTB trail color expression)
 export const RATING_COLORS: Record<string, string> = {
   easy: '#16A34A',
   intermediate: '#2563EB',

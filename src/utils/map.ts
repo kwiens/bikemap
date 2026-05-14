@@ -292,8 +292,8 @@ function hitId(layerId: string): string {
 
 export { TRAIL_LAYERS };
 
-// The Mapbox Studio style no longer includes the SORBA tileset, so attach
-// it ourselves. Idempotent: skips if the source/layer already exist.
+// The Mapbox Studio style no longer includes the MTB trails tileset, so
+// attach it ourselves. Idempotent: skips if the source/layer already exist.
 export function ensureMtnBikeSource(map: mapboxgl.Map): void {
   try {
     if (!map.getSource(MTN_BIKE_SOURCE_ID)) {
@@ -321,7 +321,7 @@ export function ensureMtnBikeSource(map: mapboxgl.Map): void {
       });
     }
   } catch (error) {
-    console.error('Failed to attach SORBA trail source/layer:', error);
+    console.error('Failed to attach MTB trail source/layer:', error);
   }
 }
 

@@ -655,7 +655,7 @@ describe('highlightMtnBikeArea', () => {
 
     highlightMtnBikeArea(mockMap, trails, 'Nonexistent Area');
 
-    // No setPaintProperty calls for SORBA layers since no trails matched
+    // No setPaintProperty calls for MTB layers since no trails matched
     expect(mockMap.setPaintProperty).not.toHaveBeenCalled();
   });
 });
@@ -779,7 +779,7 @@ describe('detectTrailAtPoint', () => {
     } as unknown as mapboxgl.Map;
   }
 
-  it('returns trail name when GPS point is on a SORBA trail', () => {
+  it('returns trail name when GPS point is on an MTB trail', () => {
     const mockMap = createMockMap({
       queryRenderedFeatures: vi.fn().mockReturnValue([
         {

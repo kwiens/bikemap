@@ -2,11 +2,13 @@
 Update trail defaultBounds and distance in geo_data.ts from Mapbox feature coordinates.
 
 Usage:
-  1. Open the map in Chrome with the SORBA layer visible
+  1. Open the map in Chrome with the MTB trail layer visible
   2. Run this in the browser console to extract trail coordinates:
 
-     const map = document.querySelector('canvas').closest('.mapboxgl-map').__mapbox_map;
-     const features = map.querySourceFeatures('composite', { sourceLayer: 'SORBA_Regional_Trails-1oj4dx' });
+     const map = window.__map;
+     // MTB trails are attached at runtime under their own source — see
+     // MTN_BIKE_SOURCE_ID / MTN_BIKE_SOURCE_LAYER in mountain-bike-trails.ts.
+     const features = map.querySourceFeatures('mtb-trails-source', { sourceLayer: 'Chattanooga_Regional_Trails_4-dhs2zs' });
      const trails = {};
      for (const f of features) {
        const name = f.properties.Trail;
