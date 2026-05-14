@@ -212,6 +212,9 @@ interface TrailLayerConfig {
   // selection/highlight match expressions. Identity for layers whose tileset
   // trail names already match our displayNames.
   toRawName: (displayName: string) => string;
+  // Maps a raw feature-property value back to its display name. Identity when
+  // the tileset already stores display names.
+  toDisplayName: (rawName: string) => string;
 }
 
 function buildColorExpression(
@@ -232,9 +235,20 @@ function buildColorExpression(
 
 // TPL trail tileset: Trail name is the raw feature value; colors come from
 // the per-trail color computed in mountainBikeTrails (driven by rating).
-const MTN_BIKE_COLOR_MAP: Record<string, string> = Object.fromEntries(
-  mountainBikeTrails.map((t) => [t.trailName, t.color]),
-);
+// Mapbox `match` silently keeps only the last duplicate input, so warn at
+// module load if two trails share a trailName — the per-trail color would
+// otherwise depend on array order.
+const MTN_BIKE_COLOR_MAP: Record<string, string> = {};
+const seenMtnBikeNames = new Set<string>();
+for (const t of mountainBikeTrails) {
+  if (seenMtnBikeNames.has(t.trailName)) {
+    console.warn(
+      `Duplicate mountainBikeTrails.trailName: "${t.trailName}" — the later entry's color wins in the Mapbox match expression`,
+    );
+  }
+  seenMtnBikeNames.add(t.trailName);
+  MTN_BIKE_COLOR_MAP[t.trailName] = t.color;
+}
 
 // Godsey tileset: raw 'Name' property values map to a display name + rating
 // via TRAIL_METADATA. Build a raw-name → rating-color map.
@@ -252,14 +266,19 @@ const GODSEY_DISPLAY_TO_RAW: Record<string, string> = Object.fromEntries(
   ]),
 );
 
-// Trails in the trail tileset that overlap with bike route layers and should
+const GODSEY_RAW_TO_DISPLAY: Record<string, string> = Object.fromEntries(
+  Object.entries(TRAIL_METADATA).map(([rawName, meta]) => [
+    rawName,
+    meta.displayName,
+  ]),
+);
+
+// Trails in the TPL tileset that overlap with bike route layers and should
 // be hidden so they don't intercept clicks or render on top of routes.
-const HIDDEN_TRAILS = [
-  'Tennessee Riverwalk',
-  'River Walk',
-  'South Chick Greenway',
-  'South Chickamauga Creek Greenway',
-];
+// (The TPL tileset replaced SORBA in early 2026; the old SORBA-only entries
+// 'Tennessee Riverwalk', 'South Chick Greenway', and
+// 'South Chickamauga Creek Greenway' don't appear in TPL and were dropped.)
+const HIDDEN_TRAILS = ['River Walk'];
 
 const TRAIL_LAYERS: TrailLayerConfig[] = [
   {
@@ -268,6 +287,7 @@ const TRAIL_LAYERS: TrailLayerConfig[] = [
     trailProp: 'Trail',
     colorMap: MTN_BIKE_COLOR_MAP,
     toRawName: (name) => name,
+    toDisplayName: (raw) => raw,
   },
   {
     layerId: GODSEY_LAYER_ID,
@@ -275,6 +295,7 @@ const TRAIL_LAYERS: TrailLayerConfig[] = [
     trailProp: 'Name',
     colorMap: GODSEY_COLOR_MAP,
     toRawName: (name) => GODSEY_DISPLAY_TO_RAW[name] ?? name,
+    toDisplayName: (raw) => GODSEY_RAW_TO_DISPLAY[raw] ?? raw,
   },
 ];
 
@@ -647,10 +668,7 @@ export function detectTrailAtPoint(
   const rawName = feature.properties?.[cfg.trailProp];
   if (!rawName) return null;
 
-  // Map through TRAIL_METADATA for display name (Godsey Ridge trails use raw
-  // names like "Green as built" that need mapping)
-  const meta = TRAIL_METADATA[rawName];
-  return meta?.displayName ?? rawName;
+  return cfg.toDisplayName(rawName);
 }
 
 // Geocoding utility
