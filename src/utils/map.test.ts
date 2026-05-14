@@ -13,6 +13,7 @@ import {
   TRAIL_LAYERS,
 } from './map';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
+import { MTN_BIKE_LAYER_ID } from '@/data/geo_data';
 import { TRAIL_METADATA, RATING_COLORS } from '@/data/trail-metadata';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type mapboxgl from 'mapbox-gl';
@@ -515,12 +516,12 @@ describe('updateMtnBikeOpacity', () => {
 
     // Main layer should get case expressions for line-opacity and line-width
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails',
+      MTN_BIKE_LAYER_ID,
       'line-opacity',
       ['case', ['==', ['get', 'Trail'], 'Five Points'], 0.9, 0.5],
     );
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails',
+      MTN_BIKE_LAYER_ID,
       'line-width',
       ['case', ['==', ['get', 'Trail'], 'Five Points'], 4, 3],
     );
@@ -535,22 +536,19 @@ describe('updateMtnBikeOpacity', () => {
     updateMtnBikeOpacity(mockMap, null);
 
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails',
+      MTN_BIKE_LAYER_ID,
       'line-opacity',
       0.5,
     );
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails',
+      MTN_BIKE_LAYER_ID,
       'line-width',
       3,
     );
   });
 
   it('should handle missing casing and glow layers gracefully', () => {
-    const mainLayers = new Set([
-      'SORBA Regional Trails',
-      'Godsey Ridge Trails',
-    ]);
+    const mainLayers = new Set([MTN_BIKE_LAYER_ID, 'Godsey Ridge Trails']);
     const mockMap = {
       setPaintProperty: vi.fn(),
       getLayer: vi.fn((id: string) =>
@@ -565,7 +563,7 @@ describe('updateMtnBikeOpacity', () => {
     // 2 properties per main layer, 2 layers = 4 calls (no casing/glow)
     expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(4);
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails',
+      MTN_BIKE_LAYER_ID,
       'line-opacity',
       expect.anything(),
     );
@@ -581,24 +579,24 @@ describe('updateMtnBikeOpacity', () => {
 
     // Casing layer updates
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails Casing',
+      `${MTN_BIKE_LAYER_ID} Casing`,
       'line-opacity',
       expect.anything(),
     );
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails Casing',
+      `${MTN_BIKE_LAYER_ID} Casing`,
       'line-width',
       expect.anything(),
     );
 
     // Glow layer updates
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails Glow',
+      `${MTN_BIKE_LAYER_ID} Glow`,
       'line-opacity',
       expect.anything(),
     );
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails Glow',
+      `${MTN_BIKE_LAYER_ID} Glow`,
       'line-width',
       expect.anything(),
     );
@@ -633,12 +631,12 @@ describe('highlightMtnBikeArea', () => {
 
     // Should set match expression on main layer with matching trail names
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails',
+      MTN_BIKE_LAYER_ID,
       'line-opacity',
       ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 0.9, 0.4],
     );
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'SORBA Regional Trails',
+      MTN_BIKE_LAYER_ID,
       'line-width',
       ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 3, 3],
     );
@@ -663,30 +661,26 @@ describe('highlightMtnBikeArea', () => {
 });
 
 describe('TRAIL_LAYERS', () => {
-  it('has entries for both SORBA and Godsey Ridge layers', () => {
+  it('has entries for both mountain-bike and Godsey Ridge layers', () => {
     expect(TRAIL_LAYERS.length).toBeGreaterThanOrEqual(2);
     expect(
-      TRAIL_LAYERS.find((l) => l.layerId === 'SORBA Regional Trails'),
+      TRAIL_LAYERS.find((l) => l.layerId === MTN_BIKE_LAYER_ID),
     ).toBeDefined();
     expect(
       TRAIL_LAYERS.find((l) => l.layerId === 'Godsey Ridge Trails'),
     ).toBeDefined();
   });
 
-  it('SORBA layer uses rating property directly', () => {
-    const sorba = TRAIL_LAYERS.find(
-      (l) => l.layerId === 'SORBA Regional Trails',
-    );
-    expect(sorba?.hasRatingProp).toBe(true);
-    expect(sorba?.trailProp).toBe('Trail');
+  it('mountain-bike layer reads the Trail property and identity-maps names', () => {
+    const cfg = TRAIL_LAYERS.find((l) => l.layerId === MTN_BIKE_LAYER_ID);
+    expect(cfg?.trailProp).toBe('Trail');
+    expect(cfg?.toRawName('Five Points')).toBe('Five Points');
   });
 
-  it('Godsey layer uses metadata for ratings', () => {
-    const godsey = TRAIL_LAYERS.find(
-      (l) => l.layerId === 'Godsey Ridge Trails',
-    );
-    expect(godsey?.hasRatingProp).toBe(false);
-    expect(godsey?.trailProp).toBe('Name');
+  it('Godsey layer reads the Name property and resolves display names', () => {
+    const cfg = TRAIL_LAYERS.find((l) => l.layerId === 'Godsey Ridge Trails');
+    expect(cfg?.trailProp).toBe('Name');
+    expect(cfg?.toRawName('Godsey Ridge Green')).toBe('Green as built');
   });
 });
 
@@ -749,10 +743,10 @@ describe('initMtnBikeColors', () => {
 describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
   it('reverse-maps display name to raw feature value for metadata layers', () => {
     const allLayers = new Set([
-      'SORBA Regional Trails',
+      MTN_BIKE_LAYER_ID,
       'Godsey Ridge Trails',
-      'SORBA Regional Trails Casing',
-      'SORBA Regional Trails Glow',
+      `${MTN_BIKE_LAYER_ID} Casing`,
+      `${MTN_BIKE_LAYER_ID} Glow`,
       'Godsey Ridge Trails Casing',
       'Godsey Ridge Trails Glow',
     ]);
@@ -789,7 +783,7 @@ describe('detectTrailAtPoint', () => {
     const mockMap = createMockMap({
       queryRenderedFeatures: vi.fn().mockReturnValue([
         {
-          layer: { id: 'SORBA Regional Trails Hit' },
+          layer: { id: `${MTN_BIKE_LAYER_ID} Hit` },
           properties: { Trail: 'Big Forest' },
         },
       ]),
@@ -800,7 +794,7 @@ describe('detectTrailAtPoint', () => {
     expect(mockMap.project).toHaveBeenCalled();
     expect(mockMap.queryRenderedFeatures).toHaveBeenCalledWith(
       { x: 100, y: 100 },
-      { layers: expect.arrayContaining(['SORBA Regional Trails Hit']) },
+      { layers: expect.arrayContaining([`${MTN_BIKE_LAYER_ID} Hit`]) },
     );
   });
 
@@ -851,7 +845,7 @@ describe('detectTrailAtPoint', () => {
     const mockMap = createMockMap({
       queryRenderedFeatures: vi.fn().mockReturnValue([
         {
-          layer: { id: 'SORBA Regional Trails Hit' },
+          layer: { id: `${MTN_BIKE_LAYER_ID} Hit` },
           properties: {},
         },
       ]),

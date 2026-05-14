@@ -4,9 +4,11 @@ import {
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 
-// Mapbox tileset layer identifiers (must match Mapbox Studio names)
-export const MTN_BIKE_LAYER_ID = 'SORBA Regional Trails';
-export const MTN_BIKE_SOURCE_LAYER = 'Chattanooga_Regional_Trails_4-dhs2zs';
+// Mapbox tileset layer identifiers (must match Mapbox Studio names).
+// The trail tileset was re-uploaded as Chatt_TPL_Trails; the layer no longer
+// has a per-feature rating prop, so colors come from mountainBikeTrails below.
+export const MTN_BIKE_LAYER_ID = 'Chatt_TPL_Trails-public';
+export const MTN_BIKE_SOURCE_LAYER = 'Chatt_TPL_Trails_Shape_FIle_N-d7idph';
 
 export const GODSEY_LAYER_ID = 'Godsey Ridge Trails';
 export const GODSEY_SOURCE_LAYER = 'LineStrings';

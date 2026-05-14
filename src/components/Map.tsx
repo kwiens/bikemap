@@ -952,11 +952,12 @@ const MapboxMap = memo(function MapboxMap() {
           initMtnBikeLayers(newMap);
           initTrailBoundsFromDefaults(mountainBikeTrails);
 
+          // Apply unselected defaults (opacity/width) through the shared
+          // helper so deselect and init stay in sync — see updateMtnBikeOpacity.
+          updateMtnBikeOpacity(newMap, null);
+
           for (const cfg of TRAIL_LAYERS) {
             if (!newMap.getLayer(cfg.layerId)) continue;
-
-            newMap.setPaintProperty(cfg.layerId, 'line-opacity', 0.35);
-            newMap.setPaintProperty(cfg.layerId, 'line-width', 3);
 
             // Click handler on hit-test layer for easier tapping
             const hId = `${cfg.layerId} Hit`;
@@ -1140,6 +1141,37 @@ const MapboxMap = memo(function MapboxMap() {
         window.addEventListener(MAP_EVENTS.LOCATION_UPDATE, onFirstLocation, {
           once: true,
         });
+
+        // Ask for a cached/coarse fix so the dot paints on tap instead of
+        // waiting for the watchPosition (maximumAge: 0) to acquire a fresh
+        // high-accuracy fix on iOS cold start. The existing watchPosition
+        // callback handles marker creation and accuracy circle updates.
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            if (!map.current || locationMarker.current) return;
+            locationMarker.current = createLocationMarker(
+              position.coords.longitude,
+              position.coords.latitude,
+            );
+            locationMarker.current.addTo(map.current);
+            locationAccuracy.current = position.coords.accuracy;
+            updateAccuracyCircle(
+              locationMarker.current,
+              position.coords.accuracy,
+              map.current.getZoom(),
+            );
+            window.dispatchEvent(
+              new CustomEvent(MAP_EVENTS.LOCATION_UPDATE, {
+                detail: {
+                  lng: position.coords.longitude,
+                  lat: position.coords.latitude,
+                },
+              }),
+            );
+          },
+          () => {},
+          { enableHighAccuracy: false, maximumAge: 60_000, timeout: 5_000 },
+        );
       }
 
       // Continuously re-center on current position using jumpTo (no animation)
