@@ -3,6 +3,8 @@ import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import {
   MTN_BIKE_LAYER_ID,
   MTN_BIKE_SOURCE_LAYER,
+  MTN_BIKE_TILESET_URL,
+  MTN_BIKE_SOURCE_ID,
   GODSEY_LAYER_ID,
   GODSEY_SOURCE_LAYER,
   mountainBikeTrails,
@@ -289,6 +291,39 @@ function hitId(layerId: string): string {
 }
 
 export { TRAIL_LAYERS };
+
+// The Mapbox Studio style no longer includes the SORBA tileset, so attach
+// it ourselves. Idempotent: skips if the source/layer already exist.
+export function ensureMtnBikeSource(map: mapboxgl.Map): void {
+  try {
+    if (!map.getSource(MTN_BIKE_SOURCE_ID)) {
+      map.addSource(MTN_BIKE_SOURCE_ID, {
+        type: 'vector',
+        url: MTN_BIKE_TILESET_URL,
+      });
+    }
+    if (!map.getLayer(MTN_BIKE_LAYER_ID)) {
+      map.addLayer({
+        id: MTN_BIKE_LAYER_ID,
+        type: 'line',
+        source: MTN_BIKE_SOURCE_ID,
+        'source-layer': MTN_BIKE_SOURCE_LAYER,
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+          'line-round-limit': 0.1,
+        },
+        paint: {
+          'line-color': UNRATED_COLOR,
+          'line-width': 3,
+          'line-opacity': 0.5,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Failed to attach SORBA trail source/layer:', error);
+  }
+}
 
 export function initMtnBikeColors(map: mapboxgl.Map): void {
   for (const cfg of TRAIL_LAYERS) {

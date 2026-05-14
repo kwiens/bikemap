@@ -43,6 +43,7 @@ import {
   highlightMtnBikeArea,
   initMtnBikeColors,
   initMtnBikeLayers,
+  ensureMtnBikeSource,
   TRAIL_LAYERS,
   addRideLayer,
   updateRideLayer,
@@ -947,7 +948,9 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
-          // Initialize all mountain bike trail layers
+          // Initialize all mountain bike trail layers. The SORBA tileset
+          // isn't included in the Mapbox Studio style, so attach it first.
+          ensureMtnBikeSource(newMap);
           initMtnBikeColors(newMap);
           initMtnBikeLayers(newMap);
           initTrailBoundsFromDefaults(mountainBikeTrails);
