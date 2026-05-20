@@ -10,6 +10,7 @@ import {
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
+import { siteConfig } from '@/config/site.config';
 import { MAP_EVENTS } from '@/events';
 import { getSetting, setSetting, type RideStyle } from '@/utils/settings';
 
@@ -62,7 +63,7 @@ const choices: {
   },
 ];
 
-const STORAGE_KEY = 'bikechatt-welcome-dismissed';
+const STORAGE_KEY = `${siteConfig.storageKeyPrefix}-welcome-dismissed`;
 
 export function getRideStyle(): RideStyle | null {
   return getSetting('rideStyle') ?? null;
@@ -114,10 +115,10 @@ export function WelcomeModal() {
             <FontAwesomeIcon icon={faBicycle} />
           </span>
           <h1 className="text-[28px] font-bold text-app-secondary mb-1 tracking-tight">
-            Bike Chatt
+            {siteConfig.name}
           </h1>
           <p className="text-[15px] text-gray-500 font-normal">
-            Your guide to biking Chattanooga
+            {siteConfig.tagline}
           </p>
         </div>
 

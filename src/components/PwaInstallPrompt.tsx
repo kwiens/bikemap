@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { siteConfig } from '@/config/site.config';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -105,7 +106,7 @@ export function PwaInstallPrompt(): React.ReactElement | null {
       <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-white/95 p-4 shadow-lg backdrop-blur">
         <div className="flex-1">
           <p className="text-sm font-semibold text-emerald-900">
-            Add Bike Chatt to your home screen
+            Add {siteConfig.name} to your home screen
           </p>
           <p className="text-xs text-emerald-700">
             {isIos
