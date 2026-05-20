@@ -64,6 +64,12 @@ const PAUSE_GESTURE_MS = 10000;
 
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
+if (!mapConfig.mapbox.accessToken) {
+  console.warn(
+    'NEXT_PUBLIC_MAPBOX_TOKEN is not set — the map will fail to load. ' +
+      'Copy .env.example to .env.local and add a Mapbox token.',
+  );
+}
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {

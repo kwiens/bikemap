@@ -1,5 +1,4 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Question or discussion
-    url: https://github.com/kwiens/bikemap/discussions
-    about: For usage questions and open-ended discussion, start here instead of an issue.
+# Blank issues stay enabled as the escape hatch for questions and anything
+# the templates don't cover. Add a Discussions contact_link here if/when
+# GitHub Discussions is enabled for the repo.
+blank_issues_enabled: true
