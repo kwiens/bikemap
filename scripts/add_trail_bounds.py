@@ -1,5 +1,5 @@
 """
-Update trail defaultBounds and distance in geo_data.ts from Mapbox feature coordinates.
+Update trail defaultBounds and distance in mountain-bike-trails.data.ts from Mapbox feature coordinates.
 
 Usage:
   1. Open the map in Chrome with the MTB trail layer visible
@@ -99,8 +99,8 @@ for name, segments in trail_coords.items():
 
 print(f"Computed data for {len(trail_data)} trails")
 
-# Read the geo_data.ts file
-with open('src/data/geo_data.ts', 'r') as f:
+# Read the mountain-bike-trails.data.ts file
+with open('src/data/mountain-bike-trails.data.ts', 'r') as f:
     content = f.read()
 
 updated_bounds = 0
@@ -151,7 +151,7 @@ for trail_name, data in trail_data.items():
             content = new_content
             updated_distances += 1
 
-with open('src/data/geo_data.ts', 'w') as f:
+with open('src/data/mountain-bike-trails.data.ts', 'w') as f:
     f.write(content)
 
 print(f"Updated {updated_bounds} bounds, {updated_distances} distances")
