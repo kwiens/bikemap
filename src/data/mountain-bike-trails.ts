@@ -17,7 +17,7 @@ export interface MountainBikeTrail {
   trailName: string; // Trail property value from Mapbox features
   displayName: string; // Human-friendly display name
   recArea: string; // Recreation area grouping
-  rating: string; // "easy" | "intermediate" | ""
+  rating: string; // "easy" | "intermediate" | "advanced" | "expert" | ""
   color: string; // Display color
   icon: IconDefinition;
   distance?: number; // Trail length in miles
