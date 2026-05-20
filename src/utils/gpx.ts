@@ -5,7 +5,7 @@ import type { StoredRidePoint } from '../data/ride';
 import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
 
-function escapeXml(str: string): string {
+export function escapeXml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
