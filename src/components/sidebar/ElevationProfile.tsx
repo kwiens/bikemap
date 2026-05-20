@@ -21,6 +21,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { getSetting } from '@/utils/settings';
+import { siteConfig } from '@/config/site.config';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
 
 const CHART_HEIGHT = 100;
@@ -119,7 +120,7 @@ function downloadGpx(profile: ElevationProfileData): void {
     .join('\n');
 
   const gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Bike Chatt" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="${siteConfig.name}" xmlns="http://www.topografix.com/GPX/1/1">
   <trk>
     <name>${profile.trail}</name>
     <trkseg>

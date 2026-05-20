@@ -1,4 +1,6 @@
-const COOKIE_NAME = 'bikechatt-settings';
+import { siteConfig } from '@/config/site.config';
+
+const COOKIE_NAME = `${siteConfig.storageKeyPrefix}-settings`;
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 
 export type RideStyle = 'casual' | 'mountain';
