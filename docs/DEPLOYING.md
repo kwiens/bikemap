@@ -79,6 +79,9 @@ contract of `BikeRoute`, `MountainBikeTrail`, `BikeResource`, `MapFeature`, and
   Each `MountainBikeTrail.trailName` must match the tileset's `Trail` feature
   property. See `CLAUDE.md` for DevTools snippets to discover layer/tileset
   names after a GIS re-upload.
+  - **Keep the elevation script in sync:** `scripts/add_trail_elevation.py`
+    has its own `MVT_TILESET` constant. If you use the pipeline in step 7,
+    point it at the **same** tileset as `MTN_BIKE_TILESET_URL`.
 
 ## 7. Trail elevation pipeline (optional)
 

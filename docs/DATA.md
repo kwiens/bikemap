@@ -46,7 +46,7 @@ its sidebar card.
 | `displayName` | `string` | Human-friendly name |
 | `recArea` | `string` | Recreation-area grouping; map it to a region in `REGION_MAP` |
 | `rating` | `string` | `easy` \| `intermediate` \| `advanced` \| `expert` \| `''` — drives the color |
-| `color` | `string` | Use the `trailColor()` helper in this file |
+| `color` | `string` | Use the `trailColor(rating, isGreenway)` helper in this file |
 | `icon` | `IconDefinition` | Font Awesome icon |
 | `distance?` | `number` | Miles — **script-generated** |
 | `elevationGain/Loss/Min/Max?` | `number` | Feet — **script-generated** |
