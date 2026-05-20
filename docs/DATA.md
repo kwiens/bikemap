@@ -12,13 +12,16 @@ library.
 | File | Export | What it is |
 |---|---|---|
 | `bike-routes.ts` | `bikeRoutes: BikeRoute[]` | Curated road / greenway routes |
-| `mountain-bike-trails.ts` | `mountainBikeTrails: MountainBikeTrail[]` | MTB trail manifest |
+| `mountain-bike-trails.data.ts` | `mountainBikeTrails: MountainBikeTrail[]` | MTB trail manifest — the array you edit |
+| `mountain-bike-trails.ts` | types, `REGION_MAP`, `regionFor` | Trail types & region logic; re-exports the array |
 | `bike-resources.ts` | `bikeResources: BikeResource[]` | Bike shops & repair stations |
 | `map-features.ts` | `mapFeatures: MapFeature[]` | Attractions / points of interest |
 | `local-resources.ts` | `localResources: LocalResource[]` | Community resource links |
 | `gbfs.ts` | — | Live bike-share API client (no static data) |
 
 `geo_data.ts` is a barrel that re-exports the above; import from `@/data/geo_data`.
+The MTB trail array lives in its own `mountain-bike-trails.data.ts` so the
+3,000-line literal doesn't bury the types and region logic.
 
 ## BikeRoute (`bike-routes.ts`)
 
@@ -38,23 +41,24 @@ its sidebar card.
 | `defaultBounds?` | `[swLng, swLat, neLng, neLat]` | Zoom-to-fit fallback when runtime bounds aren't available |
 | `bounds?` | `mapboxgl.LngLatBounds` | Computed at runtime — do not hand-author |
 
-## MountainBikeTrail (`mountain-bike-trails.ts`)
+## MountainBikeTrail (`mountain-bike-trails.data.ts`)
 
 | Field | Type | Notes |
 |---|---|---|
 | `trailName` | `string` | **Must equal the `Trail` feature property** in the trail tileset |
 | `displayName` | `string` | Human-friendly name |
-| `recArea` | `string` | Recreation-area grouping; map it to a region in `REGION_MAP` |
+| `recArea` | `string` | Recreation-area grouping; map it to a region in `REGION_MAP` (in `mountain-bike-trails.ts`) |
 | `rating` | `string` | `easy` \| `intermediate` \| `advanced` \| `expert` \| `''` — drives the color |
-| `color` | `string` | Use the `trailColor(rating, isGreenway)` helper in this file |
+| `color` | `string` | Use the `trailColor(rating, isGreenway)` helper at the top of this data file |
 | `icon` | `IconDefinition` | Font Awesome icon |
 | `distance?` | `number` | Miles — **script-generated** |
 | `elevationGain/Loss/Min/Max?` | `number` | Feet — **script-generated** |
 | `defaultBounds?` | `[swLng, swLat, neLng, neLat]` | **script-generated** |
 | `bounds?` | `mapboxgl.LngLatBounds` | Runtime only |
 
-`REGION_MAP` (same file) maps each `recArea` to a geographic region for the
-sidebar grouping — add an entry when you introduce a new `recArea`.
+`REGION_MAP` (in `mountain-bike-trails.ts`) maps each `recArea` to a geographic
+region for the sidebar grouping — add an entry when you introduce a new
+`recArea`.
 
 ## BikeResource (`bike-resources.ts`) & MapFeature (`map-features.ts`)
 

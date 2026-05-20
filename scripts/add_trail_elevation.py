@@ -6,7 +6,7 @@ from Terrain-RGB tiles. No browser extraction needed.
 
 Output:
   - public/data/elevation/{slug}.json  — per-trail elevation profiles
-  - src/data/geo_data.ts               — summary stats (gain, loss, min, max)
+  - src/data/mountain-bike-trails.data.ts  — summary stats (gain, loss, min, max)
 
 Usage: python scripts/add_trail_elevation.py
 Requires: pip install Pillow requests
@@ -28,15 +28,25 @@ _session.mount('https://', HTTPAdapter(
 # --- Constants ---
 
 def _read_mapbox_token():
-    """Read the Mapbox access token from map.config.ts."""
-    config_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'config', 'map.config.ts')
-    with open(config_path) as f:
-        content = f.read()
-    match = re.search(r"accessToken:\s*['\"](.+?)['\"]", content)
-    if not match:
-        print("Error: Could not find accessToken in src/config/map.config.ts")
+    """Read NEXT_PUBLIC_MAPBOX_TOKEN from the environment or .env.local,
+    matching how the Next.js app loads it."""
+    token = os.environ.get('NEXT_PUBLIC_MAPBOX_TOKEN')
+    if not token:
+        env_path = os.path.join(os.path.dirname(__file__), '..', '.env.local')
+        try:
+            with open(env_path) as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped.startswith('NEXT_PUBLIC_MAPBOX_TOKEN='):
+                        token = stripped.split('=', 1)[1].strip().strip('"\'')
+                        break
+        except FileNotFoundError:
+            pass
+    if not token:
+        print('Error: NEXT_PUBLIC_MAPBOX_TOKEN is not set — '
+              'add it to .env.local or your environment.')
         sys.exit(1)
-    return match.group(1)
+    return token
 
 MAPBOX_TOKEN = _read_mapbox_token()
 MVT_TILESET = 'swuller.ccfw1cmr'
@@ -48,7 +58,7 @@ SAMPLE_STEP_FT = 25
 METERS_TO_FEET = 3.28084
 EARTH_RADIUS_FT = 20902231.0
 OUTPUT_DIR = 'public/data/elevation'
-GEO_DATA_PATH = 'src/data/mountain-bike-trails.ts'
+GEO_DATA_PATH = 'src/data/mountain-bike-trails.data.ts'
 TILE_CACHE_DIR = 'scripts/.tile_cache'
 
 # --- Caches ---
@@ -520,7 +530,7 @@ def extract_all_trails(zoom, bbox):
 
 
 def get_known_trails():
-    """Extract trail names and defaultBounds from geo_data.ts."""
+    """Extract trail names and defaultBounds from mountain-bike-trails.data.ts."""
     with open(GEO_DATA_PATH) as f:
         content = f.read()
 
@@ -605,11 +615,11 @@ def slugify(name):
 
 
 # ============================================================
-# geo_data.ts Updater
+# mountain-bike-trails.data.ts Updater
 # ============================================================
 
 def update_geo_data(trail_data):
-    """Update geo_data.ts with distance and elevation summary stats.
+    """Update mountain-bike-trails.data.ts with distance and elevation summary stats.
 
     Uses a line-by-line approach to avoid regex crossing trail boundaries.
     """
@@ -758,10 +768,10 @@ def main():
     print(f"\nDone! {len(trail_results)} profiles in {time.time() - start_time:.1f}s")
     print(f"Terrain tiles: {len(terrain_cache)}, MVT tiles: {len(mvt_cache)}")
 
-    # Step 3: Update mountain-bike-trails.ts
-    print("\nUpdating mountain-bike-trails.ts...")
+    # Step 3: Update mountain-bike-trails.data.ts
+    print("\nUpdating mountain-bike-trails.data.ts...")
     updated = update_geo_data(trail_results)
-    print(f"Updated {updated} trails in mountain-bike-trails.ts")
+    print(f"Updated {updated} trails in mountain-bike-trails.data.ts")
 
 
 if __name__ == '__main__':
