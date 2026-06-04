@@ -17,6 +17,12 @@ build
 .DS_Store
 *.pem
 
+# build artifacts
+tsconfig.tsbuildinfo
+
+# codex
+.codex
+
 # debug
 npm-debug.log*
 yarn-debug.log*
