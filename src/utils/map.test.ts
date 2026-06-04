@@ -8,6 +8,7 @@ import {
   updateMtnBikeOpacity,
   highlightMtnBikeArea,
   initMtnBikeColors,
+  hideStrayStyleLayers,
   detectTrailAtPoint,
   toLngLatBounds,
   TRAIL_LAYERS,
@@ -737,6 +738,34 @@ describe('initMtnBikeColors', () => {
     initMtnBikeColors(mockMap);
 
     expect(mockMap.setPaintProperty).not.toHaveBeenCalled();
+  });
+});
+
+describe('hideStrayStyleLayers', () => {
+  it('hides the baked-in TPL trails layer when present', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue({ id: 'test' }),
+      setLayoutProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    hideStrayStyleLayers(mockMap);
+
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      'Chatt_TPL_Trails-public',
+      'visibility',
+      'none',
+    );
+  });
+
+  it('does nothing when the stray layer is absent from the style', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue(undefined),
+      setLayoutProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    hideStrayStyleLayers(mockMap);
+
+    expect(mockMap.setLayoutProperty).not.toHaveBeenCalled();
   });
 });
 

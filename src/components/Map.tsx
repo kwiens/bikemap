@@ -44,6 +44,7 @@ import {
   initMtnBikeColors,
   initMtnBikeLayers,
   ensureMtnBikeSource,
+  hideStrayStyleLayers,
   TRAIL_LAYERS,
   addRideLayer,
   updateRideLayer,
@@ -959,6 +960,9 @@ const MapboxMap = memo(function MapboxMap() {
           ensureMtnBikeSource(newMap);
           initMtnBikeColors(newMap);
           initMtnBikeLayers(newMap);
+          // Suppress orphan trail layers baked into the Studio style (e.g. the
+          // leftover TPL trails layer) so they don't render over our routes.
+          hideStrayStyleLayers(newMap);
           initTrailBoundsFromDefaults(mountainBikeTrails);
 
           // Apply unselected defaults (opacity/width) through the shared
