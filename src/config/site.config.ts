@@ -1,6 +1,10 @@
 // Site identity / branding configuration.
 // A fork rebrands by editing this file (plus map.config.ts and src/data/*).
 
+import { mapConfig } from './map.config';
+
+const region = mapConfig.region.displayName;
+
 export interface SiteConfig {
   /** Full app name — page title and welcome-modal heading. */
   name: string;
@@ -26,8 +30,8 @@ export interface SiteConfig {
 export const siteConfig: SiteConfig = {
   name: 'Bike Chatt',
   shortName: 'Bike Chatt',
-  description: 'Paths and routes for cyclists in Chattanooga, TN',
-  tagline: 'Your guide to biking Chattanooga',
+  description: `Paths and routes for cyclists in ${region}, TN`,
+  tagline: `Your guide to biking ${region}`,
   url: 'https://bikechatt.com',
   themeColor: '#c3f44d',
   backgroundColor: '#c3f44d',
