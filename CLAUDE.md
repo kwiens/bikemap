@@ -218,12 +218,76 @@ from the curated Chattanooga MTB/route layers and off by default.
   picked per-category from the Mapbox style's built-in **Maki** sprite (`parking`
   / `information`) — no custom sprite/spreet step. It shares the trails toggle
   via `setOsmTrailsVisible`.
-- Clickable: a transparent extra-wide hit layer (`OSM_TRAILS_HIT_LAYER_ID`) is
-  the tap target; `registerOsmTrailPopup` opens a Mapbox popup built by
-  `buildOsmTrailPopupHTML` (in `osm-trails.ts`) from the feature's OSM tags —
-  name, a difficulty badge (from `mtb:scale`, raw scale not shown), type,
-  surface, bike access, plus a "View on OpenStreetMap" link. OSM values are
-  HTML-escaped. Popup styling lives in `osm-trail-*` classes in `app/map.css`.
+- Selectable: a transparent extra-wide hit layer (`OSM_TRAILS_HIT_LAYER_ID`) is
+  the tap target. `registerOsmTrailSelection` (`utils/map.ts`) handles a click by
+  (1) reassembling the way's geometry across tiles by `OSM_ID`
+  (`collectOsmWayLines`), (2) highlighting the whole trail (`highlightOsmTrail` —
+  a blue line over a white casing, like a selected route), and (3) dispatching
+  `OSM_TRAIL_SELECT` with a ready-built `ElevationProfile` so the shared
+  `ElevationProfile` pane shows the trail's name + distance + elevation chart
+  (there is **no** popup — the pane is the only info surface). A `selectionId`
+  guards against a stale async terrain sample showing the wrong trail; selecting
+  a curated route/trail or any deselect clears the highlight, and the pane clears
+  via its own listeners. `ElevationProfile` seeds `profileCache` for the OSM name
+  so its `trailName` effect doesn't try to fetch a non-existent curated JSON.
+
+#### Precomputed length + elevation
+
+OSM trail tiles carry no length or elevation. The elevation **pane** always
+needs a per-point profile (which precompute doesn't store), so its chart is
+built from real-time terrain sampling (`buildOsmElevationProfile`). But a batch
+tool precomputes the aggregate stats (length + gain/loss/min/max) offline per
+region (sharded for an eventual nationwide run); when a region file covers the
+clicked way, those stats drive the pane's **headline numbers** (via
+`pointsToElevationProfile`'s `stats` override) — so both paths are supported.
+
+- **Tool**: `scripts/osm_trail_elevation.py`. Geometry comes from the **Overpass
+  API** (not the vector tiles — Overpass gives full-resolution ways + real OSM
+  ids that match the tileset's `OSM_ID`, and one query beats tens of thousands of
+  z14 tile requests for a whole state). The Overpass query mirrors
+  `OSM_BIKE_TRAIL_FILTER`. Elevation comes from Mapbox Terrain-RGB at z14, run
+  through a Python port of `computeElevation` (`src/utils/ride-stats.ts`) so the
+  precomputed numbers match the client's on-demand fallback. Overpass needs a
+  `User-Agent` header (else HTTP 406). Responses and terrain tiles are disk-cached
+  (`scripts/.osm_cache/`, `scripts/.tile_cache/terrain14/`, both gitignored) so
+  reruns are cheap and a national run is resumable. The two stages are throttled
+  separately: per-way terrain sampling runs across `--workers` threads (default
+  3 — Mapbox tolerates concurrency; the tile cache is thread-safe with per-tile
+  locks), but Overpass fetches default to `--overpass-workers 1` + `--polite-sleep
+  3` because concurrent/bursty Overpass requests get the client IP rate-limited or
+  temporarily blocked. Raise `--overpass-workers` only against a private/self-hosted
+  Overpass instance, never the public endpoint.
+
+  ```bash
+  python scripts/osm_trail_elevation.py --region oregon          # one state
+  python scripts/osm_trail_elevation.py --bbox=-124.6,41.9,-116.4,46.3 --region-name oregon
+  python scripts/osm_trail_elevation.py --region all             # every US state (long!)
+  # If the local IP is blocked, route just the Overpass queries through another
+  # host via SSH (key auth); elevation still samples Mapbox locally. The query
+  # travels over stdin, so its brackets/quotes never hit a shell:
+  python scripts/osm_trail_elevation.py --region tennessee --overpass-ssh user@host.example.com
+  # Or point at a different Overpass endpoint entirely:
+  python scripts/osm_trail_elevation.py --region tennessee --overpass-url https://HOST/api/interpreter
+  ```
+
+  A built-in `US_STATE_BBOX` table covers all 50 states + DC (padded boxes —
+  slight overspill into neighbors is fine). The bbox is split into `--cell-deg`
+  (default 0.5°) Overpass cells; ways are deduped by OSM id.
+
+- **Output** (`public/data/osm-elevation/`):
+  - `<region>.json` — `{ region, name, bbox, generatedAt, count, trails }` where
+    `trails` maps `"<osmId>"` → `[lengthMeters, gain, loss, min, max]` (meters,
+    compact arrays). One file per region.
+  - `index.json` — manifest of `{ region, name, bbox, file }`, upserted on every
+    run so files accumulate across regions.
+
+- **Client**: `lookupPrecomputedElevation(osmId, lng, lat)` in
+  `src/utils/osm-elevation.ts` loads the manifest once, then lazily loads + caches
+  the region file(s) whose bbox covers the clicked point and looks up the way id.
+  `registerOsmTrailSelection` (`utils/map.ts`) passes any hit to
+  `buildOsmElevationProfile(lines, name, token, precomputed)` so the precomputed
+  totals become the pane's headline stats; on a miss the totals are computed from
+  the real-time samples instead.
 
 ### Mapbox UI Overlays
 

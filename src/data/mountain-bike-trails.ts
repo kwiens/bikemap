@@ -1,4 +1,5 @@
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import type { OsmTrailDetails } from './osm-trails';
 
 // MTB trails tileset. The Mapbox Studio style no longer references this
 // tileset, so we add it ourselves at runtime (see ensureMtnBikeSource).
@@ -37,6 +38,9 @@ export interface ElevationProfile {
   min: number;
   max: number;
   profile: [number, number, number, number][]; // [distance_ft, elevation_ft, lng, lat]
+  // OSM trails only: a tiny tag summary shown beneath the pane header. Curated
+  // trails and recorded rides leave this undefined.
+  osm?: OsmTrailDetails;
 }
 
 // Maps recArea to its geographic region

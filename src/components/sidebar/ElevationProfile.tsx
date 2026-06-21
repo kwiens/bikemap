@@ -192,15 +192,35 @@ export function ElevationProfile() {
       setTrailName(name);
       window.history.replaceState(null, '', `?trail=${slugify(name)}`);
     };
+    // OSM trails ship a ready-built profile (no curated JSON to load by name),
+    // and aren't restorable by slug on reload, so no URL state is written.
+    // Seed the cache so the trailName effect takes its cache-hit path instead of
+    // fetching a non-existent /data/elevation/<slug>.json and clearing us.
+    const handleOsmTrailSelect = (e: Event) => {
+      const { profile: osmProfile } = (e as CustomEvent).detail as {
+        profile: ElevationProfileData;
+      };
+      sourceRef.current = 'trail';
+      rideIdRef.current = null;
+      profileCache.set(osmProfile.trail, osmProfile);
+      setTrailName(osmProfile.trail);
+      setProfile(osmProfile);
+      profileRef.current = osmProfile;
+      setHoverIndex(null);
+      setLocationIndex(null);
+      setLoading(false);
+    };
     const handleRouteSelect = () => {
       // Routes never show an elevation profile, so selecting one must clear
       // whatever profile is currently displayed (trail or ride) — otherwise a
-      // map route-click leaves the previous trail's chart visible.
+      // map route-click leaves the previous trail's chart visible. (sourceRef is
+      // only ever 'trail' or 'ride', so the old `=== 'route'` guard never hit.)
       if (sourceRef.current !== null) {
         sourceRef.current = null;
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
+        window.history.replaceState(null, '', window.location.pathname);
       }
     };
     const handleTrailDeselect = () => {
@@ -273,6 +293,7 @@ export function ElevationProfile() {
     };
 
     window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
+    window.addEventListener(MAP_EVENTS.OSM_TRAIL_SELECT, handleOsmTrailSelect);
     window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
     window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
@@ -294,6 +315,10 @@ export function ElevationProfile() {
 
     return () => {
       window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
+      window.removeEventListener(
+        MAP_EVENTS.OSM_TRAIL_SELECT,
+        handleOsmTrailSelect,
+      );
       window.removeEventListener(
         MAP_EVENTS.TRAIL_DESELECT,
         handleTrailDeselect,
@@ -556,6 +581,31 @@ export function ElevationProfile() {
           </button>
         </div>
       </div>
+
+      {profile.osm && (
+        <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-1 -mt-0.5">
+          <span className="truncate capitalize">
+            {[
+              profile.osm.difficulty,
+              profile.osm.type,
+              profile.osm.surface,
+              profile.osm.bikes && `Bikes: ${profile.osm.bikes}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          {profile.osm.url && (
+            <a
+              href={profile.osm.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto shrink-0 text-blue-600 hover:underline"
+            >
+              OSM ↗
+            </a>
+          )}
+        </div>
+      )}
 
       <div className="flex relative">
         <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
