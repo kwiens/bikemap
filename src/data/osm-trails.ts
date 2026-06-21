@@ -1,4 +1,5 @@
 import { escapeXml } from '@/utils/gpx';
+import { formatDistance, formatElevation } from '@/utils/format';
 
 // Nationwide OSM bike trails, served as vector tiles by OpenStreetMap US.
 // https://openstreetmap.us/our-work/tileservice/
@@ -147,8 +148,47 @@ export function osmTrailDetailRows(props: OsmTrailProps): [string, string][] {
   return rows;
 }
 
+// Length + elevation derived from the trail geometry (utils/osm-elevation).
+// Elevation resolves asynchronously, so the popup first renders with status
+// 'pending' and is rebuilt once sampling finishes.
+export interface OsmTrailMetrics {
+  lengthMeters?: number;
+  elevation?: { gain: number; loss: number } | null;
+  elevationStatus?: 'pending' | 'ready' | 'unavailable';
+}
+
+function fact(label: string, valueHtml: string): string {
+  return `<div class="osm-trail-fact"><dt>${escapeXml(label)}</dt><dd>${valueHtml}</dd></div>`;
+}
+
+// Length/elevation rows. Values are app-computed (not user OSM text), but pass
+// them through escapeXml anyway for consistency.
+function metricFacts(metrics?: OsmTrailMetrics): string {
+  if (!metrics) return '';
+  const rows: string[] = [];
+
+  if (metrics.lengthMeters && metrics.lengthMeters > 0) {
+    rows.push(fact('Length', escapeXml(formatDistance(metrics.lengthMeters))));
+  }
+
+  if (metrics.elevationStatus === 'pending') {
+    rows.push(
+      fact('Elevation', '<span class="osm-trail-pending">Calculating…</span>'),
+    );
+  } else if (metrics.elevation) {
+    const { gain, loss } = metrics.elevation;
+    const value = `↑${formatElevation(gain)} · ↓${formatElevation(loss)}`;
+    rows.push(fact('Elevation', escapeXml(value)));
+  }
+
+  return rows.join('');
+}
+
 /** Build the popup HTML for a clicked OSM trail feature (escaped). */
-export function buildOsmTrailPopupHTML(props: OsmTrailProps): string {
+export function buildOsmTrailPopupHTML(
+  props: OsmTrailProps,
+  metrics?: OsmTrailMetrics,
+): string {
   const name = str(props.name) || 'Unnamed trail';
   const type = osmTrailType(props);
   const difficulty = osmTrailDifficulty(props);
@@ -165,13 +205,11 @@ export function buildOsmTrailPopupHTML(props: OsmTrailProps): string {
       ? `<div class="osm-trail-subhead">${badge}${typeLabel}</div>`
       : '';
 
-  const facts = rows
-    .map(
-      ([k, v]) =>
-        `<div class="osm-trail-fact"><dt>${escapeXml(k)}</dt><dd>${escapeXml(v)}</dd></div>`,
-    )
-    .join('');
-  const factsHtml = facts ? `<dl class="osm-trail-facts">${facts}</dl>` : '';
+  const tagFacts = rows.map(([k, v]) => fact(k, escapeXml(v))).join('');
+  const allFacts = metricFacts(metrics) + tagFacts;
+  const factsHtml = allFacts
+    ? `<dl class="osm-trail-facts">${allFacts}</dl>`
+    : '';
 
   const url = osmFeatureUrl(props);
   const link = url

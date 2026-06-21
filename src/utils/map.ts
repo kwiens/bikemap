@@ -25,8 +25,12 @@ import {
   OSM_POI_SOURCE_LAYER,
   OSM_TRAILS_TILEJSON_URL,
   MTB_SCALE_RATING,
-  buildOsmTrailPopupHTML,
 } from '@/data/osm-trails';
+import {
+  lookupPrecomputedElevation,
+  buildOsmElevationProfile,
+} from '@/utils/osm-elevation';
+import { MAP_EVENTS } from '@/events';
 
 // Route utilities
 export function updateRouteOpacity(
@@ -520,31 +524,159 @@ export function setOsmTrailsVisible(map: mapboxgl.Map, visible: boolean): void {
   }
 }
 
+// --- Selected OSM trail highlight --------------------------------------------
+const OSM_HL_SOURCE_ID = 'osm-trail-highlight';
+const OSM_HL_CASING_ID = 'osm-trail-highlight-casing';
+const OSM_HL_LINE_ID = 'osm-trail-highlight-line';
+
+export function clearOsmTrailHighlight(map: mapboxgl.Map): void {
+  for (const id of [OSM_HL_LINE_ID, OSM_HL_CASING_ID]) {
+    if (map.getLayer(id)) map.removeLayer(id);
+  }
+  if (map.getSource(OSM_HL_SOURCE_ID)) map.removeSource(OSM_HL_SOURCE_ID);
+}
+
+// Draw a bright highlight over the selected OSM way (white casing + blue line),
+// the way curated routes are emphasised when selected.
+export function highlightOsmTrail(
+  map: mapboxgl.Map,
+  lines: [number, number][][],
+): void {
+  clearOsmTrailHighlight(map);
+  if (lines.length === 0) return;
+
+  map.addSource(OSM_HL_SOURCE_ID, {
+    type: 'geojson',
+    data: {
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'MultiLineString', coordinates: lines },
+    },
+  });
+  map.addLayer({
+    id: OSM_HL_CASING_ID,
+    type: 'line',
+    source: OSM_HL_SOURCE_ID,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
+  });
+  map.addLayer({
+    id: OSM_HL_LINE_ID,
+    type: 'line',
+    source: OSM_HL_SOURCE_ID,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 1 },
+  });
+}
+
+// Gather all loaded line geometry for an OSM way, keyed by its OSM id so a way
+// split across vector tiles is reassembled. Falls back to the clicked feature's
+// own geometry when there's no id or nothing else is loaded.
+function collectOsmWayLines(
+  map: mapboxgl.Map,
+  osmId: unknown,
+  clicked: mapboxgl.GeoJSONFeature,
+): [number, number][][] {
+  let features: GeoJSON.Feature[] = [];
+  if (osmId != null) {
+    features = map.querySourceFeatures(OSM_TRAILS_SOURCE_ID, {
+      sourceLayer: OSM_TRAILS_SOURCE_LAYER,
+      filter: ['==', ['get', 'OSM_ID'], osmId as string | number],
+    });
+  }
+  if (features.length === 0) features = [clicked];
+
+  const lines: [number, number][][] = [];
+  for (const feature of features) {
+    const geom = feature.geometry;
+    if (geom.type === 'LineString') {
+      lines.push(geom.coordinates as [number, number][]);
+    } else if (geom.type === 'MultiLineString') {
+      for (const line of geom.coordinates) {
+        lines.push(line as [number, number][]);
+      }
+    }
+  }
+  return lines;
+}
+
 // Make OSM trails clickable: a click on the (transparent, wide) hit layer opens
 // a popup with the trail's name + OSM tags. Mapbox only fires layer events for
 // visible layers, so these no-op while the layer is toggled off. Registered
 // once after the layer is attached.
-export function registerOsmTrailPopup(map: mapboxgl.Map): void {
-  let popup: mapboxgl.Popup | null = null;
+export function registerOsmTrailSelection(map: mapboxgl.Map): void {
+  // Bumped on every new selection or clear; pending async work checks it so a
+  // stale terrain sample can't show the wrong trail's pane.
+  let selectionId = 0;
+  // True only while we dispatch our own deselect events (to clear a curated
+  // selection) so the foreign-select listener below doesn't tear us down too.
+  let selecting = false;
+
+  const clearSelection = () => {
+    selectionId++;
+    clearOsmTrailHighlight(map);
+  };
+
+  // Selecting a curated route/trail, or any deselect (e.g. an empty-map click),
+  // clears the OSM highlight. The elevation pane clears via its own listeners on
+  // these same events.
+  const onForeignSelect = () => {
+    if (!selecting) clearSelection();
+  };
+  for (const ev of [
+    MAP_EVENTS.ROUTE_SELECT,
+    MAP_EVENTS.TRAIL_SELECT,
+    MAP_EVENTS.ROUTE_DESELECT,
+    MAP_EVENTS.TRAIL_DESELECT,
+  ]) {
+    window.addEventListener(ev, onForeignSelect);
+  }
 
   map.on('click', OSM_TRAILS_HIT_LAYER_ID, (e) => {
-    // A curated trail/route sitting on top already handled this click — don't
-    // also pop an OSM popup over it.
+    // A curated trail/route sitting on top already handled this click.
     if (e.defaultPrevented) return;
     const feature = e.features?.[0];
     if (!feature) return;
     // Stop the empty-map click handler from also deselecting routes/trails.
     e.preventDefault();
-    popup?.remove();
-    popup = new mapboxgl.Popup({
-      closeButton: true,
-      closeOnClick: true,
-      className: 'custom-popup',
-      maxWidth: '300px',
-    })
-      .setLngLat(e.lngLat)
-      .setHTML(buildOsmTrailPopupHTML(feature.properties ?? {}))
-      .addTo(map);
+
+    const props = feature.properties ?? {};
+    // Reconstruct the full way across tile boundaries by OSM id so length and
+    // elevation aren't truncated at the clicked tile's edge.
+    const lines = collectOsmWayLines(map, props.OSM_ID, feature);
+    const name =
+      typeof props.name === 'string' && props.name.trim()
+        ? props.name.trim()
+        : 'Unnamed trail';
+    const token = mapboxgl.accessToken ?? '';
+
+    // Replace any prior OSM selection, then clear any curated route/trail
+    // selection (guarded so our own deselects don't tear down this selection).
+    clearSelection();
+    const mySelection = selectionId;
+    selecting = true;
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+    selecting = false;
+
+    // Highlight the whole way like a selected route.
+    highlightOsmTrail(map, lines);
+
+    // Build the elevation pane's profile. The per-point chart always comes from
+    // real-time terrain sampling (precompute stores no points); precomputed
+    // stats, when available, drive the headline totals — supporting both paths.
+    lookupPrecomputedElevation(props.OSM_ID, e.lngLat.lng, e.lngLat.lat)
+      .catch(() => null)
+      .then((precomputed) =>
+        buildOsmElevationProfile(lines, name, token, precomputed),
+      )
+      .then((profile) => {
+        if (selectionId !== mySelection || !profile) return; // superseded
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, { detail: { profile } }),
+        );
+      })
+      .catch(() => {});
   });
 
   map.on('mouseenter', OSM_TRAILS_HIT_LAYER_ID, () => {

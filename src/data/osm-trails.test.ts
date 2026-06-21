@@ -107,4 +107,39 @@ describe('buildOsmTrailPopupHTML', () => {
     const html = buildOsmTrailPopupHTML({ name: 'X' });
     expect(html).not.toContain('openstreetmap.org');
   });
+
+  it('renders length and a pending elevation row', () => {
+    const html = buildOsmTrailPopupHTML(
+      { name: 'X' },
+      { lengthMeters: 805, elevationStatus: 'pending' },
+    );
+    expect(html).toContain('Length');
+    expect(html).toContain('0.5 mi');
+    expect(html).toContain('osm-trail-pending');
+    expect(html).toContain('Calculating');
+  });
+
+  it('renders resolved elevation gain/loss', () => {
+    const html = buildOsmTrailPopupHTML(
+      { name: 'X' },
+      {
+        lengthMeters: 1609,
+        elevation: { gain: 30.48, loss: 15.24 },
+        elevationStatus: 'ready',
+      },
+    );
+    expect(html).toContain('1.0 mi');
+    expect(html).toContain('100 ft'); // 30.48 m gain
+    expect(html).toContain('50 ft'); // 15.24 m loss
+    expect(html).not.toContain('Calculating');
+  });
+
+  it('omits the elevation row when unavailable', () => {
+    const html = buildOsmTrailPopupHTML(
+      { name: 'X' },
+      { lengthMeters: 805, elevationStatus: 'unavailable' },
+    );
+    expect(html).toContain('Length');
+    expect(html).not.toContain('Elevation');
+  });
 });

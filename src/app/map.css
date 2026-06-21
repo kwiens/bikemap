@@ -270,6 +270,12 @@
   text-align: right;
 }
 
+.osm-trail-pending {
+  color: #9ca3af;
+  font-style: italic;
+  font-weight: 400;
+}
+
 .osm-trail-source {
   margin-top: 12px;
   border-top: 1px solid #eee;

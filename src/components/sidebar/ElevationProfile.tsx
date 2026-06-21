@@ -192,13 +192,35 @@ export function ElevationProfile() {
       setTrailName(name);
       window.history.replaceState(null, '', `?trail=${slugify(name)}`);
     };
+    // OSM trails ship a ready-built profile (no curated JSON to load by name),
+    // and aren't restorable by slug on reload, so no URL state is written.
+    // Seed the cache so the trailName effect takes its cache-hit path instead of
+    // fetching a non-existent /data/elevation/<slug>.json and clearing us.
+    const handleOsmTrailSelect = (e: Event) => {
+      const { profile: osmProfile } = (e as CustomEvent).detail as {
+        profile: ElevationProfileData;
+      };
+      sourceRef.current = 'trail';
+      rideIdRef.current = null;
+      profileCache.set(osmProfile.trail, osmProfile);
+      setTrailName(osmProfile.trail);
+      setProfile(osmProfile);
+      profileRef.current = osmProfile;
+      setHoverIndex(null);
+      setLocationIndex(null);
+      setLoading(false);
+    };
     const handleRouteSelect = () => {
-      // Routes don't show elevation profiles — only trails and recorded rides do
-      if (sourceRef.current === 'route') {
+      // Routes don't show elevation profiles — only trails and recorded rides
+      // do. Selecting a route must therefore clear any active trail/ride pane
+      // (and its ?trail= URL). sourceRef is only ever 'trail' or 'ride', so the
+      // old `=== 'route'` guard never matched and left a stale trail open.
+      if (sourceRef.current !== null) {
         sourceRef.current = null;
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
+        window.history.replaceState(null, '', window.location.pathname);
       }
     };
     const handleTrailDeselect = () => {
@@ -271,6 +293,7 @@ export function ElevationProfile() {
     };
 
     window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
+    window.addEventListener(MAP_EVENTS.OSM_TRAIL_SELECT, handleOsmTrailSelect);
     window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
     window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
     window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
@@ -292,6 +315,10 @@ export function ElevationProfile() {
 
     return () => {
       window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
+      window.removeEventListener(
+        MAP_EVENTS.OSM_TRAIL_SELECT,
+        handleOsmTrailSelect,
+      );
       window.removeEventListener(
         MAP_EVENTS.TRAIL_DESELECT,
         handleTrailDeselect,

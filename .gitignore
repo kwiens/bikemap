@@ -64,6 +64,8 @@ yarn-error.log*
 .auth/
 .env.test
 scripts/.tile_cache/
+scripts/.osm_cache/
+scripts/.oregon_run.log
 
 # scratch / local-only files
 tmp/

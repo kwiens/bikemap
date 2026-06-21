@@ -46,7 +46,7 @@ import {
   ensureMtnBikeSource,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
-  registerOsmTrailPopup,
+  registerOsmTrailSelection,
   hideStrayStyleLayers,
   TRAIL_LAYERS,
   addRideLayer,
@@ -983,7 +983,7 @@ const MapboxMap = memo(function MapboxMap() {
           // Attach the nationwide OSM bike-trails layer (hidden until toggled).
           // Replay any toggle the user flipped before the style finished loading.
           ensureOsmTrailsSource(newMap);
-          registerOsmTrailPopup(newMap);
+          registerOsmTrailSelection(newMap);
           if (osmTrailsVisibleRef.current) {
             setOsmTrailsVisible(newMap, true);
           }

@@ -225,6 +225,51 @@ from the curated Chattanooga MTB/route layers and off by default.
   surface, bike access, plus a "View on OpenStreetMap" link. OSM values are
   HTML-escaped. Popup styling lives in `osm-trail-*` classes in `app/map.css`.
 
+#### Precomputed length + elevation
+
+OSM trail tiles carry no length or elevation. On click we want both instantly
+instead of sampling Mapbox Terrain-RGB in the browser every time, so a batch
+tool precomputes them offline per region (sharded for an eventual nationwide
+run) and the popup falls back to client sampling only on a miss.
+
+- **Tool**: `scripts/osm_trail_elevation.py`. Geometry comes from the **Overpass
+  API** (not the vector tiles — Overpass gives full-resolution ways + real OSM
+  ids that match the tileset's `OSM_ID`, and one query beats tens of thousands of
+  z14 tile requests for a whole state). The Overpass query mirrors
+  `OSM_BIKE_TRAIL_FILTER`. Elevation comes from Mapbox Terrain-RGB at z14, run
+  through a Python port of `computeElevation` (`src/utils/ride-stats.ts`) so the
+  precomputed numbers match the client's on-demand fallback. Overpass needs a
+  `User-Agent` header (else HTTP 406). Responses and terrain tiles are disk-cached
+  (`scripts/.osm_cache/`, `scripts/.tile_cache/terrain14/`, both gitignored) so
+  reruns are cheap and a national run is resumable. Both stages (Overpass cell
+  fetches and per-way terrain sampling) run across a thread pool — `--workers`
+  (default 3); the terrain-tile cache is thread-safe with per-tile locks.
+
+  ```bash
+  python scripts/osm_trail_elevation.py --region oregon          # one state
+  python scripts/osm_trail_elevation.py --bbox=-124.6,41.9,-116.4,46.3 --region-name oregon
+  python scripts/osm_trail_elevation.py --region all             # every US state (long!)
+  python scripts/osm_trail_elevation.py --region oregon --workers 6
+  ```
+
+  A built-in `US_STATE_BBOX` table covers all 50 states + DC (padded boxes —
+  slight overspill into neighbors is fine). The bbox is split into `--cell-deg`
+  (default 0.5°) Overpass cells; ways are deduped by OSM id.
+
+- **Output** (`public/data/osm-elevation/`):
+  - `<region>.json` — `{ region, name, bbox, generatedAt, count, trails }` where
+    `trails` maps `"<osmId>"` → `[lengthMeters, gain, loss, min, max]` (meters,
+    compact arrays). One file per region.
+  - `index.json` — manifest of `{ region, name, bbox, file }`, upserted on every
+    run so files accumulate across regions.
+
+- **Client**: `lookupPrecomputedElevation(osmId, lng, lat)` in
+  `src/utils/osm-elevation.ts` loads the manifest once, then lazily loads + caches
+  the region file(s) whose bbox covers the clicked point and looks up the way id.
+  `registerOsmTrailPopup` (`utils/map.ts`) renders precomputed values immediately
+  (`elevationStatus: 'ready'`, no terrain fetch) and falls back to
+  `sampleTrailElevation` only when there's no precomputed entry.
+
 ### Mapbox UI Overlays
 
 - The Mapbox canvas (`.map-container`) uses `position: absolute` with `z-index: 500` and covers the full viewport. It will obscure any sibling or child elements with a lower z-index.

@@ -1,0 +1,16 @@
+{
+  "regions": [
+    {
+      "region": "oregon",
+      "name": "Oregon",
+      "bbox": [
+        -124.6,
+        41.9,
+        -116.4,
+        46.3
+      ],
+      "count": 63670,
+      "file": "oregon.json"
+    }
+  ]
+}
