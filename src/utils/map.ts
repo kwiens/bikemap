@@ -604,16 +604,20 @@ function collectOsmWayLines(
 // a popup with the trail's name + OSM tags. Mapbox only fires layer events for
 // visible layers, so these no-op while the layer is toggled off. Registered
 // once after the layer is attached.
-export function registerOsmTrailSelection(map: mapboxgl.Map): void {
+export function registerOsmTrailSelection(map: mapboxgl.Map): () => void {
   // Bumped on every new selection or clear; pending async work checks it so a
   // stale terrain sample can't show the wrong trail's pane.
   let selectionId = 0;
   // True only while we dispatch our own deselect events (to clear a curated
   // selection) so the foreign-select listener below doesn't tear us down too.
   let selecting = false;
+  // Whether an OSM trail is currently selected (highlight + pane showing). Lets
+  // us clear on layer-hide without disturbing a curated selection.
+  let hasSelection = false;
 
   const clearSelection = () => {
     selectionId++;
+    hasSelection = false;
     clearOsmTrailHighlight(map);
   };
 
@@ -623,14 +627,27 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): void {
   const onForeignSelect = () => {
     if (!selecting) clearSelection();
   };
-  for (const ev of [
+  const foreignEvents = [
     MAP_EVENTS.ROUTE_SELECT,
     MAP_EVENTS.TRAIL_SELECT,
     MAP_EVENTS.ROUTE_DESELECT,
     MAP_EVENTS.TRAIL_DESELECT,
-  ]) {
-    window.addEventListener(ev, onForeignSelect);
-  }
+  ];
+  for (const ev of foreignEvents) window.addEventListener(ev, onForeignSelect);
+
+  // Hiding the Nationwide trails layer must also drop any active OSM selection,
+  // or the highlight + elevation pane linger while the layer reads "off". Guard
+  // on hasSelection so a curated selection (which also registers in the pane as
+  // a 'trail') is left untouched.
+  const onLayerToggle = (e: Event) => {
+    const detail = (e as CustomEvent).detail ?? {};
+    if (detail.layer !== 'osmTrails' || detail.visible || !hasSelection) return;
+    clearSelection();
+    selecting = true;
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+    selecting = false;
+  };
+  window.addEventListener(MAP_EVENTS.LAYER_TOGGLE, onLayerToggle);
 
   map.on('click', OSM_TRAILS_HIT_LAYER_ID, (e) => {
     // A curated trail/route sitting on top already handled this click.
@@ -661,6 +678,7 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): void {
 
     // Highlight the whole way like a selected route.
     highlightOsmTrail(map, lines);
+    hasSelection = true;
 
     // Build the elevation pane's profile. The per-point chart always comes from
     // real-time terrain sampling (precompute stores no points); precomputed
@@ -685,6 +703,16 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): void {
   map.on('mouseleave', OSM_TRAILS_HIT_LAYER_ID, () => {
     map.getCanvas().style.cursor = '';
   });
+
+  // map.remove() tears down the map.on(...) handlers above, but these window
+  // listeners outlive it. Return a cleanup so a remount doesn't leak or
+  // duplicate them (and fire clearOsmTrailHighlight on an already-removed map).
+  return () => {
+    for (const ev of foreignEvents) {
+      window.removeEventListener(ev, onForeignSelect);
+    }
+    window.removeEventListener(MAP_EVENTS.LAYER_TOGGLE, onLayerToggle);
+  };
 }
 
 // Hide orphan trail layers baked into the Studio style that the app doesn't

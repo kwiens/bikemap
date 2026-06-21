@@ -87,6 +87,8 @@ const MapboxMap = memo(function MapboxMap() {
   const [compassMode, setCompassMode] = useState(false);
   const compassHeading = useRef<number | null>(null);
   const compassCleanup = useRef<(() => void) | null>(null);
+  // Removes the OSM trail selection's window listeners on teardown/restyle.
+  const osmSelectionCleanup = useRef<(() => void) | null>(null);
   // GPS heading/speed for velocity-aware compass smoothing
   const gpsHeading = useRef<{ heading: number; speed: number } | null>(null);
   const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
@@ -981,9 +983,10 @@ const MapboxMap = memo(function MapboxMap() {
           hideStrayStyleLayers(newMap);
 
           // Attach the nationwide OSM bike-trails layer (hidden until toggled).
+          // Its click handler is registered later, after the curated route/MTB
+          // hit handlers, so curated trails win clicks in overlapping areas.
           // Replay any toggle the user flipped before the style finished loading.
           ensureOsmTrailsSource(newMap);
-          registerOsmTrailSelection(newMap);
           if (osmTrailsVisibleRef.current) {
             setOsmTrailsVisible(newMap, true);
           }
@@ -1022,6 +1025,15 @@ const MapboxMap = memo(function MapboxMap() {
               });
             }
           }
+
+          // Register the OSM trail click handler AFTER the curated route + MTB
+          // hit handlers above. Mapbox fires delegated layer handlers in
+          // registration order, so where an OSM way overlaps a curated trail the
+          // curated handler runs first and preventDefault()s; the OSM handler
+          // then bails on the already-handled click. Clear any prior registration
+          // first in case the style reloads and re-runs this block.
+          osmSelectionCleanup.current?.();
+          osmSelectionCleanup.current = registerOsmTrailSelection(newMap);
 
           // Click on empty map area deselects routes and trails.
           // Check originalEvent.target to ignore ghost clicks that land on
@@ -1143,6 +1155,12 @@ const MapboxMap = memo(function MapboxMap() {
       attractionMarkersRef.clear();
       bikeResourceMarkersRef.clear();
       bikeRentalMarkersRef.clear();
+
+      // Drop the OSM selection's window listeners before the map goes away.
+      if (osmSelectionCleanup.current) {
+        osmSelectionCleanup.current();
+        osmSelectionCleanup.current = null;
+      }
 
       if (map.current) {
         map.current.remove();
