@@ -9,6 +9,8 @@ import React, {
 } from 'react';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { slugify } from '@/utils/string';
+import { downloadFile } from '@/utils/format';
+import { escapeXml } from '@/utils/gpx';
 import { MAP_EVENTS } from '@/events';
 import { loadRide } from '@/utils/ride-storage';
 import { rideToElevationProfile } from '@/utils/ride-stats';
@@ -21,6 +23,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { getSetting } from '@/utils/settings';
+import { siteConfig } from '@/config/site.config';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
 
 const CHART_HEIGHT = 100;
@@ -119,22 +122,16 @@ function downloadGpx(profile: ElevationProfileData): void {
     .join('\n');
 
   const gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Bike Chatt" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="${escapeXml(siteConfig.name)}" xmlns="http://www.topografix.com/GPX/1/1">
   <trk>
-    <name>${profile.trail}</name>
+    <name>${escapeXml(profile.trail)}</name>
     <trkseg>
 ${gpxPoints}
     </trkseg>
   </trk>
 </gpx>`;
 
-  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${slugify(profile.trail)}.gpx`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadFile(gpx, `${slugify(profile.trail)}.gpx`, 'application/gpx+xml');
 }
 
 // Find the closest profile point to a given lng/lat using squared Euclidean distance

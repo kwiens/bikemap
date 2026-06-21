@@ -4,6 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import './globals.css';
 import './map.css';
 import Script from 'next/script';
+import { siteConfig } from '@/config/site.config';
 
 // Self-hosted to keep production builds reproducible and offline-capable
 // (next/font/google would fetch from Google Fonts at build time).
@@ -22,10 +23,10 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'Bike Chatt',
-  description: 'Paths and routes for cyclists in Chattanooga, TN',
+  title: siteConfig.name,
+  description: siteConfig.description,
   alternates: {
-    canonical: 'https://bikechatt.com',
+    canonical: siteConfig.url,
   },
   icons: {
     icon: [
@@ -44,7 +45,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Pinch-to-zoom is intentionally left enabled for accessibility.
   viewportFit: 'cover',
-  themeColor: '#c3f44d',
+  themeColor: siteConfig.themeColor,
 };
 
 export default function RootLayout({
@@ -57,9 +58,12 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Bike Chatt" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta
+          name="apple-mobile-web-app-title"
+          content={siteConfig.shortName}
+        />
         <meta
           name="apple-mobile-web-app-status-bar-style"
           content="black-translucent"

@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { siteConfig } from '@/config/site.config';
 import {
   ArrowLeft,
   MessageCircle,
@@ -23,9 +24,8 @@ function GithubIcon({ className }: { className?: string }) {
 }
 
 export const metadata: Metadata = {
-  title: 'About — Bike Chatt',
-  description:
-    'About the Bike Chatt project — a free interactive map of Chattanooga bike routes, trails, and resources.',
+  title: `About — ${siteConfig.name}`,
+  description: `About the ${siteConfig.name} project — a free interactive map of bike routes, trails, and resources.`,
 };
 
 const LOGO_DOWNLOADS = [
@@ -85,7 +85,7 @@ export default function AboutPage() {
         <div className="flex flex-col items-center text-center mb-14">
           <Image
             src="/Bike-Chatt_Logo-blue-text-green.svg"
-            alt="Bike Chatt logo"
+            alt={`${siteConfig.name} logo`}
             width={224}
             height={210}
             className="w-56 mb-6"
@@ -255,7 +255,7 @@ function LogoCard({
       >
         <Image
           src={file}
-          alt={`Bike Chatt ${label}`}
+          alt={`${siteConfig.name} ${label}`}
           width={square ? 128 : 400}
           height={128}
           className={square ? 'w-32 h-32' : 'w-full max-h-32'}

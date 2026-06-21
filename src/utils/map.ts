@@ -258,6 +258,13 @@ const HIDDEN_TRAILS = [
   'South Chickamauga Creek Greenway',
 ];
 
+// Layers baked into the Mapbox Studio style that the app does NOT manage and
+// should keep hidden. `Chatt_TPL_Trails-public` is a leftover TPL trails layer
+// (the app attaches its own MTB layer from MTN_BIKE_TILESET_URL instead); when
+// the published style ships it visible it renders raw TPL routes on top of our
+// trails. Suppress it at style load so we stay robust to style re-uploads.
+const STRAY_STYLE_LAYERS = ['Chatt_TPL_Trails-public'];
+
 const TRAIL_LAYERS: TrailLayerConfig[] = [
   {
     layerId: MTN_BIKE_LAYER_ID,
@@ -317,6 +324,21 @@ export function ensureMtnBikeSource(map: mapboxgl.Map): void {
     }
   } catch (error) {
     console.error('Failed to attach MTB trail source/layer:', error);
+  }
+}
+
+// Hide orphan trail layers baked into the Studio style that the app doesn't
+// manage (see STRAY_STYLE_LAYERS). Idempotent and guarded — skips any that
+// aren't present in the current style.
+export function hideStrayStyleLayers(map: mapboxgl.Map): void {
+  for (const id of STRAY_STYLE_LAYERS) {
+    try {
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(id, 'visibility', 'none');
+      }
+    } catch {
+      // Layer may not exist in this style
+    }
   }
 }
 

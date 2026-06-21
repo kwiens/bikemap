@@ -41,8 +41,9 @@ export interface MapConfig {
 // Chattanooga configuration
 const chattanoogaConfig: MapConfig = {
   mapbox: {
-    accessToken:
-      'pk.eyJ1Ijoic3d1bGxlciIsImEiOiJjbThyZTVuMzEwMTZwMmpvdTRzM3JpMGlhIn0.CF5lzLSkkfO-c0qt6a168A',
+    // Public (pk.*) Mapbox token — set NEXT_PUBLIC_MAPBOX_TOKEN in .env.local
+    // and in your host's environment for production. See .env.example.
+    accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '',
     styleUrl: 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt',
   },
 
@@ -72,8 +73,7 @@ const chattanoogaConfig: MapConfig = {
   },
 };
 
-// Export the active configuration
-// In the future, this could be selected based on environment variable or URL
+// Export the active configuration. A fork swaps this for its own MapConfig.
 export const mapConfig = chattanoogaConfig;
 
 // Helper to get full GBFS endpoint URLs
