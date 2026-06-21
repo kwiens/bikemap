@@ -9,6 +9,8 @@ import {
   mapFeatures,
   bikeResources,
   mountainBikeTrails,
+  hiddenStyleLayerIds,
+  trailMetadata,
 } from '@/data/geo_data';
 import {
   createLocationMarker,
@@ -23,12 +25,7 @@ import {
 import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
 import { cn } from '@/lib/utils';
 import { useToast, useMapResize, useWakeLock } from '@/hooks';
-import {
-  fetchStationInformation,
-  fetchStationStatus,
-  gbfsToBikeRentalLocation,
-  type GBFSStationStatus,
-} from '@/data/gbfs';
+import { fetchBikeRentalLocations } from '@/data/gbfs';
 import {
   geocodeAddress,
   updateRouteOpacity,
@@ -47,6 +44,7 @@ import {
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
   registerOsmTrailPopup,
+  hideStyleLayers,
   hideStrayStyleLayers,
   TRAIL_LAYERS,
   addRideLayer,
@@ -58,7 +56,6 @@ import {
 import { loadRide } from '@/utils/ride-storage';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
-import { TRAIL_METADATA } from '@/data/trail-metadata';
 import { HeadingSmoother } from '@/utils/compass';
 
 // Recenter pause durations: how long to suppress auto-centering after
@@ -473,22 +470,7 @@ const MapboxMap = memo(function MapboxMap() {
         bikeRentalMarkers.current.hide();
 
         try {
-          // Fetch station information and status
-          const [stations, statuses] = await Promise.all([
-            fetchStationInformation(),
-            fetchStationStatus(),
-          ]);
-
-          // Create status map
-          const statusMap: { [key: string]: GBFSStationStatus } = {};
-          statuses.forEach((status) => {
-            statusMap[status.station_id] = status;
-          });
-
-          // Convert GBFS stations to our format and create markers
-          const rentalLocations = stations.map((station) =>
-            gbfsToBikeRentalLocation(station, statusMap[station.station_id]),
-          );
+          const rentalLocations = await fetchBikeRentalLocations();
 
           // Create markers using the utility function
           const markers = rentalLocations
@@ -848,6 +830,8 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
+          hideStyleLayers(newMap, hiddenStyleLayerIds);
+
           // Set initial line width for specific layers
           if (style?.layers) {
             style.layers.forEach((layer) => {
@@ -983,7 +967,6 @@ const MapboxMap = memo(function MapboxMap() {
           // Attach the nationwide OSM bike-trails layer (hidden until toggled).
           // Replay any toggle the user flipped before the style finished loading.
           ensureOsmTrailsSource(newMap);
-          registerOsmTrailPopup(newMap);
           if (osmTrailsVisibleRef.current) {
             setOsmTrailsVisible(newMap, true);
           }
@@ -1004,7 +987,7 @@ const MapboxMap = memo(function MapboxMap() {
                 e.preventDefault();
                 const rawName = e.features?.[0]?.properties?.[cfg.trailProp];
                 if (!rawName) return;
-                const meta = TRAIL_METADATA[rawName];
+                const meta = trailMetadata[rawName];
                 const trailName = meta?.displayName ?? rawName;
                 window.dispatchEvent(
                   new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
@@ -1022,6 +1005,10 @@ const MapboxMap = memo(function MapboxMap() {
               });
             }
           }
+
+          // Register OSM popups after curated trail handlers so curated
+          // route/trail selections win when layers overlap.
+          registerOsmTrailPopup(newMap);
 
           // Click on empty map area deselects routes and trails.
           // Check originalEvent.target to ignore ghost clicks that land on

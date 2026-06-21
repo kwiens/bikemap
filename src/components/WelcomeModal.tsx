@@ -24,7 +24,7 @@ const features: {
     icon: faRoute,
     bg: 'bg-blue-600',
     title: 'Plan Fun Routes',
-    desc: 'Scenic loops to the river and zoo',
+    desc: 'Scenic loops and local rides',
   },
   {
     icon: faBicycle,
@@ -36,7 +36,7 @@ const features: {
     icon: faMapMarkerAlt,
     bg: 'bg-violet-600',
     title: 'Grab a Bike',
-    desc: 'Bike rental stations around town',
+    desc: 'Shared rentals around town',
   },
 ];
 

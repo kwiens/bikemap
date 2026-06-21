@@ -7,6 +7,10 @@ export function AttractionsList({
   show,
   onCenterLocation,
 }: AttractionsListProps) {
+  if (mapFeatures.length === 0) {
+    return null;
+  }
+
   return (
     <div className={cn('mb-6', !show && 'hidden')}>
       <h3 className="text-sm font-medium mb-2 text-gray-600">Attractions</h3>

@@ -1,13 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  fetchBikeRentalLocations,
   fetchStationInformation,
   fetchStationStatus,
+  gbfsFreeBikeToBikeRentalLocation,
   gbfsToBikeRentalLocation,
+  type GBFSFreeBike,
   type GBFSStation,
   type GBFSStationStatus,
   type GBFSResponse,
 } from './gbfs';
 import { faBicycle } from '@fortawesome/free-solid-svg-icons';
+import { cityConfigs } from '@/config/map.config';
 
 describe('GBFS API Integration', () => {
   beforeEach(() => {
@@ -285,6 +289,44 @@ describe('GBFS API Integration', () => {
     });
   });
 
+  describe('gbfsFreeBikeToBikeRentalLocation', () => {
+    it('should convert a dockless vehicle to a BikeRentalLocation', () => {
+      const bike: GBFSFreeBike = {
+        bike_id: '6e702198-66c1-5b85-9fe7-b52a866925a5',
+        lat: 44.022414,
+        lon: -121.268237,
+        is_reserved: false,
+        is_disabled: false,
+        rental_uris: {
+          ios: 'https://gmjc.adj.st/?adj_t=5vyf0nr&number=1014956',
+        },
+        vehicle_type_id: '3',
+        pricing_plan_id: '296',
+        current_range_meters: 45293,
+      };
+
+      const result = gbfsFreeBikeToBikeRentalLocation(bike, 'Veo');
+
+      expect(result).toEqual({
+        name: 'Veo 1014956',
+        description:
+          'Veo shared vehicle available nearby with about 28.1 miles of range.',
+        address: '44.022414, -121.268237',
+        latitude: 44.022414,
+        longitude: -121.268237,
+        icon: faBicycle,
+        rentalType: 'Shared Vehicle',
+        price: 'Use Veo app',
+        hours: 'When available',
+        capacity: 1,
+        isChargingStation: false,
+        vehicleTypeId: '3',
+        pricingPlanId: '296',
+        currentRangeMeters: 45293,
+      });
+    });
+  });
+
   describe('GBFS API integration tests', () => {
     it('should handle complete flow of fetching and converting stations', async () => {
       const mockStations: GBFSStation[] = [
@@ -345,6 +387,56 @@ describe('GBFS API Integration', () => {
       expect(rentalLocations[0].name).toBe('Station 1');
       expect(rentalLocations[0].availableBikes).toBe(5);
       expect(rentalLocations[0].availableDocks).toBe(5);
+    });
+
+    it('should fetch and convert Bend free-bike vehicles', async () => {
+      const bendGbfs = cityConfigs.bend.gbfs;
+      expect(bendGbfs?.type).toBe('freeBike');
+      if (bendGbfs?.type !== 'freeBike') return;
+
+      const availableBike: GBFSFreeBike = {
+        bike_id: 'available-bike',
+        lat: 44.05,
+        lon: -121.31,
+        is_reserved: false,
+        is_disabled: false,
+        rental_uris: {
+          ios: 'https://gmjc.adj.st/?adj_t=5vyf0nr&number=1001',
+        },
+      };
+      const disabledBike: GBFSFreeBike = {
+        bike_id: 'disabled-bike',
+        lat: 44.06,
+        lon: -121.32,
+        is_reserved: false,
+        is_disabled: true,
+      };
+      const reservedBike: GBFSFreeBike = {
+        bike_id: 'reserved-bike',
+        lat: 44.07,
+        lon: -121.33,
+        is_reserved: true,
+        is_disabled: false,
+      };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          last_updated: Date.now(),
+          ttl: 0,
+          data: { bikes: [availableBike, disabledBike, reservedBike] },
+        }),
+      });
+
+      const rentalLocations = await fetchBikeRentalLocations(bendGbfs);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://cluster-prod.veoride.com/api/shares/name/bnd/gbfs/free_bike_status',
+      );
+      expect(rentalLocations).toHaveLength(1);
+      expect(rentalLocations[0].name).toBe('Veo 1001');
+      expect(rentalLocations[0].latitude).toBe(44.05);
+      expect(rentalLocations[0].longitude).toBe(-121.31);
     });
   });
 });

@@ -3,13 +3,35 @@ import {
   faBicycle,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
+import { mapConfig } from '@/config/map.config';
+import { bikeResources, mapFeatures } from '@/data/geo_data';
 import { MapLayersSection, ToggleRow } from './MapLayersSection';
 import type { MapLayersProps } from './types';
 
-const layers: { key: string; icon: IconDefinition; label: string }[] = [
-  { key: 'attractions', icon: faMapMarkerAlt, label: 'Attractions' },
-  { key: 'bikeResources', icon: faBicycle, label: 'Bike Resources' },
-  { key: 'bikeRentals', icon: faBicycle, label: 'Bike Rentals' },
+const layers: {
+  key: 'attractions' | 'bikeResources' | 'bikeRentals';
+  icon: IconDefinition;
+  label: string;
+  enabled: boolean;
+}[] = [
+  {
+    key: 'attractions',
+    icon: faMapMarkerAlt,
+    label: 'Attractions',
+    enabled: mapFeatures.length > 0,
+  },
+  {
+    key: 'bikeResources',
+    icon: faBicycle,
+    label: 'Bike Resources',
+    enabled: bikeResources.length > 0,
+  },
+  {
+    key: 'bikeRentals',
+    icon: faBicycle,
+    label: 'Bike Rentals',
+    enabled: Boolean(mapConfig.gbfs),
+  },
 ];
 
 export function MapLayers({
@@ -30,10 +52,15 @@ export function MapLayers({
     bikeResources: onToggleBikeResources,
     bikeRentals: onToggleBikeRentals,
   };
+  const visibleLayers = layers.filter((layer) => layer.enabled);
+
+  if (visibleLayers.length === 0) {
+    return null;
+  }
 
   return (
     <MapLayersSection>
-      {layers.map(({ key, icon, label }) => (
+      {visibleLayers.map(({ key, icon, label }) => (
         <ToggleRow
           key={key}
           icon={icon}

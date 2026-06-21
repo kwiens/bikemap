@@ -2,12 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import {
-  fetchStationInformation,
-  fetchStationStatus,
-  gbfsToBikeRentalLocation,
-  type BikeRentalLocation,
-} from '@/data/gbfs';
+import { fetchBikeRentalLocations, type BikeRentalLocation } from '@/data/gbfs';
 import { SidebarCard } from './SidebarCard';
 import type { BikeRentalListProps } from './types';
 
@@ -28,18 +23,7 @@ export function BikeRentalList({
       setIsLoading(true);
       setError(null);
       try {
-        const [stations, statuses] = await Promise.all([
-          fetchStationInformation(),
-          fetchStationStatus(),
-        ]);
-
-        const statusMap = new Map(
-          statuses.map((status) => [status.station_id, status]),
-        );
-        const locations = stations.map((station) =>
-          gbfsToBikeRentalLocation(station, statusMap.get(station.station_id)),
-        );
-        setRentalLocations(locations);
+        setRentalLocations(await fetchBikeRentalLocations());
       } catch (err) {
         setError('Failed to load bike rental locations');
         console.error('Error fetching bike rental data:', err);

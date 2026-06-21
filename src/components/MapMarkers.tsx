@@ -4,6 +4,7 @@ import type {
   BikeResource,
   BikeRentalLocation,
 } from '@/data/geo_data';
+import { mapConfig } from '@/config/map.config';
 
 // Helper function to ensure FontAwesome is loaded
 export const ensureFontAwesomeLoaded = () => {
@@ -132,8 +133,16 @@ function createMarkerElement(
   return el;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function shortAddress(address: string): string {
-  return address.replace(/,\s*Chattanooga.*$/, '');
+  const { displayName, stateCode, stateName } = mapConfig.region;
+  return address
+    .replace(new RegExp(`,\\s*${escapeRegExp(displayName)}.*$`, 'i'), '')
+    .replace(new RegExp(`,\\s*${escapeRegExp(stateCode)}\\b.*$`, 'i'), '')
+    .replace(new RegExp(`,\\s*${escapeRegExp(stateName)}\\b.*$`, 'i'), '');
 }
 
 // Create popup HTML directly
