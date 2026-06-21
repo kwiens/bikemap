@@ -1,12 +1,14 @@
 import { faBicycle, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { bikeRoutes as chattanoogaBikeRoutes } from '@/data/bike-routes';
 import type { CityData } from '@/data/cities/types';
+import { bendBikeResources } from './bike-resources';
+import { bendMapFeatures } from './map-features';
 
 export const bendData: CityData = {
   cityId: 'bend',
   bikeRoutes: [],
-  mapFeatures: [],
-  bikeResources: [],
+  mapFeatures: bendMapFeatures,
+  bikeResources: bendBikeResources,
   localResources: [
     {
       name: 'About This Map',
