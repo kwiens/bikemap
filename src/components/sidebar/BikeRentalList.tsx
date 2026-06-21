@@ -1,12 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { faBicycle } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
-import { fetchBikeRentalLocations, type BikeRentalLocation } from '@/data/gbfs';
+import { mapConfig } from '@/config/map.config';
+import {
+  fetchBikeRentalLocations,
+  summarizeBikeRentals,
+  type BikeRentalLocation,
+} from '@/data/gbfs';
 import { SidebarCard } from './SidebarCard';
 import type { BikeRentalListProps } from './types';
 
 const BADGE_CLASS = 'bg-gray-200 px-2 py-0.5 rounded text-gray-600';
+
+// Lowercase plural for a vehicle type label, e.g. "E-bike" -> "e-bikes".
+function pluralizeType(label: string): string {
+  return `${label.toLowerCase()}s`;
+}
 
 export function BikeRentalList({
   show,
@@ -38,6 +49,11 @@ export function BikeRentalList({
     }
   }, [show]);
 
+  // Dockless providers (e.g. Veo) return one record per physical vehicle —
+  // often hundreds. Collapse them into a single summary card instead of a long
+  // list of serial-numbered cards. Station providers keep the per-station list.
+  const isFreeFloating = mapConfig.gbfs?.type === 'freeBike';
+
   return (
     <div className={cn('mb-6', !show && 'hidden')}>
       <h3 className="text-sm font-medium mb-2 text-gray-600">Bike Rentals</h3>
@@ -49,7 +65,14 @@ export function BikeRentalList({
       {error && (
         <div className="p-4 text-center text-red-500 font-medium">{error}</div>
       )}
-      {!isLoading && !error && (
+      {!isLoading && !error && isFreeFloating && rentalLocations.length > 0 && (
+        <FreeBikeSummaryCard
+          locations={rentalLocations}
+          providerName={mapConfig.gbfs?.providerName ?? 'Bike share'}
+          onCenterLocation={onCenterLocation}
+        />
+      )}
+      {!isLoading && !error && !isFreeFloating && (
         <div className="flex flex-col gap-2">
           {rentalLocations.map((location) => (
             <SidebarCard
@@ -84,5 +107,58 @@ export function BikeRentalList({
         </div>
       )}
     </div>
+  );
+}
+
+interface FreeBikeSummaryCardProps {
+  locations: BikeRentalLocation[];
+  providerName: string;
+  onCenterLocation: BikeRentalListProps['onCenterLocation'];
+}
+
+function FreeBikeSummaryCard({
+  locations,
+  providerName,
+  onCenterLocation,
+}: FreeBikeSummaryCardProps) {
+  const summary = useMemo(() => summarizeBikeRentals(locations), [locations]);
+
+  const headline =
+    summary.byType.length === 1
+      ? `${summary.total} ${pluralizeType(summary.byType[0].label)} available nearby`
+      : `${summary.total} vehicles available nearby`;
+
+  const handleClick = () => {
+    if (!summary.bounds) return;
+    // Fit the map to the whole fleet rather than flying to a single point.
+    onCenterLocation({
+      name: providerName,
+      description: headline,
+      bounds: summary.bounds,
+    });
+  };
+
+  return (
+    <SidebarCard
+      colorTheme="purple"
+      icon={faBicycle}
+      title={providerName}
+      description={headline}
+      onClick={summary.bounds ? handleClick : undefined}
+      showArrow={!!summary.bounds}
+    >
+      <div className="flex flex-wrap gap-2 mt-2 ml-10 text-xs text-gray-500">
+        <span className={BADGE_CLASS}>Dockless</span>
+        {summary.price && summary.price !== `Use ${providerName} app` && (
+          <span className={BADGE_CLASS}>{summary.price}</span>
+        )}
+        {summary.byType.length > 1 &&
+          summary.byType.map((type) => (
+            <span key={type.label} className={BADGE_CLASS}>
+              {type.count} {pluralizeType(type.label)}
+            </span>
+          ))}
+      </div>
+    </SidebarCard>
   );
 }

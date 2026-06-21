@@ -6,6 +6,7 @@ import type {
 } from '@/data/geo_data';
 import { mapConfig } from '@/config/map.config';
 import { escapeHtml } from '@/utils/html';
+import { formatDistance } from '@/utils/format';
 
 // Helper function to ensure FontAwesome is loaded
 export const ensureFontAwesomeLoaded = () => {
@@ -317,6 +318,11 @@ export function createBikeRentalMarker(
     '#9333EA',
   );
 
+  // Range is only meaningful for dockless vehicles that report a finite value.
+  const rangeMeters = location.currentRangeMeters;
+  const hasRange =
+    typeof rangeMeters === 'number' && Number.isFinite(rangeMeters);
+
   // Create popup HTML with rental-specific information
   const popupHTML = `
     <div class="map-popup">
@@ -333,7 +339,13 @@ export function createBikeRentalMarker(
       <p><strong>Hours:</strong> ${escapeHtml(location.hours)}</p>
       ${location.availableBikes !== undefined ? `<p><strong>Available Bikes:</strong> ${location.availableBikes}</p>` : ''}
       ${location.availableDocks !== undefined ? `<p><strong>Available Docks:</strong> ${location.availableDocks}</p>` : ''}
+      ${hasRange ? `<p><strong>Range:</strong> ~${formatDistance(rangeMeters)} left</p>` : ''}
       ${location.isChargingStation ? '<p><strong>Charging Station Available</strong></p>' : ''}
+      ${
+        location.rentalUrl
+          ? `<p><a class="rental-link" href="${escapeHtml(location.rentalUrl)}" target="_blank" rel="noopener noreferrer">Rent in ${escapeHtml(mapConfig.gbfs?.providerName ?? 'app')} app →</a></p>`
+          : ''
+      }
     </div>
   `;
 

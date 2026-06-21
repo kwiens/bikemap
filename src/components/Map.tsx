@@ -572,6 +572,26 @@ const MapboxMap = memo(function MapboxMap() {
 
       const { location } = event.detail;
 
+      // A bounds payload (e.g. the dockless fleet summary) fits the whole extent
+      // rather than flying to a single point. maxZoom keeps a tight/one-vehicle
+      // fleet from zooming all the way in.
+      if (location.bounds) {
+        const corners = (
+          location.bounds as [[number, number], [number, number]]
+        ).flat();
+        // A non-finite corner (malformed feed coord) would make fitBounds throw.
+        if (corners.every((n) => Number.isFinite(n))) {
+          pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
+          map.current.fitBounds(location.bounds, {
+            padding: 60,
+            maxZoom: 16,
+            duration: 1000,
+            essential: true,
+          });
+        }
+        return;
+      }
+
       let coordinates: [number, number] | null = null;
 
       // If we have latitude and longitude, use them directly
