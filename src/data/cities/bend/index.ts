@@ -1,12 +1,46 @@
 import { faBicycle, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { bikeRoutes as chattanoogaBikeRoutes } from '@/data/bike-routes';
 import type { CityData } from '@/data/cities/types';
+import {
+  OSM_TRAILS_SOURCE_ID,
+  OSM_TRAILS_SOURCE_LAYER,
+  OSM_TRAILS_TILEJSON_URL,
+} from '@/data/osm-trails';
+import { bendBikeResources } from './bike-resources';
+import { bendMapFeatures } from './map-features';
+import { bendMountainBikeTrails } from './mountain-bike-trails.data';
+
+// Bend's curated MTB trails render from the shared nationwide OSM trails tileset
+// (the curated entries carry the matched OSM way ids). Match by OSM_ID, and the
+// base layer filter is restricted to the union of curated ids (see map.ts).
+const BEND_MTB_LAYER_ID = 'bend-mtb-trails';
+
+// recArea (trail "complex" from bendbikerides) -> geographic region for the
+// sidebar grouping. Areas not listed fall back to 'Central Oregon'.
+const REGION_MAP: Record<string, string> = {
+  "Phil's Trail Complex": 'Bend',
+  'Wanoga Sno Park': 'Bend',
+  'Swampy Lakes': 'Bend',
+  'North of Skyliner': 'Bend',
+  'East of Bend': 'Bend',
+  'Bend Area': 'Bend',
+  'Mt. Bachelor Bike Park': 'Cascade Lakes',
+  Sunriver: 'Cascade Lakes',
+  'Cline Butte': 'Redmond & Cline Buttes',
+  Maston: 'Redmond & Cline Buttes',
+  Madras: 'Redmond & Cline Buttes',
+  Sisters: 'Sisters',
+  Oakridge: 'Oakridge & Willamette Pass',
+  'Waldo Lake': 'Oakridge & Willamette Pass',
+  McKenzie: 'Oakridge & Willamette Pass',
+  'La Pine': 'Oakridge & Willamette Pass',
+};
 
 export const bendData: CityData = {
   cityId: 'bend',
   bikeRoutes: [],
-  mapFeatures: [],
-  bikeResources: [],
+  mapFeatures: bendMapFeatures,
+  bikeResources: bendBikeResources,
   localResources: [
     {
       name: 'About This Map',
@@ -25,11 +59,20 @@ export const bendData: CityData = {
       colorTheme: 'gray',
     },
   ],
-  mountainBikeTrails: [],
+  mountainBikeTrails: bendMountainBikeTrails,
   trailMetadata: {},
-  regionFor: () => 'Central Oregon',
+  regionFor: (recArea: string) => REGION_MAP[recArea] ?? 'Central Oregon',
   mountainBike: {
-    layers: [],
+    layers: [
+      {
+        layerId: BEND_MTB_LAYER_ID,
+        sourceId: OSM_TRAILS_SOURCE_ID,
+        tilesetUrl: OSM_TRAILS_TILEJSON_URL,
+        sourceLayer: OSM_TRAILS_SOURCE_LAYER,
+        trailProp: 'OSM_ID',
+        matchBy: 'osmId',
+      },
+    ],
     hiddenTrails: [],
     strayStyleLayers: ['Chatt_TPL_Trails-public'],
   },

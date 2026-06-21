@@ -645,16 +645,22 @@ describe('highlightMtnBikeArea', () => {
 
     highlightMtnBikeArea(mockMap, trails, 'Raccoon Mountain');
 
-    // Should set match expression on main layer with matching trail names
+    // Should set a case/in match expression on the main layer for the area's
+    // trail names (name-matched layers compare trailProp against the id list).
+    const inArea = [
+      'in',
+      ['get', 'Trail'],
+      ['literal', ['Trail A', 'Trail B']],
+    ];
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       MTN_BIKE_LAYER_ID,
       'line-opacity',
-      ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 0.9, 0.4],
+      ['case', inArea, 0.9, 0.4],
     );
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       MTN_BIKE_LAYER_ID,
       'line-width',
-      ['match', ['get', 'Trail'], ['Trail A', 'Trail B'], 3, 3],
+      ['case', inArea, 3, 3],
     );
   });
 

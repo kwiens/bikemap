@@ -4,7 +4,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import './globals.css';
 import './map.css';
 import Script from 'next/script';
-import { siteConfig } from '@/config/site.config';
+import { headers } from 'next/headers';
+import { siteConfig, siteConfigForHostname } from '@/config/site.config';
 
 // Self-hosted to keep production builds reproducible and offline-capable
 // (next/font/google would fetch from Google Fonts at build time).
@@ -22,23 +23,27 @@ const geistMono = localFont({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: siteConfig.name,
-  description: siteConfig.description,
-  alternates: {
-    canonical: siteConfig.url,
-  },
-  icons: {
-    icon: [
-      { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-    ],
-    apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-    ],
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const config = siteConfigForHostname(await getRequestHostname());
+
+  return {
+    title: config.name,
+    description: config.description,
+    alternates: {
+      canonical: config.url,
+    },
+    icons: {
+      icon: [
+        { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
+        { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      ],
+      apple: [
+        { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      ],
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -48,11 +53,13 @@ export const viewport: Viewport = {
   themeColor: siteConfig.themeColor,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const config = siteConfigForHostname(await getRequestHostname());
+
   return (
     <html lang="en">
       <head>
@@ -60,10 +67,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta
-          name="apple-mobile-web-app-title"
-          content={siteConfig.shortName}
-        />
+        <meta name="apple-mobile-web-app-title" content={config.shortName} />
         <meta
           name="apple-mobile-web-app-status-bar-style"
           content="black-translucent"
@@ -153,4 +157,17 @@ export default function RootLayout({
       </body>
     </html>
   );
+}
+
+async function getRequestHostname(): Promise<string | undefined> {
+  try {
+    const requestHeaders = await headers();
+    return (
+      requestHeaders.get('x-forwarded-host') ??
+      requestHeaders.get('host') ??
+      undefined
+    );
+  } catch {
+    return undefined;
+  }
 }

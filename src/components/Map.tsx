@@ -47,6 +47,7 @@ import {
   hideStyleLayers,
   hideStrayStyleLayers,
   TRAIL_LAYERS,
+  trailNameForOsmId,
   addRideLayer,
   updateRideLayer,
   removeRideLayer,
@@ -1030,8 +1031,13 @@ const MapboxMap = memo(function MapboxMap() {
                 e.preventDefault();
                 const rawName = e.features?.[0]?.properties?.[cfg.trailProp];
                 if (!rawName) return;
-                const meta = trailMetadata[rawName];
-                const trailName = meta?.displayName ?? rawName;
+                // osmId-matched layers carry an OSM_ID; resolve it to the
+                // curated trail it belongs to. Name layers map via metadata.
+                const trailName =
+                  cfg.matchBy === 'osmId'
+                    ? trailNameForOsmId(rawName)
+                    : (trailMetadata[rawName]?.displayName ?? rawName);
+                if (!trailName) return;
                 window.dispatchEvent(
                   new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
                     detail: { trailName },

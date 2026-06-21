@@ -28,6 +28,10 @@ export interface MountainBikeTrail {
   elevationMax?: number; // Highest point in feet
   defaultBounds?: [number, number, number, number]; // [swLng, swLat, neLng, neLat]
   bounds?: mapboxgl.LngLatBounds;
+  // OSM way ids this trail rides on. Set for cities whose curated layer renders
+  // from the OSM trails tileset (matched by OSM_ID rather than a trail name) —
+  // see CuratedTrailLayerConfig.matchBy. Unset for tileset-name layers.
+  osmIds?: number[];
 }
 
 export interface ElevationProfile {

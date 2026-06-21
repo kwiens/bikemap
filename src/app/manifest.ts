@@ -1,10 +1,13 @@
 import type { MetadataRoute } from 'next';
-import { siteConfig } from '@/config/site.config';
+import { headers } from 'next/headers';
+import { siteConfigForHostname } from '@/config/site.config';
 
 // App Router serves this at /manifest.webmanifest and auto-injects the
 // <link rel="manifest"> tag. Driven by site.config.ts so a fork rebrands
 // the PWA without editing this file.
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const siteConfig = siteConfigForHostname(await getRequestHostname());
+
   return {
     name: siteConfig.name,
     short_name: siteConfig.shortName,
@@ -35,4 +38,17 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
   };
+}
+
+async function getRequestHostname(): Promise<string | undefined> {
+  try {
+    const requestHeaders = await headers();
+    return (
+      requestHeaders.get('x-forwarded-host') ??
+      requestHeaders.get('host') ??
+      undefined
+    );
+  } catch {
+    return undefined;
+  }
 }

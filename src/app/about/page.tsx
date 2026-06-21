@@ -1,8 +1,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { mapConfig } from '@/config/map.config';
-import { siteConfig } from '@/config/site.config';
+import { headers } from 'next/headers';
+import { mapConfigForHostname } from '@/config/map.config';
+import { siteConfigForHostname } from '@/config/site.config';
 import {
   ArrowLeft,
   MessageCircle,
@@ -24,12 +25,14 @@ function GithubIcon({ className }: { className?: string }) {
   );
 }
 
-export const metadata: Metadata = {
-  title: `About — ${siteConfig.name}`,
-  description: `About the ${siteConfig.name} project — a free interactive map of bike routes, trails, and resources.`,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const siteConfig = siteConfigForHostname(await getRequestHostname());
 
-const region = mapConfig.region.displayName;
+  return {
+    title: `About — ${siteConfig.name}`,
+    description: `About the ${siteConfig.name} project — a free interactive map of bike routes, trails, and resources.`,
+  };
+}
 
 const LOGO_DOWNLOADS = [
   {
@@ -67,7 +70,13 @@ const ICON_DOWNLOADS = [
   },
 ] as const;
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const hostname = await getRequestHostname();
+  const siteConfig = siteConfigForHostname(hostname);
+  const mapConfig = mapConfigForHostname(hostname);
+  const region = mapConfig.region.displayName;
+  const showBikeChattAssets = siteConfig.cityId === 'chattanooga';
+
   return (
     <div className="min-h-screen bg-gray-50 fixed inset-0 overflow-y-auto z-[9999]">
       {/* Header bar */}
@@ -86,15 +95,26 @@ export default function AboutPage() {
       <main className="max-w-2xl mx-auto px-5 py-12">
         {/* Hero */}
         <div className="flex flex-col items-center text-center mb-14">
-          <Image
-            src="/Bike-Chatt_Logo-blue-text-green.svg"
-            alt={`${siteConfig.name} logo`}
-            width={224}
-            height={210}
-            className="w-56 mb-6"
-            style={{ height: 'auto' }}
-            priority
-          />
+          {showBikeChattAssets ? (
+            <Image
+              src="/Bike-Chatt_Logo-blue-text-green.svg"
+              alt={`${siteConfig.name} logo`}
+              width={224}
+              height={210}
+              className="w-56 mb-6"
+              style={{ height: 'auto' }}
+              priority
+            />
+          ) : (
+            <div className="mb-6 flex flex-col items-center gap-3">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1a434e] text-[#c3f44d]">
+                <MapIcon className="h-8 w-8" />
+              </div>
+              <h1 className="text-4xl font-bold tracking-tight text-[#1a434e]">
+                {siteConfig.name}
+              </h1>
+            </div>
+          )}
           <p className="text-gray-600 text-lg leading-relaxed max-w-md">
             A free, open-source interactive map of {region} bike routes,
             mountain bike trails, and cycling resources.
@@ -142,50 +162,62 @@ export default function AboutPage() {
           </Link>
         </section>
 
-        {/* Logo downloads */}
-        <section className="mb-14">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
-            Logo & stickers
-          </h2>
-          <p className="text-sm text-gray-500 mb-5">
-            Use these for stickers, flyers, or anything that helps people find
-            safe rides in {region}.
-          </p>
+        {showBikeChattAssets && (
+          <section className="mb-14">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
+              Logo & stickers
+            </h2>
+            <p className="text-sm text-gray-500 mb-5">
+              Use these for stickers, flyers, or anything that helps people find
+              safe rides in {region}.
+            </p>
 
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
-            Full logo
-          </h3>
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            {LOGO_DOWNLOADS.map((logo) => (
-              <LogoCard key={logo.file} {...logo} />
-            ))}
-          </div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+              Full logo
+            </h3>
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {LOGO_DOWNLOADS.map((logo) => (
+                <LogoCard
+                  key={logo.file}
+                  {...logo}
+                  siteName={siteConfig.name}
+                />
+              ))}
+            </div>
 
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
-            Icon only
-          </h3>
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            {ICON_DOWNLOADS.map((icon) => (
-              <LogoCard key={icon.file} {...icon} square />
-            ))}
-          </div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+              Icon only
+            </h3>
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {ICON_DOWNLOADS.map((icon) => (
+                <LogoCard
+                  key={icon.file}
+                  {...icon}
+                  siteName={siteConfig.name}
+                  square
+                />
+              ))}
+            </div>
 
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
-            Stickers
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <LogoCard
-              label="Logo sticker"
-              file="/Bike-Chatt_Logo_Sticker.svg"
-              bg="bg-white"
-            />
-            <LogoCard
-              label="QR sticker"
-              file="/Bike-Chatt_QR_Sticker.svg"
-              bg="bg-white"
-            />
-          </div>
-        </section>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+              Stickers
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <LogoCard
+                label="Logo sticker"
+                file="/Bike-Chatt_Logo_Sticker.svg"
+                bg="bg-white"
+                siteName={siteConfig.name}
+              />
+              <LogoCard
+                label="QR sticker"
+                file="/Bike-Chatt_QR_Sticker.svg"
+                bg="bg-white"
+                siteName={siteConfig.name}
+              />
+            </div>
+          </section>
+        )}
 
         {/* Footer */}
         <footer className="border-t border-gray-200 pt-8 pb-12 text-center text-sm text-gray-400">
@@ -241,11 +273,13 @@ function LogoCard({
   label,
   file,
   bg,
+  siteName,
   square,
 }: {
   label: string;
   file: string;
   bg: string;
+  siteName: string;
   square?: boolean;
 }) {
   return (
@@ -258,7 +292,7 @@ function LogoCard({
       >
         <Image
           src={file}
-          alt={`${siteConfig.name} ${label}`}
+          alt={`${siteName} ${label}`}
           width={square ? 128 : 400}
           height={128}
           className={square ? 'w-32 h-32' : 'w-full max-h-32'}
@@ -278,4 +312,17 @@ function LogoCard({
       </div>
     </div>
   );
+}
+
+async function getRequestHostname(): Promise<string | undefined> {
+  try {
+    const requestHeaders = await headers();
+    return (
+      requestHeaders.get('x-forwarded-host') ??
+      requestHeaders.get('host') ??
+      undefined
+    );
+  } catch {
+    return undefined;
+  }
 }

@@ -14,6 +14,13 @@ export interface CuratedTrailLayerConfig {
   sourceId?: string;
   tilesetUrl?: string;
   metadata?: Record<string, TrailMeta>;
+  // How a curated trail entry maps to features in this layer:
+  //  - 'name'  (default): match trailProp against the trail's name
+  //  - 'osmId': match the OSM_ID property against the trail's `osmIds` set.
+  //    Used when the curated layer renders from the shared OSM trails tileset
+  //    (nationwide), so trails are identified by exact way id, and the base
+  //    layer filter is restricted to the union of curated ids.
+  matchBy?: 'name' | 'osmId';
 }
 
 export interface MountainBikeCityConfig {

@@ -1,0 +1,270 @@
+slug,name,url,complex,difficulty,one_way,ebike_ok,closed,segments,distance_m,distance_mi,elev_gain_m,elev_loss_m,elev_gain_ft,elev_loss_ft,elev_min_m,elev_max_m,closure,pois,flag_lat,flag_lng
+50-shades-of-blue,50 Shades of Blue,https://bendbikerides.com/trail/50-shades-of-blue,Wanoga Sno Park,blue,,False,False,1,442.0,0.27,0.0,39.0,0,128,1652.6,1691.3,,Wanoga Sno Park,43.98272219835948,-121.53881050197187
+afternoon-delight,Afternoon Delight,https://bendbikerides.com/trail/afternoon-delight,Sunriver,green,False,True,False,1,6970.0,4.33,187.0,103.0,614,338,1253.9,1393.0,,,43.91981333382065,-121.46385192799171
+alpine-chrome-toilet,Alpine (Chrome Toilet),https://bendbikerides.com/trail/alpine-chrome-toilet,Oakridge,blue,False,True,False,1,5111.0,3.18,344.0,119.0,1129,390,1130.2,1419.0,,,43.88530268574871,-122.4905061637534
+alpine-lower,Alpine (Lower),https://bendbikerides.com/trail/alpine-lower,Oakridge,blue,False,True,False,1,13659.0,8.49,391.0,1186.0,1283,3891,352.6,1225.0,,,43.78685073981305,-122.49102525422364
+alpine-upper,Alpine (Upper),https://bendbikerides.com/trail/alpine-upper,Oakridge,blue,False,True,False,1,6400.0,3.98,234.0,424.0,768,1391,1165.1,1456.5,,,43.8494877668752,-122.46555980981722
+arnold-ice-cave,Arnold Ice Cave,https://bendbikerides.com/trail/arnold-ice-cave,East of Bend,blue,False,False,False,1,15735.0,9.78,443.0,79.0,1453,259,1290.0,1672.2,Cabin Butte Area Closure,,43.9299467772243,-121.1647343475968
+bachelor-mountain,Bachelor Mountain,https://bendbikerides.com/trail/bachelor-mountain,Cascade Crest,black,False,False,False,1,2925.0,1.82,362.0,31.0,1188,102,1478.0,1809.5,,,44.62831376228209,-122.01296624488052
+bachy-west-xc,Bachy West XC,https://bendbikerides.com/trail/bachy-west-xc,Mt. Bachelor Bike Park,blue,,False,False,1,3086.0,1.92,14.0,105.0,46,344,1837.0,1928.2,,,44.01161288555113,-121.6814734164725
+bens-trail,Ben’s Trail,https://bendbikerides.com/trail/bens-trail,Phil's Trail Complex,green,True,True,False,1,8441.0,5.24,233.0,48.0,764,157,1185.8,1371.2,,NF 300;Phil’s Trailhead,44.03542800051586,-121.4255550985115
+betty-lake,Betty lake,https://bendbikerides.com/trail/betty-lake,Waldo Lake,blue,False,False,False,1,2945.0,1.83,72.0,54.0,236,177,1670.6,1733.3,,,43.67948112975452,-122.02414586993444
+big-bark,Big Bark,https://bendbikerides.com/trail/big-bark,Maston,green,,False,False,1,1943.0,1.21,19.0,22.0,62,72,974.8,996.2,,,44.22613803369464,-121.29659088331682
+big-wood,Big Wood,https://bendbikerides.com/trail/big-wood,Mt. Bachelor Bike Park,black,True,True,False,1,598.0,0.37,5.0,92.0,16,302,1971.4,2058.5,,Mt Bachelor Bike Park,43.99976315183932,-121.6769014774901
+black-rock,Black Rock,https://bendbikerides.com/trail/black-rock,Sunriver,green,False,True,False,1,6643.0,4.13,91.0,13.0,299,43,1287.0,1369.0,,,43.91639838528991,-121.39117039613248
+blade-runner,Blade Runner,https://bendbikerides.com/trail/blade-runner,Mt. Bachelor Bike Park,blue,True,True,False,1,657.0,0.41,4.0,76.0,13,249,1953.1,2026.1,,Mt Bachelor Bike Park,43.99852501366274,-121.6754627471641
+blue-belly-loop,Blue Belly Loop,https://bendbikerides.com/trail/blue-belly-loop,Cline Butte,blue,,False,False,1,3503.0,2.18,58.0,58.0,190,190,945.7,984.8,,,44.27385182036568,-121.34180654346345
+blue-belly-stem,Blue Belly Stem,https://bendbikerides.com/trail/blue-belly-stem,Cline Butte,green,False,False,False,1,3088.0,1.92,33.0,21.0,108,69,930.5,950.2,,,44.2816826202247,-121.32296458553742
+bobber,Bobber,https://bendbikerides.com/trail/bobber,,"blue,green",False,False,False,2,3957.0,2.46,33.0,33.0,108,108,912.0,924.0,,High Desert Sports Complex,44.302169020435116,-121.14248875640125
+bobby-lake,Bobby Lake,https://bendbikerides.com/trail/bobby-lake,Waldo Lake,green,False,False,False,1,3909.0,2.43,41.0,78.0,135,256,1652.6,1709.4,,,43.66300558483886,-121.98642669372148
+bones,Bones,https://bendbikerides.com/trail/bones,Madras,green,False,True,False,1,1823.0,1.13,44.0,11.0,144,36,760.0,794.0,,,44.63181206258622,-121.08761130260467
+bridge-to-nowhere,Bridge to Nowhere,https://bendbikerides.com/trail/bridge-to-nowhere,Madras,green,False,True,False,1,769.0,0.48,31.0,3.0,102,10,776.0,804.0,,,,
+browder-ridge,Browder Ridge,https://bendbikerides.com/trail/browder-ridge,Cascade Crest,black,False,False,False,1,6798.0,4.22,527.0,164.0,1729,538,1227.7,1601.3,,,44.382647032995976,-122.12080789061602
+bruno-meadows,Bruno Meadows,https://bendbikerides.com/trail/bruno-meadows,Cascade Crest,blue,False,False,False,1,2348.0,1.46,248.0,24.0,814,79,1308.7,1544.0,,,44.636900931442426,-122.00506196585371
+bugaboo-ridge,Bugaboo Ridge,https://bendbikerides.com/trail/bugaboo-ridge,Cascade Crest,black,False,False,False,1,4807.0,2.99,60.0,434.0,197,1424,1271.6,1649.0,,,44.62708738461586,-121.99645519260176
+bull-snake,Bull Snake,https://bendbikerides.com/trail/bull-snake,Cline Butte,green,False,False,False,1,1155.0,0.72,50.0,4.0,164,13,1012.6,1059.9,,,44.26209655744813,-121.30853801149208
+bunchgrass-lower,Bunchgrass (Lower),https://bendbikerides.com/trail/bunchgrass-lower,Oakridge,black,False,False,False,1,9909.0,6.16,1013.0,491.0,3323,1611,1071.3,1593.4,,,43.75182221802598,-122.30274306886264
+bunchgrass-upper,Bunchgrass (Upper),https://bendbikerides.com/trail/bunchgrass-upper,Oakridge,black,False,False,False,1,21113.0,13.12,1158.0,823.0,3799,2700,1517.8,1929.3,,,43.69602901500289,-122.17535563313726
+burma-road,Burma Road,https://bendbikerides.com/trail/burma-road,,blue,False,False,False,1,1453.0,0.9,205.0,6.0,673,20,889.2,1093.9,,,44.37511515065165,-121.12492851942474
+canyon-trail,Canyon Trail,https://bendbikerides.com/trail/canyon-trail,,green,False,False,False,1,793.0,0.49,3.0,55.0,10,180,815.9,867.6,,Smith Rock Welcome Center,44.36722284777184,-121.1369549829289
+canyon-trail-west,Canyon Trail West,https://bendbikerides.com/trail/canyon-trail-west,,black,False,False,False,1,1933.0,1.2,79.0,39.0,259,128,807.8,860.3,,Smith Rock Welcome Center,44.35782560467436,-121.15098178023524
+castle-rock,Castle Rock,https://bendbikerides.com/trail/castle-rock,McKenzie,blue,False,False,False,1,6827.0,4.24,672.0,189.0,2205,620,666.6,1164.4,,,44.151372488323176,-122.21213064271575
+catch-and-release,Catch & Release,https://bendbikerides.com/trail/catch-and-release,Wanoga Sno Park,green,False,True,False,1,7759.0,4.82,142.0,122.0,466,400,1220.0,1273.0,,Cascade Lakes Welcome Center,43.96980586493056,-121.42466611661479
+chain-reaction,Chain Reaction,https://bendbikerides.com/trail/chain-reaction,Sunriver,"blue,black",,True,False,2,1463.0,0.91,57.0,52.0,187,171,1290.7,1324.4,,,43.908661828713406,-121.45301223596745
+chainbreak,Chainbreak,https://bendbikerides.com/trail/chainbreak,Cline Butte,blue,True,False,False,1,1303.0,0.81,3.0,187.0,10,614,1009.4,1193.5,,,44.25323017735383,-121.29728394912343
+charlton-lake-19,Charlton Lake #19,https://bendbikerides.com/trail/charlton-lake-19,Waldo Lake,black,False,False,False,1,12349.0,7.67,474.0,224.0,1555,735,1513.9,1798.6,,,43.76647952117315,-121.95193323569151
+charlton-lake-3593,Charlton Lake #3593,https://bendbikerides.com/trail/charlton-lake-3593,Waldo Lake,blue,False,False,False,1,2388.0,1.48,92.0,7.0,302,23,1658.9,1749.6,,,43.750222461665345,-121.98890267703456
+clear-lake,Clear Lake,https://bendbikerides.com/trail/clear-lake,McKenzie,blue,False,False,False,1,4161.0,2.59,105.0,124.0,344,407,920.8,954.2,,,44.38239290270579,-122.00427404005109
+cline-access,Cline Access,https://bendbikerides.com/trail/cline-access,Cline Butte,green,False,False,False,1,1899.0,1.18,162.0,8.0,531,26,1083.8,1239.1,,,44.25547605434426,-121.31127909817188
+cline-butte-xc-trail,Cline Butte XC Trail,https://bendbikerides.com/trail/cline-butte-xc-trail,Cline Butte,green,False,False,False,1,4293.0,2.67,189.0,128.0,620,420,1012.9,1121.8,,,44.2612761487386,-121.2967159200872
+clover-meadow-21,Clover Meadow #21,https://bendbikerides.com/trail/clover-meadow-21,Waldo Lake,blue,False,False,False,1,3673.0,2.28,141.0,9.0,463,30,1588.0,1720.8,,,43.7601913120663,-121.92309744546498
+cloverpatch,Cloverpatch,https://bendbikerides.com/trail/cloverpatch,Oakridge,blue,False,True,False,1,13356.0,8.3,857.0,729.0,2812,2392,531.0,1021.7,,,43.81316161652768,-122.52736868911953
+cobra-dh,Cobra DH,https://bendbikerides.com/trail/cobra-dh,Madras,black,True,True,False,1,602.0,0.37,12.0,41.0,39,135,803.0,833.0,,,44.6322314415506,-121.07822851203136
+cod,COD,https://bendbikerides.com/trail/cod,Phil's Trail Complex,"blue,black,green,black,green,black",False,True,False,6,14758.0,9.17,221.0,419.0,725,1375,1170.0,1368.0,,Green Gate;Cascade Lakes Welcome Center,43.991560403902014,-121.44146110900007
+coffin-mountain,Coffin Mountain,https://bendbikerides.com/trail/coffin-mountain,Cascade Crest,black,False,False,False,1,2165.0,1.35,329.0,13.0,1079,43,1444.8,1761.7,,,44.621587680950825,-122.04475110478275
+cole-loop,Cole Loop,https://bendbikerides.com/trail/cole-loop,,blue,False,False,False,1,18095.0,11.24,545.0,782.0,1788,2566,889.1,1248.1,,Skull Hollow Campground,44.42974494271053,-121.12683788113728
+cole-loop-pine-ridge,Cole Loop (Pine Ridge),https://bendbikerides.com/trail/cole-loop-pine-ridge,,blue,False,False,False,1,11348.0,7.05,416.0,178.0,1365,584,918.6,1178.3,,Skull Hollow Campground,44.43088856465809,-121.0408885681916
+cone-run,Cone Run,https://bendbikerides.com/trail/cone-run,Mt. Bachelor Bike Park,blue,True,True,False,1,2204.0,1.37,54.0,177.0,177,581,2001.5,2128.8,,,43.99430926657587,-121.67338318963174
+cover-charge,Cover Charge,https://bendbikerides.com/trail/cover-charge,Cline Butte,blue,False,False,False,1,2533.0,1.57,163.0,33.0,535,108,1058.7,1190.7,,,44.25787839198318,-121.30444824218296
+coyote-loop,Coyote Loop,https://bendbikerides.com/trail/coyote-loop,East of Bend,blue,False,False,False,1,11105.0,6.9,413.0,73.0,1355,240,1322.8,1678.7,Cabin Butte Area Closure,Boyd Cave,43.90610790562809,-121.20345139966766
+coyote-run,Coyote Run,https://bendbikerides.com/trail/coyote-run,Madras,blue,False,True,False,1,633.0,0.39,2.0,53.0,7,174,780.0,831.0,,,44.62870801049502,-121.08376430267907
+crater-rim,Crater Rim,https://bendbikerides.com/trail/crater-rim,La Pine,blue,False,False,False,1,32194.0,20.0,962.0,964.0,3156,3163,1932.0,2320.0,,,43.687269708899834,-121.21534313320987
+crazy-horse,Crazy Horse,https://bendbikerides.com/trail/crazy-horse,East of Bend,blue,False,False,False,1,15368.0,9.55,263.0,263.0,863,863,1289.2,1457.7,,,43.930004797221244,-121.09608783667659
+crescent-mountain-north,Crescent Mountain (North),https://bendbikerides.com/trail/crescent-mountain-north,Cascade Crest,black,False,False,False,1,5785.0,3.59,589.0,106.0,1932,348,1230.2,1729.5,,,44.462650004794654,-122.09167087495828
+crescent-mountain-south,Crescent Mountain (South),https://bendbikerides.com/trail/crescent-mountain-south,Cascade Crest,black,False,False,False,1,7300.0,4.54,85.0,701.0,279,2300,1094.6,1758.2,,,44.437503171800415,-122.05778127264935
+crooked-arm,Crooked Arm,https://bendbikerides.com/trail/crooked-arm,East of Bend,double-black,False,False,False,1,1850.0,1.15,22.0,82.0,72,269,1411.2,1489.7,,,43.925966001873235,-121.07171605255343
+crossfire,Crossfire,https://bendbikerides.com/trail/crossfire,Cline Butte,green,False,False,False,1,2105.0,1.31,173.0,18.0,568,59,1009.1,1165.4,,,44.252334875661404,-121.30685914698233
+cultus-lake-loop,Cultus Lake Loop,https://bendbikerides.com/trail/cultus-lake-loop,Waldo Lake,green,False,False,False,1,18853.0,11.71,275.0,274.0,902,899,1378.7,1504.2,,,43.84722869866553,-121.85988470010179
+dead-mountain,Dead Mountain,https://bendbikerides.com/trail/dead-mountain,,blue,False,True,False,1,9382.0,5.83,904.0,205.0,2966,673,407.6,1141.2,,,43.78279026022466,-122.41192311948691
+deschutes-river-trail,Deschutes River Trail,https://bendbikerides.com/trail/deschutes-river-trail,Sunriver,blue,False,True,False,1,22607.0,14.05,460.0,366.0,1509,1201,1167.2,1279.2,Cabin Butte Area Closure,Benham Falls,43.98158858663041,-121.40681037602808
+dinah-moe-humm,Dinah Moe Humm,https://bendbikerides.com/trail/dinah-moe-humm,Wanoga Sno Park,blue,False,True,False,1,9817.0,6.1,148.0,288.0,486,945,1537.3,1712.9,,,43.94395596894955,-121.55615378693832
+double-ditch,Double Ditch,https://bendbikerides.com/trail/double-ditch,Sisters,blue,False,False,False,1,410.0,0.25,2.0,11.0,7,36,1037.5,1047.2,,,44.24047080610302,-121.52398438091863
+dry-river-canyon,Dry River Canyon,https://bendbikerides.com/trail/dry-river-canyon,East of Bend,black,False,False,False,1,5155.0,3.2,277.0,112.0,909,367,1122.3,1287.5,,,43.92673960389459,-121.00740348972235
+dsm,DSM,https://bendbikerides.com/trail/dsm,Mt. Bachelor Bike Park,blue,True,True,False,1,643.0,0.4,38.0,62.0,125,203,1979.9,2013.9,,,44.003938034817565,-121.68763965335837
+duck-n-cover,Duck 'n' Cover,https://bendbikerides.com/trail/duck-n-cover,,"blue,black",False,False,False,2,3418.0,2.12,56.0,60.0,184,197,912.0,924.0,,,44.30138946926019,-121.13256690497448
+duodenum,Duodenum,https://bendbikerides.com/trail/duodenum,Wanoga Sno Park,"blue,blue",mixed,True,True,2,4821.0,3.0,139.0,178.0,456,584,1455.9,1579.0,,,43.93277971255826,-121.49910059984116
+eagle-rock,Eagle Rock,https://bendbikerides.com/trail/eagle-rock,Sisters,black,False,False,False,1,715.0,0.44,34.0,29.0,112,95,1000.6,1033.4,,,44.26083113118531,-121.5337510062534
+eagle-rock-loop,Eagle Rock Loop,https://bendbikerides.com/trail/eagle-rock-loop,Sisters,blue,False,False,False,1,2482.0,1.54,24.0,15.0,79,49,998.1,1021.9,,,44.257979845264884,-121.54281315503803
+edison-lava,Edison-Lava,https://bendbikerides.com/trail/edison-lava,,black,,False,False,1,15931.0,9.9,358.0,440.0,1175,1444,1450.7,1814.5,,,43.924151770076776,-121.68884574474541
+elko-point,Elko Point,https://bendbikerides.com/trail/elko-point,Sunriver,blue,False,True,False,1,614.0,0.38,1.0,43.0,3,141,1272.1,1314.1,,,43.913250611972586,-121.44400581455146
+elv,ELV,https://bendbikerides.com/trail/elv,Phil's Trail Complex,green,False,True,False,1,1381.0,0.86,25.0,23.0,82,75,1232.0,1245.7,,,44.017209061640344,-121.39981107657269
+escape-from-moscow,Escape from Moscow,https://bendbikerides.com/trail/escape-from-moscow,East of Bend,black,False,False,False,1,2373.0,1.47,8.0,151.0,26,495,1109.8,1253.4,,,43.932509169117,-121.03648016857497
+eula-ridge,EULA Ridge,https://bendbikerides.com/trail/eula-ridge,Oakridge,black,False,False,False,1,6144.0,3.82,85.0,980.0,279,3215,291.1,1188.1,,,43.8158114089679,-122.63950268103257
+evergreen,Evergreen,https://bendbikerides.com/trail/evergreen,Mt. Bachelor Bike Park,blue,True,False,False,1,2004.0,1.25,52.0,165.0,171,541,1938.9,2051.9,,Mt Bachelor Bike Park,44.00115660100798,-121.678359272076
+expressway,Expressway,https://bendbikerides.com/trail/expressway,Phil's Trail Complex,green,False,True,False,1,1821.0,1.13,16.0,21.0,52,69,1213.1,1232.5,,The Flaming Chicken,44.021255536689885,-121.40802142249981
+ext,EXT,https://bendbikerides.com/trail/ext,Phil's Trail Complex,green,False,True,False,1,808.0,0.5,19.0,15.0,62,49,1367.0,1382.0,,NF 300,44.027192463960056,-121.46211958347604
+farewell,Farewell,https://bendbikerides.com/trail/farewell,North of Skyliner,black,False,False,False,1,5191.0,3.23,50.0,392.0,164,1286,1510.0,1852.0,,Tumalo Falls,44.04007597222767,-121.5628796917025
+fat-rabbit-loop,Fat Rabbit Loop,https://bendbikerides.com/trail/fat-rabbit-loop,Maston,green,False,False,False,1,5005.0,3.11,72.0,50.0,236,164,933.4,970.0,,,44.24047391748846,-121.25939811226881
+flagline-access,Flagline Access,https://bendbikerides.com/trail/flagline-access,Swampy Lakes,blue,,False,False,1,3294.0,2.05,132.0,50.0,433,164,1924.3,2038.4,,Dutchman Flat Sno Park,44.010849954976806,-121.6640528443677
+flagline-tie,Flagline Tie,https://bendbikerides.com/trail/flagline-tie,Swampy Lakes,blue,,False,False,1,2116.0,1.31,26.0,49.0,85,161,1901.5,1936.0,,,43.9999099442534,-121.6077538304875
+ftl,FTL,https://bendbikerides.com/trail/ftl,Mt. Bachelor Bike Park,green,True,True,False,1,1050.0,0.65,6.0,90.0,20,295,1942.7,2026.3,,Mt Bachelor Bike Park,44.001733219883874,-121.67594562086293
+fuji-mountain,Fuji Mountain,https://bendbikerides.com/trail/fuji-mountain,Waldo Lake,black,False,False,False,1,9452.0,5.87,774.0,82.0,2539,269,1470.4,2176.4,,,43.6592021884417,-122.10334577279701
+funner,Funner,https://bendbikerides.com/trail/funner,Wanoga Sno Park,blue,False,True,False,1,6673.0,4.15,12.0,275.0,39,902,1386.0,1650.0,,Wanoga Sno Park,43.98161518489899,-121.50385254411067
+galyen-stallion,Galyen Stallion,https://bendbikerides.com/trail/galyen-stallion,Madras,black,True,True,False,1,257.0,0.16,0.0,36.0,0,118,793.0,829.0,,,44.62517208180279,-121.08165047699924
+gate-creek,Gate Creek,https://bendbikerides.com/trail/gate-creek,Cascade Crest,black,False,False,False,1,4692.0,2.92,59.0,535.0,194,1755,1115.8,1592.0,,,44.37151818731377,-122.05593913856205
+gold-lake,Gold Lake,https://bendbikerides.com/trail/gold-lake,Waldo Lake,blue,False,False,False,1,5859.0,3.64,54.0,289.0,177,948,1469.8,1704.6,,,43.65907763517674,-122.02370205833058
+goodman-creek,Goodman Creek,https://bendbikerides.com/trail/goodman-creek,Oakridge,blue,False,False,False,1,10046.0,6.24,830.0,247.0,2723,810,284.4,911.9,,,43.846611621900195,-122.73528332500024
+gordon-lakes,Gordon Lakes,https://bendbikerides.com/trail/gordon-lakes,Cascade Crest,black,False,False,False,1,11216.0,6.97,501.0,246.0,1644,807,958.3,1279.8,,,44.36610498824493,-122.27705766666611
+gordon-meadows,Gordon Meadows,https://bendbikerides.com/trail/gordon-meadows,Cascade Crest,blue,False,False,False,1,1146.0,0.71,89.0,3.0,292,10,1222.8,1310.7,,,44.36849264943578,-122.30793980875995
+gordon-peak,Gordon Peak,https://bendbikerides.com/trail/gordon-peak,Cascade Crest,blue,False,False,False,1,10820.0,6.72,148.0,852.0,486,2795,703.6,1407.6,,,44.55372943889404,-122.13926723284365
+grand-slam,Grand Slam,https://bendbikerides.com/trail/grand-slam,Phil's Trail Complex,"blue,black",,True,False,2,8299.0,5.16,59.0,255.0,194,837,1212.6,1417.8,,,44.00497399503679,-121.45005872255594
+gray-butte,Gray Butte,https://bendbikerides.com/trail/gray-butte,,blue,False,False,False,1,9900.0,6.15,428.0,361.0,1404,1184,1086.0,1303.5,,,44.390668996104324,-121.11302713798231
+green-ridge,Green Ridge,https://bendbikerides.com/trail/green-ridge,Sisters,green,False,False,False,1,18903.0,11.75,564.0,318.0,1850,1043,1132.0,1478.9,,,44.4918726608669,-121.6032884783593
+gut-punch,Gut Punch,https://bendbikerides.com/trail/gut-punch,Madras,blue,False,True,False,1,609.0,0.38,49.0,5.0,161,16,793.0,837.0,,,44.62547299913314,-121.07951130832936
+hanger,Hanger,https://bendbikerides.com/trail/hanger,Mt. Bachelor Bike Park,blue,True,True,False,1,1122.0,0.7,23.0,117.0,75,384,2023.7,2118.7,,,43.99388728176484,-121.67087630298863
+hardesty,Hardesty,https://bendbikerides.com/trail/hardesty,Oakridge,blue,False,False,False,1,9457.0,5.88,1127.0,255.0,3698,837,293.8,1295.0,,,43.81223343373145,-122.66760255706306
+has-no-horse,Has No Horse,https://bendbikerides.com/trail/has-no-horse,East of Bend,blue,False,False,False,1,7147.0,4.44,240.0,63.0,787,207,1311.9,1489.2,,,43.92516836663469,-121.05764668894662
+headgate,Headgate,https://bendbikerides.com/trail/headgate,Maston,green,False,False,False,1,3314.0,2.06,19.0,12.0,62,39,974.6,984.2,,Maston Trailhead,44.21408186488412,-121.28886519982632
+heart-lake,Heart Lake,https://bendbikerides.com/trail/heart-lake,Cascade Crest,black,False,False,False,1,1855.0,1.15,187.0,29.0,614,95,1591.5,1749.8,,,44.37503398861895,-122.08452352631608
+heckletooth,Heckletooth,https://bendbikerides.com/trail/heckletooth,Oakridge,black,False,False,False,1,11184.0,6.95,1092.0,520.0,3583,1706,499.3,1120.6,,,43.74485219649134,-122.37502155993094
+hello-kitty,Hello Kitty,https://bendbikerides.com/trail/hello-kitty,Sisters,blue,False,False,False,1,484.0,0.3,1.0,5.0,3,16,1133.5,1138.3,,,44.22687013289584,-121.55100914593505
+holy-loop,Holy Loop,https://bendbikerides.com/trail/holy-loop,East of Bend,black,False,False,False,1,3023.0,1.88,5.0,356.0,16,1168,1138.5,1490.6,,,43.937208799140535,-121.07700380735358
+holy-loop-connector,Holy Loop Connector,https://bendbikerides.com/trail/holy-loop-connector,East of Bend,green,False,False,False,1,3293.0,2.05,130.0,155.0,427,509,1118.6,1254.4,,Horse Ridge Trailhead,43.946586125716806,-121.0566173236346
+homestead,Homestead,https://bendbikerides.com/trail/homestead,,black,False,False,False,1,1191.0,0.74,9.0,64.0,30,210,814.7,870.6,,Smith Rock Welcome Center,44.37173392135577,-121.1349610731412
+horse-butte,Horse Butte,https://bendbikerides.com/trail/horse-butte,East of Bend,blue,False,False,False,1,15853.0,9.85,240.0,241.0,787,791,1196.0,1319.0,Cabin Butte Area Closure;Cabin Butte Area Closure,Horse Butte;Boyd Cave,43.969491236783796,-121.20428230673457
+hot-dust,Hot Dust,https://bendbikerides.com/trail/hot-dust,Mt. Bachelor Bike Park,black,True,True,False,1,836.0,0.52,6.0,138.0,20,453,1939.0,2070.1,,Mt Bachelor Bike Park,43.99972479658365,-121.68190021249825
+hotshot-spur,Hotshot Spur,https://bendbikerides.com/trail/hotshot-spur,,black,False,False,False,1,464.0,0.29,12.0,5.0,39,16,924.0,932.0,,High Desert Sports Complex,44.293834810106716,-121.14221894604154
+hummingbird,Hummingbird,https://bendbikerides.com/trail/hummingbird,Cline Butte,blue,False,False,False,1,1941.0,1.21,35.0,56.0,115,184,943.0,987.8,,,44.280719211452436,-121.3101392056991
+indigo-extension,Indigo Extension,https://bendbikerides.com/trail/indigo-extension,Oakridge,black,False,True,False,1,2336.0,1.45,251.0,27.0,823,89,1800.6,2034.8,,,43.39245633516222,-122.09551811224836
+indigo-lake,Indigo Lake,https://bendbikerides.com/trail/indigo-lake,Oakridge,blue,False,True,False,1,4390.0,2.73,224.0,41.0,735,135,1617.7,1810.6,,,43.396593449155716,-122.1052957058281
+jim-weaver-loop,Jim Weaver Loop,https://bendbikerides.com/trail/jim-weaver-loop,Waldo Lake,blue,False,False,False,1,30983.0,19.25,638.0,638.0,2093,2093,1651.5,1752.9,,,43.76847175662883,-122.05246840283678
+june-lake,June Lake,https://bendbikerides.com/trail/june-lake,Oakridge,blue,False,True,False,1,3402.0,2.11,167.0,64.0,548,210,1615.1,1723.8,,,43.40468285511747,-122.13289892287798
+juniper-trailhead,Juniper Trailhead,https://bendbikerides.com/trail/juniper-trailhead,Maston,green,,False,False,1,211.0,0.13,7.0,0.0,23,0,945.2,952.4,,Juniper Trailhead,,
+karman-line,Karman Line,https://bendbikerides.com/trail/karman-line,Cline Butte,blue,False,False,False,1,460.0,0.29,30.0,19.0,98,62,1222.6,1242.1,,,44.25242951862043,-121.3028457251267
+kents-trail,Kent’s Trail,https://bendbikerides.com/trail/kents-trail,Phil's Trail Complex,green,False,True,False,1,7071.0,4.39,194.0,35.0,636,115,1185.5,1345.0,,Phil’s Trailhead,44.0364377859036,-121.40216745003193
+kgb,K.G.B.,https://bendbikerides.com/trail/kgb,Phil's Trail Complex,blue,False,True,False,1,7247.0,4.5,110.0,186.0,361,610,1181.8,1277.4,,The Flaming Chicken,44.026088937181136,-121.38922197346744
+king-castle,King Castle,https://bendbikerides.com/trail/king-castle,McKenzie,blue,False,False,False,1,6388.0,3.97,159.0,643.0,522,2110,377.7,878.3,,,44.164275979962184,-122.20733088152085
+kiwa-butte,Kiwa Butte,https://bendbikerides.com/trail/kiwa-butte,Wanoga Sno Park,green,False,True,False,1,2203.0,1.37,43.0,53.0,141,174,1676.9,1715.4,,,43.956164737581446,-121.52531617934305
+lake-creek,Lake Creek,https://bendbikerides.com/trail/lake-creek,Sisters,green,False,False,False,1,6964.0,4.33,8.0,150.0,26,492,908.5,1053.1,,,44.44236489191991,-121.69431452866337
+larison-creek,Larison Creek,https://bendbikerides.com/trail/larison-creek,,blue,False,True,False,1,9280.0,5.77,340.0,756.0,1115,2480,472.0,888.8,,,43.690987577504956,-122.50000173333326
+larison-rock,Larison Rock,https://bendbikerides.com/trail/larison-rock,Oakridge,blue,False,True,False,1,5150.0,3.2,95.0,736.0,312,2415,364.3,1021.4,,,43.73411841473188,-122.46757476229531
+last-chance,Last Chance,https://bendbikerides.com/trail/last-chance,Mt. Bachelor Bike Park,black,True,True,False,1,6028.0,3.75,152.0,577.0,499,1893,1935.3,2360.1,,Mt Bachelor Bike Park,43.99925217946563,-121.69370645968276
+lava-flow,Lava Flow,https://bendbikerides.com/trail/lava-flow,Mt. Bachelor Bike Park,blue,True,True,False,1,5139.0,3.19,125.0,473.0,410,1552,2002.7,2353.4,,,43.99127683696645,-121.68139905967232
+lava-flow-lower,Lava Flow (Lower),https://bendbikerides.com/trail/lava-flow-lower,Mt. Bachelor Bike Park,blue,True,True,False,1,1022.0,0.64,13.0,79.0,43,259,1939.0,2005.5,,Mt Bachelor Bike Park,43.99951702298097,-121.67330604061678
+lawler,Lawler,https://bendbikerides.com/trail/lawler,Oakridge,blue,False,True,False,1,11148.0,6.93,243.0,1245.0,797,4085,327.8,1341.5,,,43.80004209205251,-122.59690646017503
+leap-of-faith,Leap of Faith,https://bendbikerides.com/trail/leap-of-faith,Waldo Lake,black,False,False,False,1,2428.0,1.51,0.0,349.0,0,1145,1951.7,2300.2,,,43.61910952192409,-121.9574563531028
+leap-of-faith-madras,Leap of Faith,https://bendbikerides.com/trail/leap-of-faith-madras,Madras,blue,True,True,False,1,443.0,0.28,27.0,6.0,89,20,783.0,807.0,,,44.627014143204576,-121.09441828489321
+legal-eagle,Legal Eagle,https://bendbikerides.com/trail/legal-eagle,Cline Butte,green,False,False,False,1,3237.0,2.01,127.0,50.0,417,164,993.7,1104.1,,,44.257335376460674,-121.28850863534382
+lemish-lake-trail,Lemish Lake Trail,https://bendbikerides.com/trail/lemish-lake-trail,Waldo Lake,blue,False,False,False,1,4946.0,3.07,136.0,23.0,446,75,1447.9,1569.3,,,43.797613731440435,-121.88896647686875
+lone-wolf,Lone Wolf,https://bendbikerides.com/trail/lone-wolf,Wanoga Sno Park,black,True,True,False,1,2297.0,1.43,10.0,155.0,33,509,1504.0,1649.0,,,43.94436267900821,-121.4965466138266
+lorax,Lorax,https://bendbikerides.com/trail/lorax,Wanoga Sno Park,blue,,False,False,1,1450.0,0.9,105.0,19.0,344,62,1649.2,1739.1,,Wanoga Sno Park,43.98027744434529,-121.54366261079996
+lost-dream,Lost Dream,https://bendbikerides.com/trail/lost-dream,Maston,green,False,False,False,1,7251.0,4.51,76.0,50.0,249,164,951.6,980.3,,,44.2277327600799,-121.30534050544325
+lower-butte-loop,Lower Butte Loop,https://bendbikerides.com/trail/lower-butte-loop,Sisters,green,False,False,False,1,16808.0,10.44,362.0,279.0,1188,915,960.9,1102.2,,Indian Ford Campground,44.42290914577174,-121.66332215051477
+lower-flagline,Lower Flagline,https://bendbikerides.com/trail/lower-flagline,Swampy Lakes,blue,,False,False,1,1857.0,1.15,3.0,109.0,10,358,1797.2,1903.4,,,44.0069753236198,-121.59505175668681
+lower-whoops,Lower Whoops,https://bendbikerides.com/trail/lower-whoops,Phil's Trail Complex,blue,True,True,False,1,2705.0,1.68,1.0,133.0,3,436,1371.1,1503.8,,NF 300,44.03206989453989,-121.46700181937767
+maiden-lake,Maiden Lake,https://bendbikerides.com/trail/maiden-lake,Waldo Lake,blue,False,False,False,1,8780.0,5.46,540.0,214.0,1772,702,1503.5,1978.1,,,43.610571268185,-121.9641937522216
+maiden-peak,Maiden Peak,https://bendbikerides.com/trail/maiden-peak,Waldo Lake,black,False,False,False,1,9634.0,5.99,963.0,53.0,3159,174,1468.9,2380.2,,,43.64021645749753,-121.99913073162168
+marvins-garden,Marvin’s Garden,https://bendbikerides.com/trail/marvins-garden,Phil's Trail Complex,green,False,True,False,1,8543.0,5.31,132.0,68.0,433,223,1172.0,1239.0,,Phil’s Trailhead,44.032352561518856,-121.37811408097726
+maston-tie,Maston Tie,https://bendbikerides.com/trail/maston-tie,Maston,green,False,False,False,1,847.0,0.53,12.0,1.0,39,3,965.6,976.8,,Maston Trailhead,44.21526565978553,-121.30471524265563
+maverick,Maverick,https://bendbikerides.com/trail/maverick,Madras,blue,True,True,False,1,1003.0,0.62,7.0,41.0,23,135,775.0,816.0,,,44.628215989435944,-121.08838159002408
+mckenzie-river-trail,McKenzie River Trail,https://bendbikerides.com/trail/mckenzie-river-trail,McKenzie,"black,blue",False,False,False,2,39426.0,24.5,461.0,980.0,1512,3215,435.1,962.3,,,44.28203748932225,-122.05199369493103
+metolius-windigo-99-lower,Metolius-Windigo: 99 Lower,https://bendbikerides.com/trail/metolius-windigo-99-lower,,blue,,False,False,1,15623.0,9.71,142.0,781.0,466,2562,1288.2,1947.9,,,44.16367635015658,-121.65062897415882
+metolius-windigo-99-upper,Metolius-Windigo: 99 Upper,https://bendbikerides.com/trail/metolius-windigo-99-upper,,blue,,False,False,1,11408.0,7.09,263.0,245.0,863,804,1911.8,2066.2,,,44.09900889450873,-121.59081211024301
+metolius-windigo-black-butte,Metolius-Windigo (Black Butte),https://bendbikerides.com/trail/metolius-windigo-black-butte,Sisters,blue,False,False,False,1,15019.0,9.33,228.0,383.0,748,1257,903.9,1195.7,,,44.43954260516034,-121.63484294538722
+metolius-windigo-happy-valley,Metolius-Windigo: Happy Valley,https://bendbikerides.com/trail/metolius-windigo-happy-valley,Swampy Lakes,blue,,False,False,1,4809.0,2.99,49.0,290.0,161,951,1849.9,2095.1,,,44.06060797093696,-121.63128566730653
+metolius-windigo-lava-lake,Metolius-Windigo: Lava Lake,https://bendbikerides.com/trail/metolius-windigo-lava-lake,,blue,,False,False,1,16896.0,10.5,142.0,528.0,466,1732,1449.3,1845.2,,,44.00077409980537,-121.73835391638005
+metolius-windigo-north-fork-to-mrazek,Metolius Windigo: North Fork to Mrazek,https://bendbikerides.com/trail/metolius-windigo-north-fork-to-mrazek,,blue,,False,False,1,1821.0,1.13,82.0,20.0,269,66,1849.7,1910.8,,,44.05807210772366,-121.60829614086451
+metolius-windigo-ramble-on,Metolius-Windigo: Ramble on,https://bendbikerides.com/trail/metolius-windigo-ramble-on,Swampy Lakes,blue,,False,False,1,3675.0,2.28,172.0,65.0,564,213,1983.2,2091.1,,,44.03931613035857,-121.65904426912385
+metolius-windigo-todd-lake,Metolius-Windigo: Todd Lake,https://bendbikerides.com/trail/metolius-windigo-todd-lake,,blue,,False,False,1,5605.0,3.48,231.0,85.0,758,279,1820.6,1993.7,,,44.021535005199325,-121.67865745555697
+metolius-windigo-waldo-north,Metolius-Windigo (Waldo North),https://bendbikerides.com/trail/metolius-windigo-waldo-north,Waldo Lake,blue,False,False,False,1,10478.0,6.51,75.0,296.0,246,971,1569.5,1790.0,,,43.73805583906534,-121.9376195542313
+metolius-windigo-waldo-south,Metolius-Windigo (Waldo South),https://bendbikerides.com/trail/metolius-windigo-waldo-south,Waldo Lake,blue,False,False,False,1,22307.0,13.86,724.0,304.0,2375,997,1354.4,1821.2,,,43.65795177161934,-121.88497403813228
+middle-flagline,Middle Flagline,https://bendbikerides.com/trail/middle-flagline,Swampy Lakes,blue,False,False,True,1,6253.0,3.89,163.0,279.0,535,915,1904.0,2120.0,,,44.01560783556732,-121.62074370178294
+middle-fork-willamette,Middle Fork Willamette,https://bendbikerides.com/trail/middle-fork-willamette,Oakridge,black,False,False,False,1,40359.0,25.08,435.0,1502.0,1427,4928,544.6,1615.1,,,43.50497611953392,-122.29605018642785
+middle-fork-willamette-lower,Middle Fork Willamette (Lower),https://bendbikerides.com/trail/middle-fork-willamette-lower,Oakridge,green,False,False,False,1,7174.0,4.46,86.0,15.0,282,49,476.2,547.0,,,43.591916735958335,-122.45288972805363
+moore-creek,Moore Creek,https://bendbikerides.com/trail/moore-creek,Waldo Lake,blue,False,False,False,1,7791.0,4.84,54.0,233.0,177,764,1473.4,1659.3,,,43.66310498520295,-121.94276772499992
+mormon-mission,Mormon Mission,https://bendbikerides.com/trail/mormon-mission,Madras,blue,False,True,False,1,901.0,0.56,5.0,59.0,16,194,776.0,831.0,,,44.62843566050546,-121.08090999623624
+mrazek,Mrazek (Lower),https://bendbikerides.com/trail/mrazek,North of Skyliner,blue,False,False,False,1,12072.0,7.5,43.0,478.0,141,1568,1172.0,1607.0,,,44.054657206528645,-121.43697020903228
+mrazek-upper,Mrazek (Upper),https://bendbikerides.com/trail/mrazek-upper,North of Skyliner,"blue,blue",mixed,False,False,2,9012.0,5.6,105.0,409.0,344,1342,1607.0,1911.0,,,44.051164391570836,-121.55984518054854
+mt-ray-trail,Mt Ray Trail,https://bendbikerides.com/trail/mt-ray-trail,Oakridge,blue,False,False,False,1,4130.0,2.57,259.0,4.0,850,13,1525.4,1781.5,,,43.65742391021894,-122.04842925099767
+mtb,MTB,https://bendbikerides.com/trail/mtb,Phil's Trail Complex,blue,False,True,False,1,2701.0,1.68,60.0,50.0,197,164,1206.0,1257.0,,,44.03674009051247,-121.41139362572407
+north-fork,North Fork,https://bendbikerides.com/trail/north-fork,,blue,,False,False,1,5894.0,3.66,394.0,61.0,1293,200,1516.3,1849.8,,Tumalo Falls,44.0476318958182,-121.59002078590086
+north-fork-3666,North Fork #3666,https://bendbikerides.com/trail/north-fork-3666,Oakridge,blue,False,False,False,1,7845.0,4.87,258.0,218.0,846,715,326.7,415.2,,,43.800048478778166,-122.45096530622426
+north-pyramid,North Pyramid,https://bendbikerides.com/trail/north-pyramid,Cascade Crest,black,False,False,False,1,5127.0,3.19,633.0,91.0,2077,299,1021.2,1614.0,,,44.526443738382085,-122.06597592968444
+olallie-trail,Olallie Trail,https://bendbikerides.com/trail/olallie-trail,McKenzie,blue,False,False,False,1,11292.0,7.02,524.0,632.0,1719,2073,1384.4,1612.7,,,44.10725444752052,-122.084524920293
+old-hwy-20,Old Hwy 20,https://bendbikerides.com/trail/old-hwy-20,East of Bend,green,False,False,False,1,4002.0,2.49,145.0,16.0,476,52,1180.5,1311.7,,,43.91655094111957,-121.01239252595079
+oleary-mountain,O’Leary Mountain,https://bendbikerides.com/trail/oleary-mountain,McKenzie,black,False,False,False,1,20429.0,12.69,1379.0,1477.0,4524,4846,679.4,1564.8,,,44.12893200533546,-122.16350015409856
+olympus,Olympus,https://bendbikerides.com/trail/olympus,Madras,blue,False,True,False,1,1082.0,0.67,34.0,21.0,112,69,818.0,838.0,,,44.631534382176085,-121.07515280510637
+oregon-sunshine,Oregon Sunshine,https://bendbikerides.com/trail/oregon-sunshine,Maston,green,False,False,False,1,1935.0,1.2,27.0,21.0,89,69,949.7,972.3,,Juniper Trailhead,44.241916471025036,-121.28520019733693
+parkway,Parkway,https://bendbikerides.com/trail/parkway,East of Bend,blue,False,False,False,1,7175.0,4.46,298.0,53.0,978,174,1108.9,1374.6,,Horse Ridge Trailhead,43.923956056636314,-121.03052919908403
+peek-a-boo,Peek A Boo,https://bendbikerides.com/trail/peek-a-boo,Madras,green,False,True,False,1,904.0,0.56,22.0,40.0,72,131,804.0,844.0,,,44.62780902024096,-121.07532385880324
+peterson-ridge,Peterson Ridge,https://bendbikerides.com/trail/peterson-ridge,Sisters,blue,False,True,False,1,28166.0,17.5,346.0,346.0,1135,1135,975.2,1170.9,,Peterson Ridge Trailhead,44.26293455696447,-121.52726240321007
+peterson-ridge-tie,Peterson Ridge Tie,https://bendbikerides.com/trail/peterson-ridge-tie,Sisters,blue,False,False,False,1,5155.0,3.2,180.0,61.0,591,200,1170.6,1290.1,,,44.21838956178914,-121.58644895251321
+phils-trail,Phil’s Trail,https://bendbikerides.com/trail/phils-trail,Phil's Trail Complex,"black,green,blue,green",mixed,True,False,4,12186.0,7.57,90.0,431.0,295,1414,1181.0,1538.0,,Phil’s Trailhead;The Flaming Chicken,44.019032366884666,-121.42102685440892
+pinedrops,Pinedrops,https://bendbikerides.com/trail/pinedrops,Phil's Trail Complex,green,False,True,False,1,3092.0,1.92,146.0,14.0,479,46,1371.3,1514.4,,NF 300,44.026093655720466,-121.4808359187917
+pondo,Pondo,https://bendbikerides.com/trail/pondo,Wanoga Sno Park,blue,True,False,False,1,1341.0,0.83,5.0,109.0,16,358,1632.2,1736.9,,Wanoga Sno Park,43.980178920298926,-121.53627198033575
+positive-vibrations,Positive Vibrations,https://bendbikerides.com/trail/positive-vibrations,Cline Butte,green,False,False,False,1,557.0,0.35,5.0,47.0,16,154,1121.8,1167.0,,,44.25919850110964,-121.29952907233212
+powerline,Powerline,https://bendbikerides.com/trail/powerline,Sisters,blue,False,False,False,1,182.0,0.11,0.0,4.0,0,13,990.0,994.1,,,44.269425833749125,-121.5420442798004
+prt-middle,PRT Middle,https://bendbikerides.com/trail/prt-middle,Sisters,blue,False,False,False,1,2345.0,1.46,4.0,44.0,13,144,1120.5,1160.3,,,44.2253518054261,-121.56108176022812
+pumice-foot,Pumice Foot,https://bendbikerides.com/trail/pumice-foot,Maston,green,False,False,False,1,3313.0,2.06,29.0,27.0,95,89,956.5,971.6,,,44.23415130401125,-121.2883134856136
+pyramid-peak,Pyramid Peak,https://bendbikerides.com/trail/pyramid-peak,Cascade Crest,black,False,False,False,1,5499.0,3.42,412.0,381.0,1352,1250,598.9,732.2,,,44.49194999548797,-122.16626292502002
+pyramids,Pyramids,https://bendbikerides.com/trail/pyramids,Cascade Crest,double-black,False,False,False,1,3199.0,1.99,561.0,30.0,1841,98,1174.6,1706.6,,,44.50554965733244,-122.07055728058734
+quarantine,Quarantine,https://bendbikerides.com/trail/quarantine,Madras,green,False,True,False,1,609.0,0.38,1.0,39.0,3,128,805.0,843.0,,,44.628966664548216,-121.07698403919852
+radlands,Radlands,https://bendbikerides.com/trail/radlands,,green,False,False,False,1,1604.0,1.0,22.0,17.0,72,56,918.0,932.0,,High Desert Sports Complex,44.29106112511195,-121.14404910512877
+rattler,Rattler,https://bendbikerides.com/trail/rattler,Cline Butte,"blue,blue",mixed,False,False,2,5316.0,3.3,121.0,97.0,397,318,939.1,1012.8,,,44.27495216589526,-121.31614686265375
+rattlesnake,Rattlesnake,https://bendbikerides.com/trail/rattlesnake,Mt. Bachelor Bike Park,black,True,True,False,1,1847.0,1.15,24.0,241.0,79,791,2025.9,2242.9,,,43.99280736827413,-121.67747075901818
+redline,Redline,https://bendbikerides.com/trail/redline,Mt. Bachelor Bike Park,black,True,True,False,1,2301.0,1.43,32.0,316.0,105,1037,2071.0,2355.3,,,43.99640125930381,-121.68531331397757
+return-policy,Return Policy,https://bendbikerides.com/trail/return-policy,Cline Butte,blue,False,False,False,1,839.0,0.52,68.0,5.0,223,16,1163.8,1227.3,,,44.25533072392548,-121.29962128981137
+return-to-whiskey,Return to Whiskey,https://bendbikerides.com/trail/return-to-whiskey,Madras,green,False,True,False,1,542.0,0.34,38.0,1.0,125,3,782.0,820.0,,,44.62991297775139,-121.08151409967867
+ridge-loop-trail,Ridge Loop Trail,https://bendbikerides.com/trail/ridge-loop-trail,Swampy Lakes,blue,,False,True,1,4243.0,2.64,181.0,21.0,594,69,1767.2,1926.8,,Swampy Lakes,43.99692597385871,-121.59580079502767
+ridge-runner,Ridge Runner,https://bendbikerides.com/trail/ridge-runner,Cline Butte,blue,False,False,False,1,2449.0,1.52,102.0,36.0,335,118,1014.9,1093.2,,,44.248945392547114,-121.32661856567205
+river-trail,River Trail,https://bendbikerides.com/trail/river-trail,,blue,False,False,False,1,3469.0,2.16,131.0,126.0,430,413,803.8,851.0,,Smith Rock Welcome Center,44.36432331913218,-121.14996756145153
+rockbar,Rockbar,https://bendbikerides.com/trail/rockbar,Maston,blue,False,False,False,1,1640.0,1.02,40.0,32.0,131,105,954.0,984.3,,,44.21604630623392,-121.2682799739186
+rockfall,Rockfall,https://bendbikerides.com/trail/rockfall,Mt. Bachelor Bike Park,double-black,True,True,False,1,1473.0,0.92,15.0,304.0,49,997,2068.2,2359.5,,,43.99248181960559,-121.6851160271369
+roundabout,Roundabout,https://bendbikerides.com/trail/roundabout,Sunriver,blue,False,True,False,1,5144.0,3.2,99.0,93.0,325,305,1265.4,1337.3,,,43.913351255773684,-121.45029253511905
+royal-flush,Royal Flush,https://bendbikerides.com/trail/royal-flush,Sunriver,blue,True,True,False,1,2019.0,1.25,4.0,87.0,13,285,1374.2,1457.2,,,43.93331201721836,-121.48015549310337
+running-elk,Running Elk,https://bendbikerides.com/trail/running-elk,Sisters,blue,False,False,False,1,244.0,0.15,3.0,4.0,10,13,1030.2,1034.2,,,44.25100233939966,-121.52587876419992
+saddle-access,Saddle Access,https://bendbikerides.com/trail/saddle-access,,green,False,False,False,1,1129.0,0.7,163.0,1.0,535,3,1075.1,1237.1,,,44.25657355514343,-121.29638325601383
+salmon-creek-north,Salmon Creek (North),https://bendbikerides.com/trail/salmon-creek-north,Oakridge,green,False,False,False,1,6533.0,4.06,113.0,37.0,371,121,378.0,458.3,,,43.75510941447655,-122.39852703051201
+salmon-creek-south,Salmon Creek (South),https://bendbikerides.com/trail/salmon-creek-south,Oakridge,black,False,False,False,1,6988.0,4.34,274.0,363.0,899,1191,375.2,559.2,,,43.757603071657684,-122.37861220520301
+sand-canyon,Sand Canyon,https://bendbikerides.com/trail/sand-canyon,East of Bend,black,False,False,False,1,3335.0,2.07,6.0,319.0,20,1047,1116.7,1430.4,,Horse Ridge Trailhead,43.93812195226059,-121.04544440033658
+sawtooth,Sawtooth,https://bendbikerides.com/trail/sawtooth,Oakridge,black,False,True,False,1,8247.0,5.12,229.0,747.0,751,2451,762.7,1280.1,,,43.80607166579114,-122.70390415984932
+sawtooth-mountain,Sawtooth Mountain,https://bendbikerides.com/trail/sawtooth-mountain,Oakridge,black,False,False,False,1,3628.0,2.25,109.0,393.0,358,1289,1684.2,1988.5,,,43.39059271068095,-122.11323454978266
+scar-mountain,Scar Mountain,https://bendbikerides.com/trail/scar-mountain,Cascade Crest,black,False,False,False,1,11191.0,6.95,645.0,984.0,2116,3228,1070.9,1509.0,,,44.57054577104469,-122.09181220533566
+sector-16,Sector 16,https://bendbikerides.com/trail/sector-16,Swampy Lakes,blue,,False,True,1,5010.0,3.11,80.0,110.0,262,361,1658.5,1735.8,,Swede Ridge Shelter;Shooting Star,44.00812842835984,-121.5366717549341
+shevlin,Shevlin,https://bendbikerides.com/trail/shevlin,North of Skyliner,green,False,True,False,1,3994.0,2.48,140.0,71.0,459,233,1104.0,1173.0,,,44.064705936125506,-121.39370893974262
+sisters-tie,Sisters Tie,https://bendbikerides.com/trail/sisters-tie,Sisters,blue,False,False,False,1,10476.0,6.51,35.0,16.0,115,52,967.2,990.6,,Indian Ford Campground,44.34532134034316,-121.55728981157816
+skyline,Skyline,https://bendbikerides.com/trail/skyline,Waldo Lake,blue,False,False,False,1,5435.0,3.38,329.0,39.0,1079,128,1613.9,1930.1,,,43.62255280605126,-122.00876316851227
+skyliner,Skyliner,https://bendbikerides.com/trail/skyliner,Phil's Trail Complex,blue,,True,False,1,5078.0,3.16,128.0,74.0,420,243,1447.2,1502.8,,Skyliners Trailhead,44.034137011629184,-121.49546161497237
+sourth-fork,South Fork,https://bendbikerides.com/trail/sourth-fork,Swampy Lakes,black,,False,False,1,5084.0,3.16,309.0,16.0,1014,52,1500.1,1795.4,,Swampy Shelter,44.02252881645228,-121.5788433469815
+south-pyramid-creek,South Pyramid Creek,https://bendbikerides.com/trail/south-pyramid-creek,Cascade Crest,blue,False,False,False,1,10351.0,6.43,315.0,796.0,1033,2612,680.0,1279.4,,,44.49168398950806,-122.10934774816332
+south-waldo-lake,South Waldo Lake,https://bendbikerides.com/trail/south-waldo-lake,Waldo Lake,blue,False,False,False,1,9001.0,5.59,229.0,589.0,751,1932,1420.9,1891.4,,,43.628596497594344,-122.11216504397224
+south-willamette,South Willamette,https://bendbikerides.com/trail/south-willamette,Oakridge,blue,False,False,False,1,10693.0,6.64,530.0,584.0,1739,1916,287.2,435.4,,,43.845317167277386,-122.63621155713122
+sst,SST,https://bendbikerides.com/trail/sst,Swampy Lakes,blue,,False,False,1,5401.0,3.36,102.0,177.0,335,581,1730.4,1817.7,,Swede Ridge Shelter,44.00655042428477,-121.56828767070687
+start-o-willamette,Start 'O Willamette,https://bendbikerides.com/trail/start-o-willamette,Oakridge,black,False,True,False,1,1662.0,1.03,196.0,10.0,643,33,1611.4,1797.6,,,43.418092122027446,-122.11044821205068
+steve-larsen,Steve Larsen,https://bendbikerides.com/trail/steve-larsen,Wanoga Sno Park,green,False,True,False,1,4242.0,2.64,74.0,94.0,243,308,1426.2,1464.5,,,43.960503155997145,-121.48147242634958
+stinger-east,Stinger East,https://bendbikerides.com/trail/stinger-east,Cline Butte,blue,False,False,False,1,3648.0,2.27,79.0,47.0,259,154,979.2,1036.8,,,44.257928716152094,-121.3323011452486
+stinger-west,Stinger West,https://bendbikerides.com/trail/stinger-west,Cline Butte,blue,False,False,False,1,3951.0,2.46,48.0,80.0,157,262,959.2,1015.2,,,44.25818265251297,-121.34294320905082
+storm-king-lower,Storm King (Lower),https://bendbikerides.com/trail/storm-king-lower,Wanoga Sno Park,blue,False,True,False,1,5786.0,3.6,72.0,223.0,236,732,1236.0,1414.0,,,43.96988591651229,-121.45031202161343
+storm-king-upper,Storm King (Upper),https://bendbikerides.com/trail/storm-king-upper,Phil's Trail Complex,blue,False,True,False,1,8760.0,5.44,142.0,261.0,466,856,1360.0,1526.0,,Green Gate,44.012240057851855,-121.47769882999934
+strong-whiskey,Strong Whiskey,https://bendbikerides.com/trail/strong-whiskey,Madras,black,True,True,False,1,415.0,0.26,0.0,37.0,0,121,782.0,819.0,,,44.630437541669124,-121.0838445152402
+summer-range,Summer Range,https://bendbikerides.com/trail/summer-range,Sisters,blue,False,False,False,1,909.0,0.56,13.0,16.0,43,52,1003.3,1015.7,,,44.25616512031377,-121.52750968775717
+summit-trail,Summit Trail,https://bendbikerides.com/trail/summit-trail,,blue,False,False,False,1,3749.0,2.33,73.0,351.0,240,1152,810.6,1088.7,,,44.37764628128318,-121.13109237488244
+sunset-ridge,Sunset Ridge,https://bendbikerides.com/trail/sunset-ridge,Madras,green,False,True,False,1,488.0,0.3,13.0,6.0,43,20,783.0,795.0,,,44.630224394245005,-121.09423285987904
+suttle-lake-loop,Suttle Lake Loop,https://bendbikerides.com/trail/suttle-lake-loop,Sisters,green,False,False,False,1,5520.0,3.43,50.0,52.0,164,171,1049.0,1059.0,,,44.42767440899868,-121.73150730457962
+suttle-tie,Suttle Tie,https://bendbikerides.com/trail/suttle-tie,Sisters,green,False,False,False,1,8270.0,5.14,110.0,81.0,361,266,1002.2,1058.3,,,44.4207114906543,-121.70576774891994
+swamp-thing,Swamp Thing,https://bendbikerides.com/trail/swamp-thing,Swampy Lakes,green,False,False,False,1,2835.0,1.76,123.0,20.0,404,66,1665.0,1768.0,,Swampy Lakes;Wanoga Sno Park,43.9873477394392,-121.5522256258322
+swamp-wells,Swamp Wells,https://bendbikerides.com/trail/swamp-wells,East of Bend,blue,False,False,False,1,37049.0,23.02,1392.0,318.0,4567,1043,1233.0,2307.0,Cabin Butte Area Closure,,43.95418344495249,-121.25576322843673
+swampy-lakes-loop,Swampy Lakes Loop,https://bendbikerides.com/trail/swampy-lakes-loop,Swampy Lakes,blue,,False,False,1,6568.0,4.08,109.0,109.0,358,358,1766.2,1824.4,,Swampy Shelter;Swampy Lakes,44.00346799201802,-121.58429028901367
+swampydutchman,Swampy/Dutchman,https://bendbikerides.com/trail/swampydutchman,Swampy Lakes,green,,False,True,1,7054.0,4.38,197.0,209.0,646,686,1860.0,1977.5,,Dutchman Flat Sno Park,43.98668738762029,-121.63278635940964
+swan-song,Swan Song,https://bendbikerides.com/trail/swan-song,Sunriver,green,False,True,False,1,2880.0,1.79,19.0,19.0,62,62,1266.5,1278.0,,,43.89019481617944,-121.45912589961941
+swede-ridge,Swede Ridge,https://bendbikerides.com/trail/swede-ridge,Swampy Lakes,blue,,False,False,1,2977.0,1.85,60.0,116.0,197,381,1734.0,1810.3,,Swede Ridge Shelter,44.0118159167385,-121.56889181391307
+talon-trail,Talon Trail,https://bendbikerides.com/trail/talon-trail,Maston,green,False,False,False,1,3289.0,2.04,29.0,43.0,95,141,947.1,986.3,,,44.2219497899423,-121.2690152192748
+telegraph,Telegraph,https://bendbikerides.com/trail/telegraph,Sisters,blue,False,False,False,1,625.0,0.39,16.0,1.0,52,3,1112.1,1126.5,,,44.22604956366496,-121.54361451120681
+the-goat,The Goat,https://bendbikerides.com/trail/the-goat,Cline Butte,blue,False,False,False,1,445.0,0.28,0.0,75.0,0,246,1163.2,1237.9,,,44.25603972037919,-121.30057487592487
+the-lair,The Lair,https://bendbikerides.com/trail/the-lair,Phil's Trail Complex,double-black,True,True,False,1,1220.0,0.76,27.0,51.0,89,167,1196.6,1222.8,,,44.02698998352993,-121.37413406718399
+the-ravine,The Ravine,https://bendbikerides.com/trail/the-ravine,Madras,green,False,True,False,1,771.0,0.48,37.0,4.0,121,13,804.0,837.0,,,44.62750858166157,-121.07759368107227
+the-saddle,The Saddle,https://bendbikerides.com/trail/the-saddle,Cline Butte,blue,True,False,False,1,780.0,0.48,1.0,131.0,3,430,1033.8,1163.4,,,44.25503459628035,-121.29444917256478
+ticket-to-ride,Ticket to Ride,https://bendbikerides.com/trail/ticket-to-ride,Phil's Trail Complex,green,False,True,False,1,9508.0,5.91,190.0,190.0,623,623,1210.0,1337.8,,Cascade Lakes Welcome Center,44.01158678839737,-121.4088907468362
+tiddlywinks-lower,Tiddlywinks (Lower),https://bendbikerides.com/trail/tiddlywinks-lower,Wanoga Sno Park,blue,False,True,False,1,6554.0,4.07,53.0,353.0,174,1158,1386.0,1689.0,,,43.96767566656834,-121.50143788084999
+tiddlywinks-upper,Tiddlywinks (Upper),https://bendbikerides.com/trail/tiddlywinks-upper,Wanoga Sno Park,blue,False,True,False,1,4553.0,2.83,101.0,63.0,331,207,1627.4,1686.1,,Wanoga Sno Park,43.97444855663062,-121.52031709885279
+timpanogas-lake,Timpanogas Lake,https://bendbikerides.com/trail/timpanogas-lake,Oakridge,blue,False,False,False,1,1662.0,1.03,23.0,23.0,75,75,1608.3,1620.3,,,43.41290197870836,-122.11093314194275
+tin-can-alley,Tin Can Alley,https://bendbikerides.com/trail/tin-can-alley,Sisters,blue,False,False,False,1,351.0,0.22,1.0,1.0,3,3,983.2,984.1,,,44.27373887794482,-121.54388226302589
+tire-mountain,Tire Mountain,https://bendbikerides.com/trail/tire-mountain,Oakridge,blue,False,True,False,1,7847.0,4.88,271.0,629.0,889,2064,857.5,1241.3,,,43.84035029454574,-122.5360743088163
+top-ring,Top Ring,https://bendbikerides.com/trail/top-ring,Sisters,blue,False,False,False,1,1652.0,1.03,30.0,19.0,98,62,1143.5,1170.6,,,44.225384460761006,-121.56522732177523
+trail-1,Trail 1,https://bendbikerides.com/trail/trail-1,Cline Butte,black,True,False,False,1,724.0,0.45,0.0,161.0,0,528,1074.0,1234.9,,,44.25217820078785,-121.29907195218527
+trail-2,Trail 2,https://bendbikerides.com/trail/trail-2,Cline Butte,double-black,True,False,False,1,986.0,0.61,0.0,212.0,0,696,1026.4,1238.6,,,44.25155904631498,-121.30059623614142
+trail-3,Trail 3,https://bendbikerides.com/trail/trail-3,Cline Butte,black,True,False,False,1,1382.0,0.86,6.0,220.0,20,722,1026.8,1240.7,,,44.24803332948758,-121.29931263641947
+trestle,Trestle,https://bendbikerides.com/trail/trestle,Madras,"black,green,black",mixed,True,False,3,1257.0,0.78,0.0,49.0,0,161,761.0,810.0,,,44.63197043261198,-121.0926795400324
+trestle-return,Trestle Return,https://bendbikerides.com/trail/trestle-return,Madras,green,False,True,False,1,1181.0,0.73,49.0,0.0,161,0,761.0,810.0,,,,
+trinity-spur,Trinity Spur,https://bendbikerides.com/trail/trinity-spur,,black,False,False,False,1,111.0,0.07,1.0,1.0,3,3,915.0,916.0,,High Desert Sports Complex,44.29705049397049,-121.14651213900352
+tumalo-creek,Tumalo Creek,https://bendbikerides.com/trail/tumalo-creek,North of Skyliner,green,False,False,False,1,4614.0,2.87,129.0,71.0,423,233,1447.0,1505.0,,Skyliners Trailhead;Tumalo Falls,44.03235275659591,-121.5351466071736
+tumalo-ridge,Tumalo Ridge,https://bendbikerides.com/trail/tumalo-ridge,Swampy Lakes,blue,,False,True,1,7515.0,4.67,395.0,108.0,1296,354,1449.3,1736.0,,Swede Ridge Shelter;Skyliners Trailhead,44.02512146655906,-121.55004597257599
+turkey-hollow,Turkey Hollow,https://bendbikerides.com/trail/turkey-hollow,Sisters,blue,False,False,False,1,311.0,0.19,3.0,2.0,10,7,1086.4,1088.3,,,44.23322719246494,-121.52912654294087
+twin-peaks,Twin Peaks,https://bendbikerides.com/trail/twin-peaks,Waldo Lake,black,False,False,False,1,9934.0,6.17,455.0,342.0,1493,1122,1705.5,2121.7,,,43.70305956403047,-121.978959683662
+twin-snakes,Twin Snakes,https://bendbikerides.com/trail/twin-snakes,Madras,green,False,True,False,1,525.0,0.33,1.0,34.0,3,112,804.0,837.0,,,44.627754190345655,-121.07905460465065
+tylers-traverse,Tyler's Traverse,https://bendbikerides.com/trail/tylers-traverse,Wanoga Sno Park,blue,True,True,False,1,10221.0,6.35,98.0,520.0,322,1706,1255.0,1697.0,,,43.95437603759295,-121.45908638944297
+upper-butte-loop,Upper Butte Loop,https://bendbikerides.com/trail/upper-butte-loop,Sisters,blue,False,False,False,1,18886.0,11.74,571.0,514.0,1873,1686,1069.6,1258.4,,,44.42168861262485,-121.64167213314232
+upper-flagline,Upper Flagline,https://bendbikerides.com/trail/upper-flagline,Swampy Lakes,blue,,False,False,1,2095.0,1.3,57.0,87.0,187,285,1976.6,2022.9,,,44.03349318800255,-121.66752276516641
+upper-whoops,Upper Whoops,https://bendbikerides.com/trail/upper-whoops,Phil's Trail Complex,blue,False,False,False,1,3169.0,1.97,3.0,208.0,10,682,1500.0,1707.0,,Shooting Star,44.02228688863895,-121.50309168284429
+vista-butte,Vista Butte,https://bendbikerides.com/trail/vista-butte,Swampy Lakes,black,,False,False,1,870.0,0.54,4.0,74.0,13,243,1942.6,2016.3,,,43.9928164566457,-121.59865985876445
+voodoo,Voodoo,https://bendbikerides.com/trail/voodoo,Phil's Trail Complex,blue,False,True,False,1,4896.0,3.04,97.0,141.0,318,463,1273.4,1345.7,,,44.02758292754734,-121.443329008374
+voodoo-child,Voodoo Child,https://bendbikerides.com/trail/voodoo-child,Phil's Trail Complex,green,False,True,False,1,1308.0,0.81,10.0,18.0,33,59,1316.9,1330.3,,,44.010143339779894,-121.43489464317237
+way-out,Way Out,https://bendbikerides.com/trail/way-out,Mt. Bachelor Bike Park,blue,True,False,False,1,1129.0,0.7,22.0,89.0,72,292,1937.1,2004.5,,Mt Bachelor Bike Park,44.00189240649698,-121.68365913969788
+west-bend-trail,West Bend Trail,https://bendbikerides.com/trail/west-bend-trail,Phil's Trail Complex,green,False,True,False,1,1678.0,1.04,18.0,3.0,59,10,1161.0,1176.0,,,44.05231951158345,-121.37345615648303
+west-side,West Side,https://bendbikerides.com/trail/west-side,Madras,blue,False,True,False,1,4104.0,2.55,108.0,76.0,354,249,761.0,823.0,,,44.63247098980571,-121.09751647740927
+whiptail,Whiptail,https://bendbikerides.com/trail/whiptail,Cline Butte,green,False,False,False,1,2358.0,1.47,13.0,11.0,43,36,929.2,940.6,,,44.286639536622374,-121.32046509029576
+white-buffalo-a,White Buffalo A,https://bendbikerides.com/trail/white-buffalo-a,Madras,double-black,True,True,False,1,479.0,0.3,2.0,46.0,7,151,787.0,831.0,,,44.626446373827946,-121.08163935972668
+white-buffalo-b,White Buffalo B,https://bendbikerides.com/trail/white-buffalo-b,Madras,black,True,True,False,1,448.0,0.28,1.0,40.0,3,131,788.0,827.0,,,44.62745514306954,-121.08321017024068
+winberry-divide,Winberry Divide,https://bendbikerides.com/trail/winberry-divide,Oakridge,blue,False,True,False,1,14488.0,9.0,687.0,1210.0,2254,3970,337.9,861.2,,,43.866951320451875,-122.59302768547629
+windy-pass,Windy Pass,https://bendbikerides.com/trail/windy-pass,Oakridge,black,False,True,False,1,13653.0,8.48,691.0,471.0,2267,1545,1736.9,2123.8,,,43.40705421447885,-122.0737125691073
+wolf-tree,Wolf Tree,https://bendbikerides.com/trail/wolf-tree,,blue,False,False,False,1,1769.0,1.1,91.0,18.0,299,59,816.1,889.6,,Smith Rock Welcome Center,44.37437984529612,-121.1377735861727

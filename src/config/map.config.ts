@@ -3,7 +3,8 @@ import type { CityId } from '@/data/cities/types';
 // Centralized map configuration
 // This file contains geo-specific settings for each supported city. A fork can
 // still replace the active config export, while this app can switch cities by
-// setting NEXT_PUBLIC_CITY_ID.
+// setting NEXT_PUBLIC_CITY_ID or by mapping production hostnames with
+// NEXT_PUBLIC_CITY_HOST_MAP.
 
 interface StationGBFSConfig {
   type: 'station';
@@ -150,18 +151,69 @@ export const cityConfigs: Record<CityId, MapConfig> = {
   bend: bendConfig,
 };
 
-function parseCityId(value: string | undefined): CityId {
+const DEFAULT_CITY_ID: CityId = 'chattanooga';
+
+export function parseCityId(value: string | undefined): CityId {
   if (value === 'bend' || value === 'chattanooga') {
     return value;
   }
-  return 'chattanooga';
+  return DEFAULT_CITY_ID;
 }
 
-export const activeCityId = parseCityId(process.env.NEXT_PUBLIC_CITY_ID);
+export function cityIdForHostname(
+  hostname: string | undefined,
+  hostMapRaw = process.env.NEXT_PUBLIC_CITY_HOST_MAP,
+): CityId | undefined {
+  if (!hostname || !hostMapRaw) {
+    return undefined;
+  }
+
+  let hostMap: Record<string, string>;
+  try {
+    hostMap = JSON.parse(hostMapRaw) as Record<string, string>;
+  } catch {
+    console.warn('NEXT_PUBLIC_CITY_HOST_MAP must be a JSON object.');
+    return undefined;
+  }
+
+  const normalizedHostname = normalizeHostname(hostname);
+  return parseCityIdOrUndefined(hostMap[normalizedHostname]);
+}
+
+export function resolveActiveCityId(hostname?: string): CityId {
+  return (
+    cityIdForHostname(hostname ?? getBrowserHostname()) ??
+    parseCityId(process.env.NEXT_PUBLIC_CITY_ID)
+  );
+}
+
+function parseCityIdOrUndefined(value: string | undefined): CityId | undefined {
+  if (value === 'bend' || value === 'chattanooga') {
+    return value;
+  }
+  return undefined;
+}
+
+function getBrowserHostname(): string | undefined {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  return window.location.hostname;
+}
+
+function normalizeHostname(hostname: string): string {
+  return hostname.toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
+}
+
+export const activeCityId = resolveActiveCityId();
 
 // Export the active configuration. A fork can swap this for its own MapConfig,
 // while this app can select one of the stored city configs via env.
 export const mapConfig = cityConfigs[activeCityId];
+
+export function mapConfigForHostname(hostname: string | undefined): MapConfig {
+  return cityConfigs[resolveActiveCityId(hostname)];
+}
 
 // Helper to get full GBFS endpoint URLs
 export function getGBFSUrl(endpoint: string): string {

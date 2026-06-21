@@ -3,8 +3,8 @@ import manifest from './manifest';
 import { siteConfig } from '@/config/site.config';
 
 describe('manifest', () => {
-  it('builds the PWA manifest from siteConfig', () => {
-    const m = manifest();
+  it('builds the PWA manifest from siteConfig', async () => {
+    const m = await manifest();
     expect(m.name).toBe(siteConfig.name);
     expect(m.short_name).toBe(siteConfig.shortName);
     expect(m.description).toBe(siteConfig.description);
@@ -14,8 +14,8 @@ describe('manifest', () => {
     expect(m.display).toBe('standalone');
   });
 
-  it('ships any + maskable icons', () => {
-    const icons = manifest().icons ?? [];
+  it('ships any + maskable icons', async () => {
+    const icons = (await manifest()).icons ?? [];
     expect(icons.length).toBeGreaterThan(0);
     expect(icons.some((i) => i.purpose === 'maskable')).toBe(true);
     expect(icons.every((i) => i.src.startsWith('/icon-'))).toBe(true);
