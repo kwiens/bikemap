@@ -250,15 +250,20 @@ clicked way, those stats drive the pane's **headline numbers** (via
   precomputed numbers match the client's on-demand fallback. Overpass needs a
   `User-Agent` header (else HTTP 406). Responses and terrain tiles are disk-cached
   (`scripts/.osm_cache/`, `scripts/.tile_cache/terrain14/`, both gitignored) so
-  reruns are cheap and a national run is resumable. Both stages (Overpass cell
-  fetches and per-way terrain sampling) run across a thread pool — `--workers`
-  (default 3); the terrain-tile cache is thread-safe with per-tile locks.
+  reruns are cheap and a national run is resumable. The two stages are throttled
+  separately: per-way terrain sampling runs across `--workers` threads (default
+  3 — Mapbox tolerates concurrency; the tile cache is thread-safe with per-tile
+  locks), but Overpass fetches default to `--overpass-workers 1` + `--polite-sleep
+  3` because concurrent/bursty Overpass requests get the client IP rate-limited or
+  temporarily blocked. Raise `--overpass-workers` only against a private/self-hosted
+  Overpass instance, never the public endpoint.
 
   ```bash
   python scripts/osm_trail_elevation.py --region oregon          # one state
   python scripts/osm_trail_elevation.py --bbox=-124.6,41.9,-116.4,46.3 --region-name oregon
   python scripts/osm_trail_elevation.py --region all             # every US state (long!)
-  python scripts/osm_trail_elevation.py --region oregon --workers 6
+  # Point at a self-hosted / less-loaded Overpass mirror (e.g. from another host):
+  python scripts/osm_trail_elevation.py --region tennessee --overpass-url https://HOST/api/interpreter
   ```
 
   A built-in `US_STATE_BBOX` table covers all 50 states + DC (padded boxes —

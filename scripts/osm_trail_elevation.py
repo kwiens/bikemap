@@ -403,10 +403,12 @@ def fetch_overpass_cell(region, s, w, n, e, overpass_url, polite_s):
     return []
 
 
-def fetch_region_ways(region, bbox, cell_deg, overpass_url, polite_s, workers):
+def fetch_region_ways(region, bbox, cell_deg, overpass_url, polite_s,
+                      overpass_workers):
     """Fetch every bike-relevant way in the region bbox, deduped by OSM id.
-    Cells are fetched concurrently (`workers` at a time); each cell caches to its
-    own file, and the results are merged on the main thread."""
+    Cells are fetched `overpass_workers` at a time (default 1 — Overpass bans
+    aggressive concurrent clients); each cell caches to its own file, and the
+    results are merged on the main thread."""
     min_lng, min_lat, max_lng, max_lat = bbox
     # Build the cell grid (Overpass bbox order is south, west, north, east).
     lats = _frange(min_lat, max_lat, cell_deg)
@@ -416,7 +418,7 @@ def fetch_region_ways(region, bbox, cell_deg, overpass_url, polite_s, workers):
 
     ways = {}
     done = 0
-    with ThreadPoolExecutor(max_workers=workers) as pool:
+    with ThreadPoolExecutor(max_workers=overpass_workers) as pool:
         futures = {
             pool.submit(fetch_overpass_cell, region, s, w, n, e,
                         overpass_url, polite_s): (s, w)
@@ -490,11 +492,12 @@ def update_manifest(region, name, bbox, count, file_name):
 
 # --- Main --------------------------------------------------------------------
 
-def process_region(region, name, bbox, cell_deg, overpass_url, polite_s, workers):
+def process_region(region, name, bbox, cell_deg, overpass_url, polite_s,
+                   workers, overpass_workers):
     print(f'\n=== {name} ({region}) bbox={bbox} ===')
     print('Fetching bike-relevant ways from Overpass...')
     ways = fetch_region_ways(region, bbox, cell_deg, overpass_url, polite_s,
-                             workers)
+                             overpass_workers)
     print(f'  {len(ways)} unique ways')
 
     trails = {}
@@ -548,11 +551,15 @@ def main():
                        help=f'Overpass cell size in degrees (default {CELL_DEG_DEFAULT})')
     parser.add_argument('--overpass-url', default=OVERPASS_URL_DEFAULT,
                        help='Overpass API endpoint')
-    parser.add_argument('--polite-sleep', type=float, default=1.0,
-                       help='Seconds each worker sleeps between Overpass requests')
+    parser.add_argument('--polite-sleep', type=float, default=3.0,
+                       help='Seconds to sleep after each Overpass request, per '
+                            'worker (default 3.0 — Overpass fair-use)')
     parser.add_argument('--workers', type=int, default=3,
-                       help='Concurrent workers for Overpass + terrain fetches '
-                            '(default 3)')
+                       help='Concurrent workers for terrain (Mapbox) sampling '
+                            '(default 3 — Mapbox tolerates concurrency)')
+    parser.add_argument('--overpass-workers', type=int, default=1,
+                       help='Concurrent Overpass requests (default 1; '
+                            'concurrency is what gets the client rate-limited)')
     args = parser.parse_args()
 
     if args.bbox:
@@ -575,7 +582,8 @@ def main():
 
     for region, name, bbox in targets:
         process_region(region, name, bbox, args.cell_deg,
-                       args.overpass_url, args.polite_sleep, args.workers)
+                       args.overpass_url, args.polite_sleep, args.workers,
+                       args.overpass_workers)
 
 
 if __name__ == '__main__':
