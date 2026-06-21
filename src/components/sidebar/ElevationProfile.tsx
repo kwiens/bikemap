@@ -87,16 +87,34 @@ export function computeGradeColors(
   return smoothed.map((g) => gradeToColor(g));
 }
 
+// Force strictly increasing offsets. Consecutive profile points can share a
+// distance (multi-segment trails repeat distance at a seam), which would yield
+// duplicate gradient offsets — invalid as React keys and pointless zero-width
+// stops. Nudging duplicates up by a hair keeps the seam's hard color edge while
+// making every offset unique.
+function uniqueOffsets(
+  stops: { offset: number; color: string }[],
+): { offset: number; color: string }[] {
+  let prev = -1;
+  for (const s of stops) {
+    if (s.offset <= prev) s.offset = prev + 1e-6;
+    prev = s.offset;
+  }
+  return stops;
+}
+
 export function downsampleStops(
   points: [number, number, number, number][],
   colors: string[],
   maxDist: number,
 ): { offset: number; color: string }[] {
   if (points.length <= MAX_GRADIENT_STOPS) {
-    return colors.map((color, i) => ({
-      offset: maxDist > 0 ? points[i][0] / maxDist : 0,
-      color,
-    }));
+    return uniqueOffsets(
+      colors.map((color, i) => ({
+        offset: maxDist > 0 ? points[i][0] / maxDist : 0,
+        color,
+      })),
+    );
   }
   const step = (points.length - 1) / (MAX_GRADIENT_STOPS - 1);
   const stops: { offset: number; color: string }[] = [];
@@ -107,7 +125,7 @@ export function downsampleStops(
       color: colors[idx],
     });
   }
-  return stops;
+  return uniqueOffsets(stops);
 }
 
 // Profile data cache to avoid refetching on revisit
@@ -190,7 +208,11 @@ export function ElevationProfile() {
       sourceRef.current = 'trail';
       rideIdRef.current = null;
       setTrailName(name);
-      window.history.replaceState(null, '', `?trail=${slugify(name)}`);
+      window.history.replaceState(
+        null,
+        '',
+        `?trail=${encodeURIComponent(slugify(name))}`,
+      );
     };
     // OSM trails ship a ready-built profile (no curated JSON to load by name),
     // and aren't restorable by slug on reload, so no URL state is written.
@@ -393,7 +415,7 @@ export function ElevationProfile() {
     setLocationIndex(null);
 
     const controller = new AbortController();
-    const slug = slugify(trailName);
+    const slug = encodeURIComponent(slugify(trailName));
     fetch(`/data/elevation/${slug}.json`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
