@@ -4,6 +4,9 @@ export const MAP_EVENTS = {
   ROUTE_DESELECT: 'route-deselect',
   TRAIL_SELECT: 'trail-select',
   TRAIL_DESELECT: 'trail-deselect',
+  // OSM trail selected on the map — carries a ready-built ElevationProfile for
+  // the elevation pane (OSM trails have no curated JSON to load by name).
+  OSM_TRAIL_SELECT: 'osm-trail-select',
   AREA_SELECT: 'area-select',
   LAYER_TOGGLE: 'layer-toggle',
   CENTER_LOCATION: 'center-location',
