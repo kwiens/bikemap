@@ -8,6 +8,7 @@ import {
   updateMtnBikeOpacity,
   highlightMtnBikeArea,
   initMtnBikeColors,
+  hideStrayStyleLayers,
   detectTrailAtPoint,
   toLngLatBounds,
   TRAIL_LAYERS,
@@ -20,6 +21,7 @@ import {
   OSM_TRAILS_SOURCE_ID,
   OSM_TRAILS_LAYER_ID,
   OSM_TRAILS_CASING_LAYER_ID,
+  OSM_TRAILS_HIT_LAYER_ID,
   OSM_POI_LAYER_ID,
 } from '@/data/osm-trails';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
@@ -750,6 +752,34 @@ describe('initMtnBikeColors', () => {
   });
 });
 
+describe('hideStrayStyleLayers', () => {
+  it('hides the baked-in TPL trails layer when present', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue({ id: 'test' }),
+      setLayoutProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    hideStrayStyleLayers(mockMap);
+
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      'Chatt_TPL_Trails-public',
+      'visibility',
+      'none',
+    );
+  });
+
+  it('does nothing when the stray layer is absent from the style', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue(undefined),
+      setLayoutProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    hideStrayStyleLayers(mockMap);
+
+    expect(mockMap.setLayoutProperty).not.toHaveBeenCalled();
+  });
+});
+
 describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
   it('reverse-maps display name to raw feature value for metadata layers', () => {
     const allLayers = new Set([
@@ -891,6 +921,15 @@ describe('OSM nationwide bike trails', () => {
     expect(serialized).toContain('cycleway');
   });
 
+  it('filter excludes mtb/cycleway trails that deny bike or general access', () => {
+    const serialized = JSON.stringify(OSM_BIKE_TRAIL_FILTER);
+    // The mtb:scale / cycleway branch is gated on NOT bike-denied and NOT
+    // access-restricted (bicycle/access in no/private).
+    expect(serialized).toContain('access');
+    expect(serialized).toContain('private');
+    expect(serialized).toContain('"no"');
+  });
+
   it('POI filter targets parking and information points', () => {
     expect(OSM_POI_FILTER[0]).toBe('any');
     const serialized = JSON.stringify(OSM_POI_FILTER);
@@ -917,9 +956,11 @@ describe('OSM nationwide bike trails', () => {
     );
     expect(added[OSM_TRAILS_LAYER_ID]).toBeDefined();
     expect(added[OSM_TRAILS_CASING_LAYER_ID]).toBeDefined();
+    expect(added[OSM_TRAILS_HIT_LAYER_ID]).toBeDefined();
     expect(added[OSM_POI_LAYER_ID]).toBeDefined();
     expect(added[OSM_POI_LAYER_ID].type).toBe('symbol');
     expect(added[OSM_TRAILS_LAYER_ID].layout?.visibility).toBe('none');
+    expect(added[OSM_TRAILS_HIT_LAYER_ID].layout?.visibility).toBe('none');
     expect(added[OSM_POI_LAYER_ID].layout?.visibility).toBe('none');
   });
 

@@ -46,6 +46,8 @@ import {
   ensureMtnBikeSource,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
+  registerOsmTrailPopup,
+  hideStrayStyleLayers,
   TRAIL_LAYERS,
   addRideLayer,
   updateRideLayer,
@@ -66,6 +68,12 @@ const PAUSE_GESTURE_MS = 10000;
 
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
+if (!mapConfig.mapbox.accessToken) {
+  console.warn(
+    'NEXT_PUBLIC_MAPBOX_TOKEN is not set — the map will fail to load. ' +
+      'Copy .env.example to .env.local and add a Mapbox token.',
+  );
+}
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
@@ -91,6 +99,9 @@ const MapboxMap = memo(function MapboxMap() {
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
+  // Desired OSM-trails visibility, tracked in a ref so a toggle flipped before
+  // the style finishes loading can be replayed once the layers are attached.
+  const osmTrailsVisibleRef = useRef(false);
 
   // Trail auto-detection during ride recording
   const autoDetectEnabledRef = useRef(false);
@@ -533,8 +544,10 @@ const MapboxMap = memo(function MapboxMap() {
     }
 
     // Nationwide OSM bike trails are an independent vector layer (not a marker
-    // group), so just flip their visibility.
+    // group), so just flip their visibility. Remember the desired state so it
+    // can be replayed if the style hadn't finished loading yet.
     if (layer === 'osmTrails') {
+      osmTrailsVisibleRef.current = visible;
       setOsmTrailsVisible(map.current, visible);
       return;
     }
@@ -963,8 +976,17 @@ const MapboxMap = memo(function MapboxMap() {
           initMtnBikeColors(newMap);
           initMtnBikeLayers(newMap);
 
+          // Suppress orphan trail layers baked into the Studio style (e.g. the
+          // leftover TPL trails layer) so they don't render over our routes.
+          hideStrayStyleLayers(newMap);
+
           // Attach the nationwide OSM bike-trails layer (hidden until toggled).
+          // Replay any toggle the user flipped before the style finished loading.
           ensureOsmTrailsSource(newMap);
+          registerOsmTrailPopup(newMap);
+          if (osmTrailsVisibleRef.current) {
+            setOsmTrailsVisible(newMap, true);
+          }
           initTrailBoundsFromDefaults(mountainBikeTrails);
 
           // Apply unselected defaults (opacity/width) through the shared

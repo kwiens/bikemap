@@ -12,10 +12,22 @@ coverage
 .next/
 out/
 build
+*.tsbuildinfo
+
+# python (trail-data scripts)
+.venv/
+__pycache__/
+*.pyc
 
 # misc
 .DS_Store
 *.pem
+*.pdf
+
+# AI agent / editor local files
+.cursorrules
+.codex
+.claude
 
 # build artifacts
 tsconfig.tsbuildinfo

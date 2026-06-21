@@ -19,10 +19,12 @@ import {
   OSM_TRAILS_SOURCE_ID,
   OSM_TRAILS_LAYER_ID,
   OSM_TRAILS_CASING_LAYER_ID,
+  OSM_TRAILS_HIT_LAYER_ID,
   OSM_POI_LAYER_ID,
   OSM_TRAILS_SOURCE_LAYER,
   OSM_POI_SOURCE_LAYER,
   OSM_TRAILS_TILEJSON_URL,
+  buildOsmTrailPopupHTML,
 } from '@/data/osm-trails';
 
 // Route utilities
@@ -272,6 +274,13 @@ const HIDDEN_TRAILS = [
   'South Chickamauga Creek Greenway',
 ];
 
+// Layers baked into the Mapbox Studio style that the app does NOT manage and
+// should keep hidden. `Chatt_TPL_Trails-public` is a leftover TPL trails layer
+// (the app attaches its own MTB layer from MTN_BIKE_TILESET_URL instead); when
+// the published style ships it visible it renders raw TPL routes on top of our
+// trails. Suppress it at style load so we stay robust to style re-uploads.
+const STRAY_STYLE_LAYERS = ['Chatt_TPL_Trails-public'];
+
 const TRAIL_LAYERS: TrailLayerConfig[] = [
   {
     layerId: MTN_BIKE_LAYER_ID,
@@ -336,14 +345,21 @@ export function ensureMtnBikeSource(map: mapboxgl.Map): void {
 
 // --- Nationwide OSM bike trails (OpenStreetMap US tile service) ---------------
 
-// Bike-relevant trails: bicycle access is permitted, OR the way carries an
-// mtb:scale tag (MTB singletrack often lacks an explicit bicycle tag), OR it is
-// an explicit cycleway. Foot-only / horse-only paths are excluded.
+// Bike-relevant trails. A way qualifies when bikes are explicitly permitted
+// (`bicycle` in yes/designated/permissive — this wins even over a general
+// access restriction), OR it carries an `mtb:scale` tag (MTB singletrack often
+// lacks an explicit bicycle tag) or is a cycleway AND is not bike-denied
+// (`bicycle=no/private`) or access-restricted (`access=no/private`). This keeps
+// foot-only / horse-only and explicitly off-limits paths out of the layer.
 export const OSM_BIKE_TRAIL_FILTER: mapboxgl.FilterSpecification = [
   'any',
   ['in', ['get', 'bicycle'], ['literal', ['yes', 'designated', 'permissive']]],
-  ['has', 'mtb:scale'],
-  ['==', ['get', 'highway'], 'cycleway'],
+  [
+    'all',
+    ['any', ['has', 'mtb:scale'], ['==', ['get', 'highway'], 'cycleway']],
+    ['!', ['in', ['get', 'bicycle'], ['literal', ['no', 'private']]]],
+    ['!', ['in', ['get', 'access'], ['literal', ['no', 'private']]]],
+  ],
 ];
 
 // Trail POIs we surface: trailhead parking (amenity=parking) and information
@@ -445,6 +461,28 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
       );
     }
 
+    // Transparent, extra-wide tap target so the thin trail lines are easy to
+    // click/tap. Added on top so it always receives the click.
+    if (!map.getLayer(OSM_TRAILS_HIT_LAYER_ID)) {
+      map.addLayer({
+        id: OSM_TRAILS_HIT_LAYER_ID,
+        type: 'line',
+        source: OSM_TRAILS_SOURCE_ID,
+        'source-layer': OSM_TRAILS_SOURCE_LAYER,
+        filter: OSM_BIKE_TRAIL_FILTER,
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+          visibility: 'none',
+        },
+        paint: {
+          'line-color': 'rgba(0,0,0,0)',
+          'line-width': 14,
+          'line-opacity': 0,
+        },
+      });
+    }
+
     // Trailhead parking + information points (Maki icons), only once zoomed in
     // so the nationwide view isn't cluttered. Symbol collision thins them out.
     if (!map.getLayer(OSM_POI_LAYER_ID)) {
@@ -485,10 +523,58 @@ export function setOsmTrailsVisible(map: mapboxgl.Map, visible: boolean): void {
   for (const id of [
     OSM_TRAILS_CASING_LAYER_ID,
     OSM_TRAILS_LAYER_ID,
+    OSM_TRAILS_HIT_LAYER_ID,
     OSM_POI_LAYER_ID,
   ]) {
     if (map.getLayer(id)) {
       map.setLayoutProperty(id, 'visibility', value);
+    }
+  }
+}
+
+// Make OSM trails clickable: a click on the (transparent, wide) hit layer opens
+// a popup with the trail's name + OSM tags. Mapbox only fires layer events for
+// visible layers, so these no-op while the layer is toggled off. Registered
+// once after the layer is attached.
+export function registerOsmTrailPopup(map: mapboxgl.Map): void {
+  let popup: mapboxgl.Popup | null = null;
+
+  map.on('click', OSM_TRAILS_HIT_LAYER_ID, (e) => {
+    const feature = e.features?.[0];
+    if (!feature) return;
+    // Stop the empty-map click handler from also deselecting routes/trails.
+    e.preventDefault();
+    popup?.remove();
+    popup = new mapboxgl.Popup({
+      closeButton: true,
+      closeOnClick: true,
+      className: 'custom-popup',
+      maxWidth: '300px',
+    })
+      .setLngLat(e.lngLat)
+      .setHTML(buildOsmTrailPopupHTML(feature.properties ?? {}))
+      .addTo(map);
+  });
+
+  map.on('mouseenter', OSM_TRAILS_HIT_LAYER_ID, () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', OSM_TRAILS_HIT_LAYER_ID, () => {
+    map.getCanvas().style.cursor = '';
+  });
+}
+
+// Hide orphan trail layers baked into the Studio style that the app doesn't
+// manage (see STRAY_STYLE_LAYERS). Idempotent and guarded — skips any that
+// aren't present in the current style.
+export function hideStrayStyleLayers(map: mapboxgl.Map): void {
+  for (const id of STRAY_STYLE_LAYERS) {
+    try {
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(id, 'visibility', 'none');
+      }
+    } catch {
+      // Layer may not exist in this style
     }
   }
 }

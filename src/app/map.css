@@ -194,3 +194,22 @@
 .map-popup a:hover {
   text-decoration: underline;
 }
+
+.osm-trail-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.osm-trail-tag {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #374151;
+}
+
+.osm-trail-source {
+  margin-top: 10px;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+  font-size: 13px;
+}
