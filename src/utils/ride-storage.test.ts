@@ -119,7 +119,9 @@ describe('ride-storage (IndexedDB)', () => {
       expect(summaries[0].name).toBe('First');
       expect(summaries[0].startTime).toBe(2000);
       expect(summaries[0].stats).toEqual(FAKE_STATS);
-      expect((summaries[0] as Record<string, unknown>).points).toBeUndefined();
+      expect(
+        (summaries[0] as unknown as Record<string, unknown>).points,
+      ).toBeUndefined();
     });
 
     it('returns summaries sorted by startTime descending', async () => {

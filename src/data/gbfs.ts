@@ -187,6 +187,8 @@ export async function fetchFreeBikeStatus(
   return data.data.bikes;
 }
 
+// Fetch GBFS data and convert it to our BikeRentalLocation shape. This is the
+// single source of truth shared by the map markers and the sidebar list.
 export async function fetchBikeRentalLocations(
   gbfs: GBFSConfig | undefined = mapConfig.gbfs,
 ): Promise<BikeRentalLocation[]> {

@@ -5,6 +5,7 @@ import type {
   BikeRentalLocation,
 } from '@/data/geo_data';
 import { mapConfig } from '@/config/map.config';
+import { escapeHtml } from '@/utils/html';
 
 // Helper function to ensure FontAwesome is loaded
 export const ensureFontAwesomeLoaded = () => {
@@ -153,12 +154,12 @@ function createPopupHTML(
 ): string {
   return `
     <div class="map-popup">
-      <h3>${name}</h3>
-      <p>${description}</p>
+      <h3>${escapeHtml(name)}</h3>
+      <p>${escapeHtml(description)}</p>
       <p class="address">
         <strong>Address:</strong>
-        <a href="https://maps.google.com/?q=${address}" target="_blank" rel="noopener noreferrer">
-          ${shortAddress(address)}
+        <a href="https://maps.google.com/?q=${encodeURIComponent(address)}" target="_blank" rel="noopener noreferrer">
+          ${escapeHtml(shortAddress(address))}
         </a>
       </p>
     </div>
@@ -319,17 +320,17 @@ export function createBikeRentalMarker(
   // Create popup HTML with rental-specific information
   const popupHTML = `
     <div class="map-popup">
-      <h3>${location.name}</h3>
-      <p>${location.description}</p>
+      <h3>${escapeHtml(location.name)}</h3>
+      <p>${escapeHtml(location.description)}</p>
       <p class="address">
         <strong>Address:</strong>
-        <a href="https://maps.google.com/?q=${location.address}" target="_blank" rel="noopener noreferrer">
-          ${shortAddress(location.address)}
+        <a href="https://maps.google.com/?q=${encodeURIComponent(location.address)}" target="_blank" rel="noopener noreferrer">
+          ${escapeHtml(shortAddress(location.address))}
         </a>
       </p>
-      <p><strong>Type:</strong> ${location.rentalType}</p>
-      <p><strong>Price:</strong> ${location.price}</p>
-      <p><strong>Hours:</strong> ${location.hours}</p>
+      <p><strong>Type:</strong> ${escapeHtml(location.rentalType)}</p>
+      <p><strong>Price:</strong> ${escapeHtml(location.price)}</p>
+      <p><strong>Hours:</strong> ${escapeHtml(location.hours)}</p>
       ${location.availableBikes !== undefined ? `<p><strong>Available Bikes:</strong> ${location.availableBikes}</p>` : ''}
       ${location.availableDocks !== undefined ? `<p><strong>Available Docks:</strong> ${location.availableDocks}</p>` : ''}
       ${location.isChargingStation ? '<p><strong>Charging Station Available</strong></p>' : ''}

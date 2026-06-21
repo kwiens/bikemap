@@ -23,7 +23,8 @@ export function BikeRentalList({
       setIsLoading(true);
       setError(null);
       try {
-        setRentalLocations(await fetchBikeRentalLocations());
+        const locations = await fetchBikeRentalLocations();
+        setRentalLocations(locations);
       } catch (err) {
         setError('Failed to load bike rental locations');
         console.error('Error fetching bike rental data:', err);

@@ -106,11 +106,7 @@ export function calculateRouteBounds(
   });
 
   // Only return bounds if we have valid coordinates
-  if (bounds.getNorth() !== undefined && bounds.getSouth() !== undefined) {
-    return bounds;
-  }
-
-  return null;
+  return bounds.isEmpty() ? null : bounds;
 }
 
 // Coordinate utilities
