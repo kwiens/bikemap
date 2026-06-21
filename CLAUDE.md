@@ -99,7 +99,7 @@ Routes are styled via Mapbox Studio (referenced by layer IDs like `riverwalk-loo
 
 ### Mountain Bike Trails
 
-The MTB trails layer contains 220+ trails identified by the `Trail` feature property. Trail data is defined in `src/data/mountain-bike-trails.ts` (re-exported from `src/data/geo_data.ts`) with precalculated `defaultBounds` for zoom-to-fit and `distance` in miles. Code uses `MTN_BIKE_*` constants and the `mountainBikeTrails` array everywhere — names like "SORBA" only appear when referring to the upstream GIS dataset.
+The MTB trails layer contains 220+ trails identified by the `Trail` feature property. The editable trail array (`mountainBikeTrails`) lives in `src/data/mountain-bike-trails.data.ts` with precalculated `defaultBounds` for zoom-to-fit and `distance` in miles; the wrapper `src/data/mountain-bike-trails.ts` holds the types, the `MTN_BIKE_*` layer-id constants, and `REGION_MAP`/`regionFor`, and re-exports the array. Both are re-exported from `src/data/geo_data.ts`. Code uses `MTN_BIKE_*` constants and the `mountainBikeTrails` array everywhere — names like "SORBA" only appear when referring to the upstream GIS dataset.
 
 #### The Mapbox style ≠ the MTB trails tileset
 
@@ -183,12 +183,12 @@ python scripts/add_trail_elevation.py
 
 The script outputs:
 - `public/data/elevation/{slug}.json` — per-trail elevation profile (distance, gain, loss, min, max, coordinate samples)
-- Updates `src/data/mountain-bike-trails.ts` — summary stats (distance, elevationGain, elevationLoss, elevationMin, elevationMax)
+- Updates `src/data/mountain-bike-trails.data.ts` — summary stats (distance, elevationGain, elevationLoss, elevationMin, elevationMax)
 
 #### Adding a New Trail
 
 1. Find the trail name in Chrome DevTools (see above)
-2. Add an entry to the `mountainBikeTrails` array in `src/data/mountain-bike-trails.ts` with `trailName`, `displayName`, `recArea`, `rating`, `color`, and `icon`
+2. Add an entry to the `mountainBikeTrails` array in `src/data/mountain-bike-trails.data.ts` with `trailName`, `displayName`, `recArea`, `rating`, `color`, and `icon`
 3. Run `scripts/add_trail_elevation.py --trail "Trail Name"` to generate elevation data and populate `distance`, elevation stats, and `defaultBounds`
 4. If the trail is in a new `recArea`, add it to `REGION_MAP` in `mountain-bike-trails.ts`
 
