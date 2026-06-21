@@ -211,10 +211,10 @@ export function ElevationProfile() {
       setLoading(false);
     };
     const handleRouteSelect = () => {
-      // Routes don't show elevation profiles — only trails and recorded rides
-      // do. Selecting a route must therefore clear any active trail/ride pane
-      // (and its ?trail= URL). sourceRef is only ever 'trail' or 'ride', so the
-      // old `=== 'route'` guard never matched and left a stale trail open.
+      // Routes never show an elevation profile, so selecting one must clear
+      // whatever profile is currently displayed (trail or ride) — otherwise a
+      // map route-click leaves the previous trail's chart visible. (sourceRef is
+      // only ever 'trail' or 'ride', so the old `=== 'route'` guard never hit.)
       if (sourceRef.current !== null) {
         sourceRef.current = null;
         setTrailName(null);

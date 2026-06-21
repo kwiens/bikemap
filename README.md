@@ -37,7 +37,7 @@ The full step-by-step is in **[docs/DEPLOYING.md](docs/DEPLOYING.md)**; the data
 ### For riders
 
 - **Curated bike routes** — Hand-picked road, greenway, and connector routes styled in Mapbox Studio with descriptions, distance, and zoom-to-fit bounds.
-- **Mountain bike trails** — 225+ trails in the reference deployment, grouped by recreation area and region, color-coded by difficulty, with per-trail elevation profiles.
+- **Mountain bike trails** — 220+ trails in the reference deployment, grouped by recreation area and region, color-coded by difficulty, with per-trail elevation profiles.
 - **Real-time bike share** — Live station availability via the [GBFS](https://gbfs.org/) standard, configurable per region.
 - **Points of interest** — Attractions, bike shops, rentals, and local resources as toggleable map layers.
 - **Live location & compass** — Tracks position and heading, with a smoothed compass heading derived from GPS readings.
@@ -59,7 +59,7 @@ A full client-side GPS ride tracker:
 
 - **Two config files** drive geography and branding; content is plain TypeScript in `src/data/` — see [docs/DATA.md](docs/DATA.md).
 - **Trail tooling** — Python scripts extract trail geometry from a Mapbox tileset and sample elevation from Terrain-RGB to generate per-trail profiles. See [docs/DEPLOYING.md](docs/DEPLOYING.md).
-- **GPX import/export** — round-trip rides and routes via the standard GPX 1.1 format.
+- **GPX export** — download rides and routes as standard GPX 1.1 files.
 
 ## Architecture
 
@@ -131,7 +131,7 @@ The Python trail-elevation pipeline is optional and documented in [docs/DEPLOYIN
 
 ## Testing
 
-Tests live next to source as `*.test.ts(x)` and run under Vitest with jsdom — covering GBFS integration, ride stats and storage, DEM correction, GPX build/parse, compass smoothing, and sidebar components.
+Tests live next to source as `*.test.ts(x)` and run under Vitest with jsdom — covering GBFS integration, ride stats and storage, DEM correction, GPX building, compass smoothing, and sidebar components.
 
 Mapbox layer events cannot be triggered synthetically — for layer-click testing, dispatch the corresponding custom event from `src/events.ts` directly.
 

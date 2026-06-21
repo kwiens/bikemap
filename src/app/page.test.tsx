@@ -79,7 +79,7 @@ describe('Home — share link URL parameter handling', () => {
 
     // Before MAP_READY fires, no TRAIL_SELECT should have been dispatched
     const trailEvents = dispatchSpy.mock.calls.filter(
-      ([e]) => (e as Event).type === MAP_EVENTS.TRAIL_SELECT,
+      ([e]: [Event]) => e.type === MAP_EVENTS.TRAIL_SELECT,
     );
     expect(trailEvents).toHaveLength(0);
 
@@ -87,7 +87,7 @@ describe('Home — share link URL parameter handling', () => {
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
     const afterReady = dispatchSpy.mock.calls.filter(
-      ([e]) => (e as Event).type === MAP_EVENTS.TRAIL_SELECT,
+      ([e]: [Event]) => e.type === MAP_EVENTS.TRAIL_SELECT,
     );
     expect(afterReady).toHaveLength(1);
 
@@ -103,7 +103,7 @@ describe('Home — share link URL parameter handling', () => {
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
     const routeEvents = dispatchSpy.mock.calls.filter(
-      ([e]) => (e as Event).type === MAP_EVENTS.ROUTE_SELECT,
+      ([e]: [Event]) => e.type === MAP_EVENTS.ROUTE_SELECT,
     );
     expect(routeEvents).toHaveLength(1);
     expect((routeEvents[0][0] as CustomEvent).detail.routeId).toBe(
@@ -118,9 +118,9 @@ describe('Home — share link URL parameter handling', () => {
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
     const selectEvents = dispatchSpy.mock.calls.filter(
-      ([e]) =>
-        (e as Event).type === MAP_EVENTS.TRAIL_SELECT ||
-        (e as Event).type === MAP_EVENTS.ROUTE_SELECT,
+      ([e]: [Event]) =>
+        e.type === MAP_EVENTS.TRAIL_SELECT ||
+        e.type === MAP_EVENTS.ROUTE_SELECT,
     );
     expect(selectEvents).toHaveLength(0);
   });
@@ -132,7 +132,7 @@ describe('Home — share link URL parameter handling', () => {
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
     const trailEvents = dispatchSpy.mock.calls.filter(
-      ([e]) => (e as Event).type === MAP_EVENTS.TRAIL_SELECT,
+      ([e]: [Event]) => e.type === MAP_EVENTS.TRAIL_SELECT,
     );
     expect(trailEvents).toHaveLength(0);
   });
@@ -149,7 +149,7 @@ describe('Home — share link URL parameter handling', () => {
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
     const trailEvents = dispatchSpy.mock.calls.filter(
-      ([e]) => (e as Event).type === MAP_EVENTS.TRAIL_SELECT,
+      ([e]: [Event]) => e.type === MAP_EVENTS.TRAIL_SELECT,
     );
     expect(trailEvents).toHaveLength(1);
   });
@@ -165,7 +165,7 @@ describe('Home — share link URL parameter handling', () => {
 
     // Should have dispatched immediately, without needing MAP_READY event
     const trailEvents = dispatchSpy.mock.calls.filter(
-      ([e]) => (e as Event).type === MAP_EVENTS.TRAIL_SELECT,
+      ([e]: [Event]) => e.type === MAP_EVENTS.TRAIL_SELECT,
     );
     expect(trailEvents).toHaveLength(1);
     expect((trailEvents[0][0] as CustomEvent).detail.trailName).toBe(
@@ -184,10 +184,10 @@ describe('Home — share link URL parameter handling', () => {
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
     const trailEvents = dispatchSpy.mock.calls.filter(
-      ([e]) => (e as Event).type === MAP_EVENTS.TRAIL_SELECT,
+      ([e]: [Event]) => e.type === MAP_EVENTS.TRAIL_SELECT,
     );
     const routeEvents = dispatchSpy.mock.calls.filter(
-      ([e]) => (e as Event).type === MAP_EVENTS.ROUTE_SELECT,
+      ([e]: [Event]) => e.type === MAP_EVENTS.ROUTE_SELECT,
     );
     expect(trailEvents).toHaveLength(1);
     expect(routeEvents).toHaveLength(0);

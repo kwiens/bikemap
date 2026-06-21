@@ -1,19 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type mapboxgl from 'mapbox-gl';
 
 interface MockPopup {
-  isOpen: ReturnType<typeof vi.fn>;
-  remove: ReturnType<typeof vi.fn>;
-  on: ReturnType<typeof vi.fn>;
+  isOpen: Mock;
+  remove: Mock;
+  on: Mock;
   trigger: (event: 'open' | 'close') => void;
 }
 
 interface MockMarker {
-  getLngLat: ReturnType<typeof vi.fn>;
-  getPopup: ReturnType<typeof vi.fn>;
-  togglePopup: ReturnType<typeof vi.fn>;
-  addTo: ReturnType<typeof vi.fn>;
-  remove: ReturnType<typeof vi.fn>;
+  getLngLat: Mock;
+  getPopup: Mock;
+  togglePopup: Mock;
+  addTo: Mock;
+  remove: Mock;
 }
 
 const makePopup = (open = false): MockPopup => {
