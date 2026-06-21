@@ -3,12 +3,18 @@ import {
   fetchBikeRentalLocations,
   fetchStationInformation,
   fetchStationStatus,
+  formatPricingPlan,
   gbfsFreeBikeToBikeRentalLocation,
   gbfsToBikeRentalLocation,
+  summarizeBikeRentals,
+  vehicleTypeLabel,
+  type FreeBikeLookups,
   type GBFSFreeBike,
+  type GBFSPricingPlan,
   type GBFSStation,
   type GBFSStationStatus,
   type GBFSResponse,
+  type GBFSVehicleType,
 } from './gbfs';
 import { faBicycle } from '@fortawesome/free-solid-svg-icons';
 import { cityConfigs } from '@/config/map.config';
@@ -308,22 +314,206 @@ describe('GBFS API Integration', () => {
       const result = gbfsFreeBikeToBikeRentalLocation(bike, 'Veo');
 
       expect(result).toEqual({
-        name: 'Veo 1014956',
-        description:
-          'Veo shared vehicle available nearby with about 28.1 miles of range.',
+        name: 'Veo shared vehicle',
+        description: 'Dockless shared vehicle available nearby.',
         address: '44.022414, -121.268237',
         latitude: 44.022414,
         longitude: -121.268237,
         icon: faBicycle,
-        rentalType: 'Shared Vehicle',
+        rentalType: 'Shared vehicle',
         price: 'Use Veo app',
-        hours: 'When available',
+        hours: 'Available now',
         capacity: 1,
         isChargingStation: false,
         vehicleTypeId: '3',
         pricingPlanId: '296',
         currentRangeMeters: 45293,
+        rentalUrl: 'https://gmjc.adj.st/?adj_t=5vyf0nr&number=1014956',
       });
+    });
+
+    it('should enrich the vehicle with resolved type, price, and deep link', () => {
+      const bike: GBFSFreeBike = {
+        bike_id: '6e702198-66c1-5b85-9fe7-b52a866925a5',
+        lat: 44.022414,
+        lon: -121.268237,
+        is_reserved: false,
+        is_disabled: false,
+        rental_uris: {
+          ios: 'https://gmjc.adj.st/?adj_t=5vyf0nr&number=1014956',
+        },
+        vehicle_type_id: '3',
+        pricing_plan_id: '296',
+        current_range_meters: 45293,
+      };
+
+      const lookups: FreeBikeLookups = {
+        vehicleTypes: new Map<string, GBFSVehicleType>([
+          [
+            '3',
+            {
+              vehicle_type_id: '3',
+              form_factor: 'bicycle',
+              propulsion_type: 'electric',
+            },
+          ],
+        ]),
+        pricingPlans: new Map<string, GBFSPricingPlan>([
+          [
+            '296',
+            {
+              plan_id: '296',
+              currency: 'USD',
+              price: 1,
+              per_min_pricing: [{ start: 0, rate: 0.39, interval: 1 }],
+            },
+          ],
+        ]),
+      };
+
+      const result = gbfsFreeBikeToBikeRentalLocation(bike, 'Veo', lookups);
+
+      expect(result.name).toBe('Veo e-bike');
+      expect(result.rentalType).toBe('E-bike');
+      expect(result.price).toBe('$1 to unlock + $0.39/min');
+      expect(result.description).toBe('Dockless e-bike available nearby.');
+      expect(result.rentalUrl).toBe(
+        'https://gmjc.adj.st/?adj_t=5vyf0nr&number=1014956',
+      );
+    });
+  });
+
+  describe('vehicleTypeLabel', () => {
+    it('labels electric and human-powered form factors', () => {
+      expect(
+        vehicleTypeLabel({
+          vehicle_type_id: '3',
+          form_factor: 'bicycle',
+          propulsion_type: 'electric',
+        }),
+      ).toBe('E-bike');
+      expect(
+        vehicleTypeLabel({
+          vehicle_type_id: '0',
+          form_factor: 'bicycle',
+          propulsion_type: 'human',
+        }),
+      ).toBe('Bike');
+      expect(
+        vehicleTypeLabel({
+          vehicle_type_id: '1',
+          form_factor: 'scooter',
+          propulsion_type: 'electric',
+        }),
+      ).toBe('E-scooter');
+      expect(vehicleTypeLabel(undefined)).toBe('Shared vehicle');
+    });
+  });
+
+  describe('formatPricingPlan', () => {
+    it('formats unlock fee plus per-minute rate', () => {
+      expect(
+        formatPricingPlan({
+          plan_id: '296',
+          currency: 'USD',
+          price: 1,
+          per_min_pricing: [{ start: 0, rate: 0.39, interval: 1 }],
+        }),
+      ).toBe('$1 to unlock + $0.39/min');
+    });
+
+    it('keeps cents on non-whole amounts but drops them on whole dollars', () => {
+      expect(
+        formatPricingPlan({
+          plan_id: 'p',
+          currency: 'USD',
+          price: 1.5,
+          per_min_pricing: [{ start: 0, rate: 0.4, interval: 1 }],
+        }),
+      ).toBe('$1.50 to unlock + $0.40/min');
+    });
+
+    it('skips a free intro tier and surfaces the first paid per-minute rate', () => {
+      expect(
+        formatPricingPlan({
+          plan_id: 'p',
+          currency: 'USD',
+          price: 1,
+          per_min_pricing: [
+            { start: 0, rate: 0, interval: 1 },
+            { start: 5, rate: 0.39, interval: 1 },
+          ],
+        }),
+      ).toBe('$1 to unlock + $0.39/min');
+    });
+
+    it('renders the billing interval when it is not a single minute', () => {
+      expect(
+        formatPricingPlan({
+          plan_id: 'p',
+          currency: 'USD',
+          price: 1,
+          per_min_pricing: [{ start: 0, rate: 0.39, interval: 5 }],
+        }),
+      ).toBe('$1 to unlock + $0.39 per 5 min');
+    });
+
+    it('picks the lowest-start paid tier regardless of array order', () => {
+      expect(
+        formatPricingPlan({
+          plan_id: 'p',
+          currency: 'USD',
+          price: 1,
+          per_min_pricing: [
+            { start: 60, rate: 0.2, interval: 1 },
+            { start: 0, rate: 0.39, interval: 1 },
+          ],
+        }),
+      ).toBe('$1 to unlock + $0.39/min');
+    });
+
+    it('returns null when there is nothing to charge', () => {
+      expect(formatPricingPlan(undefined)).toBeNull();
+      expect(formatPricingPlan({ plan_id: 'x', price: 0 })).toBeNull();
+    });
+  });
+
+  describe('summarizeBikeRentals', () => {
+    const freeBike = (bike_id: string, lat: number, lon: number) =>
+      gbfsFreeBikeToBikeRentalLocation(
+        { bike_id, lat, lon, is_reserved: false, is_disabled: false },
+        'Veo',
+      );
+
+    it('aggregates counts by type, shared price, centroid, and bounds', () => {
+      const summary = summarizeBikeRentals([
+        freeBike('a', 44, -121),
+        freeBike('b', 46, -123),
+      ]);
+
+      expect(summary.total).toBe(2);
+      expect(summary.byType).toEqual([{ label: 'Shared vehicle', count: 2 }]);
+      expect(summary.centroid).toEqual({ latitude: 45, longitude: -122 });
+      expect(summary.bounds).toEqual([
+        [-123, 44],
+        [-121, 46],
+      ]);
+      // Both vehicles share the same (fallback) price string.
+      expect(summary.price).toBe('Use Veo app');
+    });
+
+    it('reports a null price when the fleet has mixed prices', () => {
+      const cheap = freeBike('a', 44, -121);
+      const pricey = { ...freeBike('b', 46, -123), price: '$2 to unlock' };
+
+      expect(summarizeBikeRentals([cheap, pricey]).price).toBeNull();
+    });
+
+    it('returns null centroid and bounds for an empty fleet', () => {
+      const summary = summarizeBikeRentals([]);
+      expect(summary.total).toBe(0);
+      expect(summary.centroid).toBeNull();
+      expect(summary.bounds).toBeNull();
     });
   });
 
@@ -434,9 +624,12 @@ describe('GBFS API Integration', () => {
         'https://cluster-prod.veoride.com/api/shares/name/bnd/gbfs/free_bike_status',
       );
       expect(rentalLocations).toHaveLength(1);
-      expect(rentalLocations[0].name).toBe('Veo 1001');
+      expect(rentalLocations[0].name).toBe('Veo shared vehicle');
       expect(rentalLocations[0].latitude).toBe(44.05);
       expect(rentalLocations[0].longitude).toBe(-121.31);
+      expect(rentalLocations[0].rentalUrl).toBe(
+        'https://gmjc.adj.st/?adj_t=5vyf0nr&number=1001',
+      );
     });
   });
 });
