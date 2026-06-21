@@ -25,6 +25,7 @@ import {
   OSM_POI_SOURCE_LAYER,
   OSM_TRAILS_TILEJSON_URL,
   MTB_SCALE_RATING,
+  osmTrailDetails,
 } from '@/data/osm-trails';
 import {
   lookupPrecomputedElevation,
@@ -690,6 +691,8 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): () => void {
       )
       .then((profile) => {
         if (selectionId !== mySelection || !profile) return; // superseded
+        // Carry a tiny OSM tag summary for the pane header.
+        profile.osm = osmTrailDetails(props);
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, { detail: { profile } }),
         );

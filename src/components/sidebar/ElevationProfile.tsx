@@ -582,6 +582,31 @@ export function ElevationProfile() {
         </div>
       </div>
 
+      {profile.osm && (
+        <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-1 -mt-0.5">
+          <span className="truncate capitalize">
+            {[
+              profile.osm.difficulty,
+              profile.osm.type,
+              profile.osm.surface,
+              profile.osm.bikes && `Bikes: ${profile.osm.bikes}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          {profile.osm.url && (
+            <a
+              href={profile.osm.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto shrink-0 text-blue-600 hover:underline"
+            >
+              OSM ↗
+            </a>
+          )}
+        </div>
+      )}
+
       <div className="flex relative">
         <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
           <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">

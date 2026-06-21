@@ -58,3 +58,66 @@ function buildScaleRatingMap(): Record<string, TrailRating> {
 }
 
 export const MTB_SCALE_RATING = buildScaleRatingMap();
+
+// --- Tiny OSM detail line for the elevation pane -----------------------------
+
+// A focused subset of a trail's OSM tags shown beneath the pane header. Rendered
+// as React text (auto-escaped), so no manual HTML escaping is needed here.
+export interface OsmTrailDetails {
+  type?: string; // highway kind, e.g. "Cycleway"
+  surface?: string; // e.g. "Dirt"
+  bikes?: string; // bicycle access, e.g. "Designated"
+  difficulty?: TrailRating; // from mtb:scale
+  url?: string; // openstreetmap.org link
+}
+
+const HIGHWAY_LABELS: Record<string, string> = {
+  path: 'Path',
+  cycleway: 'Cycleway',
+  track: 'Track',
+  footway: 'Footway',
+  bridleway: 'Bridleway',
+  pedestrian: 'Pedestrian way',
+  steps: 'Steps',
+  service: 'Service road',
+};
+
+function str(value: unknown): string {
+  return value == null ? '' : String(value).trim();
+}
+
+// Title-case, Unicode-aware so accented OSM values (e.g. "éboulis") capitalize.
+function titleCase(value: string): string {
+  return value
+    .replace(/_/g, ' ')
+    .replace(/(^|\s)(\p{L})/gu, (_m, sep, ch) => sep + ch.toUpperCase());
+}
+
+/** Pull a focused set of display details from a trail feature's OSM tags. */
+export function osmTrailDetails(
+  props: Record<string, unknown>,
+): OsmTrailDetails {
+  const highway = str(props.highway);
+  const surface = str(props.surface);
+  const bicycle = str(props.bicycle);
+  const scale = str(props['mtb:scale']);
+  const id = str(props.OSM_ID);
+  const rawType = str(props.OSM_TYPE).toLowerCase();
+  const osmType = rawType.startsWith('n')
+    ? 'node'
+    : rawType.startsWith('r')
+      ? 'relation'
+      : 'way';
+
+  return {
+    type: highway ? (HIGHWAY_LABELS[highway] ?? titleCase(highway)) : undefined,
+    surface: surface ? titleCase(surface) : undefined,
+    bikes: bicycle ? titleCase(bicycle) : undefined,
+    difficulty: scale
+      ? (MTB_SCALE_RATING[scale] ?? SCALE_DIGIT_RATING[scale.charAt(0)])
+      : undefined,
+    url: id
+      ? `https://www.openstreetmap.org/${osmType}/${encodeURIComponent(id)}`
+      : undefined,
+  };
+}
