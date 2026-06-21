@@ -1000,6 +1000,7 @@ const MapboxMap = memo(function MapboxMap() {
             const hId = `${cfg.layerId} Hit`;
             if (newMap.getLayer(hId)) {
               newMap.on('click', hId, (e) => {
+                if (e.defaultPrevented) return;
                 e.preventDefault();
                 const rawName = e.features?.[0]?.properties?.[cfg.trailProp];
                 if (!rawName) return;

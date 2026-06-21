@@ -1,3 +1,5 @@
+import { escapeXml } from '@/utils/gpx';
+
 // Nationwide OSM bike trails, served as vector tiles by OpenStreetMap US.
 // https://openstreetmap.us/our-work/tileservice/
 //
@@ -34,7 +36,11 @@ export const OSM_TRAILS_TILEJSON_URL =
 // OSM trails carry no curated metadata (unlike the local MTB trails), so a
 // click opens a Mapbox popup built straight from the feature's OSM tags.
 
-type OsmTrailProps = Record<string, unknown>;
+interface OsmTrailProps {
+  [key: string]: unknown;
+}
+
+export type TrailRating = 'easy' | 'intermediate' | 'advanced' | 'expert';
 
 const HIGHWAY_LABELS: Record<string, string> = {
   path: 'Path',
@@ -47,12 +53,8 @@ const HIGHWAY_LABELS: Record<string, string> = {
   service: 'Service road',
 };
 
-type TrailRating = 'easy' | 'intermediate' | 'advanced' | 'expert';
-
-// mtb:scale 0–6 grouped into the same easy/intermediate/advanced/expert buckets
-// the line coloring uses. The raw scale number is an internal OSM reference and
-// is intentionally not surfaced — the difficulty label/badge carries the meaning.
-const MTB_SCALE_RATING: Record<string, TrailRating> = {
+// The bucket a single mtb:scale digit (0–6) falls into.
+const SCALE_DIGIT_RATING: Record<string, TrailRating> = {
   '0': 'easy',
   '1': 'intermediate',
   '2': 'advanced',
@@ -62,6 +64,21 @@ const MTB_SCALE_RATING: Record<string, TrailRating> = {
   '6': 'expert',
 };
 
+// Single source of truth: every mtb:scale token → difficulty bucket. OSM uses
+// 0–6 with optional +/- refinements (e.g. "4+"), so expand the digits to cover
+// them. Both the line color expression (utils/map.ts) and the popup badge derive
+// from this map so the rendered color and the badge can never disagree. The raw
+// scale number is an internal OSM reference and is never surfaced in the UI.
+function buildScaleRatingMap(): Record<string, TrailRating> {
+  const out: Record<string, TrailRating> = {};
+  for (const [digit, rating] of Object.entries(SCALE_DIGIT_RATING)) {
+    for (const suffix of ['', '+', '-']) out[`${digit}${suffix}`] = rating;
+  }
+  return out;
+}
+
+export const MTB_SCALE_RATING = buildScaleRatingMap();
+
 const RATING_LABEL: Record<TrailRating, string> = {
   easy: 'Easy',
   intermediate: 'Intermediate',
@@ -69,19 +86,11 @@ const RATING_LABEL: Record<TrailRating, string> = {
   expert: 'Expert',
 };
 
-// OSM names/tags are arbitrary user-generated text — always escape before
-// injecting into popup HTML.
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
+// Title-case, Unicode-aware so accented OSM values (e.g. "éboulis") capitalize.
 function titleCase(value: string): string {
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return value
+    .replace(/_/g, ' ')
+    .replace(/(^|\s)(\p{L})/gu, (_m, sep, ch) => sep + ch.toUpperCase());
 }
 
 function str(value: unknown): string {
@@ -98,7 +107,9 @@ function osmFeatureUrl(props: OsmTrailProps): string | null {
     : raw.startsWith('r')
       ? 'relation'
       : 'way';
-  return `https://www.openstreetmap.org/${type}/${id}`;
+  // Encode the id (OSM ids are numeric today, but defend against unexpected
+  // values) — the type is from a fixed whitelist above.
+  return `https://www.openstreetmap.org/${type}/${encodeURIComponent(id)}`;
 }
 
 /** Trail type label (e.g. "Cycleway"), or null when untagged. */
@@ -114,7 +125,9 @@ export function osmTrailDifficulty(
 ): { label: string; rating: TrailRating } | null {
   const scale = str(props['mtb:scale']);
   if (!scale) return null;
-  const rating = MTB_SCALE_RATING[scale] ?? 'advanced';
+  // Fall back to the leading digit for any token not in the map.
+  const rating = MTB_SCALE_RATING[scale] ?? SCALE_DIGIT_RATING[scale.charAt(0)];
+  if (!rating) return null;
   return { label: RATING_LABEL[rating], rating };
 }
 
@@ -142,10 +155,10 @@ export function buildOsmTrailPopupHTML(props: OsmTrailProps): string {
   const rows = osmTrailDetailRows(props);
 
   const badge = difficulty
-    ? `<span class="osm-trail-badge osm-trail-badge--${difficulty.rating}">${escapeHtml(difficulty.label)}</span>`
+    ? `<span class="osm-trail-badge osm-trail-badge--${difficulty.rating}">${escapeXml(difficulty.label)}</span>`
     : '';
   const typeLabel = type
-    ? `<span class="osm-trail-type">${escapeHtml(type)}</span>`
+    ? `<span class="osm-trail-type">${escapeXml(type)}</span>`
     : '';
   const subhead =
     badge || typeLabel
@@ -155,15 +168,15 @@ export function buildOsmTrailPopupHTML(props: OsmTrailProps): string {
   const facts = rows
     .map(
       ([k, v]) =>
-        `<div class="osm-trail-fact"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`,
+        `<div class="osm-trail-fact"><dt>${escapeXml(k)}</dt><dd>${escapeXml(v)}</dd></div>`,
     )
     .join('');
   const factsHtml = facts ? `<dl class="osm-trail-facts">${facts}</dl>` : '';
 
   const url = osmFeatureUrl(props);
   const link = url
-    ? `<div class="osm-trail-source"><a href="${url}" target="_blank" rel="noopener noreferrer">View on OpenStreetMap</a></div>`
+    ? `<div class="osm-trail-source"><a href="${escapeXml(url)}" target="_blank" rel="noopener noreferrer">View on OpenStreetMap</a></div>`
     : '';
 
-  return `<div class="map-popup osm-trail-popup"><h3 class="osm-trail-name">${escapeHtml(name)}</h3>${subhead}${factsHtml}${link}</div>`;
+  return `<div class="map-popup osm-trail-popup"><h3 class="osm-trail-name">${escapeXml(name)}</h3>${subhead}${factsHtml}${link}</div>`;
 }

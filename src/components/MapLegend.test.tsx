@@ -42,8 +42,21 @@ vi.mock('./sidebar', () => ({
     </div>
   ),
   MapLayers: () => <div data-testid="map-layers" />,
-  ToggleSwitch: ({ isActive }: { isActive: boolean }) => (
-    <div data-testid="toggle-switch" data-active={isActive} />
+  MapLayersSection: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="map-layers-section">{children}</div>
+  ),
+  ToggleRow: ({
+    label,
+    isActive,
+    onToggle,
+  }: {
+    label: string;
+    isActive: boolean;
+    onToggle: () => void;
+  }) => (
+    <button type="button" onClick={onToggle} data-active={isActive}>
+      {label}
+    </button>
   ),
   AttractionsList: () => <div data-testid="attractions" />,
   BikeResourcesList: () => <div data-testid="bike-resources" />,

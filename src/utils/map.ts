@@ -24,6 +24,7 @@ import {
   OSM_TRAILS_SOURCE_LAYER,
   OSM_POI_SOURCE_LAYER,
   OSM_TRAILS_TILEJSON_URL,
+  MTB_SCALE_RATING,
   buildOsmTrailPopupHTML,
 } from '@/data/osm-trails';
 
@@ -370,38 +371,45 @@ export const OSM_POI_FILTER: mapboxgl.FilterSpecification = [
   ['==', ['get', 'tourism'], 'information'],
 ];
 
+// Lines render only from this zoom in — nationwide trail geometry at lower
+// zooms is dense and janky; the POI symbols gate higher still (z12).
+const OSM_TRAILS_MIN_ZOOM = 9;
+
 // Pick a Maki sprite icon per POI category (icons ship with the Mapbox style).
-function osmPoiIconExpression(): mapboxgl.Expression {
-  return [
-    'case',
-    ['==', ['get', 'amenity'], 'parking'],
-    'parking',
-    'information',
-  ] as mapboxgl.Expression;
-}
+const OSM_POI_ICON_EXPRESSION: mapboxgl.Expression = [
+  'case',
+  ['==', ['get', 'amenity'], 'parking'],
+  'parking',
+  'information',
+];
 
-// Color by MTB difficulty (mtb:scale 0–6, including "1+"-style intermediates);
+// Color by MTB difficulty, derived from the shared MTB_SCALE_RATING map so the
+// line color and the popup difficulty badge can never disagree (incl. the +/-
+// scale refinements). Tokens are grouped by color to keep the match compact;
 // trails without an mtb:scale tag fall back to the neutral unrated color.
-function osmTrailColorExpression(): mapboxgl.Expression {
-  return [
-    'match',
-    ['get', 'mtb:scale'],
-    ['0'],
-    RATING_COLORS.easy,
-    ['1', '1+'],
-    RATING_COLORS.intermediate,
-    ['2', '2+', '3', '3+'],
-    RATING_COLORS.advanced,
-    ['4', '4+', '5', '5+', '6'],
-    RATING_COLORS.expert,
-    UNRATED_COLOR,
-  ] as mapboxgl.Expression;
+function buildOsmTrailColorExpression(): mapboxgl.Expression {
+  const tokensByColor = new Map<string, string[]>();
+  for (const [token, rating] of Object.entries(MTB_SCALE_RATING)) {
+    const color = RATING_COLORS[rating] ?? UNRATED_COLOR;
+    const tokens = tokensByColor.get(color) ?? [];
+    tokens.push(token);
+    tokensByColor.set(color, tokens);
+  }
+  const expr: unknown[] = ['match', ['get', 'mtb:scale']];
+  for (const [color, tokens] of tokensByColor) {
+    expr.push(tokens, color);
+  }
+  expr.push(UNRATED_COLOR);
+  return expr as mapboxgl.Expression;
 }
 
-// Attach the OSM trails tileset and a filtered bike-trail line layer (with a
-// subtle white casing for legibility). Hidden by default — toggled on from the
-// "Map Layers" sidebar. Idempotent: skips if source/layers already exist.
-// Inserted beneath the curated MTB layer so local content stays on top.
+const OSM_TRAIL_COLOR_EXPRESSION = buildOsmTrailColorExpression();
+
+// Attach the OSM trails tileset and its filtered line layers (white casing, the
+// colored line, and a transparent wide tap target). Hidden by default — toggled
+// from the "Map Layers" sidebar. Idempotent: skips existing source/layers.
+// Inserted beneath the curated MTB layer (via beforeId) so curated content
+// stays on top and curated clicks win over OSM clicks.
 export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
   try {
     if (!map.getSource(OSM_TRAILS_SOURCE_ID)) {
@@ -415,72 +423,52 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
       ? MTN_BIKE_LAYER_ID
       : undefined;
 
-    if (!map.getLayer(OSM_TRAILS_CASING_LAYER_ID)) {
-      map.addLayer(
-        {
-          id: OSM_TRAILS_CASING_LAYER_ID,
-          type: 'line',
-          source: OSM_TRAILS_SOURCE_ID,
-          'source-layer': OSM_TRAILS_SOURCE_LAYER,
-          filter: OSM_BIKE_TRAIL_FILTER,
-          layout: {
-            'line-cap': 'round',
-            'line-join': 'round',
-            visibility: 'none',
-          },
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2, 14, 4.5],
-            'line-opacity': 0.6,
-          },
-        },
-        beforeId,
-      );
-    }
+    const baseLine = {
+      type: 'line' as const,
+      source: OSM_TRAILS_SOURCE_ID,
+      'source-layer': OSM_TRAILS_SOURCE_LAYER,
+      minzoom: OSM_TRAILS_MIN_ZOOM,
+      filter: OSM_BIKE_TRAIL_FILTER,
+      layout: {
+        'line-cap': 'round' as const,
+        'line-join': 'round' as const,
+        visibility: 'none' as const,
+      },
+    };
 
-    if (!map.getLayer(OSM_TRAILS_LAYER_ID)) {
-      map.addLayer(
-        {
-          id: OSM_TRAILS_LAYER_ID,
-          type: 'line',
-          source: OSM_TRAILS_SOURCE_ID,
-          'source-layer': OSM_TRAILS_SOURCE_LAYER,
-          filter: OSM_BIKE_TRAIL_FILTER,
-          layout: {
-            'line-cap': 'round',
-            'line-join': 'round',
-            visibility: 'none',
-          },
-          paint: {
-            'line-color': osmTrailColorExpression(),
-            'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 14, 2.5],
-            'line-opacity': 0.75,
-          },
+    const lineLayers = [
+      {
+        id: OSM_TRAILS_CASING_LAYER_ID,
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 2, 14, 4.5],
+          'line-opacity': 0.6,
         },
-        beforeId,
-      );
-    }
-
-    // Transparent, extra-wide tap target so the thin trail lines are easy to
-    // click/tap. Added on top so it always receives the click.
-    if (!map.getLayer(OSM_TRAILS_HIT_LAYER_ID)) {
-      map.addLayer({
+      },
+      {
+        id: OSM_TRAILS_LAYER_ID,
+        paint: {
+          'line-color': OSM_TRAIL_COLOR_EXPRESSION,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1, 14, 2.5],
+          'line-opacity': 0.75,
+        },
+      },
+      {
         id: OSM_TRAILS_HIT_LAYER_ID,
-        type: 'line',
-        source: OSM_TRAILS_SOURCE_ID,
-        'source-layer': OSM_TRAILS_SOURCE_LAYER,
-        filter: OSM_BIKE_TRAIL_FILTER,
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round',
-          visibility: 'none',
-        },
         paint: {
           'line-color': 'rgba(0,0,0,0)',
           'line-width': 14,
           'line-opacity': 0,
         },
-      });
+      },
+    ];
+
+    for (const { id, paint } of lineLayers) {
+      if (map.getLayer(id)) continue;
+      map.addLayer(
+        { ...baseLine, id, paint } as mapboxgl.LayerSpecification,
+        beforeId,
+      );
     }
 
     // Trailhead parking + information points (Maki icons), only once zoomed in
@@ -495,7 +483,7 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
         filter: OSM_POI_FILTER,
         layout: {
           visibility: 'none',
-          'icon-image': osmPoiIconExpression(),
+          'icon-image': OSM_POI_ICON_EXPRESSION,
           'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 1.1],
           'icon-allow-overlap': false,
           'text-optional': true,
@@ -540,6 +528,9 @@ export function registerOsmTrailPopup(map: mapboxgl.Map): void {
   let popup: mapboxgl.Popup | null = null;
 
   map.on('click', OSM_TRAILS_HIT_LAYER_ID, (e) => {
+    // A curated trail/route sitting on top already handled this click — don't
+    // also pop an OSM popup over it.
+    if (e.defaultPrevented) return;
     const feature = e.features?.[0];
     if (!feature) return;
     // Stop the empty-map click handler from also deselecting routes/trails.

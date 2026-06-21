@@ -4,6 +4,7 @@ import {
   osmTrailDetailRows,
   osmTrailType,
   osmTrailDifficulty,
+  MTB_SCALE_RATING,
 } from './osm-trails';
 
 describe('osmTrailType', () => {
@@ -29,6 +30,16 @@ describe('osmTrailDifficulty', () => {
       rating: 'expert',
     });
     expect(osmTrailDifficulty({})).toBeNull();
+  });
+
+  it('handles +/- scale refinements via the shared rating map', () => {
+    // The same map feeds the line color expression, so these must agree.
+    expect(MTB_SCALE_RATING['4+']).toBe('expert');
+    expect(MTB_SCALE_RATING['2-']).toBe('advanced');
+    expect(MTB_SCALE_RATING['0+']).toBe('easy');
+    expect(osmTrailDifficulty({ 'mtb:scale': '4+' })?.rating).toBe('expert');
+    // Unknown token still buckets by its leading digit.
+    expect(osmTrailDifficulty({ 'mtb:scale': '5x' })?.rating).toBe('expert');
   });
 });
 
