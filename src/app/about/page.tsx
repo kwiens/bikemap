@@ -92,6 +92,7 @@ export default function AboutPage() {
             width={224}
             height={210}
             className="w-56 mb-6"
+            style={{ height: 'auto' }}
             priority
           />
           <p className="text-gray-600 text-lg leading-relaxed max-w-md">
@@ -261,6 +262,7 @@ function LogoCard({
           width={square ? 128 : 400}
           height={128}
           className={square ? 'w-32 h-32' : 'w-full max-h-32'}
+          style={square ? undefined : { height: 'auto' }}
         />
       </a>
       <div className="flex items-center justify-between">
