@@ -194,3 +194,18 @@
 .map-popup a:hover {
   text-decoration: underline;
 }
+
+.map-popup a.rental-link {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 6px 12px;
+  background-color: #9333ea;
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.map-popup a.rental-link:hover {
+  background-color: #7e22ce;
+  text-decoration: none;
+}

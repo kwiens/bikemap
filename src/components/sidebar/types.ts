@@ -7,6 +7,9 @@ export interface LocationProps {
   latitude?: number;
   longitude?: number;
   address?: string;
+  // [[minLng, minLat], [maxLng, maxLat]] — when set, the map fits these bounds
+  // instead of flying to a single point (used by the dockless fleet summary).
+  bounds?: [[number, number], [number, number]];
 }
 
 export interface ToggleSwitchProps {
