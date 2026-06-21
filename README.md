@@ -37,7 +37,7 @@ The full step-by-step is in **[docs/DEPLOYING.md](docs/DEPLOYING.md)**; the data
 ### For riders
 
 - **Curated bike routes** — Hand-picked road, greenway, and connector routes styled in Mapbox Studio with descriptions, distance, and zoom-to-fit bounds.
-- **Mountain bike trails** — 225+ trails in the reference deployment, grouped by recreation area and region, color-coded by difficulty, with per-trail elevation profiles.
+- **Mountain bike trails** — 220+ trails in the reference deployment, grouped by recreation area and region, color-coded by difficulty, with per-trail elevation profiles.
 - **Real-time bike share** — Live station availability via the [GBFS](https://gbfs.org/) standard, configurable per region.
 - **Points of interest** — Attractions, bike shops, rentals, and local resources as toggleable map layers.
 - **Live location & compass** — Tracks position and heading, with a smoothed compass heading derived from GPS readings.
