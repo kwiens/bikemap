@@ -155,7 +155,7 @@ describe('HeadingSmoother', () => {
       // The smoothed value wraps to near 360
       expect(result).toBeLessThan(5);
       // It should be a small number near 0, or near 360
-      expect(result >= 0).toBe(true);
+      expect(result).toBeGreaterThanOrEqual(0);
     });
 
     it('converges across boundary over multiple readings', () => {

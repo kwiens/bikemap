@@ -102,11 +102,7 @@ export function calculateRouteBounds(
   });
 
   // Only return bounds if we have valid coordinates
-  if (bounds.getNorth() !== undefined && bounds.getSouth() !== undefined) {
-    return bounds;
-  }
-
-  return null;
+  return bounds.isEmpty() ? null : bounds;
 }
 
 // Coordinate utilities
@@ -124,7 +120,9 @@ export function calculateTrailBounds(
   map: mapboxgl.Map,
   trailName: string,
 ): mapboxgl.LngLatBounds | null {
-  const features = map.querySourceFeatures('composite', {
+  // MTB trails are attached at runtime under MTN_BIKE_SOURCE_ID, not the
+  // Mapbox Studio "composite" source — query the source we actually added.
+  const features = map.querySourceFeatures(MTN_BIKE_SOURCE_ID, {
     sourceLayer: MTN_BIKE_SOURCE_LAYER,
     filter: ['==', ['get', 'Trail'], trailName],
   });
@@ -146,10 +144,7 @@ export function calculateTrailBounds(
     }
   }
 
-  if (bounds.getNorth() !== undefined && bounds.getSouth() !== undefined) {
-    return bounds;
-  }
-  return null;
+  return bounds.isEmpty() ? null : bounds;
 }
 
 /** Convert a [swLng, swLat, neLng, neLat] tuple to LngLatBounds, or return undefined. */

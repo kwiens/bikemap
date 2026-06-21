@@ -228,12 +228,13 @@ export function useRideRecording(
 
         // Filter 1: skip readings with poor altitude accuracy
         const altAccuracy = position.coords.altitudeAccuracy;
-        const altUsable =
-          point.altitude !== null &&
-          (altAccuracy === null || altAccuracy <= ALT_MAX_ACCURACY);
+        const altValue = point.altitude;
 
-        if (altUsable) {
-          let alt = point.altitude!;
+        if (
+          altValue !== null &&
+          (altAccuracy === null || altAccuracy <= ALT_MAX_ACCURACY)
+        ) {
+          let alt = altValue;
 
           // Filter 2: spike rejection — replace outlier jumps with current EMA
           if (
@@ -252,8 +253,12 @@ export function useRideRecording(
               ALT_EMA_ALPHA * alt + (1 - ALT_EMA_ALPHA) * emaAltRef.current;
 
             // Filter 3: require minimum horizontal distance before anchor update
-            if (distSinceAnchorRef.current >= ALT_MIN_DIST_M) {
-              const delta = emaAltRef.current - altAnchorRef.current!;
+            const anchor = altAnchorRef.current;
+            if (
+              distSinceAnchorRef.current >= ALT_MIN_DIST_M &&
+              anchor !== null
+            ) {
+              const delta = emaAltRef.current - anchor;
               if (delta > ALT_DEADBAND_M) {
                 elevGainRef.current += delta;
                 setLiveElevationGain(elevGainRef.current);

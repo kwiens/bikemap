@@ -303,6 +303,7 @@ describe('Mapbox Geo Integration', () => {
         icon: {} as IconDefinition,
         defaultWidth: 8,
         opacity: 1.0,
+        distance: 5.0,
       };
 
       const mockLayer = {
@@ -349,6 +350,7 @@ describe('Mapbox Geo Integration', () => {
         icon: {} as IconDefinition,
         defaultWidth: 8,
         opacity: 1.0,
+        distance: 5.0,
       };
 
       const mockLayer = {
@@ -374,6 +376,7 @@ describe('Mapbox Geo Integration', () => {
         icon: {} as IconDefinition,
         defaultWidth: 8,
         opacity: 1.0,
+        distance: 5.0,
       };
 
       const mockLayer = {
@@ -399,6 +402,7 @@ describe('Mapbox Geo Integration', () => {
         icon: {} as IconDefinition,
         defaultWidth: 8,
         opacity: 1.0,
+        distance: 5.0,
       };
 
       const mockLayer = {
