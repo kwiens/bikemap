@@ -23,12 +23,7 @@ import {
 import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
 import { cn } from '@/lib/utils';
 import { useToast, useMapResize, useWakeLock } from '@/hooks';
-import {
-  fetchStationInformation,
-  fetchStationStatus,
-  gbfsToBikeRentalLocation,
-  type GBFSStationStatus,
-} from '@/data/gbfs';
+import { fetchBikeRentalLocations } from '@/data/gbfs';
 import {
   geocodeAddress,
   updateRouteOpacity,
@@ -86,6 +81,9 @@ const MapboxMap = memo(function MapboxMap() {
   const attractionMarkers = useRef<MarkerManager>(new MarkerManager());
   const bikeResourceMarkers = useRef<MarkerManager>(new MarkerManager());
   const bikeRentalMarkers = useRef<MarkerManager>(new MarkerManager());
+  // Tracks the latest desired visibility of the rentals layer so a slow GBFS
+  // fetch can't re-show markers after the user has toggled the layer back off.
+  const bikeRentalsVisibleRef = useRef(false);
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
@@ -236,6 +234,12 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Create location marker
   function initializeLocationMarker() {
+    // Idempotent: never start a second geolocation watch. The GPS watch is
+    // started lazily on explicit user intent (tracking toggle / ride recording),
+    // not on map load — requesting location before the user asks is a privacy
+    // and battery regression.
+    if (watchId.current !== null) return;
+
     // Options to request frequent, high-accuracy GPS updates
     const gpsOptions = {
       enableHighAccuracy: true, // Use GPS instead of WiFi/cell tower
@@ -454,33 +458,24 @@ const MapboxMap = memo(function MapboxMap() {
     }
 
     if (layer === 'bikeRentals') {
+      bikeRentalsVisibleRef.current = visible;
       setShowBikeRentals(visible);
 
       if (visible) {
         bikeRentalMarkers.current.hide();
 
         try {
-          // Fetch station information and status
-          const [stations, statuses] = await Promise.all([
-            fetchStationInformation(),
-            fetchStationStatus(),
-          ]);
+          const rentalLocations = await fetchBikeRentalLocations();
 
-          // Create status map
-          const statusMap: { [key: string]: GBFSStationStatus } = {};
-          statuses.forEach((status) => {
-            statusMap[status.station_id] = status;
-          });
+          // The user may have toggled the layer back off (or the map may have
+          // unmounted) while the GBFS fetch was in flight — don't re-show.
+          if (!bikeRentalsVisibleRef.current || !map.current) {
+            return;
+          }
 
-          // Convert GBFS stations to our format and create markers
-          const rentalLocations = stations.map((station) =>
-            gbfsToBikeRentalLocation(station, statusMap[station.station_id]),
+          const markers = rentalLocations.map((location) =>
+            createBikeRentalMarker(location),
           );
-
-          // Create markers using the utility function
-          const markers = rentalLocations
-            .map((location) => createBikeRentalMarker(location))
-            .filter((marker): marker is mapboxgl.Marker => marker !== null);
 
           bikeRentalMarkers.current.setMarkers(markers);
           bikeRentalMarkers.current.show(map.current);
@@ -922,6 +917,10 @@ const MapboxMap = memo(function MapboxMap() {
 
             newMap.on('click', clickTarget, (e) => {
               e.preventDefault();
+              // Selecting a route also clears any active trail selection, so
+              // the trail highlight + elevation profile don't linger. Mirrors
+              // the sidebar route-click path in MapLegend.
+              window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
               window.dispatchEvent(
                 new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
                   detail: { routeId: route.id },
@@ -1023,7 +1022,8 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }, 100);
 
-          initializeLocationMarker();
+          // Do NOT start the GPS watch here — it begins only when the user
+          // enables tracking or starts recording (see setLocationWatch).
           initializeGestureWatch();
 
           // Debug: click map to simulate GPS location
@@ -1120,6 +1120,10 @@ const MapboxMap = memo(function MapboxMap() {
     setWatchingLocation(value);
 
     if (value) {
+      // Start the GPS watch on first explicit opt-in (idempotent — no-op if
+      // a watch is already running, e.g. when recording is also active).
+      initializeLocationMarker();
+
       // When enabled: immediately center on current location (preserving zoom).
       // If GPS hasn't fired yet (locationMarker null), wait for the first
       // LOCATION_UPDATE and then fly there — fixes iOS cold-start delay.
@@ -1181,6 +1185,10 @@ const MapboxMap = memo(function MapboxMap() {
       // so the map is never mid-flight, which would block route-layer tap events.
       // Skip when the user is mid-gesture (pinch-zoom, drag) so we don't
       // interrupt and snap the zoom back — this was causing #57.
+      // Clear any prior interval first so re-enabling can't leak a duplicate.
+      if (locationWatch.current) {
+        clearInterval(locationWatch.current);
+      }
       locationWatch.current = setInterval(() => {
         if (!map.current || !locationMarker.current) {
           return;
@@ -1372,6 +1380,10 @@ const MapboxMap = memo(function MapboxMap() {
       window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handleStart);
       window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handleStop);
     };
+    // setLocationWatch is stable-by-refs (reads only refs + stable setters) and
+    // this listener wiring must run exactly once; the real fix is the deferred
+    // GPS/compass hook extraction.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

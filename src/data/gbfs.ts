@@ -75,6 +75,24 @@ export async function fetchStationStatus(): Promise<GBFSStationStatus[]> {
   return data.data.stations;
 }
 
+// Fetch both GBFS feeds, join status onto each station, and convert to our
+// BikeRentalLocation shape. Single source of truth shared by the map markers
+// (Map.tsx) and the sidebar list (BikeRentalList.tsx).
+export async function fetchBikeRentalLocations(): Promise<
+  BikeRentalLocation[]
+> {
+  const [stations, statuses] = await Promise.all([
+    fetchStationInformation(),
+    fetchStationStatus(),
+  ]);
+  const statusMap = new Map(
+    statuses.map((status) => [status.station_id, status]),
+  );
+  return stations.map((station) =>
+    gbfsToBikeRentalLocation(station, statusMap.get(station.station_id)),
+  );
+}
+
 // Extended BikeRentalLocation interface with GBFS-specific fields
 export interface BikeRentalLocation {
   name: string;

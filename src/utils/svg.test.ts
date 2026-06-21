@@ -102,8 +102,8 @@ describe('buildSvg', () => {
     const viewBoxMatch = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
     expect(viewBoxMatch).not.toBeNull();
     // ViewBox dimensions should be positive
-    const w = Number.parseFloat(viewBoxMatch?.[1]);
-    const h = Number.parseFloat(viewBoxMatch?.[2]);
+    const w = Number.parseFloat(viewBoxMatch?.[1] ?? '');
+    const h = Number.parseFloat(viewBoxMatch?.[2] ?? '');
     expect(w).toBeGreaterThan(0);
     expect(h).toBeGreaterThan(0);
   });

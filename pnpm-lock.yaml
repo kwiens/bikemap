@@ -38,12 +38,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      eslint-config-prettier:
-        specifier: ^10.1.8
-        version: 10.1.8(eslint@9.39.4(jiti@1.21.7))
-      eslint-import-resolver-typescript:
-        specifier: ^4.4.4
-        version: 4.4.4(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@1.21.7))
       lucide-react:
         specifier: ^1.7.0
         version: 1.7.0(react@19.2.4)
@@ -90,6 +84,12 @@ importers:
       eslint-config-next:
         specifier: 16.2.1
         version: 16.2.1(@typescript-eslint/parser@8.57.2(eslint@9.39.4(jiti@1.21.7))(typescript@6.0.2))(eslint@9.39.4(jiti@1.21.7))(typescript@6.0.2)
+      eslint-config-prettier:
+        specifier: ^10.1.8
+        version: 10.1.8(eslint@9.39.4(jiti@1.21.7))
+      eslint-import-resolver-typescript:
+        specifier: ^4.4.4
+        version: 4.4.4(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@1.21.7))
       fake-indexeddb:
         specifier: ^6.2.5
         version: 6.2.5

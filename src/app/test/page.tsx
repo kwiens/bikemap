@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { RecordedRide, RideStats } from '@/data/ride';
@@ -460,6 +461,12 @@ function TrackCard({ track, precomputedStats, badge, onAdd }: TrackCardProps) {
 // --- Main Page ---
 
 export default function TestPage() {
+  // Dev-only fixture/editor tool — never expose it (or its destructive
+  // "Clear All Rides" action) on production deployments.
+  if (process.env.NODE_ENV === 'production') {
+    notFound();
+  }
+
   const [cherokeeTrack, setCherokeeTrack] = useState<ExampleTrack | null>(null);
   const [cherokeeStats, setCherokeeStats] = useState<RideStats | null>(null);
   const [cherokeePoints, setCherokeePoints] = useState<

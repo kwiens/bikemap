@@ -1,18 +1,24 @@
-import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
+import localFont from 'next/font/local';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import './globals.css';
 import './map.css';
 import Script from 'next/script';
 
-const geistSans = Geist({
+// Self-hosted to keep production builds reproducible and offline-capable
+// (next/font/google would fetch from Google Fonts at build time).
+const geistSans = localFont({
+  src: './fonts/Geist-Variable.woff2',
   variable: '--font-geist-sans',
-  subsets: ['latin'],
+  weight: '100 900',
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: './fonts/GeistMono-Variable.woff2',
   variable: '--font-geist-mono',
-  subsets: ['latin'],
+  weight: '100 900',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -33,6 +39,14 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Pinch-to-zoom is intentionally left enabled for accessibility.
+  viewportFit: 'cover',
+  themeColor: '#c3f44d',
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,14 +55,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
-        />
         <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#c3f44d" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Bike Chatt" />
         <meta

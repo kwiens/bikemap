@@ -43,7 +43,8 @@ async function loadTile(
   tileY: number,
 ): Promise<ImageData | null> {
   const key = `${tileX}/${tileY}`;
-  if (tileCache.has(key)) return tileCache.get(key)!;
+  const cached = tileCache.get(key);
+  if (cached !== undefined) return cached;
 
   try {
     const url = `/terrain/${TILE_ZOOM}/${tileX}/${tileY}.png`;
@@ -56,7 +57,11 @@ async function loadTile(
     const blob = await resp.blob();
     const bitmap = await createImageBitmap(blob);
     const canvas = new OffscreenCanvas(TILE_SIZE, TILE_SIZE);
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      tileCache.set(key, null);
+      return null;
+    }
     ctx.drawImage(bitmap, 0, 0);
     const imageData = ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE);
     tileCache.set(key, imageData);
