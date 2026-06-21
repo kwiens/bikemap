@@ -1,0 +1,270 @@
+slug,name,complex,difficulty,dist_from_bend_mi,geom_status,covered_frac,n_osm_ways,name_check,osm_primary_name,osm_mtb_scale,osm_ids
+50-shades-of-blue,50 Shades of Blue,Wanoga Sno Park,blue,12.3,strong,1.0,1,1.0,50 Shades of Blue,,1415722674
+afternoon-delight,Afternoon Delight,Sunriver,green,12.1,strong,1.0,2,1.0,Afternoon Delight,,959854045;1451212360
+alpine-chrome-toilet,Alpine (Chrome Toilet),Oakridge,blue,59.6,strong,1.0,1,0.73,Alpine Trail #3450,,419940597
+alpine-lower,Alpine (Lower),Oakridge,blue,61.4,strong,1.0,1,0.8,Alpine Trail #3450,,419940597
+alpine-upper,Alpine (Upper),Oakridge,blue,59.0,strong,1.0,1,0.8,Alpine Trail #3450,,419940597
+arnold-ice-cave,Arnold Ice Cave,East of Bend,blue,11.6,strong,0.95,3,0.9,Arnold Ice Cave Trail Number 63,,616186747;568003261;272378390
+bachelor-mountain,Bachelor Mountain,Cascade Crest,black,52.3,none,0.0,0,0.0,,,
+bachy-west-xc,Bachy West XC,Mt. Bachelor Bike Park,blue,18.5,strong,1.0,1,0.0,,2,91883621
+bens-trail,Ben’s Trail,Phil's Trail Complex,green,5.7,strong,1.0,1,0.89,Ben's Trail,1,60079163
+betty-lake,Betty lake,Waldo Lake,blue,43.9,none,0.02,0,0.0,,,
+big-bark,Big Bark,Maston,green,11.6,strong,1.0,1,1.0,Big Bark Trail,,315701846
+big-wood,Big Wood,Mt. Bachelor Bike Park,black,18.4,strong,1.0,1,1.0,Big Wood,,521161756
+black-rock,Black Rock,Sunriver,green,10.5,strong,1.0,1,1.0,Black Rock #3935,,418704942
+blade-runner,Blade Runner,Mt. Bachelor Bike Park,blue,18.4,strong,1.0,1,1.0,Blade Runner,,870840939
+blue-belly-loop,Blue Belly Loop,Cline Butte,blue,15.0,strong,1.0,1,1.0,Blue-Belly Loop,,1024743650
+blue-belly-stem,Blue Belly Stem,Cline Butte,green,15.4,strong,1.0,1,1.0,Blue-Belly Stem,,1024743649
+bobber,Bobber,,"blue,green",18.9,none,0.0,0,0.0,,,
+bobby-lake,Bobby Lake,Waldo Lake,green,43.2,none,0.0,0,0.0,,,
+bones,Bones,Madras,green,41.2,good,0.64,1,0.0,,,926396878
+bridge-to-nowhere,Bridge to Nowhere,Madras,green,41.2,strong,1.0,1,0.0,,,926396878
+browder-ridge,Browder Ridge,Cascade Crest,black,45.8,none,0.0,0,0.0,,,
+bruno-meadows,Bruno Meadows,Cascade Crest,blue,52.5,none,0.0,0,0.0,,,
+bugaboo-ridge,Bugaboo Ridge,Cascade Crest,black,51.7,none,0.0,0,0.0,,,
+bull-snake,Bull Snake,Cline Butte,green,14.1,good,0.75,2,1.0,Bull Snake,,1389943344;1456604245
+bunchgrass-lower,Bunchgrass (Lower),Oakridge,black,53.5,none,0.0,0,0.0,,,
+bunchgrass-upper,Bunchgrass (Upper),Oakridge,black,49.6,none,0.0,0,0.0,,,
+burma-road,Burma Road,,blue,23.8,none,0.03,0,0.0,,,
+canyon-trail,Canyon Trail,,green,23.1,none,0.11,0,0.0,,,
+canyon-trail-west,Canyon Trail West,,black,22.2,none,0.0,0,0.0,,,
+castle-rock,Castle Rock,McKenzie,blue,45.0,strong,1.0,1,1.0,Castle Rock Trail #3506,,311474863
+catch-and-release,Catch & Release,Wanoga Sno Park,green,8.2,strong,1.0,2,1.0,Catch & Release,,410101707;563682158
+chain-reaction,Chain Reaction,Sunriver,"blue,black",12.4,strong,1.0,1,1.0,Chain Reaction,,1451212359
+chainbreak,Chainbreak,Cline Butte,blue,13.5,strong,1.0,1,1.0,Chainbreak,,1363935398
+charlton-lake-19,Charlton Lake #19,Waldo Lake,black,37.6,none,0.07,0,0.0,,,
+charlton-lake-3593,Charlton Lake #3593,Waldo Lake,blue,39.7,none,0.02,0,0.0,,,
+clear-lake,Clear Lake,McKenzie,blue,40.8,strong,0.93,4,1.0,McKenzie River Trail #3507,,71183459;844398872;179312806;71183458
+cline-access,Cline Access,Cline Butte,green,13.6,none,0.15,0,0.0,,,
+cline-butte-xc-trail,Cline Butte XC Trail,Cline Butte,green,14.1,strong,0.98,2,0.97,Cline Buttes XC,,314032089;1366042657
+clover-meadow-21,Clover Meadow #21,Waldo Lake,blue,36.6,none,0.01,0,0.0,,,
+cloverpatch,Cloverpatch,Oakridge,blue,62.6,weak,0.54,0,0.0,,,
+cobra-dh,Cobra DH,Madras,black,41.4,strong,1.0,1,0.0,,,1158818402
+cod,COD,Phil's Trail Complex,"blue,black,green,black,green,black",7.8,strong,0.96,5,1.0,COD,,701207708;903544743;1498364649;270674118;373320999
+coffin-mountain,Coffin Mountain,Cascade Crest,black,53.1,none,0.0,0,0.0,,,
+cole-loop,Cole Loop,,blue,27.3,strong,0.93,3,1.0,Cole Loop Trail #854,,438938540;438942588;692052468
+cole-loop-pine-ridge,Cole Loop (Pine Ridge),,blue,29.1,good,0.65,1,0.8,Cole Loop Trail #854,,931601314
+cone-run,Cone Run,Mt. Bachelor Bike Park,blue,18.3,strong,1.0,1,1.0,Cone Run,,521161761
+cover-charge,Cover Charge,Cline Butte,blue,13.8,strong,1.0,2,1.0,Cover Charge,,1456609453;1456609454
+coyote-loop,Coyote Loop,East of Bend,blue,11.9,strong,1.0,4,0.87,Coyote Loop Trail Number 62,,410107724;315419582;907557673;507627946
+coyote-run,Coyote Run,Madras,blue,41.0,weak,0.46,0,0.0,,,
+crater-rim,Crater Rim,La Pine,blue,26.1,strong,0.89,2,1.0,Crater Rim Trail #3957,,306294828;661642572
+crazy-horse,Crazy Horse,East of Bend,blue,14.0,strong,0.92,3,1.0,Crazy Horse,1,413217280;771706758;771706759
+crescent-mountain-north,Crescent Mountain (North),Cascade Crest,black,47.5,none,0.0,0,0.0,,,
+crescent-mountain-south,Crescent Mountain (South),Cascade Crest,black,45.1,none,0.0,0,0.0,,,
+crooked-arm,Crooked Arm,East of Bend,double-black,15.2,strong,1.0,1,1.0,Crooked Arm,1,542002715
+crossfire,Crossfire,Cline Butte,green,13.4,strong,1.0,1,1.0,Crossfire,,1267948045
+cultus-lake-loop,Cultus Lake Loop,Waldo Lake,green,30.8,weak,0.33,0,0.0,,,
+dead-mountain,Dead Mountain,,blue,57.8,strong,1.0,1,1.0,Dead Mountain Trail,,436704729
+deschutes-river-trail,Deschutes River Trail,Sunriver,blue,7.0,strong,1.0,7,1.0,Deschutes River Trail,1,270513850;297122217;52967868;122607623;294471127;274218766;122607622
+dinah-moe-humm,Dinah Moe Humm,Wanoga Sno Park,blue,14.3,strong,1.0,2,1.0,Dinah-Moe Humm,2,364700016;83962178
+double-ditch,Double Ditch,Sisters,blue,16.3,none,0.0,0,0.0,,,
+dry-river-canyon,Dry River Canyon,East of Bend,black,17.8,none,0.0,0,0.0,,,
+dsm,DSM,Mt. Bachelor Bike Park,blue,18.9,none,0.06,0,0.0,,,
+duck-n-cover,Duck 'n' Cover,,"blue,black",19.1,none,0.0,0,0.0,,,
+duodenum,Duodenum,Wanoga Sno Park,"blue,blue",12.6,strong,1.0,2,1.0,Duodenum,,294466350;1296098959
+eagle-rock,Eagle Rock,Sisters,black,17.7,none,0.0,0,0.0,,,
+eagle-rock-loop,Eagle Rock Loop,Sisters,blue,17.8,none,0.0,0,0.0,,,
+edison-lava,Edison-Lava,,black,20.8,strong,1.0,2,1.0,Edison-Lava Trail,2,364706614;878985038
+elko-point,Elko Point,Sunriver,blue,11.9,strong,1.0,1,1.0,Elko Point,,1451212356
+elv,ELV,Phil's Trail Complex,green,5.1,strong,1.0,1,1.0,ELV,,277902827
+escape-from-moscow,Escape from Moscow,East of Bend,black,16.4,strong,1.0,1,1.0,Escape from Moscow,1,53013417
+eula-ridge,EULA Ridge,Oakridge,black,68.0,none,0.0,0,0.0,,,
+evergreen,Evergreen,Mt. Bachelor Bike Park,blue,18.5,strong,1.0,1,1.0,Evergreen Trail,,1308671200
+expressway,Expressway,Phil's Trail Complex,green,5.3,strong,1.0,2,1.0,Expressway,,277902828;654788456
+ext,EXT,Phil's Trail Complex,green,7.6,strong,1.0,1,1.0,EXT,,541630430
+farewell,Farewell,North of Skyliner,black,12.4,strong,1.0,1,1.0,Farewell Trail #26,1,83886021
+fat-rabbit-loop,Fat Rabbit Loop,Maston,green,12.9,strong,1.0,1,0.75,Fat Rabit Trail,1,319803293
+flagline-access,Flagline Access,Swampy Lakes,blue,17.6,strong,1.0,6,1.0,Flagline Access XC trail,,294603184;1468089164;1467390220;1477856828;1477856833;1477856830
+flagline-tie,Flagline Tie,Swampy Lakes,blue,15.1,strong,1.0,4,1.0,Flagline Tie Trail #40.3,,878847270;299552988;878847267;878847269
+ftl,FTL,Mt. Bachelor Bike Park,green,18.3,none,0.02,0,0.0,,,
+fuji-mountain,Fuji Mountain,Waldo Lake,black,48.0,none,0.0,0,0.0,,,
+funner,Funner,Wanoga Sno Park,blue,10.8,strong,1.0,4,1.0,Funner,2,364700820;969940395;969940394;364566980
+galyen-stallion,Galyen Stallion,Madras,black,40.8,good,0.76,1,0.0,,,926396878
+gate-creek,Gate Creek,Cascade Crest,black,42.6,none,0.0,0,0.0,,,
+gold-lake,Gold Lake,Waldo Lake,blue,44.8,none,0.0,0,0.0,,,
+goodman-creek,Goodman Creek,Oakridge,blue,72.1,good,0.6,1,1.0,Goodman Creek Trail #3461.1,,591696366
+gordon-lakes,Gordon Lakes,Cascade Crest,black,52.2,none,0.0,0,0.0,,,
+gordon-meadows,Gordon Meadows,Cascade Crest,blue,53.6,none,0.0,0,0.0,,,
+gordon-peak,Gordon Peak,Cascade Crest,blue,53.2,none,0.0,0,0.0,,,
+grand-slam,Grand Slam,Phil's Trail Complex,"blue,black",7.6,strong,1.0,1,1.0,Grand Slam,1,60366894
+gray-butte,Gray Butte,,blue,25.1,strong,1.0,4,1.0,Gray Butte Trail #852,,277480758;692052470;692079921;692052468
+green-ridge,Green Ridge,Sisters,green,33.2,strong,1.0,2,1.0,Green Ridge Trail,,691537299;1176513824
+gut-punch,Gut Punch,Madras,blue,40.9,strong,1.0,1,0.0,,,926396878
+hanger,Hanger,Mt. Bachelor Bike Park,blue,18.2,strong,1.0,1,1.0,Hanger,,1436856888
+hardesty,Hardesty,Oakridge,blue,69.4,none,0.01,0,0.0,,,
+has-no-horse,Has No Horse,East of Bend,blue,15.8,strong,1.0,1,0.5,Horse Ridge,1,59985405
+headgate,Headgate,Maston,green,10.8,strong,1.0,1,1.0,Headgate Trail,1,319803294
+heart-lake,Heart Lake,Cascade Crest,black,43.9,none,0.0,0,0.0,,,
+heckletooth,Heckletooth,Oakridge,black,57.0,none,0.0,0,0.0,,,
+hello-kitty,Hello Kitty,Sisters,blue,16.5,none,0.0,0,0.0,,,
+holy-loop,Holy Loop,East of Bend,black,14.5,strong,0.91,1,0.18,Check Yo Self,,542003875
+holy-loop-connector,Holy Loop Connector,East of Bend,green,15.0,strong,0.94,3,0.25,Check Yo Self,,1148081881;542003875;1148081882
+homestead,Homestead,,black,23.4,good,0.6,1,1.0,Homestead Trail,,122743988
+horse-butte,Horse Butte,East of Bend,blue,8.2,strong,1.0,4,0.34,Coyote Loop Trail Number 62,,272375638;272385699;272375608;272378910
+hot-dust,Hot Dust,Mt. Bachelor Bike Park,black,18.7,strong,1.0,2,1.0,Hot Dust,,865493403;872375094
+hotshot-spur,Hotshot Spur,,black,18.4,none,0.0,0,0.0,,,
+hummingbird,Hummingbird,Cline Butte,blue,15.4,strong,1.0,1,1.0,Hummingbird,,1456604244
+indigo-extension,Indigo Extension,Oakridge,black,60.3,strong,1.0,1,1.0,Indigo Extension Trail,,545755897
+indigo-lake,Indigo Lake,Oakridge,blue,60.4,strong,1.0,2,1.0,Indigo Lake Trail,,290754632;290755201
+jim-weaver-loop,Jim Weaver Loop,Waldo Lake,blue,41.8,strong,0.98,3,1.0,Jim Weaver Loop Trail #3590,,545761322;601805747;1412525667
+june-lake,June Lake,Oakridge,blue,60.9,strong,1.0,1,1.0,June Lake Trail,,290754105
+juniper-trailhead,Juniper Trailhead,Maston,green,13.0,strong,1.0,1,0.48,Juniper Trail Head,,314029302
+karman-line,Karman Line,Cline Butte,blue,13.4,strong,1.0,1,1.0,Karman Line,,1267948039
+kents-trail,Kent’s Trail,Phil's Trail Complex,green,4.6,strong,1.0,2,0.91,Kent's Trail,1,266274272;583314013
+kgb,K.G.B.,Phil's Trail Complex,blue,4.3,strong,0.91,3,0.25,KGB,1,278460631;278460136;266273941
+king-castle,King Castle,McKenzie,blue,44.9,strong,1.0,1,1.0,King-Castle Trail #4326,,311481799
+kiwa-butte,Kiwa Butte,Wanoga Sno Park,green,12.6,strong,1.0,1,0.87,Kiwa Butte MTB Trail,2,83885964
+lake-creek,Lake Creek,Sisters,green,32.5,strong,1.0,3,1.0,Lake Creek Trail,,200696369;544273655;200696365
+larison-creek,Larison Creek,,blue,64.2,strong,1.0,1,1.0,Larison Creek Trail #3646,,391496597
+larison-rock,Larison Rock,Oakridge,blue,61.6,strong,1.0,1,1.0,Larison Rock Trail #3607,,356962767
+last-chance,Last Chance,Mt. Bachelor Bike Park,black,19.2,none,0.12,0,0.0,,,
+lava-flow,Lava Flow,Mt. Bachelor Bike Park,blue,18.8,none,0.09,0,0.0,,,
+lava-flow-lower,Lava Flow (Lower),Mt. Bachelor Bike Park,blue,18.2,none,0.09,0,0.0,,,
+lawler,Lawler,Oakridge,blue,66.2,none,0.0,0,0.0,,,
+leap-of-faith,Leap of Faith,Waldo Lake,black,44.1,none,0.0,0,0.0,,,
+leap-of-faith-madras,Leap of Faith,Madras,blue,40.8,none,0.18,0,0.0,,,
+legal-eagle,Legal Eagle,Cline Butte,green,13.8,strong,1.0,2,1.0,Legal Eagle,,1456609452;1456609451
+lemish-lake-trail,Lemish Lake Trail,Waldo Lake,blue,33.8,none,0.18,0,0.0,,,
+lone-wolf,Lone Wolf,Wanoga Sno Park,black,12.0,strong,1.0,1,1.0,Lone Wolf,,723674963
+lorax,Lorax,Wanoga Sno Park,blue,12.6,strong,1.0,2,1.0,Lomax uphill route,,1415722676;1415722675
+lost-dream,Lost Dream,Maston,green,11.7,strong,1.0,2,1.0,Lost Dream Trail,1,316234042;52928134
+lower-butte-loop,Lower Butte Loop,Sisters,green,30.5,weak,0.54,0,0.0,,,
+lower-flagline,Lower Flagline,Swampy Lakes,blue,14.3,strong,1.0,1,0.8,Flagline Trail #41,,878847233
+lower-whoops,Lower Whoops,Phil's Trail Complex,blue,7.7,strong,1.0,1,1.0,Lower Whoops Trail,1,60085516
+maiden-lake,Maiden Lake,Waldo Lake,blue,44.7,none,0.0,0,0.0,,,
+maiden-peak,Maiden Peak,Waldo Lake,black,44.7,none,0.01,0,0.0,,,
+marvins-garden,Marvin’s Garden,Phil's Trail Complex,green,3.6,strong,1.0,7,0.97,Marvin's Garden,1,60366840;1498364649;1419165530;1163474896;219440688;1498364650;903622913
+maston-tie,Maston Tie,Maston,green,10.9,strong,1.0,1,1.0,Maston Tie,1,319803295
+maverick,Maverick,Madras,blue,40.9,none,0.03,0,0.0,,,
+mckenzie-river-trail,McKenzie River Trail,McKenzie,"black,blue",39.7,strong,1.0,7,1.0,McKenzie River Trail #3507,,279837470;346121973;693843001;530623354;71183461;966899654;966899663
+metolius-windigo-99-lower,Metolius-Windigo: 99 Lower,,blue,18.2,strong,1.0,2,0.87,Metolius-Windigo Trail #99,,483168578;740850314
+metolius-windigo-99-upper,Metolius-Windigo: 99 Upper,,blue,14.0,strong,0.93,1,0.87,Metolius-Windigo Trail #99,,83885765
+metolius-windigo-black-butte,Metolius-Windigo (Black Butte),Sisters,blue,30.7,strong,0.98,3,0.8,Metolius-Windigo Trail,,5440673;215506662;1180138819
+metolius-windigo-happy-valley,Metolius-Windigo: Happy Valley,Swampy Lakes,blue,15.7,strong,1.0,1,0.8,Metolius-Windigo Trail #99,,488566461
+metolius-windigo-lava-lake,Metolius-Windigo: Lava Lake,,blue,21.4,strong,1.0,2,0.8,Metolius-Windigo Trail,2,488566356;364706615
+metolius-windigo-north-fork-to-mrazek,Metolius Windigo: North Fork to Mrazek,,blue,14.5,strong,1.0,1,0.73,Metolius-Windigo Trail #99,,83885765
+metolius-windigo-ramble-on,Metolius-Windigo: Ramble on,Swampy Lakes,blue,17.1,strong,1.0,1,0.8,Metolius-Windigo Trail #99,,488566461
+metolius-windigo-todd-lake,Metolius-Windigo: Todd Lake,,blue,18.2,strong,0.84,3,0.8,Metolius-Windigo Trail #99,,488566461;669880393;740850328
+metolius-windigo-waldo-north,Metolius-Windigo (Waldo North),Waldo Lake,blue,38.1,strong,1.0,1,0.8,Metolius-Windigo Trail,,545761991
+metolius-windigo-waldo-south,Metolius-Windigo (Waldo South),Waldo Lake,blue,39.6,strong,1.0,1,0.8,Metolius-Windigo Trail,,355571020
+middle-flagline,Middle Flagline,Swampy Lakes,blue,15.5,strong,1.0,2,0.8,Flagline Trail #41,,299566182;878847233
+middle-fork-willamette,Middle Fork Willamette,Oakridge,black,62.1,strong,0.95,4,1.0,Middle Fork Willamette Trail #3609,,544267199;544267198;287399173;544267203
+middle-fork-willamette-lower,Middle Fork Willamette (Lower),Oakridge,green,65.2,strong,1.0,2,0.9,Middle Fork Willamette Trail #3609,,544267553;1412525644
+moore-creek,Moore Creek,Waldo Lake,blue,41.5,none,0.01,0,0.0,,,
+mormon-mission,Mormon Mission,Madras,blue,41.1,good,0.66,2,0.0,,,1158818399;926396878
+mrazek,Mrazek (Lower),North of Skyliner,blue,6.0,strong,1.0,4,1.0,Mrazek Trail #32,1,1098448178;278424196;83885766;410898730
+mrazek-upper,Mrazek (Upper),North of Skyliner,"blue,blue",12.2,strong,1.0,1,0.8,Mrazek Trail #32,1,544270266
+mt-ray-trail,Mt Ray Trail,Oakridge,blue,45.8,none,0.0,0,0.0,,,
+mtb,MTB,Phil's Trail Complex,blue,5.0,good,0.69,1,1.0,MTB,,266274273
+north-fork,North Fork,,blue,13.7,strong,1.0,3,1.0,North Fork Trail #24.2,,279479048;559496142;293606660
+north-fork-3666,North Fork #3666,Oakridge,blue,59.3,strong,1.0,1,1.0,North Fork Trail #3666,,416763448
+north-pyramid,North Pyramid,Cascade Crest,black,49.2,none,0.0,0,0.0,,,
+olallie-trail,Olallie Trail,McKenzie,blue,38.3,strong,1.0,1,1.0,Olallie Trail #3529,,1016648394
+old-hwy-20,Old Hwy 20,East of Bend,green,18.0,none,0.22,0,0.0,,,
+oleary-mountain,O’Leary Mountain,McKenzie,black,42.4,strong,1.0,2,0.65,O'Leary Mountain Trail #3321,,1011627408;1016648394
+olympus,Olympus,Madras,blue,41.4,good,0.61,2,0.0,,,1158818402;1158818400
+oregon-sunshine,Oregon Sunshine,Maston,green,12.8,strong,1.0,1,1.0,Oregon Sunshine Trail,1,314029303
+parkway,Parkway,East of Bend,blue,16.9,strong,1.0,1,1.0,Parkway,1,53013418
+peek-a-boo,Peek A Boo,Madras,green,41.1,strong,1.0,1,0.0,,,926396878
+peterson-ridge,Peterson Ridge,Sisters,blue,17.6,none,0.0,0,0.0,,,
+peterson-ridge-tie,Peterson Ridge Tie,Sisters,blue,17.4,none,0.01,0,0.0,,,
+phils-trail,Phil’s Trail,Phil's Trail Complex,"black,green,blue,green",5.9,strong,1.0,2,0.91,Phil's Trail,1,410101711;60091169
+pinedrops,Pinedrops,Phil's Trail Complex,green,8.5,strong,0.93,2,1.0,Pinedrops,,295044333;1113565034
+pondo,Pondo,Wanoga Sno Park,blue,12.2,strong,1.0,1,1.0,Pondo,,1447024927
+positive-vibrations,Positive Vibrations,Cline Butte,green,13.9,strong,1.0,1,1.0,Positive Vibrations,,1456609450
+powerline,Powerline,Sisters,blue,18.4,none,0.0,0,0.0,,,
+prt-middle,PRT Middle,Sisters,blue,16.8,none,0.0,0,0.0,,,
+pumice-foot,Pumice Foot,Maston,green,12.2,strong,1.0,1,1.0,Pumice Foot Trail,0;1,52928190
+pyramid-peak,Pyramid Peak,Cascade Crest,black,51.7,none,0.0,0,0.0,,,
+pyramids,Pyramids,Cascade Crest,double-black,48.5,none,0.0,0,0.0,,,
+quarantine,Quarantine,Madras,green,41.2,none,0.21,0,0.0,,,
+radlands,Radlands,,green,18.2,none,0.0,0,0.0,,,
+rattler,Rattler,Cline Butte,"blue,blue",15.0,strong,1.0,2,1.0,Rattler,,1363935401;1363935399
+rattlesnake,Rattlesnake,Mt. Bachelor Bike Park,black,18.6,strong,1.0,1,1.0,Rattlesnake,,868756952
+redline,Redline,Mt. Bachelor Bike Park,black,18.9,strong,1.0,1,1.0,Redline,,872375094
+return-policy,Return Policy,Cline Butte,blue,13.6,strong,1.0,2,1.0,Return Policy,,1479076703;1363935397
+return-to-whiskey,Return to Whiskey,Madras,green,41.2,none,0.09,0,0.0,,,
+ridge-loop-trail,Ridge Loop Trail,Swampy Lakes,blue,14.6,strong,1.0,3,0.08,Swampy-Dutchman Trail #40,,878964272;878964271;91883634
+ridge-runner,Ridge Runner,Cline Butte,blue,13.2,strong,1.0,1,0.47,Cline/Stinger Transfer,,1024743654
+river-trail,River Trail,,blue,22.7,strong,1.0,2,1.0,River Trail,,239536053;116046235
+rockbar,Rockbar,Maston,blue,11.2,strong,1.0,1,1.0,Rockbar Trail,2,294038786
+rockfall,Rockfall,Mt. Bachelor Bike Park,double-black,18.9,strong,1.0,1,1.0,Rockfall,,865492757
+roundabout,Roundabout,Sunriver,blue,12.0,strong,0.99,1,1.0,Roundabout,,5347670
+royal-flush,Royal Flush,Sunriver,blue,11.9,strong,1.0,1,1.0,Royal Flush,,1061434042
+running-elk,Running Elk,Sisters,blue,16.9,none,0.0,0,0.0,,,
+saddle-access,Saddle Access,,green,13.7,weak,0.34,0,0.0,,,
+salmon-creek-north,Salmon Creek (North),Oakridge,green,57.8,none,0.0,0,0.0,,,
+salmon-creek-south,Salmon Creek (South),Oakridge,black,56.9,none,0.0,0,0.0,,,
+sand-canyon,Sand Canyon,East of Bend,black,15.8,strong,1.0,1,1.0,Sand Canyon,1,53013430
+sawtooth,Sawtooth,Oakridge,black,71.3,none,0.0,0,0.0,,,
+sawtooth-mountain,Sawtooth Mountain,Oakridge,black,61.0,strong,1.0,1,0.8,Sawtooth Trail,,843380037
+scar-mountain,Scar Mountain,Cascade Crest,black,52.2,none,0.0,0,0.0,,,
+sector-16,Sector 16,Swampy Lakes,blue,11.5,strong,1.0,1,1.0,Sector 16 Trail #27,,286212436
+shevlin,Shevlin,North of Skyliner,green,3.9,strong,1.0,2,0.8,Shevlin Loop Trail,1,62623833;410898730
+sisters-tie,Sisters Tie,Sisters,blue,23.2,none,0.0,0,0.0,,,
+skyline,Skyline,Waldo Lake,blue,45.8,strong,1.0,1,0.8,Skyline Bike Trail #4383,,563799672
+skyliner,Skyliner,Phil's Trail Complex,blue,9.1,strong,1.0,1,1.0,Skyliner Trail #28,1,286212437
+sourth-fork,South Fork,Swampy Lakes,black,13.3,strong,1.0,2,1.0,Swampy Lakes Trail #23,1,840625071;840623247
+south-pyramid-creek,South Pyramid Creek,Cascade Crest,blue,49.4,none,0.0,0,0.0,,,
+south-waldo-lake,South Waldo Lake,Waldo Lake,blue,49.6,none,0.0,0,0.0,,,
+south-willamette,South Willamette,Oakridge,blue,67.3,none,0.0,0,0.0,,,
+sst,SST,Swampy Lakes,blue,13.1,strong,1.0,4,0.11,Swede Ridge Loop Trail #53,,286209949;878847304;878847235;878847303
+start-o-willamette,Start 'O Willamette,Oakridge,black,59.4,none,0.04,0,0.0,,,
+steve-larsen,Steve Larsen,Wanoga Sno Park,green,10.7,strong,1.0,1,0.8,Larsen's,,364566595
+stinger-east,Stinger East,Cline Butte,blue,13.8,strong,1.0,1,1.0,Stinger East,,1132605754
+stinger-west,Stinger West,Cline Butte,blue,13.9,strong,1.0,2,1.0,Stinger West,,1024743651;1479077397
+storm-king-lower,Storm King (Lower),Wanoga Sno Park,blue,9.1,strong,1.0,1,1.0,Lower Storm King,,290404136
+storm-king-upper,Storm King (Upper),Phil's Trail Complex,blue,8.7,strong,1.0,4,0.87,Storm King,1,61350753;701207705;275617611;701207707
+strong-whiskey,Strong Whiskey,Madras,black,41.2,none,0.07,0,0.0,,,
+summer-range,Summer Range,Sisters,blue,17.3,none,0.0,0,0.0,,,
+summit-trail,Summit Trail,,blue,23.9,none,0.16,0,0.0,,,
+sunset-ridge,Sunset Ridge,Madras,green,41.0,none,0.14,0,0.0,,,
+suttle-lake-loop,Suttle Lake Loop,Sisters,green,32.8,none,0.0,0,0.0,,,
+suttle-tie,Suttle Tie,Sisters,green,31.6,none,0.01,0,0.0,,,
+swamp-thing,Swamp Thing,Swampy Lakes,green,12.7,none,0.12,0,0.0,,,
+swamp-wells,Swamp Wells,East of Bend,blue,7.8,strong,0.94,5,0.87,Swamp Wells Trail Number 61,,490819223;315420354;410107573;490819227;416235030
+swampy-lakes-loop,Swampy Lakes Loop,Swampy Lakes,blue,13.9,strong,1.0,5,0.87,Swampy Lakes Trail #23,,279479053;878964282;5359369;286212438;878847319
+swampydutchman,Swampy/Dutchman,Swampy Lakes,green,16.5,strong,1.0,3,1.0,Swampy-Dutchman Trail #40,,878847234;878964269;91883634
+swan-song,Swan Song,Sunriver,green,13.6,none,0.02,0,0.0,,,
+swede-ridge,Swede Ridge,Swampy Lakes,blue,13.0,strong,1.0,1,1.0,Swede Ridge Trail #52,,286537814
+talon-trail,Talon Trail,Maston,green,11.5,strong,1.0,1,1.0,Talon Trail,1,314029018
+telegraph,Telegraph,Sisters,blue,16.2,none,0.0,0,0.0,,,
+the-goat,The Goat,Cline Butte,blue,13.7,strong,1.0,1,1.0,Goat,,1144553410
+the-lair,The Lair,Phil's Trail Complex,double-black,3.6,none,0.03,0,0.0,,,
+the-ravine,The Ravine,Madras,green,41.1,strong,1.0,2,0.0,,,1158818403;926396878
+the-saddle,The Saddle,Cline Butte,blue,13.6,strong,1.0,1,1.0,The Saddle,,1267948040
+ticket-to-ride,Ticket to Ride,Phil's Trail Complex,green,5.7,strong,1.0,2,1.0,Ticket to Ride,1,408491012;903622912
+tiddlywinks-lower,Tiddlywinks (Lower),Wanoga Sno Park,blue,11.2,strong,1.0,4,0.97,Tiddly Winks (Lower),2,819635371;52089874;364700018;819635370
+tiddlywinks-upper,Tiddlywinks (Upper),Wanoga Sno Park,blue,11.7,strong,1.0,4,0.76,Tiddly Winks (Upper),2,364701121;1412525695;299617640;299617900
+timpanogas-lake,Timpanogas Lake,Oakridge,blue,59.7,strong,0.9,2,1.0,Timpanogas Lake Trail,,290753507;1412499781
+tin-can-alley,Tin Can Alley,Sisters,blue,18.7,none,0.0,0,0.0,,,
+tire-mountain,Tire Mountain,Oakridge,blue,62.6,strong,1.0,2,1.0,Tire Mountain Trail #3485,,416741330;416739783
+top-ring,Top Ring,Sisters,blue,16.9,none,0.0,0,0.0,,,
+trail-1,Trail 1,Cline Butte,black,13.4,strong,1.0,1,0.0,Trail 1,,314031419
+trail-2,Trail 2,Cline Butte,double-black,13.4,strong,1.0,1,0.0,Trail 2,,328697513
+trail-3,Trail 3,Cline Butte,black,13.1,strong,1.0,1,0.0,Trail 3,,1458938212
+trestle,Trestle,Madras,"black,green,black",41.1,good,0.75,2,0.0,,,1158818395;926846563
+trestle-return,Trestle Return,Madras,green,41.4,good,0.74,3,0.0,,,1158818395;1158818398;926846563
+trinity-spur,Trinity Spur,,black,18.5,none,0.0,0,0.0,,,
+tumalo-creek,Tumalo Creek,North of Skyliner,green,11.1,strong,1.0,2,1.0,Tumalo Creek Trail #25.1,1,279479050;279480189
+tumalo-ridge,Tumalo Ridge,Swampy Lakes,blue,11.9,strong,1.0,3,1.0,Tumalo Ridge Trail #25.2,,286212442;286212441;368608524
+turkey-hollow,Turkey Hollow,Sisters,blue,16.1,none,0.0,0,0.0,,,
+twin-peaks,Twin Peaks,Waldo Lake,black,41.2,none,0.0,0,0.0,,,
+twin-snakes,Twin Snakes,Madras,green,41.0,none,0.15,0,0.0,,,
+tylers-traverse,Tyler's Traverse,Wanoga Sno Park,blue,10.1,strong,1.0,1,1.0,Tyler's Traverse,,364700021
+upper-butte-loop,Upper Butte Loop,Sisters,blue,29.9,strong,1.0,1,1.0,Upper Butte Loop,,5447680
+upper-flagline,Upper Flagline,Swampy Lakes,blue,17.6,strong,1.0,3,0.8,Flagline Trail #41,,1467651000;299566182;1467390219
+upper-whoops,Upper Whoops,Phil's Trail Complex,blue,9.7,strong,1.0,2,1.0,Upper Whoops,,410104939;878847232
+vista-butte,Vista Butte,Swampy Lakes,black,14.8,strong,1.0,1,1.0,Vista Butte Trail #40.2,,299952087
+voodoo,Voodoo,Phil's Trail Complex,blue,6.7,strong,1.0,1,1.0,Voodoo Trail,,219541540
+voodoo-child,Voodoo Child,Phil's Trail Complex,green,6.8,strong,1.0,1,1.0,Voodoo Child,1,661627237
+way-out,Way Out,Mt. Bachelor Bike Park,blue,18.7,weak,0.33,0,0.0,,,
+west-bend-trail,West Bend Trail,Phil's Trail Complex,green,2.9,none,0.05,0,0.0,,,
+west-side,West Side,Madras,blue,41.1,none,0.08,0,0.0,,,
+whiptail,Whiptail,Cline Butte,green,15.8,strong,1.0,1,1.0,Whiptail,,1365651434
+white-buffalo-a,White Buffalo A,Madras,double-black,40.9,weak,0.31,0,0.0,,,
+white-buffalo-b,White Buffalo B,Madras,black,41.0,none,0.09,0,0.0,,,
+winberry-divide,Winberry Divide,Oakridge,blue,64.9,weak,0.53,0,0.0,,,
+windy-pass,Windy Pass,Oakridge,black,58.8,none,0.01,0,0.0,,,
+wolf-tree,Wolf Tree,,blue,23.5,none,0.02,0,0.0,,,
