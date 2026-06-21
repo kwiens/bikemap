@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import {
-  traceLengthMeters,
   decodeTerrainRgb,
   densifyLine,
   stitchLines,
@@ -51,25 +50,6 @@ describe('decodeTerrainRgb', () => {
     // -10000 + (R*65536 + G*256 + B) * 0.1
     expect(decodeTerrainRgb(0, 0, 0)).toBeCloseTo(-10000);
     expect(decodeTerrainRgb(1, 134, 160)).toBeCloseTo(0); // 100000 * 0.1 - 10000
-  });
-});
-
-describe('traceLengthMeters', () => {
-  it('sums haversine length across polylines', () => {
-    // ~0.001 deg latitude ≈ 111 m
-    const len = traceLengthMeters([
-      [
-        [0, 0],
-        [0, 0.001],
-      ],
-    ]);
-    expect(len).toBeGreaterThan(105);
-    expect(len).toBeLessThan(115);
-  });
-
-  it('is zero for degenerate input', () => {
-    expect(traceLengthMeters([])).toBe(0);
-    expect(traceLengthMeters([[[0, 0]]])).toBe(0);
   });
 });
 

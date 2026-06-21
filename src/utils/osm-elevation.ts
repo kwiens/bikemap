@@ -6,11 +6,7 @@
 // running the samples through the shared smoothed gain/loss computation. Values
 // are approximate — vector-tile geometry is simplified and tile-clipped.
 
-import {
-  haversineDistance,
-  computeElevation,
-  pointsToElevationProfile,
-} from './ride-stats';
+import { haversineDistance, pointsToElevationProfile } from './ride-stats';
 import type { ElevationProfile } from '../data/mountain-bike-trails';
 
 const TERRAIN_ZOOM = 14;
@@ -24,22 +20,6 @@ export interface ElevationStats {
   loss: number;
   min: number;
   max: number;
-}
-
-/** Total length (meters) of a set of polylines of [lng, lat] coordinates. */
-export function traceLengthMeters(lines: [number, number][][]): number {
-  let total = 0;
-  for (const line of lines) {
-    for (let i = 1; i < line.length; i++) {
-      total += haversineDistance(
-        line[i - 1][1],
-        line[i - 1][0],
-        line[i][1],
-        line[i][0],
-      );
-    }
-  }
-  return total;
 }
 
 /** Decode a Mapbox Terrain-RGB pixel to elevation in meters. */
@@ -126,74 +106,6 @@ function loadTerrainTile(
 
   tileCache.set(key, promise);
   return promise;
-}
-
-/**
- * Sample Mapbox Terrain-RGB along the given polylines and return smoothed
- * gain/loss/min/max (meters), or null if no terrain could be read.
- */
-export async function sampleTrailElevation(
-  lines: [number, number][][],
-  token: string,
-): Promise<ElevationStats | null> {
-  const densified = lines
-    .map((line) => densifyLine(line))
-    .filter((line) => line.length >= 2);
-  if (!densified.length) return null;
-
-  // Collect the distinct terrain tiles we need, then fetch them once each.
-  const needed = new Map<string, { x: number; y: number }>();
-  for (const line of densified) {
-    for (const [lng, lat] of line) {
-      const tp = lngLatToTilePixel(lng, lat, TERRAIN_ZOOM);
-      needed.set(`${tp.x}/${tp.y}`, { x: tp.x, y: tp.y });
-    }
-  }
-  const tiles = new Map<string, ImageData | null>();
-  await Promise.all(
-    [...needed].map(async ([key, { x, y }]) => {
-      tiles.set(key, await loadTerrainTile(x, y, TERRAIN_ZOOM, token));
-    }),
-  );
-
-  const elevationAt = (lng: number, lat: number): number | null => {
-    const tp = lngLatToTilePixel(lng, lat, TERRAIN_ZOOM);
-    const img = tiles.get(`${tp.x}/${tp.y}`);
-    if (!img) return null;
-    const o = (tp.py * TILE_SIZE + tp.px) * 4;
-    return decodeTerrainRgb(img.data[o], img.data[o + 1], img.data[o + 2]);
-  };
-
-  // Aggregate per line so clipped-segment seams don't fabricate gain/loss.
-  let gain = 0;
-  let loss = 0;
-  let min = Infinity;
-  let max = -Infinity;
-  let sampled = false;
-
-  for (const line of densified) {
-    const points = line.map(([lng, lat]) => ({
-      lng,
-      lat,
-      altitude: elevationAt(lng, lat),
-      timestamp: 0,
-    }));
-    if (!points.some((p) => p.altitude !== null)) continue;
-    sampled = true;
-    const e = computeElevation(points);
-    gain += e.gain;
-    loss += e.loss;
-    min = Math.min(min, e.min);
-    max = Math.max(max, e.max);
-  }
-
-  if (!sampled) return null;
-  return {
-    gain,
-    loss,
-    min: min === Infinity ? 0 : min,
-    max: max === -Infinity ? 0 : max,
-  };
 }
 
 // --- Full profile for the elevation pane -------------------------------------

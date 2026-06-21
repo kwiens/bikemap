@@ -218,19 +218,28 @@ from the curated Chattanooga MTB/route layers and off by default.
   picked per-category from the Mapbox style's built-in **Maki** sprite (`parking`
   / `information`) — no custom sprite/spreet step. It shares the trails toggle
   via `setOsmTrailsVisible`.
-- Clickable: a transparent extra-wide hit layer (`OSM_TRAILS_HIT_LAYER_ID`) is
-  the tap target; `registerOsmTrailPopup` opens a Mapbox popup built by
-  `buildOsmTrailPopupHTML` (in `osm-trails.ts`) from the feature's OSM tags —
-  name, a difficulty badge (from `mtb:scale`, raw scale not shown), type,
-  surface, bike access, plus a "View on OpenStreetMap" link. OSM values are
-  HTML-escaped. Popup styling lives in `osm-trail-*` classes in `app/map.css`.
+- Selectable: a transparent extra-wide hit layer (`OSM_TRAILS_HIT_LAYER_ID`) is
+  the tap target. `registerOsmTrailSelection` (`utils/map.ts`) handles a click by
+  (1) reassembling the way's geometry across tiles by `OSM_ID`
+  (`collectOsmWayLines`), (2) highlighting the whole trail (`highlightOsmTrail` —
+  a blue line over a white casing, like a selected route), and (3) dispatching
+  `OSM_TRAIL_SELECT` with a ready-built `ElevationProfile` so the shared
+  `ElevationProfile` pane shows the trail's name + distance + elevation chart
+  (there is **no** popup — the pane is the only info surface). A `selectionId`
+  guards against a stale async terrain sample showing the wrong trail; selecting
+  a curated route/trail or any deselect clears the highlight, and the pane clears
+  via its own listeners. `ElevationProfile` seeds `profileCache` for the OSM name
+  so its `trailName` effect doesn't try to fetch a non-existent curated JSON.
 
 #### Precomputed length + elevation
 
-OSM trail tiles carry no length or elevation. On click we want both instantly
-instead of sampling Mapbox Terrain-RGB in the browser every time, so a batch
-tool precomputes them offline per region (sharded for an eventual nationwide
-run) and the popup falls back to client sampling only on a miss.
+OSM trail tiles carry no length or elevation. The elevation **pane** always
+needs a per-point profile (which precompute doesn't store), so its chart is
+built from real-time terrain sampling (`buildOsmElevationProfile`). But a batch
+tool precomputes the aggregate stats (length + gain/loss/min/max) offline per
+region (sharded for an eventual nationwide run); when a region file covers the
+clicked way, those stats drive the pane's **headline numbers** (via
+`pointsToElevationProfile`'s `stats` override) — so both paths are supported.
 
 - **Tool**: `scripts/osm_trail_elevation.py`. Geometry comes from the **Overpass
   API** (not the vector tiles — Overpass gives full-resolution ways + real OSM
@@ -266,9 +275,10 @@ run) and the popup falls back to client sampling only on a miss.
 - **Client**: `lookupPrecomputedElevation(osmId, lng, lat)` in
   `src/utils/osm-elevation.ts` loads the manifest once, then lazily loads + caches
   the region file(s) whose bbox covers the clicked point and looks up the way id.
-  `registerOsmTrailPopup` (`utils/map.ts`) renders precomputed values immediately
-  (`elevationStatus: 'ready'`, no terrain fetch) and falls back to
-  `sampleTrailElevation` only when there's no precomputed entry.
+  `registerOsmTrailSelection` (`utils/map.ts`) passes any hit to
+  `buildOsmElevationProfile(lines, name, token, precomputed)` so the precomputed
+  totals become the pane's headline stats; on a miss the totals are computed from
+  the real-time samples instead.
 
 ### Mapbox UI Overlays
 
