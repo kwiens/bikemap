@@ -33,6 +33,8 @@ import argparse
 import json
 import math
 import os
+import shlex
+import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -64,6 +66,10 @@ SPIKE_EMA_ALPHA = 0.3
 OVERPASS_URL_DEFAULT = 'https://overpass-api.de/api/interpreter'
 # Overpass rejects requests without a User-Agent (HTTP 406). Identify the tool.
 OVERPASS_HEADERS = {'User-Agent': 'bikemap-osm-elevation/1.0 (+github.com/kwiens/bikemap)'}
+# When set (--overpass-ssh user@host), Overpass queries run via `ssh host curl`
+# instead of locally — used when the local IP is blocked/rate-limited. Elevation
+# (Mapbox) still fetches locally. Set in main().
+OVERPASS_SSH_HOST = None
 # Split a region into cells of this size so each Overpass query stays small and
 # resumable. Tune down if queries time out, up to make fewer requests.
 CELL_DEG_DEFAULT = 0.5
@@ -368,6 +374,34 @@ def cell_key(region, s, w, n, e):
     return f'{region}_{s:.3f}_{w:.3f}_{n:.3f}_{e:.3f}'.replace('-', 'm')
 
 
+def _overpass_request(overpass_url, query):
+    """Run one Overpass query and return the parsed JSON dict. Routes through
+    `ssh host curl` when OVERPASS_SSH_HOST is set, else a local HTTP POST. Raises
+    on any failure (including a non-JSON rate-limit body) so the caller retries.
+    The query travels over stdin in the SSH path, so its brackets/quotes never
+    touch a shell."""
+    if OVERPASS_SSH_HOST:
+        remote = (
+            f"curl -s -m 180 -A {shlex.quote(OVERPASS_HEADERS['User-Agent'])} "
+            f"--data-urlencode data@- {shlex.quote(overpass_url)}"
+        )
+        proc = subprocess.run(
+            ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20',
+             OVERPASS_SSH_HOST, remote],
+            input=query.encode(), stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, timeout=300)
+        if proc.returncode != 0:
+            raise RuntimeError(f'ssh/curl failed: {proc.stderr.decode()[:200]}')
+        return json.loads(proc.stdout.decode())  # non-JSON (e.g. 429) -> retry
+
+    resp = _session.post(overpass_url, data={'data': query},
+                         headers=OVERPASS_HEADERS, timeout=180)
+    if resp.status_code in (429, 504):
+        raise RuntimeError(f'overpass HTTP {resp.status_code}')
+    resp.raise_for_status()
+    return resp.json()
+
+
 def fetch_overpass_cell(region, s, w, n, e, overpass_url, polite_s):
     """Fetch one bbox cell of ways from Overpass, with disk caching + retries.
     Returns the parsed JSON 'elements' list (ways with inline geometry)."""
@@ -381,15 +415,7 @@ def fetch_overpass_cell(region, s, w, n, e, overpass_url, polite_s):
     last_err = None
     for attempt in range(5):
         try:
-            resp = _session.post(overpass_url, data={'data': query},
-                                 headers=OVERPASS_HEADERS, timeout=180)
-            if resp.status_code in (429, 504):
-                wait = 5 * (attempt + 1)
-                print(f'    Overpass {resp.status_code}, backing off {wait}s...')
-                time.sleep(wait)
-                continue
-            resp.raise_for_status()
-            data = resp.json()
+            data = _overpass_request(overpass_url, query)
             os.makedirs(os.path.dirname(cache_path), exist_ok=True)
             with open(cache_path, 'w') as f:
                 json.dump(data, f)
@@ -560,7 +586,14 @@ def main():
     parser.add_argument('--overpass-workers', type=int, default=1,
                        help='Concurrent Overpass requests (default 1; '
                             'concurrency is what gets the client rate-limited)')
+    parser.add_argument('--overpass-ssh',
+                       help='Route Overpass through `ssh USER@HOST curl` (key '
+                            'auth) when the local IP is blocked. Elevation still '
+                            'samples Mapbox locally.')
     args = parser.parse_args()
+
+    global OVERPASS_SSH_HOST
+    OVERPASS_SSH_HOST = args.overpass_ssh
 
     if args.bbox:
         if not args.region_name:

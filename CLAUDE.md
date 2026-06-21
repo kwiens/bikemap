@@ -262,7 +262,11 @@ clicked way, those stats drive the pane's **headline numbers** (via
   python scripts/osm_trail_elevation.py --region oregon          # one state
   python scripts/osm_trail_elevation.py --bbox=-124.6,41.9,-116.4,46.3 --region-name oregon
   python scripts/osm_trail_elevation.py --region all             # every US state (long!)
-  # Point at a self-hosted / less-loaded Overpass mirror (e.g. from another host):
+  # If the local IP is blocked, route just the Overpass queries through another
+  # host via SSH (key auth); elevation still samples Mapbox locally. The query
+  # travels over stdin, so its brackets/quotes never hit a shell:
+  python scripts/osm_trail_elevation.py --region tennessee --overpass-ssh user@host.example.com
+  # Or point at a different Overpass endpoint entirely:
   python scripts/osm_trail_elevation.py --region tennessee --overpass-url https://HOST/api/interpreter
   ```
 

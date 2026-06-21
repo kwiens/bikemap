@@ -11,6 +11,18 @@
       ],
       "count": 63670,
       "file": "oregon.json"
+    },
+    {
+      "region": "tennessee",
+      "name": "Tennessee",
+      "bbox": [
+        -90.4,
+        34.9,
+        -81.6,
+        36.8
+      ],
+      "count": 12657,
+      "file": "tennessee.json"
     }
   ]
 }
