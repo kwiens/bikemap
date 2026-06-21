@@ -14,11 +14,13 @@ import {
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
   OSM_BIKE_TRAIL_FILTER,
+  OSM_POI_FILTER,
 } from './map';
 import {
   OSM_TRAILS_SOURCE_ID,
   OSM_TRAILS_LAYER_ID,
   OSM_TRAILS_CASING_LAYER_ID,
+  OSM_POI_LAYER_ID,
 } from '@/data/osm-trails';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import { MTN_BIKE_LAYER_ID } from '@/data/geo_data';
@@ -889,7 +891,14 @@ describe('OSM nationwide bike trails', () => {
     expect(serialized).toContain('cycleway');
   });
 
-  it('ensureOsmTrailsSource adds the source and both line layers (hidden)', () => {
+  it('POI filter targets parking and information points', () => {
+    expect(OSM_POI_FILTER[0]).toBe('any');
+    const serialized = JSON.stringify(OSM_POI_FILTER);
+    expect(serialized).toContain('parking');
+    expect(serialized).toContain('information');
+  });
+
+  it('ensureOsmTrailsSource adds the source, line, casing, and POI layers (hidden)', () => {
     const added: Record<string, mapboxgl.LayerSpecification> = {};
     const mockMap = {
       getSource: vi.fn().mockReturnValue(undefined),
@@ -908,7 +917,10 @@ describe('OSM nationwide bike trails', () => {
     );
     expect(added[OSM_TRAILS_LAYER_ID]).toBeDefined();
     expect(added[OSM_TRAILS_CASING_LAYER_ID]).toBeDefined();
+    expect(added[OSM_POI_LAYER_ID]).toBeDefined();
+    expect(added[OSM_POI_LAYER_ID].type).toBe('symbol');
     expect(added[OSM_TRAILS_LAYER_ID].layout?.visibility).toBe('none');
+    expect(added[OSM_POI_LAYER_ID].layout?.visibility).toBe('none');
   });
 
   it('ensureOsmTrailsSource is idempotent', () => {
@@ -941,6 +953,11 @@ describe('OSM nationwide bike trails', () => {
     setOsmTrailsVisible(mockMap, false);
     expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
       OSM_TRAILS_CASING_LAYER_ID,
+      'visibility',
+      'none',
+    );
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      OSM_POI_LAYER_ID,
       'visibility',
       'none',
     );

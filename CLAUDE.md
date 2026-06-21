@@ -212,6 +212,12 @@ from the curated Chattanooga MTB/route layers and off by default.
   marker group): the "Nationwide trails" switch in the MTB **Trails** tab
   (`MapLegend`) dispatches `layer-toggle` with `layer: 'osmTrails'`; `Map.tsx`
   flips visibility via `setOsmTrailsVisible`.
+- Trail POIs come from the `trail_poi` source-layer as a single symbol layer
+  (`OSM_POI_LAYER_ID`, `minzoom 12`). `OSM_POI_FILTER` keeps trailhead parking
+  (`amenity=parking`) and information points (`tourism=information`); the icon is
+  picked per-category from the Mapbox style's built-in **Maki** sprite (`parking`
+  / `information`) — no custom sprite/spreet step. It shares the trails toggle
+  via `setOsmTrailsVisible`.
 
 ### Mapbox UI Overlays
 

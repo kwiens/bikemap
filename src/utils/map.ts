@@ -19,7 +19,9 @@ import {
   OSM_TRAILS_SOURCE_ID,
   OSM_TRAILS_LAYER_ID,
   OSM_TRAILS_CASING_LAYER_ID,
+  OSM_POI_LAYER_ID,
   OSM_TRAILS_SOURCE_LAYER,
+  OSM_POI_SOURCE_LAYER,
   OSM_TRAILS_TILEJSON_URL,
 } from '@/data/osm-trails';
 
@@ -344,6 +346,24 @@ export const OSM_BIKE_TRAIL_FILTER: mapboxgl.FilterSpecification = [
   ['==', ['get', 'highway'], 'cycleway'],
 ];
 
+// Trail POIs we surface: trailhead parking (amenity=parking) and information
+// points (tourism=information). Everything else in trail_poi is hidden.
+export const OSM_POI_FILTER: mapboxgl.FilterSpecification = [
+  'any',
+  ['==', ['get', 'amenity'], 'parking'],
+  ['==', ['get', 'tourism'], 'information'],
+];
+
+// Pick a Maki sprite icon per POI category (icons ship with the Mapbox style).
+function osmPoiIconExpression(): mapboxgl.Expression {
+  return [
+    'case',
+    ['==', ['get', 'amenity'], 'parking'],
+    'parking',
+    'information',
+  ] as mapboxgl.Expression;
+}
+
 // Color by MTB difficulty (mtb:scale 0–6, including "1+"-style intermediates);
 // trails without an mtb:scale tag fall back to the neutral unrated color.
 function osmTrailColorExpression(): mapboxgl.Expression {
@@ -424,6 +444,37 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
         beforeId,
       );
     }
+
+    // Trailhead parking + information points (Maki icons), only once zoomed in
+    // so the nationwide view isn't cluttered. Symbol collision thins them out.
+    if (!map.getLayer(OSM_POI_LAYER_ID)) {
+      map.addLayer({
+        id: OSM_POI_LAYER_ID,
+        type: 'symbol',
+        source: OSM_TRAILS_SOURCE_ID,
+        'source-layer': OSM_POI_SOURCE_LAYER,
+        minzoom: 12,
+        filter: OSM_POI_FILTER,
+        layout: {
+          visibility: 'none',
+          'icon-image': osmPoiIconExpression(),
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 1.1],
+          'icon-allow-overlap': false,
+          'text-optional': true,
+          'text-field': ['coalesce', ['get', 'name'], ''],
+          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.1],
+          'text-anchor': 'top',
+          'text-max-width': 9,
+        },
+        paint: {
+          'text-color': '#374151',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 1.2,
+        },
+      });
+    }
   } catch (error) {
     console.error('Failed to attach OSM trails source/layer:', error);
   }
@@ -431,7 +482,11 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
 
 export function setOsmTrailsVisible(map: mapboxgl.Map, visible: boolean): void {
   const value = visible ? 'visible' : 'none';
-  for (const id of [OSM_TRAILS_CASING_LAYER_ID, OSM_TRAILS_LAYER_ID]) {
+  for (const id of [
+    OSM_TRAILS_CASING_LAYER_ID,
+    OSM_TRAILS_LAYER_ID,
+    OSM_POI_LAYER_ID,
+  ]) {
     if (map.getLayer(id)) {
       map.setLayoutProperty(id, 'visibility', value);
     }

@@ -11,9 +11,15 @@
 export const OSM_TRAILS_SOURCE_ID = 'osm-trails-source';
 export const OSM_TRAILS_LAYER_ID = 'osm-trails';
 export const OSM_TRAILS_CASING_LAYER_ID = 'osm-trails-casing';
+export const OSM_POI_LAYER_ID = 'osm-trail-poi';
 
 // Vector layer inside the tileset that holds path/trail line geometry.
 export const OSM_TRAILS_SOURCE_LAYER = 'trail';
+
+// Vector layer holding trail points of interest (parking, information boards,
+// shelters, water, …). We surface trailhead parking and information points,
+// rendered with Maki icons from the Mapbox style sprite.
+export const OSM_POI_SOURCE_LAYER = 'trail_poi';
 
 // TileJSON describing the tiles, min/max zoom, and attribution. Passing the
 // TileJSON URL (rather than a raw {z}/{x}/{y} template) lets Mapbox pick up
