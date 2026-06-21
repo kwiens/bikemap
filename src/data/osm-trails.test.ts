@@ -1,8 +1,39 @@
 import { describe, it, expect } from 'vitest';
-import { buildOsmTrailPopupHTML, osmTrailDetailRows } from './osm-trails';
+import {
+  buildOsmTrailPopupHTML,
+  osmTrailDetailRows,
+  osmTrailType,
+  osmTrailDifficulty,
+} from './osm-trails';
+
+describe('osmTrailType', () => {
+  it('maps highway tag to a friendly label', () => {
+    expect(osmTrailType({ highway: 'cycleway' })).toBe('Cycleway');
+    expect(osmTrailType({ highway: 'unknown_kind' })).toBe('Unknown Kind');
+    expect(osmTrailType({})).toBeNull();
+  });
+});
+
+describe('osmTrailDifficulty', () => {
+  it('buckets mtb:scale into a rating + label, without exposing the raw scale', () => {
+    expect(osmTrailDifficulty({ 'mtb:scale': '0' })).toEqual({
+      label: 'Easy',
+      rating: 'easy',
+    });
+    expect(osmTrailDifficulty({ 'mtb:scale': '3' })).toEqual({
+      label: 'Advanced',
+      rating: 'advanced',
+    });
+    expect(osmTrailDifficulty({ 'mtb:scale': '5' })).toEqual({
+      label: 'Expert',
+      rating: 'expert',
+    });
+    expect(osmTrailDifficulty({})).toBeNull();
+  });
+});
 
 describe('osmTrailDetailRows', () => {
-  it('maps OSM tags to human-readable rows', () => {
+  it('maps secondary OSM tags to human-readable rows', () => {
     const rows = osmTrailDetailRows({
       highway: 'path',
       'mtb:scale': '2',
@@ -10,28 +41,30 @@ describe('osmTrailDetailRows', () => {
       bicycle: 'designated',
       operator: 'Parks Dept',
     });
-    expect(rows).toContainEqual(['Type', 'Path']);
-    expect(rows).toContainEqual(['Difficulty', 'Advanced (mtb:scale 2)']);
+    // Type and Difficulty are rendered separately (subhead), not as rows.
+    expect(rows).not.toContainEqual(['Type', 'Path']);
     expect(rows).toContainEqual(['Surface', 'Natural Ground']);
     expect(rows).toContainEqual(['Bikes', 'Designated']);
     expect(rows).toContainEqual(['Operator', 'Parks Dept']);
   });
 
   it('omits rows for missing tags', () => {
-    const rows = osmTrailDetailRows({ highway: 'cycleway' });
-    expect(rows).toEqual([['Type', 'Cycleway']]);
+    expect(osmTrailDetailRows({ highway: 'cycleway' })).toEqual([]);
   });
 });
 
 describe('buildOsmTrailPopupHTML', () => {
-  it('uses the trail name and renders detail rows', () => {
+  it('uses the trail name and renders a difficulty badge', () => {
     const html = buildOsmTrailPopupHTML({
       name: 'Dirt Therapy',
       highway: 'path',
       'mtb:scale': '1',
     });
-    expect(html).toContain('<h3>Dirt Therapy</h3>');
-    expect(html).toContain('Intermediate (mtb:scale 1)');
+    expect(html).toContain('Dirt Therapy');
+    expect(html).toContain('osm-trail-badge--intermediate');
+    expect(html).toContain('>Intermediate<');
+    // The raw mtb:scale reference must not surface in the UI.
+    expect(html).not.toContain('mtb:scale');
   });
 
   it('falls back to "Unnamed trail" when there is no name', () => {

@@ -218,6 +218,12 @@ from the curated Chattanooga MTB/route layers and off by default.
   picked per-category from the Mapbox style's built-in **Maki** sprite (`parking`
   / `information`) — no custom sprite/spreet step. It shares the trails toggle
   via `setOsmTrailsVisible`.
+- Clickable: a transparent extra-wide hit layer (`OSM_TRAILS_HIT_LAYER_ID`) is
+  the tap target; `registerOsmTrailPopup` opens a Mapbox popup built by
+  `buildOsmTrailPopupHTML` (in `osm-trails.ts`) from the feature's OSM tags —
+  name, a difficulty badge (from `mtb:scale`, raw scale not shown), type,
+  surface, bike access, plus a "View on OpenStreetMap" link. OSM values are
+  HTML-escaped. Popup styling lives in `osm-trail-*` classes in `app/map.css`.
 
 ### Mapbox UI Overlays
 

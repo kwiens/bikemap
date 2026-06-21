@@ -47,16 +47,26 @@ const HIGHWAY_LABELS: Record<string, string> = {
   service: 'Service road',
 };
 
+type TrailRating = 'easy' | 'intermediate' | 'advanced' | 'expert';
+
 // mtb:scale 0–6 grouped into the same easy/intermediate/advanced/expert buckets
-// the line coloring uses.
-const MTB_SCALE_LABELS: Record<string, string> = {
-  '0': 'Easy',
-  '1': 'Intermediate',
-  '2': 'Advanced',
-  '3': 'Advanced',
-  '4': 'Expert',
-  '5': 'Expert',
-  '6': 'Expert',
+// the line coloring uses. The raw scale number is an internal OSM reference and
+// is intentionally not surfaced — the difficulty label/badge carries the meaning.
+const MTB_SCALE_RATING: Record<string, TrailRating> = {
+  '0': 'easy',
+  '1': 'intermediate',
+  '2': 'advanced',
+  '3': 'advanced',
+  '4': 'expert',
+  '5': 'expert',
+  '6': 'expert',
+};
+
+const RATING_LABEL: Record<TrailRating, string> = {
+  easy: 'Easy',
+  intermediate: 'Intermediate',
+  advanced: 'Advanced',
+  expert: 'Expert',
 };
 
 // OSM names/tags are arbitrary user-generated text — always escape before
@@ -91,20 +101,26 @@ function osmFeatureUrl(props: OsmTrailProps): string | null {
   return `https://www.openstreetmap.org/${type}/${id}`;
 }
 
-/** Human-readable label/value rows derived from a trail feature's OSM tags. */
+/** Trail type label (e.g. "Cycleway"), or null when untagged. */
+export function osmTrailType(props: OsmTrailProps): string | null {
+  const highway = str(props.highway);
+  if (!highway) return null;
+  return HIGHWAY_LABELS[highway] ?? titleCase(highway);
+}
+
+/** Difficulty derived from mtb:scale (label + rating bucket), or null. */
+export function osmTrailDifficulty(
+  props: OsmTrailProps,
+): { label: string; rating: TrailRating } | null {
+  const scale = str(props['mtb:scale']);
+  if (!scale) return null;
+  const rating = MTB_SCALE_RATING[scale] ?? 'advanced';
+  return { label: RATING_LABEL[rating], rating };
+}
+
+/** Secondary detail rows (surface, bike access, operator) for the popup body. */
 export function osmTrailDetailRows(props: OsmTrailProps): [string, string][] {
   const rows: [string, string][] = [];
-
-  const highway = str(props.highway);
-  if (highway) {
-    rows.push(['Type', HIGHWAY_LABELS[highway] ?? titleCase(highway)]);
-  }
-
-  const scale = str(props['mtb:scale']);
-  if (scale) {
-    const label = MTB_SCALE_LABELS[scale] ?? 'Advanced';
-    rows.push(['Difficulty', `${label} (mtb:scale ${scale})`]);
-  }
 
   const surface = str(props.surface);
   if (surface) rows.push(['Surface', titleCase(surface)]);
@@ -121,21 +137,33 @@ export function osmTrailDetailRows(props: OsmTrailProps): [string, string][] {
 /** Build the popup HTML for a clicked OSM trail feature (escaped). */
 export function buildOsmTrailPopupHTML(props: OsmTrailProps): string {
   const name = str(props.name) || 'Unnamed trail';
+  const type = osmTrailType(props);
+  const difficulty = osmTrailDifficulty(props);
   const rows = osmTrailDetailRows(props);
 
-  const rowsHtml = rows
+  const badge = difficulty
+    ? `<span class="osm-trail-badge osm-trail-badge--${difficulty.rating}">${escapeHtml(difficulty.label)}</span>`
+    : '';
+  const typeLabel = type
+    ? `<span class="osm-trail-type">${escapeHtml(type)}</span>`
+    : '';
+  const subhead =
+    badge || typeLabel
+      ? `<div class="osm-trail-subhead">${badge}${typeLabel}</div>`
+      : '';
+
+  const facts = rows
     .map(
       ([k, v]) =>
-        `<span class="osm-trail-tag"><strong>${escapeHtml(k)}:</strong> ${escapeHtml(v)}</span>`,
+        `<div class="osm-trail-fact"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`,
     )
     .join('');
+  const factsHtml = facts ? `<dl class="osm-trail-facts">${facts}</dl>` : '';
 
   const url = osmFeatureUrl(props);
   const link = url
-    ? `<p class="osm-trail-source"><a href="${url}" target="_blank" rel="noopener noreferrer">View on OpenStreetMap</a></p>`
+    ? `<div class="osm-trail-source"><a href="${url}" target="_blank" rel="noopener noreferrer">View on OpenStreetMap</a></div>`
     : '';
 
-  return `<div class="map-popup osm-trail-popup"><h3>${escapeHtml(name)}</h3>${
-    rowsHtml ? `<div class="osm-trail-tags">${rowsHtml}</div>` : ''
-  }${link}</div>`;
+  return `<div class="map-popup osm-trail-popup"><h3 class="osm-trail-name">${escapeHtml(name)}</h3>${subhead}${factsHtml}${link}</div>`;
 }
