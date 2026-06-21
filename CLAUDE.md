@@ -192,6 +192,27 @@ The script outputs:
 3. Run `scripts/add_trail_elevation.py --trail "Trail Name"` to generate elevation data and populate `distance`, elevation stats, and `defaultBounds`
 4. If the trail is in a new `recArea`, add it to `REGION_MAP` in `mountain-bike-trails.ts`
 
+### Nationwide OSM Bike Trails
+
+A toggleable nationwide bike-trails layer sourced from the OpenStreetMap US
+[tile service](https://openstreetmap.us/our-work/tileservice/). It is separate
+from the curated Chattanooga MTB/route layers and off by default.
+
+- Constants live in `src/data/osm-trails.ts`; the tileset is attached at runtime
+  via `ensureOsmTrailsSource(map)` in `utils/map.ts` (same pattern as the MTB
+  tileset — it is **not** in the Mapbox Studio style). We pass the TileJSON URL
+  (`https://tiles.openstreetmap.us/vector/trails.json`) so Mapbox picks up zoom
+  bounds (z0–14) and the "© OpenStreetMap contributors" attribution for free.
+- The `trail` source-layer carries OSM tags. `OSM_BIKE_TRAIL_FILTER` selects
+  bike-relevant ways: `bicycle` in {yes, designated, permissive}, OR a present
+  `mtb:scale` tag (MTB singletrack often lacks an explicit bicycle tag), OR
+  `highway=cycleway`. Lines are colored by `mtb:scale` difficulty, with a white
+  casing for legibility, and inserted beneath the curated MTB layer.
+- It toggles independently of the marker layers (it's a vector line layer, not a
+  marker group): the "Nationwide trails" switch in the MTB **Trails** tab
+  (`MapLegend`) dispatches `layer-toggle` with `layer: 'osmTrails'`; `Map.tsx`
+  flips visibility via `setOsmTrailsVisible`.
+
 ### Mapbox UI Overlays
 
 - The Mapbox canvas (`.map-container`) uses `position: absolute` with `z-index: 500` and covers the full viewport. It will obscure any sibling or child elements with a lower z-index.

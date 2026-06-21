@@ -44,6 +44,8 @@ import {
   initMtnBikeColors,
   initMtnBikeLayers,
   ensureMtnBikeSource,
+  ensureOsmTrailsSource,
+  setOsmTrailsVisible,
   TRAIL_LAYERS,
   addRideLayer,
   updateRideLayer,
@@ -530,6 +532,13 @@ const MapboxMap = memo(function MapboxMap() {
       }
     }
 
+    // Nationwide OSM bike trails are an independent vector layer (not a marker
+    // group), so just flip their visibility.
+    if (layer === 'osmTrails') {
+      setOsmTrailsVisible(map.current, visible);
+      return;
+    }
+
     if (visible) {
       updateRouteOpacity(map.current, bikeRoutes, null, {
         selected: 0.1,
@@ -953,6 +962,9 @@ const MapboxMap = memo(function MapboxMap() {
           ensureMtnBikeSource(newMap);
           initMtnBikeColors(newMap);
           initMtnBikeLayers(newMap);
+
+          // Attach the nationwide OSM bike-trails layer (hidden until toggled).
+          ensureOsmTrailsSource(newMap);
           initTrailBoundsFromDefaults(mountainBikeTrails);
 
           // Apply unselected defaults (opacity/width) through the shared

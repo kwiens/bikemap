@@ -42,6 +42,9 @@ vi.mock('./sidebar', () => ({
     </div>
   ),
   MapLayers: () => <div data-testid="map-layers" />,
+  ToggleSwitch: ({ isActive }: { isActive: boolean }) => (
+    <div data-testid="toggle-switch" data-active={isActive} />
+  ),
   AttractionsList: () => <div data-testid="attractions" />,
   BikeResourcesList: () => <div data-testid="bike-resources" />,
   BikeRentalList: () => <div data-testid="bike-rentals" />,
@@ -263,5 +266,28 @@ describe('MapLegendProvider', () => {
     dispatch(MAP_EVENTS.RIDE_STYLE_CHOSEN, { style: 'mountain' });
 
     expect(screen.queryByTestId('map-layers')).not.toBeInTheDocument();
+  });
+
+  it('Nationwide trails toggle lives in the trails tab and dispatches osmTrails', () => {
+    render(
+      <MapLegendProvider>
+        <div />
+      </MapLegendProvider>,
+    );
+
+    // Not present in the casual (routes) tab
+    expect(screen.queryByText('Nationwide trails')).not.toBeInTheDocument();
+
+    dispatch(MAP_EVENTS.RIDE_STYLE_CHOSEN, { style: 'mountain' });
+
+    fireEvent.click(screen.getByText('Nationwide trails'));
+
+    const toggle = events.find(
+      (e) =>
+        e.type === MAP_EVENTS.LAYER_TOGGLE &&
+        (e.detail as { layer?: string }).layer === 'osmTrails',
+    );
+    expect(toggle).toBeDefined();
+    expect((toggle?.detail as { visible: boolean }).visible).toBe(true);
   });
 });

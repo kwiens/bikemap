@@ -15,6 +15,13 @@ import {
   RATING_COLORS,
   UNRATED_COLOR,
 } from '@/data/trail-metadata';
+import {
+  OSM_TRAILS_SOURCE_ID,
+  OSM_TRAILS_LAYER_ID,
+  OSM_TRAILS_CASING_LAYER_ID,
+  OSM_TRAILS_SOURCE_LAYER,
+  OSM_TRAILS_TILEJSON_URL,
+} from '@/data/osm-trails';
 
 // Route utilities
 export function updateRouteOpacity(
@@ -322,6 +329,112 @@ export function ensureMtnBikeSource(map: mapboxgl.Map): void {
     }
   } catch (error) {
     console.error('Failed to attach MTB trail source/layer:', error);
+  }
+}
+
+// --- Nationwide OSM bike trails (OpenStreetMap US tile service) ---------------
+
+// Bike-relevant trails: bicycle access is permitted, OR the way carries an
+// mtb:scale tag (MTB singletrack often lacks an explicit bicycle tag), OR it is
+// an explicit cycleway. Foot-only / horse-only paths are excluded.
+export const OSM_BIKE_TRAIL_FILTER: mapboxgl.FilterSpecification = [
+  'any',
+  ['in', ['get', 'bicycle'], ['literal', ['yes', 'designated', 'permissive']]],
+  ['has', 'mtb:scale'],
+  ['==', ['get', 'highway'], 'cycleway'],
+];
+
+// Color by MTB difficulty (mtb:scale 0–6, including "1+"-style intermediates);
+// trails without an mtb:scale tag fall back to the neutral unrated color.
+function osmTrailColorExpression(): mapboxgl.Expression {
+  return [
+    'match',
+    ['get', 'mtb:scale'],
+    ['0'],
+    RATING_COLORS.easy,
+    ['1', '1+'],
+    RATING_COLORS.intermediate,
+    ['2', '2+', '3', '3+'],
+    RATING_COLORS.advanced,
+    ['4', '4+', '5', '5+', '6'],
+    RATING_COLORS.expert,
+    UNRATED_COLOR,
+  ] as mapboxgl.Expression;
+}
+
+// Attach the OSM trails tileset and a filtered bike-trail line layer (with a
+// subtle white casing for legibility). Hidden by default — toggled on from the
+// "Map Layers" sidebar. Idempotent: skips if source/layers already exist.
+// Inserted beneath the curated MTB layer so local content stays on top.
+export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
+  try {
+    if (!map.getSource(OSM_TRAILS_SOURCE_ID)) {
+      map.addSource(OSM_TRAILS_SOURCE_ID, {
+        type: 'vector',
+        url: OSM_TRAILS_TILEJSON_URL,
+      });
+    }
+
+    const beforeId = map.getLayer(MTN_BIKE_LAYER_ID)
+      ? MTN_BIKE_LAYER_ID
+      : undefined;
+
+    if (!map.getLayer(OSM_TRAILS_CASING_LAYER_ID)) {
+      map.addLayer(
+        {
+          id: OSM_TRAILS_CASING_LAYER_ID,
+          type: 'line',
+          source: OSM_TRAILS_SOURCE_ID,
+          'source-layer': OSM_TRAILS_SOURCE_LAYER,
+          filter: OSM_BIKE_TRAIL_FILTER,
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+            visibility: 'none',
+          },
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2, 14, 4.5],
+            'line-opacity': 0.6,
+          },
+        },
+        beforeId,
+      );
+    }
+
+    if (!map.getLayer(OSM_TRAILS_LAYER_ID)) {
+      map.addLayer(
+        {
+          id: OSM_TRAILS_LAYER_ID,
+          type: 'line',
+          source: OSM_TRAILS_SOURCE_ID,
+          'source-layer': OSM_TRAILS_SOURCE_LAYER,
+          filter: OSM_BIKE_TRAIL_FILTER,
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+            visibility: 'none',
+          },
+          paint: {
+            'line-color': osmTrailColorExpression(),
+            'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 14, 2.5],
+            'line-opacity': 0.75,
+          },
+        },
+        beforeId,
+      );
+    }
+  } catch (error) {
+    console.error('Failed to attach OSM trails source/layer:', error);
+  }
+}
+
+export function setOsmTrailsVisible(map: mapboxgl.Map, visible: boolean): void {
+  const value = visible ? 'visible' : 'none';
+  for (const id of [OSM_TRAILS_CASING_LAYER_ID, OSM_TRAILS_LAYER_ID]) {
+    if (map.getLayer(id)) {
+      map.setLayoutProperty(id, 'visibility', value);
+    }
   }
 }
 

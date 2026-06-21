@@ -3,12 +3,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MAP_EVENTS } from '@/events';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
+import {
+  faTimes,
+  faLayerGroup,
+  faMountain,
+} from '@fortawesome/free-solid-svg-icons';
 
 import {
   BikeRoutes,
   MountainBikeTrails,
   MapLayers,
+  ToggleSwitch,
   AttractionsList,
   BikeResourcesList,
   BikeRentalList,
@@ -41,6 +46,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
+  const [showOsmTrails, setShowOsmTrails] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -227,6 +233,20 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     [toggleLayer],
   );
 
+  // Nationwide OSM bike trails toggle independently of the marker layers
+  // (it's a vector line layer, not part of the radio-button marker group).
+  const toggleOsmTrailsLayer = useCallback(() => {
+    setShowOsmTrails((prev) => {
+      const next = !prev;
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+          detail: { layer: 'osmTrails', visible: next },
+        }),
+      );
+      return next;
+    });
+  }, []);
+
   // Function to center map on a specific location
   const centerOnLocation = useCallback(
     (location: LocationProps) => {
@@ -390,11 +410,40 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             )}
 
             {activeSection === 'trails' && (
-              <MountainBikeTrails
-                selectedTrail={selectedTrail}
-                onTrailSelect={handleTrailSelect}
-                onAreaSelect={handleAreaSelect}
-              />
+              <>
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium mb-2 text-gray-600">
+                    Map Layers
+                  </h3>
+                  <div
+                    onClick={toggleOsmTrailsLayer}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleOsmTrailsLayer();
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    className="p-2 rounded cursor-pointer transition-all duration-200 flex items-center justify-between hover:bg-blue-600/5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FontAwesomeIcon
+                        icon={faMountain}
+                        className="w-4 h-4 text-gray-500"
+                      />
+                      <span className="font-medium">Nationwide trails</span>
+                    </div>
+                    <ToggleSwitch isActive={showOsmTrails} />
+                  </div>
+                </div>
+
+                <MountainBikeTrails
+                  selectedTrail={selectedTrail}
+                  onTrailSelect={handleTrailSelect}
+                  onAreaSelect={handleAreaSelect}
+                />
+              </>
             )}
 
             <InformationSection />

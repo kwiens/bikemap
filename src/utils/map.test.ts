@@ -11,7 +11,15 @@ import {
   detectTrailAtPoint,
   toLngLatBounds,
   TRAIL_LAYERS,
+  ensureOsmTrailsSource,
+  setOsmTrailsVisible,
+  OSM_BIKE_TRAIL_FILTER,
 } from './map';
+import {
+  OSM_TRAILS_SOURCE_ID,
+  OSM_TRAILS_LAYER_ID,
+  OSM_TRAILS_CASING_LAYER_ID,
+} from '@/data/osm-trails';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import { MTN_BIKE_LAYER_ID } from '@/data/geo_data';
 import { TRAIL_METADATA, RATING_COLORS } from '@/data/trail-metadata';
@@ -868,5 +876,73 @@ describe('toLngLatBounds', () => {
     expect(bounds?.getSouth()).toBeCloseTo(35.03);
     expect(bounds?.getEast()).toBeCloseTo(-85.28);
     expect(bounds?.getNorth()).toBeCloseTo(35.06);
+  });
+});
+
+describe('OSM nationwide bike trails', () => {
+  it('filter includes bike-permitted, mtb-scaled, and cycleway trails', () => {
+    expect(OSM_BIKE_TRAIL_FILTER[0]).toBe('any');
+    const serialized = JSON.stringify(OSM_BIKE_TRAIL_FILTER);
+    expect(serialized).toContain('bicycle');
+    expect(serialized).toContain('designated');
+    expect(serialized).toContain('mtb:scale');
+    expect(serialized).toContain('cycleway');
+  });
+
+  it('ensureOsmTrailsSource adds the source and both line layers (hidden)', () => {
+    const added: Record<string, mapboxgl.LayerSpecification> = {};
+    const mockMap = {
+      getSource: vi.fn().mockReturnValue(undefined),
+      addSource: vi.fn(),
+      getLayer: vi.fn((id: string) => added[id]),
+      addLayer: vi.fn((layer: mapboxgl.LayerSpecification) => {
+        added[layer.id] = layer;
+      }),
+    } as unknown as mapboxgl.Map;
+
+    ensureOsmTrailsSource(mockMap);
+
+    expect(mockMap.addSource).toHaveBeenCalledWith(
+      OSM_TRAILS_SOURCE_ID,
+      expect.objectContaining({ type: 'vector' }),
+    );
+    expect(added[OSM_TRAILS_LAYER_ID]).toBeDefined();
+    expect(added[OSM_TRAILS_CASING_LAYER_ID]).toBeDefined();
+    expect(added[OSM_TRAILS_LAYER_ID].layout?.visibility).toBe('none');
+  });
+
+  it('ensureOsmTrailsSource is idempotent', () => {
+    const mockMap = {
+      getSource: vi.fn().mockReturnValue({}),
+      addSource: vi.fn(),
+      getLayer: vi.fn().mockReturnValue({}),
+      addLayer: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    ensureOsmTrailsSource(mockMap);
+
+    expect(mockMap.addSource).not.toHaveBeenCalled();
+    expect(mockMap.addLayer).not.toHaveBeenCalled();
+  });
+
+  it('setOsmTrailsVisible flips visibility on both layers', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue({}),
+      setLayoutProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    setOsmTrailsVisible(mockMap, true);
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      OSM_TRAILS_LAYER_ID,
+      'visibility',
+      'visible',
+    );
+
+    setOsmTrailsVisible(mockMap, false);
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      OSM_TRAILS_CASING_LAYER_ID,
+      'visibility',
+      'none',
+    );
   });
 });
