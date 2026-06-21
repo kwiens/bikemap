@@ -9,7 +9,7 @@ Output:
   - src/data/geo_data.ts               — summary stats (gain, loss, min, max)
 
 Usage: python scripts/add_trail_elevation.py
-Requires: pip install Pillow requests
+Requires: pip install -r scripts/requirements.txt
 """
 
 import gzip, json, math, os, re, struct, sys, time
@@ -28,15 +28,34 @@ _session.mount('https://', HTTPAdapter(
 # --- Constants ---
 
 def _read_mapbox_token():
-    """Read the Mapbox access token from map.config.ts."""
-    config_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'config', 'map.config.ts')
-    with open(config_path) as f:
-        content = f.read()
-    match = re.search(r"accessToken:\s*['\"](.+?)['\"]", content)
-    if not match:
-        print("Error: Could not find accessToken in src/config/map.config.ts")
-        sys.exit(1)
-    return match.group(1)
+    """Resolve the Mapbox token the same way the app does.
+
+    The token is no longer a literal in map.config.ts — it comes from
+    NEXT_PUBLIC_MAPBOX_TOKEN (see .env.example). Prefer the environment, then
+    fall back to parsing .env.local / .env at the repo root.
+    """
+    token = os.environ.get('NEXT_PUBLIC_MAPBOX_TOKEN')
+    if token and token.strip():
+        return token.strip()
+
+    root = os.path.join(os.path.dirname(__file__), '..')
+    for env_file in ('.env.local', '.env'):
+        path = os.path.join(root, env_file)
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('NEXT_PUBLIC_MAPBOX_TOKEN='):
+                    value = line.split('=', 1)[1].strip().strip('"').strip("'")
+                    if value:
+                        return value
+
+    print(
+        "Error: Mapbox token not found. Set NEXT_PUBLIC_MAPBOX_TOKEN in your "
+        "environment or add it to .env.local (see .env.example)."
+    )
+    sys.exit(1)
 
 MAPBOX_TOKEN = _read_mapbox_token()
 MVT_TILESET = 'swuller.ccfw1cmr'
