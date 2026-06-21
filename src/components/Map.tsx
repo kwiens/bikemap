@@ -44,6 +44,7 @@ import {
   initMtnBikeColors,
   initMtnBikeLayers,
   ensureMtnBikeSource,
+  hideStrayStyleLayers,
   TRAIL_LAYERS,
   addRideLayer,
   updateRideLayer,
@@ -64,6 +65,12 @@ const PAUSE_GESTURE_MS = 10000;
 
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
+if (!mapConfig.mapbox.accessToken) {
+  console.warn(
+    'NEXT_PUBLIC_MAPBOX_TOKEN is not set — the map will fail to load. ' +
+      'Copy .env.example to .env.local and add a Mapbox token.',
+  );
+}
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
@@ -953,6 +960,9 @@ const MapboxMap = memo(function MapboxMap() {
           ensureMtnBikeSource(newMap);
           initMtnBikeColors(newMap);
           initMtnBikeLayers(newMap);
+          // Suppress orphan trail layers baked into the Studio style (e.g. the
+          // leftover TPL trails layer) so they don't render over our routes.
+          hideStrayStyleLayers(newMap);
           initTrailBoundsFromDefaults(mountainBikeTrails);
 
           // Apply unselected defaults (opacity/width) through the shared

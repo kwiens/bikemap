@@ -11,7 +11,8 @@
       "!**/.next",
       "!**/public",
       "!**/.vercel",
-      "!**/generate-icons.html"
+      "!**/generate-icons.html",
+      "!**/next-env.d.ts"
     ]
   },
   "vcs": {

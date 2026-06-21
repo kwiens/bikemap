@@ -2,8 +2,10 @@
 // Spec: https://www.topografix.com/gpx/1/1/
 
 import type { StoredRidePoint } from '../data/ride';
+import { mapConfig } from '@/config/map.config';
+import { siteConfig } from '@/config/site.config';
 
-function escapeXml(str: string): string {
+export function escapeXml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -81,7 +83,7 @@ export function buildRideGpx(input: RideGpxInput): string {
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
      xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
      version="1.1"
-     creator="Bike Chattanooga">
+     creator="${escapeXml(siteConfig.name)}">
   <metadata>
     <name>${escapeXml(input.name)}</name>
   </metadata>
@@ -105,19 +107,20 @@ export function buildGpx(routes: GpxRoute[]): string | null {
 
   if (tracks.length === 0) return null;
 
+  const region = mapConfig.region.displayName;
   const metaName =
-    routes.length === 1 ? routes[0].name : 'Chattanooga Bike Routes';
+    routes.length === 1 ? routes[0].name : `${region} Bike Routes`;
   const metaDesc =
     routes.length === 1
       ? routes[0].description
-      : 'All bike routes in Chattanooga, TN';
+      : `All bike routes in ${region}`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx xmlns="http://www.topografix.com/GPX/1/1"
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
      xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
      version="1.1"
-     creator="Bike Chattanooga">
+     creator="${escapeXml(siteConfig.name)}">
   <metadata>
     <name>${escapeXml(metaName)}</name>
     <desc>${escapeXml(metaDesc)}</desc>

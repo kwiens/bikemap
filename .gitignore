@@ -12,10 +12,17 @@ coverage
 .next/
 out/
 build
+*.tsbuildinfo
 
 # misc
 .DS_Store
 *.pem
+*.pdf
+
+# AI agent / editor local files
+.cursorrules
+.codex
+.claude
 
 # build artifacts
 tsconfig.tsbuildinfo

@@ -4,8 +4,9 @@ import { mapConfig, getGBFSUrl } from './map.config';
 describe('map.config', () => {
   describe('mapConfig', () => {
     it('should have valid mapbox configuration', () => {
-      expect(mapConfig.mapbox.accessToken).toBeDefined();
-      expect(mapConfig.mapbox.accessToken).toMatch(/^pk\./);
+      // accessToken is sourced from NEXT_PUBLIC_MAPBOX_TOKEN at runtime, so it
+      // is an empty string when the env var is unset (e.g. in CI/tests).
+      expect(typeof mapConfig.mapbox.accessToken).toBe('string');
       expect(mapConfig.mapbox.styleUrl).toBeDefined();
       expect(mapConfig.mapbox.styleUrl).toMatch(/^mapbox:\/\/styles\//);
     });
