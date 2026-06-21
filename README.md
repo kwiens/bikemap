@@ -83,11 +83,12 @@ src/
 ├── hooks/                 useRideRecording, useWakeLock, useMapResize,
 │                          useToast, use-mobile
 ├── utils/                 ride-stats, ride-storage (IndexedDB), dem (Terrain-RGB
-│                          elevation correction), gpx, compass, map, format
+│                          elevation correction), gpx, compass, map, format, ...
 ├── events.ts              Custom DOM event constants
 └── lib/utils.ts           cn() — clsx + tailwind-merge
 
 public/data/elevation/     Per-trail elevation JSON
+public/terrain/            Pre-cached DEM tiles (region-specific; see docs/DEPLOYING.md)
 scripts/                   Python tooling for trails & elevation
 ```
 

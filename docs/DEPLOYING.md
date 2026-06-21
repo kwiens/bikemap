@@ -97,7 +97,23 @@ python scripts/validate_trails.py              # sanity-check
 
 This populates the script-generated fields documented in [DATA.md](DATA.md).
 
-## 8. Brand assets — `public/`
+## 8. Ride-recording elevation tiles — `public/terrain/` (optional)
+
+The ride recorder corrects noisy GPS altitude against pre-cached Mapbox
+Terrain-RGB tiles served locally from `public/terrain/{z}/{x}/{y}.png` (see
+`src/utils/dem.ts`). **The committed tiles cover the Chattanooga area only**
+(z13, ~21 MB).
+
+This degrades gracefully: for points outside the cached tiles, recorded rides
+keep their raw GPS altitude — nothing breaks, but ride elevation profiles are
+less accurate. For your region, either:
+
+- **Skip it** — delete `public/terrain/` and ship without DEM correction, or
+- **Regenerate it** — cache z13 Terrain-RGB tiles covering your area under
+  `public/terrain/13/{x}/{y}.png` (256px `mapbox.terrain-rgb` tiles). There is
+  no script for this yet; it's a manual tile fetch.
+
+## 9. Brand assets — `public/`
 
 Replace with your own:
 
@@ -107,7 +123,7 @@ Replace with your own:
 - **iOS splash screens** — `public/splash/*`
 - **README screenshots** — `screenshot-splash.png`, `screenshot-route.png`
 
-## 9. Deploy
+## 10. Deploy
 
 ```bash
 pnpm build      # verify the production build locally
@@ -125,5 +141,6 @@ Any Node host works — `pnpm build` then `pnpm start`.
 - [ ] `src/data/*` — routes, trails, shops, POIs ([DATA.md](DATA.md))
 - [ ] Route layer IDs and trail tileset wired to Mapbox Studio
 - [ ] Trail elevation script run (if you have MTB trails)
+- [ ] `public/terrain/` DEM tiles regenerated or removed (ride-recording elevation)
 - [ ] `public/` brand assets replaced
 - [ ] `pnpm build` passes; host env var set
