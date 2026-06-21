@@ -129,7 +129,11 @@ export default function ExportPage() {
     });
     const gpx = buildGpx(tracks);
     if (gpx)
-      downloadFile(gpx, 'chattanooga-bike-routes.gpx', 'application/gpx+xml');
+      downloadFile(
+        gpx,
+        `${slugify(mapConfig.region.displayName)}-bike-routes.gpx`,
+        'application/gpx+xml',
+      );
   }
 
   function handleDownloadAllSvg() {

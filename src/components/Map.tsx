@@ -9,6 +9,8 @@ import {
   mapFeatures,
   bikeResources,
   mountainBikeTrails,
+  hiddenStyleLayerIds,
+  trailMetadata,
 } from '@/data/geo_data';
 import {
   createLocationMarker,
@@ -42,6 +44,7 @@ import {
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
   registerOsmTrailSelection,
+  hideStyleLayers,
   hideStrayStyleLayers,
   TRAIL_LAYERS,
   addRideLayer,
@@ -53,7 +56,6 @@ import {
 import { loadRide } from '@/utils/ride-storage';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
-import { TRAIL_METADATA } from '@/data/trail-metadata';
 import { HeadingSmoother } from '@/utils/compass';
 
 // Recenter pause durations: how long to suppress auto-centering after
@@ -845,6 +847,8 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
+          hideStyleLayers(newMap, hiddenStyleLayerIds);
+
           // Set initial line width for specific layers
           if (style?.layers) {
             style.layers.forEach((layer) => {
@@ -1006,7 +1010,7 @@ const MapboxMap = memo(function MapboxMap() {
                 e.preventDefault();
                 const rawName = e.features?.[0]?.properties?.[cfg.trailProp];
                 if (!rawName) return;
-                const meta = TRAIL_METADATA[rawName];
+                const meta = trailMetadata[rawName];
                 const trailName = meta?.displayName ?? rawName;
                 window.dispatchEvent(
                   new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
