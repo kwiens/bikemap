@@ -1,6 +1,8 @@
 // Barrel re-export — all data modules accessible from '@/data/geo_data'
+import { activeCityData } from './cities';
+
 export type { BikeRoute } from './bike-routes';
-export { bikeRoutes } from './bike-routes';
+export const bikeRoutes = activeCityData.bikeRoutes;
 
 export {
   MTN_BIKE_LAYER_ID,
@@ -9,21 +11,24 @@ export {
   MTN_BIKE_SOURCE_ID,
   GODSEY_LAYER_ID,
   GODSEY_SOURCE_LAYER,
-  mountainBikeTrails,
-  regionFor,
 } from './mountain-bike-trails';
 export type {
   MountainBikeTrail,
   ElevationProfile,
 } from './mountain-bike-trails';
+export const mountainBikeTrails = activeCityData.mountainBikeTrails;
+export const mountainBikeConfig = activeCityData.mountainBike;
+export const trailMetadata = activeCityData.trailMetadata;
+export const hiddenStyleLayerIds = activeCityData.hiddenStyleLayerIds;
+export const regionFor = activeCityData.regionFor;
 
 export type { MapFeature } from './map-features';
-export { mapFeatures } from './map-features';
+export const mapFeatures = activeCityData.mapFeatures;
 
 export type { BikeResource } from './bike-resources';
-export { bikeResources } from './bike-resources';
+export const bikeResources = activeCityData.bikeResources;
 
 export type { LocalResource } from './local-resources';
-export { localResources } from './local-resources';
+export const localResources = activeCityData.localResources;
 
 export type { BikeRentalLocation } from './gbfs';

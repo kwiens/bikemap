@@ -1,20 +1,24 @@
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import {
-  MTN_BIKE_LAYER_ID,
-  MTN_BIKE_SOURCE_LAYER,
-  MTN_BIKE_TILESET_URL,
-  MTN_BIKE_SOURCE_ID,
-  GODSEY_LAYER_ID,
-  GODSEY_SOURCE_LAYER,
+  mountainBikeConfig,
   mountainBikeTrails,
   regionFor,
+  trailMetadata,
 } from '@/data/geo_data';
+import { RATING_COLORS, UNRATED_COLOR } from '@/data/trail-metadata';
 import {
-  TRAIL_METADATA,
-  RATING_COLORS,
-  UNRATED_COLOR,
-} from '@/data/trail-metadata';
+  OSM_TRAILS_SOURCE_ID,
+  OSM_TRAILS_LAYER_ID,
+  OSM_TRAILS_CASING_LAYER_ID,
+  OSM_TRAILS_HIT_LAYER_ID,
+  OSM_POI_LAYER_ID,
+  OSM_TRAILS_SOURCE_LAYER,
+  OSM_POI_SOURCE_LAYER,
+  OSM_TRAILS_TILEJSON_URL,
+  MTB_SCALE_RATING,
+  buildOsmTrailPopupHTML,
+} from '@/data/osm-trails';
 
 // Route utilities
 export function updateRouteOpacity(
@@ -120,31 +124,38 @@ export function calculateTrailBounds(
   map: mapboxgl.Map,
   trailName: string,
 ): mapboxgl.LngLatBounds | null {
-  // MTB trails are attached at runtime under MTN_BIKE_SOURCE_ID, not the
-  // Mapbox Studio "composite" source — query the source we actually added.
-  const features = map.querySourceFeatures(MTN_BIKE_SOURCE_ID, {
-    sourceLayer: MTN_BIKE_SOURCE_LAYER,
-    filter: ['==', ['get', 'Trail'], trailName],
-  });
+  for (const cfg of TRAIL_LAYERS) {
+    const source = sourceIdForLayer(map, cfg);
+    if (!source) continue;
 
-  if (features.length === 0) return null;
+    const features = map.querySourceFeatures(source, {
+      sourceLayer: cfg.sourceLayer,
+      filter: ['==', ['get', cfg.trailProp], cfg.toRawName(trailName)],
+    });
 
-  const bounds = new mapboxgl.LngLatBounds();
-  for (const feature of features) {
-    if (feature.geometry.type === 'LineString') {
-      for (const coord of feature.geometry.coordinates) {
-        bounds.extend(coord as [number, number]);
-      }
-    } else if (feature.geometry.type === 'MultiLineString') {
-      for (const line of feature.geometry.coordinates) {
-        for (const coord of line) {
+    if (features.length === 0) continue;
+
+    const bounds = new mapboxgl.LngLatBounds();
+    for (const feature of features) {
+      if (feature.geometry.type === 'LineString') {
+        for (const coord of feature.geometry.coordinates) {
           bounds.extend(coord as [number, number]);
+        }
+      } else if (feature.geometry.type === 'MultiLineString') {
+        for (const line of feature.geometry.coordinates) {
+          for (const coord of line) {
+            bounds.extend(coord as [number, number]);
+          }
         }
       }
     }
+
+    if (bounds.getNorth() !== undefined && bounds.getSouth() !== undefined) {
+      return bounds;
+    }
   }
 
-  return bounds.isEmpty() ? null : bounds;
+  return null;
 }
 
 /** Convert a [swLng, swLat, neLng, neLat] tuple to LngLatBounds, or return undefined. */
@@ -202,6 +213,8 @@ interface TrailLayerConfig {
   layerId: string;
   sourceLayer: string;
   trailProp: string; // feature property containing the trail name
+  sourceId?: string;
+  tilesetUrl?: string;
   // Maps the raw feature-property value (e.g. tileset 'Trail' name) to the
   // line color. Falls back to UNRATED_COLOR for anything unlisted.
   colorMap: Record<string, string>;
@@ -227,60 +240,36 @@ function buildColorExpression(
   return entries as mapboxgl.Expression;
 }
 
-// TPL trail tileset: Trail name is the raw feature value; colors come from
-// the per-trail color computed in mountainBikeTrails (driven by rating).
-const MTN_BIKE_COLOR_MAP: Record<string, string> = Object.fromEntries(
-  mountainBikeTrails.map((t) => [t.trailName, t.color]),
-);
+function buildTrailLayerConfig(): TrailLayerConfig[] {
+  return mountainBikeConfig.layers.map((layer) => {
+    const metadata = layer.metadata ?? {};
+    const hasMetadata = Object.keys(metadata).length > 0;
+    const colorMap = hasMetadata
+      ? Object.fromEntries(
+          Object.entries(metadata).map(([rawName, meta]) => [
+            rawName,
+            RATING_COLORS[meta.rating] ?? UNRATED_COLOR,
+          ]),
+        )
+      : Object.fromEntries(
+          mountainBikeTrails.map((trail) => [trail.trailName, trail.color]),
+        );
+    const displayToRaw = Object.fromEntries(
+      Object.entries(metadata).map(([rawName, meta]) => [
+        meta.displayName,
+        rawName,
+      ]),
+    );
 
-// Godsey tileset: raw 'Name' property values map to a display name + rating
-// via TRAIL_METADATA. Build a raw-name → rating-color map.
-const GODSEY_COLOR_MAP: Record<string, string> = Object.fromEntries(
-  Object.entries(TRAIL_METADATA).map(([rawName, meta]) => [
-    rawName,
-    RATING_COLORS[meta.rating] ?? UNRATED_COLOR,
-  ]),
-);
+    return {
+      ...layer,
+      colorMap,
+      toRawName: (name: string) => displayToRaw[name] ?? name,
+    };
+  });
+}
 
-const GODSEY_DISPLAY_TO_RAW: Record<string, string> = Object.fromEntries(
-  Object.entries(TRAIL_METADATA).map(([rawName, meta]) => [
-    meta.displayName,
-    rawName,
-  ]),
-);
-
-// Trails in the trail tileset that overlap with bike route layers and should
-// be hidden so they don't intercept clicks or render on top of routes.
-const HIDDEN_TRAILS = [
-  'Tennessee Riverwalk',
-  'River Walk',
-  'South Chick Greenway',
-  'South Chickamauga Creek Greenway',
-];
-
-// Layers baked into the Mapbox Studio style that the app does NOT manage and
-// should keep hidden. `Chatt_TPL_Trails-public` is a leftover TPL trails layer
-// (the app attaches its own MTB layer from MTN_BIKE_TILESET_URL instead); when
-// the published style ships it visible it renders raw TPL routes on top of our
-// trails. Suppress it at style load so we stay robust to style re-uploads.
-const STRAY_STYLE_LAYERS = ['Chatt_TPL_Trails-public'];
-
-const TRAIL_LAYERS: TrailLayerConfig[] = [
-  {
-    layerId: MTN_BIKE_LAYER_ID,
-    sourceLayer: MTN_BIKE_SOURCE_LAYER,
-    trailProp: 'Trail',
-    colorMap: MTN_BIKE_COLOR_MAP,
-    toRawName: (name) => name,
-  },
-  {
-    layerId: GODSEY_LAYER_ID,
-    sourceLayer: GODSEY_SOURCE_LAYER,
-    trailProp: 'Name',
-    colorMap: GODSEY_COLOR_MAP,
-    toRawName: (name) => GODSEY_DISPLAY_TO_RAW[name] ?? name,
-  },
-];
+const TRAIL_LAYERS: TrailLayerConfig[] = buildTrailLayerConfig();
 
 function casingId(layerId: string): string {
   return `${layerId} Casing`;
@@ -294,22 +283,36 @@ function hitId(layerId: string): string {
 
 export { TRAIL_LAYERS };
 
-// The Mapbox Studio style no longer includes the MTB trails tileset, so
-// attach it ourselves. Idempotent: skips if the source/layer already exist.
+function sourceIdForLayer(
+  map: mapboxgl.Map,
+  cfg: TrailLayerConfig,
+): string | null {
+  const layer = map.getLayer(cfg.layerId) as
+    | (mapboxgl.LayerSpecification & { source?: string })
+    | undefined;
+  return layer?.source ?? cfg.sourceId ?? null;
+}
+
+// Attach any city-managed curated trail tilesets that are not already baked
+// into the Mapbox Studio style. Idempotent: skips existing sources/layers.
 export function ensureMtnBikeSource(map: mapboxgl.Map): void {
   try {
-    if (!map.getSource(MTN_BIKE_SOURCE_ID)) {
-      map.addSource(MTN_BIKE_SOURCE_ID, {
-        type: 'vector',
-        url: MTN_BIKE_TILESET_URL,
-      });
-    }
-    if (!map.getLayer(MTN_BIKE_LAYER_ID)) {
+    for (const cfg of TRAIL_LAYERS) {
+      if (!cfg.sourceId || !cfg.tilesetUrl) continue;
+
+      if (!map.getSource(cfg.sourceId)) {
+        map.addSource(cfg.sourceId, {
+          type: 'vector',
+          url: cfg.tilesetUrl,
+        });
+      }
+      if (map.getLayer(cfg.layerId)) continue;
+
       map.addLayer({
-        id: MTN_BIKE_LAYER_ID,
+        id: cfg.layerId,
         type: 'line',
-        source: MTN_BIKE_SOURCE_ID,
-        'source-layer': MTN_BIKE_SOURCE_LAYER,
+        source: cfg.sourceId,
+        'source-layer': cfg.sourceLayer,
         layout: {
           'line-cap': 'round',
           'line-join': 'round',
@@ -327,11 +330,220 @@ export function ensureMtnBikeSource(map: mapboxgl.Map): void {
   }
 }
 
-// Hide orphan trail layers baked into the Studio style that the app doesn't
-// manage (see STRAY_STYLE_LAYERS). Idempotent and guarded — skips any that
-// aren't present in the current style.
-export function hideStrayStyleLayers(map: mapboxgl.Map): void {
-  for (const id of STRAY_STYLE_LAYERS) {
+// --- Nationwide OSM bike trails (OpenStreetMap US tile service) ---------------
+
+// Bike-relevant trails. A way qualifies when bikes are explicitly permitted
+// (`bicycle` in yes/designated/permissive — this wins even over a general
+// access restriction), OR it carries an `mtb:scale` tag (MTB singletrack often
+// lacks an explicit bicycle tag) or is a cycleway AND is not bike-denied
+// (`bicycle=no/private`) or access-restricted (`access=no/private`). This keeps
+// foot-only / horse-only and explicitly off-limits paths out of the layer.
+export const OSM_BIKE_TRAIL_FILTER: mapboxgl.FilterSpecification = [
+  'any',
+  ['in', ['get', 'bicycle'], ['literal', ['yes', 'designated', 'permissive']]],
+  [
+    'all',
+    ['any', ['has', 'mtb:scale'], ['==', ['get', 'highway'], 'cycleway']],
+    ['!', ['in', ['get', 'bicycle'], ['literal', ['no', 'private']]]],
+    ['!', ['in', ['get', 'access'], ['literal', ['no', 'private']]]],
+  ],
+];
+
+// Trail POIs we surface: trailhead parking (amenity=parking) and information
+// points (tourism=information). Everything else in trail_poi is hidden.
+export const OSM_POI_FILTER: mapboxgl.FilterSpecification = [
+  'any',
+  ['==', ['get', 'amenity'], 'parking'],
+  ['==', ['get', 'tourism'], 'information'],
+];
+
+// Lines render only from this zoom in — nationwide trail geometry at lower
+// zooms is dense and janky; the POI symbols gate higher still (z12).
+const OSM_TRAILS_MIN_ZOOM = 9;
+
+// Pick a Maki sprite icon per POI category (icons ship with the Mapbox style).
+const OSM_POI_ICON_EXPRESSION: mapboxgl.Expression = [
+  'case',
+  ['==', ['get', 'amenity'], 'parking'],
+  'parking',
+  'information',
+];
+
+// Color by MTB difficulty, derived from the shared MTB_SCALE_RATING map so the
+// line color and the popup difficulty badge can never disagree (incl. the +/-
+// scale refinements). Tokens are grouped by color to keep the match compact;
+// trails without an mtb:scale tag fall back to the neutral unrated color.
+function buildOsmTrailColorExpression(): mapboxgl.Expression {
+  const tokensByColor = new Map<string, string[]>();
+  for (const [token, rating] of Object.entries(MTB_SCALE_RATING)) {
+    const color = RATING_COLORS[rating] ?? UNRATED_COLOR;
+    const tokens = tokensByColor.get(color) ?? [];
+    tokens.push(token);
+    tokensByColor.set(color, tokens);
+  }
+  const expr: unknown[] = ['match', ['get', 'mtb:scale']];
+  for (const [color, tokens] of tokensByColor) {
+    expr.push(tokens, color);
+  }
+  expr.push(UNRATED_COLOR);
+  return expr as mapboxgl.Expression;
+}
+
+const OSM_TRAIL_COLOR_EXPRESSION = buildOsmTrailColorExpression();
+
+// Attach the OSM trails tileset and its filtered line layers (white casing, the
+// colored line, and a transparent wide tap target). Hidden by default — toggled
+// from the "Map Layers" sidebar. Idempotent: skips existing source/layers.
+// Inserted beneath the curated MTB layer (via beforeId) so curated content
+// stays on top and curated clicks win over OSM clicks.
+export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
+  try {
+    if (!map.getSource(OSM_TRAILS_SOURCE_ID)) {
+      map.addSource(OSM_TRAILS_SOURCE_ID, {
+        type: 'vector',
+        url: OSM_TRAILS_TILEJSON_URL,
+      });
+    }
+
+    const firstCuratedLayer = TRAIL_LAYERS.find((cfg) =>
+      map.getLayer(cfg.layerId),
+    );
+    const beforeId = firstCuratedLayer?.layerId;
+
+    const baseLine = {
+      type: 'line' as const,
+      source: OSM_TRAILS_SOURCE_ID,
+      'source-layer': OSM_TRAILS_SOURCE_LAYER,
+      minzoom: OSM_TRAILS_MIN_ZOOM,
+      filter: OSM_BIKE_TRAIL_FILTER,
+      layout: {
+        'line-cap': 'round' as const,
+        'line-join': 'round' as const,
+        visibility: 'none' as const,
+      },
+    };
+
+    const lineLayers = [
+      {
+        id: OSM_TRAILS_CASING_LAYER_ID,
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 2, 14, 4.5],
+          'line-opacity': 0.6,
+        },
+      },
+      {
+        id: OSM_TRAILS_LAYER_ID,
+        paint: {
+          'line-color': OSM_TRAIL_COLOR_EXPRESSION,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1, 14, 2.5],
+          'line-opacity': 0.75,
+        },
+      },
+      {
+        id: OSM_TRAILS_HIT_LAYER_ID,
+        paint: {
+          'line-color': 'rgba(0,0,0,0)',
+          'line-width': 14,
+          'line-opacity': 0,
+        },
+      },
+    ];
+
+    for (const { id, paint } of lineLayers) {
+      if (map.getLayer(id)) continue;
+      map.addLayer(
+        { ...baseLine, id, paint } as mapboxgl.LayerSpecification,
+        beforeId,
+      );
+    }
+
+    // Trailhead parking + information points (Maki icons), only once zoomed in
+    // so the nationwide view isn't cluttered. Symbol collision thins them out.
+    if (!map.getLayer(OSM_POI_LAYER_ID)) {
+      map.addLayer({
+        id: OSM_POI_LAYER_ID,
+        type: 'symbol',
+        source: OSM_TRAILS_SOURCE_ID,
+        'source-layer': OSM_POI_SOURCE_LAYER,
+        minzoom: 12,
+        filter: OSM_POI_FILTER,
+        layout: {
+          visibility: 'none',
+          'icon-image': OSM_POI_ICON_EXPRESSION,
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 1.1],
+          'icon-allow-overlap': false,
+          'text-optional': true,
+          'text-field': ['coalesce', ['get', 'name'], ''],
+          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.1],
+          'text-anchor': 'top',
+          'text-max-width': 9,
+        },
+        paint: {
+          'text-color': '#374151',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 1.2,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Failed to attach OSM trails source/layer:', error);
+  }
+}
+
+export function setOsmTrailsVisible(map: mapboxgl.Map, visible: boolean): void {
+  const value = visible ? 'visible' : 'none';
+  for (const id of [
+    OSM_TRAILS_CASING_LAYER_ID,
+    OSM_TRAILS_LAYER_ID,
+    OSM_TRAILS_HIT_LAYER_ID,
+    OSM_POI_LAYER_ID,
+  ]) {
+    if (map.getLayer(id)) {
+      map.setLayoutProperty(id, 'visibility', value);
+    }
+  }
+}
+
+// Make OSM trails clickable: a click on the (transparent, wide) hit layer opens
+// a popup with the trail's name + OSM tags. Mapbox only fires layer events for
+// visible layers, so these no-op while the layer is toggled off. Registered
+// once after the layer is attached.
+export function registerOsmTrailPopup(map: mapboxgl.Map): void {
+  let popup: mapboxgl.Popup | null = null;
+
+  map.on('click', OSM_TRAILS_HIT_LAYER_ID, (e) => {
+    // A curated trail/route sitting on top already handled this click — don't
+    // also pop an OSM popup over it.
+    if (e.defaultPrevented) return;
+    const feature = e.features?.[0];
+    if (!feature) return;
+    // Stop the empty-map click handler from also deselecting routes/trails.
+    e.preventDefault();
+    popup?.remove();
+    popup = new mapboxgl.Popup({
+      closeButton: true,
+      closeOnClick: true,
+      className: 'custom-popup',
+      maxWidth: '300px',
+    })
+      .setLngLat(e.lngLat)
+      .setHTML(buildOsmTrailPopupHTML(feature.properties ?? {}))
+      .addTo(map);
+  });
+
+  map.on('mouseenter', OSM_TRAILS_HIT_LAYER_ID, () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', OSM_TRAILS_HIT_LAYER_ID, () => {
+    map.getCanvas().style.cursor = '';
+  });
+}
+
+export function hideStyleLayers(map: mapboxgl.Map, layerIds: string[]): void {
+  for (const id of layerIds) {
     try {
       if (map.getLayer(id)) {
         map.setLayoutProperty(id, 'visibility', 'none');
@@ -340,6 +552,12 @@ export function hideStrayStyleLayers(map: mapboxgl.Map): void {
       // Layer may not exist in this style
     }
   }
+}
+
+// Hide orphan trail layers baked into the Studio style that the app doesn't
+// manage. Idempotent and guarded — skips any that aren't present.
+export function hideStrayStyleLayers(map: mapboxgl.Map): void {
+  hideStyleLayers(map, mountainBikeConfig.strayStyleLayers);
 }
 
 export function initMtnBikeColors(map: mapboxgl.Map): void {
@@ -439,10 +657,14 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
     map.setLayoutProperty(cfg.layerId, 'line-round-limit', 0.1);
 
     // Hide trails that overlap with bike route layers
-    if (HIDDEN_TRAILS.length > 0) {
+    if (mountainBikeConfig.hiddenTrails.length > 0) {
       const filter: mapboxgl.FilterSpecification = [
         '!',
-        ['in', ['get', cfg.trailProp], ['literal', HIDDEN_TRAILS]],
+        [
+          'in',
+          ['get', cfg.trailProp],
+          ['literal', mountainBikeConfig.hiddenTrails],
+        ],
       ];
       for (const id of [cfg.layerId, cId, gId, hId]) {
         if (map.getLayer(id)) {
@@ -699,9 +921,9 @@ export function detectTrailAtPoint(
   const rawName = feature.properties?.[cfg.trailProp];
   if (!rawName) return null;
 
-  // Map through TRAIL_METADATA for display name (Godsey Ridge trails use raw
-  // names like "Green as built" that need mapping)
-  const meta = TRAIL_METADATA[rawName];
+  // Map through city metadata for display names when a tileset uses raw GIS
+  // values (e.g. Godsey Ridge in Chattanooga).
+  const meta = trailMetadata[rawName];
   return meta?.displayName ?? rawName;
 }
 

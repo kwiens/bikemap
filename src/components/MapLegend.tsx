@@ -3,12 +3,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MAP_EVENTS } from '@/events';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
+import {
+  faTimes,
+  faLayerGroup,
+  faMountain,
+} from '@fortawesome/free-solid-svg-icons';
 
 import {
   BikeRoutes,
   MountainBikeTrails,
   MapLayers,
+  MapLayersSection,
+  ToggleRow,
   AttractionsList,
   BikeResourcesList,
   BikeRentalList,
@@ -19,6 +25,21 @@ import { getRideStyle } from './WelcomeModal';
 import { getSetting, setSetting } from '@/utils/settings';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
 import { cn } from '@/lib/utils';
+import { mapConfig } from '@/config/map.config';
+import {
+  bikeResources,
+  bikeRoutes,
+  mapFeatures,
+  mountainBikeTrails,
+} from '@/data/geo_data';
+
+const hasRoutesSection =
+  bikeRoutes.length > 0 ||
+  mapFeatures.length > 0 ||
+  bikeResources.length > 0 ||
+  Boolean(mapConfig.gbfs);
+const hasCuratedTrails = mountainBikeTrails.length > 0;
+const hasTrailsSection = true;
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
@@ -29,11 +50,15 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
     () => {
       const saved = getSetting('activeTab');
-      if (saved === 'routes' || saved === 'trails') return saved;
-      return getRideStyle() === 'mountain' ? 'trails' : 'routes';
+      if (saved === 'routes' && hasRoutesSection) return saved;
+      if (saved === 'trails' && hasTrailsSection) return saved;
+      if (getRideStyle() === 'mountain' && hasTrailsSection) return 'trails';
+      return hasRoutesSection ? 'routes' : 'trails';
     },
   );
   const switchTab = (tab: 'routes' | 'trails') => {
+    if (tab === 'routes' && !hasRoutesSection) return;
+    if (tab === 'trails' && !hasTrailsSection) return;
     setActiveSection(tab);
     setSetting('activeTab', tab);
   };
@@ -41,6 +66,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
+  const [showOsmTrails, setShowOsmTrails] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -227,6 +253,20 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     [toggleLayer],
   );
 
+  // Nationwide OSM bike trails toggle independently of the marker layers
+  // (it's a vector line layer, not part of the radio-button marker group).
+  // Compute next, set, then dispatch — dispatching inside the setState updater
+  // would double-fire under React StrictMode's double-invoked updaters.
+  const toggleOsmTrailsLayer = useCallback(() => {
+    const next = !showOsmTrails;
+    setShowOsmTrails(next);
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+        detail: { layer: 'osmTrails', visible: next },
+      }),
+    );
+  }, [showOsmTrails]);
+
   // Function to center map on a specific location
   const centerOnLocation = useCallback(
     (location: LocationProps) => {
@@ -327,30 +367,34 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         {/* Casual / MTB toggle in header */}
         <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
           <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
-            <button
-              type="button"
-              className={cn(
-                'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
-                activeSection === 'routes'
-                  ? 'bg-white text-gray-800 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
-              )}
-              onClick={() => switchTab('routes')}
-            >
-              Casual
-            </button>
-            <button
-              type="button"
-              className={cn(
-                'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
-                activeSection === 'trails'
-                  ? 'bg-white text-gray-800 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
-              )}
-              onClick={() => switchTab('trails')}
-            >
-              MTB
-            </button>
+            {hasRoutesSection && (
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
+                  activeSection === 'routes'
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700',
+                )}
+                onClick={() => switchTab('routes')}
+              >
+                Casual
+              </button>
+            )}
+            {hasTrailsSection && (
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
+                  activeSection === 'trails'
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700',
+                )}
+                onClick={() => switchTab('trails')}
+              >
+                MTB
+              </button>
+            )}
           </div>
         </div>
 
@@ -390,11 +434,24 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             )}
 
             {activeSection === 'trails' && (
-              <MountainBikeTrails
-                selectedTrail={selectedTrail}
-                onTrailSelect={handleTrailSelect}
-                onAreaSelect={handleAreaSelect}
-              />
+              <>
+                <MapLayersSection>
+                  <ToggleRow
+                    icon={faMountain}
+                    label="Nationwide trails"
+                    isActive={showOsmTrails}
+                    onToggle={toggleOsmTrailsLayer}
+                  />
+                </MapLayersSection>
+
+                {hasCuratedTrails && (
+                  <MountainBikeTrails
+                    selectedTrail={selectedTrail}
+                    onTrailSelect={handleTrailSelect}
+                    onAreaSelect={handleAreaSelect}
+                  />
+                )}
+              </>
             )}
 
             <InformationSection />

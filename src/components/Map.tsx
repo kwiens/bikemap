@@ -9,6 +9,8 @@ import {
   mapFeatures,
   bikeResources,
   mountainBikeTrails,
+  hiddenStyleLayerIds,
+  trailMetadata,
 } from '@/data/geo_data';
 import {
   createLocationMarker,
@@ -39,6 +41,10 @@ import {
   initMtnBikeColors,
   initMtnBikeLayers,
   ensureMtnBikeSource,
+  ensureOsmTrailsSource,
+  setOsmTrailsVisible,
+  registerOsmTrailPopup,
+  hideStyleLayers,
   hideStrayStyleLayers,
   TRAIL_LAYERS,
   addRideLayer,
@@ -50,7 +56,6 @@ import {
 import { loadRide } from '@/utils/ride-storage';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
-import { TRAIL_METADATA } from '@/data/trail-metadata';
 import { HeadingSmoother } from '@/utils/compass';
 
 // Recenter pause durations: how long to suppress auto-centering after
@@ -94,6 +99,9 @@ const MapboxMap = memo(function MapboxMap() {
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
+  // Desired OSM-trails visibility, tracked in a ref so a toggle flipped before
+  // the style finishes loading can be replayed once the layers are attached.
+  const osmTrailsVisibleRef = useRef(false);
 
   // Trail auto-detection during ride recording
   const autoDetectEnabledRef = useRef(false);
@@ -532,6 +540,15 @@ const MapboxMap = memo(function MapboxMap() {
       }
     }
 
+    // Nationwide OSM bike trails are an independent vector layer (not a marker
+    // group), so just flip their visibility. Remember the desired state so it
+    // can be replayed if the style hadn't finished loading yet.
+    if (layer === 'osmTrails') {
+      osmTrailsVisibleRef.current = visible;
+      setOsmTrailsVisible(map.current, visible);
+      return;
+    }
+
     if (visible) {
       updateRouteOpacity(map.current, bikeRoutes, null, {
         selected: 0.1,
@@ -828,6 +845,8 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
+          hideStyleLayers(newMap, hiddenStyleLayerIds);
+
           // Set initial line width for specific layers
           if (style?.layers) {
             style.layers.forEach((layer) => {
@@ -959,9 +978,17 @@ const MapboxMap = memo(function MapboxMap() {
           ensureMtnBikeSource(newMap);
           initMtnBikeColors(newMap);
           initMtnBikeLayers(newMap);
+
           // Suppress orphan trail layers baked into the Studio style (e.g. the
           // leftover TPL trails layer) so they don't render over our routes.
           hideStrayStyleLayers(newMap);
+
+          // Attach the nationwide OSM bike-trails layer (hidden until toggled).
+          // Replay any toggle the user flipped before the style finished loading.
+          ensureOsmTrailsSource(newMap);
+          if (osmTrailsVisibleRef.current) {
+            setOsmTrailsVisible(newMap, true);
+          }
           initTrailBoundsFromDefaults(mountainBikeTrails);
 
           // Apply unselected defaults (opacity/width) through the shared
@@ -975,10 +1002,11 @@ const MapboxMap = memo(function MapboxMap() {
             const hId = `${cfg.layerId} Hit`;
             if (newMap.getLayer(hId)) {
               newMap.on('click', hId, (e) => {
+                if (e.defaultPrevented) return;
                 e.preventDefault();
                 const rawName = e.features?.[0]?.properties?.[cfg.trailProp];
                 if (!rawName) return;
-                const meta = TRAIL_METADATA[rawName];
+                const meta = trailMetadata[rawName];
                 const trailName = meta?.displayName ?? rawName;
                 window.dispatchEvent(
                   new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
@@ -996,6 +1024,10 @@ const MapboxMap = memo(function MapboxMap() {
               });
             }
           }
+
+          // Register OSM popups after curated trail handlers so curated
+          // route/trail selections win when layers overlap.
+          registerOsmTrailPopup(newMap);
 
           // Click on empty map area deselects routes and trails.
           // Check originalEvent.target to ignore ghost clicks that land on

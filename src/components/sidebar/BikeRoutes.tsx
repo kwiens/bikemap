@@ -4,6 +4,10 @@ import { bikeRoutes } from '@/data/geo_data';
 import type { BikeRoutesProps } from './types';
 
 export function BikeRoutes({ selectedRoute, onRouteSelect }: BikeRoutesProps) {
+  if (bikeRoutes.length === 0) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {bikeRoutes.map((route) => (

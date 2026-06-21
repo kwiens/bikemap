@@ -4,6 +4,7 @@
 import { mapConfig } from './map.config';
 
 const region = mapConfig.region.displayName;
+const state = mapConfig.region.stateCode;
 
 export interface SiteConfig {
   /** Full app name — page title and welcome-modal heading. */
@@ -30,7 +31,7 @@ export interface SiteConfig {
 export const siteConfig: SiteConfig = {
   name: 'Bike Chatt',
   shortName: 'Bike Chatt',
-  description: `Paths and routes for cyclists in ${region}, TN`,
+  description: `Paths and routes for cyclists in ${region}, ${state}`,
   tagline: `Your guide to biking ${region}`,
   url: 'https://bikechatt.com',
   themeColor: '#c3f44d',

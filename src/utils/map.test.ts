@@ -12,7 +12,18 @@ import {
   detectTrailAtPoint,
   toLngLatBounds,
   TRAIL_LAYERS,
+  ensureOsmTrailsSource,
+  setOsmTrailsVisible,
+  OSM_BIKE_TRAIL_FILTER,
+  OSM_POI_FILTER,
 } from './map';
+import {
+  OSM_TRAILS_SOURCE_ID,
+  OSM_TRAILS_LAYER_ID,
+  OSM_TRAILS_CASING_LAYER_ID,
+  OSM_TRAILS_HIT_LAYER_ID,
+  OSM_POI_LAYER_ID,
+} from '@/data/osm-trails';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import { MTN_BIKE_LAYER_ID } from '@/data/geo_data';
 import { TRAIL_METADATA, RATING_COLORS } from '@/data/trail-metadata';
@@ -901,5 +912,99 @@ describe('toLngLatBounds', () => {
     expect(bounds?.getSouth()).toBeCloseTo(35.03);
     expect(bounds?.getEast()).toBeCloseTo(-85.28);
     expect(bounds?.getNorth()).toBeCloseTo(35.06);
+  });
+});
+
+describe('OSM nationwide bike trails', () => {
+  it('filter includes bike-permitted, mtb-scaled, and cycleway trails', () => {
+    expect(OSM_BIKE_TRAIL_FILTER[0]).toBe('any');
+    const serialized = JSON.stringify(OSM_BIKE_TRAIL_FILTER);
+    expect(serialized).toContain('bicycle');
+    expect(serialized).toContain('designated');
+    expect(serialized).toContain('mtb:scale');
+    expect(serialized).toContain('cycleway');
+  });
+
+  it('filter excludes mtb/cycleway trails that deny bike or general access', () => {
+    const serialized = JSON.stringify(OSM_BIKE_TRAIL_FILTER);
+    // The mtb:scale / cycleway branch is gated on NOT bike-denied and NOT
+    // access-restricted (bicycle/access in no/private).
+    expect(serialized).toContain('access');
+    expect(serialized).toContain('private');
+    expect(serialized).toContain('"no"');
+  });
+
+  it('POI filter targets parking and information points', () => {
+    expect(OSM_POI_FILTER[0]).toBe('any');
+    const serialized = JSON.stringify(OSM_POI_FILTER);
+    expect(serialized).toContain('parking');
+    expect(serialized).toContain('information');
+  });
+
+  it('ensureOsmTrailsSource adds the source, line, casing, and POI layers (hidden)', () => {
+    const added: Record<string, mapboxgl.LayerSpecification> = {};
+    const mockMap = {
+      getSource: vi.fn().mockReturnValue(undefined),
+      addSource: vi.fn(),
+      getLayer: vi.fn((id: string) => added[id]),
+      addLayer: vi.fn((layer: mapboxgl.LayerSpecification) => {
+        added[layer.id] = layer;
+      }),
+    } as unknown as mapboxgl.Map;
+
+    ensureOsmTrailsSource(mockMap);
+
+    expect(mockMap.addSource).toHaveBeenCalledWith(
+      OSM_TRAILS_SOURCE_ID,
+      expect.objectContaining({ type: 'vector' }),
+    );
+    expect(added[OSM_TRAILS_LAYER_ID]).toBeDefined();
+    expect(added[OSM_TRAILS_CASING_LAYER_ID]).toBeDefined();
+    expect(added[OSM_TRAILS_HIT_LAYER_ID]).toBeDefined();
+    expect(added[OSM_POI_LAYER_ID]).toBeDefined();
+    expect(added[OSM_POI_LAYER_ID].type).toBe('symbol');
+    expect(added[OSM_TRAILS_LAYER_ID].layout?.visibility).toBe('none');
+    expect(added[OSM_TRAILS_HIT_LAYER_ID].layout?.visibility).toBe('none');
+    expect(added[OSM_POI_LAYER_ID].layout?.visibility).toBe('none');
+  });
+
+  it('ensureOsmTrailsSource is idempotent', () => {
+    const mockMap = {
+      getSource: vi.fn().mockReturnValue({}),
+      addSource: vi.fn(),
+      getLayer: vi.fn().mockReturnValue({}),
+      addLayer: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    ensureOsmTrailsSource(mockMap);
+
+    expect(mockMap.addSource).not.toHaveBeenCalled();
+    expect(mockMap.addLayer).not.toHaveBeenCalled();
+  });
+
+  it('setOsmTrailsVisible flips visibility on both layers', () => {
+    const mockMap = {
+      getLayer: vi.fn().mockReturnValue({}),
+      setLayoutProperty: vi.fn(),
+    } as unknown as mapboxgl.Map;
+
+    setOsmTrailsVisible(mockMap, true);
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      OSM_TRAILS_LAYER_ID,
+      'visibility',
+      'visible',
+    );
+
+    setOsmTrailsVisible(mockMap, false);
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      OSM_TRAILS_CASING_LAYER_ID,
+      'visibility',
+      'none',
+    );
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      OSM_POI_LAYER_ID,
+      'visibility',
+      'none',
+    );
   });
 });

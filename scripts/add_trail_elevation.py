@@ -57,7 +57,21 @@ def _read_mapbox_token():
     )
     sys.exit(1)
 
-MAPBOX_TOKEN = _read_mapbox_token()
+_MAPBOX_TOKEN = None
+
+
+def _get_mapbox_token():
+    """Resolve the Mapbox token lazily (cached), only when a tile fetch needs it.
+
+    Resolving at import time would kill any module that imports this one purely
+    for its decoder helpers (e.g. validate_trails.py) when no token is set.
+    """
+    global _MAPBOX_TOKEN
+    if _MAPBOX_TOKEN is None:
+        _MAPBOX_TOKEN = _read_mapbox_token()
+    return _MAPBOX_TOKEN
+
+
 MVT_TILESET = 'swuller.ccfw1cmr'
 TRAIL_BBOX = (-85.48, 34.76, -84.85, 35.21)
 MVT_ZOOM = 12
@@ -290,7 +304,7 @@ def fetch_mvt(z, x, y):
 
     # Fetch from API
     url = (f'https://api.mapbox.com/v4/{MVT_TILESET}'
-           f'/{z}/{x}/{y}.mvt?access_token={MAPBOX_TOKEN}')
+           f'/{z}/{x}/{y}.mvt?access_token={_get_mapbox_token()}')
     resp = _session.get(url)
 
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
@@ -324,7 +338,7 @@ def fetch_terrain_tile(tile_x, tile_y):
     # Fetch from API
     url = (f'https://api.mapbox.com/v4/mapbox.terrain-rgb'
            f'/{TERRAIN_ZOOM}/{tile_x}/{tile_y}.pngraw'
-           f'?access_token={MAPBOX_TOKEN}')
+           f'?access_token={_get_mapbox_token()}')
     resp = _session.get(url)
     resp.raise_for_status()
 

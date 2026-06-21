@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
 import {
   ArrowLeft,
@@ -27,6 +28,8 @@ export const metadata: Metadata = {
   title: `About — ${siteConfig.name}`,
   description: `About the ${siteConfig.name} project — a free interactive map of bike routes, trails, and resources.`,
 };
+
+const region = mapConfig.region.displayName;
 
 const LOGO_DOWNLOADS = [
   {
@@ -89,12 +92,12 @@ export default function AboutPage() {
             width={224}
             height={210}
             className="w-56 mb-6"
+            style={{ height: 'auto' }}
             priority
           />
           <p className="text-gray-600 text-lg leading-relaxed max-w-md">
-            A free, open-source interactive map of Chattanooga bike routes,
-            mountain bike trails, and cycling resources, built by the local
-            riding community.
+            A free, open-source interactive map of {region} bike routes,
+            mountain bike trails, and cycling resources.
           </p>
         </div>
 
@@ -146,7 +149,7 @@ export default function AboutPage() {
           </h2>
           <p className="text-sm text-gray-500 mb-5">
             Use these for stickers, flyers, or anything that helps people find
-            safe rides in Chattanooga.
+            safe rides in {region}.
           </p>
 
           <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
@@ -187,7 +190,7 @@ export default function AboutPage() {
         {/* Footer */}
         <footer className="border-t border-gray-200 pt-8 pb-12 text-center text-sm text-gray-400">
           <p>
-            Made in Chattanooga.{' '}
+            Made for {region}.{' '}
             <a
               href="https://github.com/kwiens/bikemap/blob/main/LICENSE"
               className="underline hover:text-gray-600"
@@ -259,6 +262,7 @@ function LogoCard({
           width={square ? 128 : 400}
           height={128}
           className={square ? 'w-32 h-32' : 'w-full max-h-32'}
+          style={square ? undefined : { height: 'auto' }}
         />
       </a>
       <div className="flex items-center justify-between">
