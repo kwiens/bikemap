@@ -21,6 +21,7 @@ Output: public/data/bend/bike-network.geojson
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import time
@@ -29,11 +30,17 @@ import osm_trail_elevation as ote  # reuse Overpass request infra (retry + SSH)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-CACHE = os.path.join(HERE, ".osm_cache", "bend_network.json")
-OUT = os.path.join(ROOT, "public", "data", "bend", "bike-network.geojson")
+CACHE_DIR = os.path.join(HERE, ".osm_cache")
 
 # Bend city + Old Mill / downtown / eastside + the river-trail corridor.
 DEFAULT_BBOX = (-121.42, 43.95, -121.18, 44.12)  # (w, s, e, n)
+
+
+def cache_path(query: str) -> str:
+    """Cache keyed by the exact Overpass query (bbox + filters), so rerunning
+    with a different --bbox doesn't return a stale extent."""
+    h = hashlib.sha1(query.encode("utf-8")).hexdigest()[:12]
+    return os.path.join(CACHE_DIR, f"network_{h}.json")
 
 # Highway kinds we pull: bike-relevant paths + the street classes we grade for
 # comfort. Excludes motorways, service/driveways, and non-route footways.
@@ -74,22 +81,24 @@ def build_query(bbox) -> str:
 
 
 def fetch(bbox, overpass_url) -> dict:
-    if os.path.exists(CACHE) and os.path.getsize(CACHE) > 0:
-        with open(CACHE, encoding="utf-8") as fh:
+    query = build_query(bbox)
+    cache = cache_path(query)
+    if os.path.exists(cache) and os.path.getsize(cache) > 0:
+        with open(cache, encoding="utf-8") as fh:
             return json.load(fh)
-    print("Querying Overpass for the Bend bbox ...")
+    print(f"Querying Overpass for bbox {bbox} ...")
     data = None
     for attempt in range(4):
         try:
-            data = ote._overpass_request(overpass_url, build_query(bbox))
+            data = ote._overpass_request(overpass_url, query)
             break
         except Exception as e:  # noqa: BLE001 — retry transient Overpass failures
             print(f"  attempt {attempt + 1} failed: {e}")
             time.sleep(5 * (attempt + 1))
     if data is None:
         raise SystemExit("Overpass failed after retries (try --overpass-ssh).")
-    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
-    with open(CACHE, "w", encoding="utf-8") as fh:
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    with open(cache, "w", encoding="utf-8") as fh:
         json.dump(data, fh)
     return data
 
@@ -128,13 +137,15 @@ def classify(tags: dict) -> str | None:
 
     paved = is_paved(tags)
 
-    # Off-street, dedicated bike infrastructure first.
+    # Off-street, dedicated bike infrastructure first. A dedicated cycleway is
+    # paved by convention unless tagged otherwise; a generic path/footway is only
+    # "paved" when its surface explicitly says so (untagged forest paths are dirt).
     if hw == "cycleway":
         return "unpaved_trail" if paved is False else "paved_trail"
     if hw in ("path", "footway", "pedestrian", "bridleway"):
         # Only count as a route if bikes are actually allowed there.
         if bicycle in ("designated", "yes", "permissive") or tags.get("segregated"):
-            return "unpaved_trail" if paved is False else "paved_trail"
+            return "paved_trail" if paved is True else "unpaved_trail"
         return None
     if hw == "track":
         # Tracks are bikeable gravel/dirt unless bikes are denied (handled above).
@@ -153,12 +164,17 @@ def classify(tags: dict) -> str | None:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bbox", help="w,s,e,n (lng,lat)")
+    ap.add_argument("--region", default="bend",
+                    help="region slug for the default output path")
+    ap.add_argument("--out", help="output GeoJSON path (overrides --region)")
     ap.add_argument("--overpass-url", default=ote.OVERPASS_URL_DEFAULT)
     ap.add_argument("--overpass-ssh", help="user@host to proxy Overpass via SSH")
     args = ap.parse_args()
     if args.overpass_ssh:
         ote.OVERPASS_SSH_HOST = args.overpass_ssh
     bbox = tuple(float(x) for x in args.bbox.split(",")) if args.bbox else DEFAULT_BBOX
+    out = args.out or os.path.join(
+        ROOT, "public", "data", args.region, "bike-network.geojson")
 
     data = fetch(bbox, args.overpass_url)
     elements = [e for e in data.get("elements", []) if e.get("type") == "way"]
@@ -197,11 +213,11 @@ def main():
         },
         "features": features,
     }
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w", encoding="utf-8") as fh:
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w", encoding="utf-8") as fh:
         json.dump(fc, fh, separators=(",", ":"))
 
-    print(f"\nWrote {len(features)} features -> {OUT} ({os.path.getsize(OUT)//1024} KB)")
+    print(f"\nWrote {len(features)} features -> {out} ({os.path.getsize(out)//1024} KB)")
     print(f"dropped (not a bike route): {dropped}")
     for k, (label, _) in CLASSES.items():
         print(f"  {label:14s} {counts[k]}")

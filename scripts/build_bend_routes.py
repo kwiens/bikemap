@@ -16,8 +16,10 @@ Run after scripts/build_bend_bike_network.py (it reads that output).
 from __future__ import annotations
 
 import json
-import math
 import os
+
+from _geo import slugify
+from osm_trail_elevation import line_length_m
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -52,27 +54,8 @@ ROUTES = [
 DEFAULT_WIDTH = 8
 
 
-def slugify(name: str) -> str:
-    import re
-    s = name.lower()
-    s = re.sub(r"['\"]", "", s)
-    s = re.sub(r"[/&]", "-", s)
-    s = re.sub(r"\s+", "-", s)
-    s = re.sub(r"-+", "-", s)
-    return re.sub(r"^-|-$", "", s)
-
-
 def line_len_mi(coords) -> float:
-    R = 6371000.0
-    t = 0.0
-    for a, b in zip(coords, coords[1:]):
-        dlat = math.radians(b[1] - a[1])
-        dlng = math.radians(b[0] - a[0])
-        t += R * 2 * math.asin(math.sqrt(
-            math.sin(dlat / 2) ** 2
-            + math.cos(math.radians(a[1])) * math.cos(math.radians(b[1]))
-            * math.sin(dlng / 2) ** 2))
-    return t * M_TO_MI
+    return line_length_m(coords) * M_TO_MI
 
 
 def main():

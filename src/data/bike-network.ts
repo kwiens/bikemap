@@ -1,13 +1,14 @@
-// Classified Bend bike network overlay, derived from OpenStreetMap by
-// scripts/build_bend_bike_network.py and served as a static GeoJSON. Attached at
-// runtime (see ensureBendNetworkSource in utils/map.ts) and toggled from the
-// Casual sidebar. Inspired by bendbikes.org; data is © OpenStreetMap.
+// Classified bike-network overlay, derived from OpenStreetMap (see
+// scripts/build_bend_bike_network.py) and served as a static GeoJSON per city.
+// Attached at runtime (see ensureBikeNetworkSource in utils/map.ts) and toggled
+// from the Casual sidebar. The five comfort classes are OSM-tag-derived and
+// city-agnostic; a city opts in via CityData.bikeNetworkUrl. Data © OpenStreetMap.
 
-export const BEND_NETWORK_SOURCE_ID = 'bend-network-source';
+export const BIKE_NETWORK_SOURCE_ID = 'bike-network-source';
 // Base = the road-comfort tint (calm / caution), drawn thin underneath.
-export const BEND_NETWORK_BASE_LAYER_ID = 'bend-network-base';
+export const BIKE_NETWORK_BASE_LAYER_ID = 'bike-network-base';
 // Infra = the bike-specific network (trails + lanes), drawn thicker on top.
-export const BEND_NETWORK_INFRA_LAYER_ID = 'bend-network-infra';
+export const BIKE_NETWORK_INFRA_LAYER_ID = 'bike-network-infra';
 
 export interface NetworkClass {
   key: string;
@@ -18,7 +19,7 @@ export interface NetworkClass {
 }
 
 // Order here drives the sidebar legend (top = most bike-friendly).
-export const BEND_NETWORK_CLASSES: NetworkClass[] = [
+export const BIKE_NETWORK_CLASSES: NetworkClass[] = [
   { key: 'paved_trail', label: 'Paved trail', color: '#16A34A', tier: 'infra' },
   {
     key: 'unpaved_trail',
@@ -31,9 +32,9 @@ export const BEND_NETWORK_CLASSES: NetworkClass[] = [
   { key: 'caution', label: 'Use caution', color: '#F97316', tier: 'base' },
 ];
 
-export const BEND_NETWORK_BASE_CLASSES = BEND_NETWORK_CLASSES.filter(
+export const BIKE_NETWORK_BASE_CLASSES = BIKE_NETWORK_CLASSES.filter(
   (c) => c.tier === 'base',
 ).map((c) => c.key);
-export const BEND_NETWORK_INFRA_CLASSES = BEND_NETWORK_CLASSES.filter(
+export const BIKE_NETWORK_INFRA_CLASSES = BIKE_NETWORK_CLASSES.filter(
   (c) => c.tier === 'infra',
 ).map((c) => c.key);

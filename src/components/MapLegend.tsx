@@ -69,7 +69,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
   const [showOsmTrails, setShowOsmTrails] = useState(false);
-  const [showBendNetwork, setShowBendNetwork] = useState(false);
+  const [showBikeNetwork, setShowBikeNetwork] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -271,15 +271,15 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   }, [showOsmTrails]);
 
   // Classified bike-network overlay (Casual mode), independent of the markers.
-  const toggleBendNetworkLayer = useCallback(() => {
-    const next = !showBendNetwork;
-    setShowBendNetwork(next);
+  const toggleBikeNetworkLayer = useCallback(() => {
+    const next = !showBikeNetwork;
+    setShowBikeNetwork(next);
     window.dispatchEvent(
       new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-        detail: { layer: 'bendNetwork', visible: next },
+        detail: { layer: 'bikeNetwork', visible: next },
       }),
     );
-  }, [showBendNetwork]);
+  }, [showBikeNetwork]);
 
   // Function to center map on a specific location
   const centerOnLocation = useCallback(
@@ -423,8 +423,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
                 {bikeNetworkUrl && (
                   <BikeNetworkLayer
-                    isActive={showBendNetwork}
-                    onToggle={toggleBendNetworkLayer}
+                    isActive={showBikeNetwork}
+                    onToggle={toggleBikeNetworkLayer}
                   />
                 )}
 

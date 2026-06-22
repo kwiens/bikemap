@@ -45,8 +45,8 @@ import {
   ensureMtnBikeSource,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
-  ensureBendNetworkSource,
-  setBendNetworkVisible,
+  ensureBikeNetworkSource,
+  setBikeNetworkVisible,
   ensureInlineRoutes,
   registerOsmTrailSelection,
   hideStyleLayers,
@@ -110,7 +110,7 @@ const MapboxMap = memo(function MapboxMap() {
   // Desired OSM-trails visibility, tracked in a ref so a toggle flipped before
   // the style finishes loading can be replayed once the layers are attached.
   const osmTrailsVisibleRef = useRef(false);
-  const bendNetworkVisibleRef = useRef(false);
+  const bikeNetworkVisibleRef = useRef(false);
 
   // Trail auto-detection during ride recording
   const autoDetectEnabledRef = useRef(false);
@@ -558,9 +558,16 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
-    if (layer === 'bendNetwork') {
-      bendNetworkVisibleRef.current = visible;
-      if (bikeNetworkUrl) setBendNetworkVisible(map.current, visible);
+    if (layer === 'bikeNetwork') {
+      bikeNetworkVisibleRef.current = visible;
+      // Lazy-attach the (multi-MB) network GeoJSON on first enable rather than
+      // at startup, so users who never open it don't pay the download. If the
+      // style isn't loaded yet, the ref alone suffices — the style.load handler
+      // replays it. ensureBikeNetworkSource is idempotent.
+      if (bikeNetworkUrl && map.current.isStyleLoaded()) {
+        if (visible) ensureBikeNetworkSource(map.current, bikeNetworkUrl);
+        setBikeNetworkVisible(map.current, visible);
+      }
       return;
     }
 
@@ -1034,13 +1041,12 @@ const MapboxMap = memo(function MapboxMap() {
             setOsmTrailsVisible(newMap, true);
           }
 
-          // Attach the city's classified bike-network overlay (Casual mode),
-          // hidden until toggled. Only cities with a network URL get it.
-          if (bikeNetworkUrl) {
-            ensureBendNetworkSource(newMap, bikeNetworkUrl);
-            if (bendNetworkVisibleRef.current) {
-              setBendNetworkVisible(newMap, true);
-            }
+          // The classified bike-network overlay (Casual mode) is lazy-attached
+          // on first toggle (its GeoJSON is multi-MB). Only replay here if the
+          // user already enabled it before the style finished loading.
+          if (bikeNetworkUrl && bikeNetworkVisibleRef.current) {
+            ensureBikeNetworkSource(newMap, bikeNetworkUrl);
+            setBikeNetworkVisible(newMap, true);
           }
           initTrailBoundsFromDefaults(mountainBikeTrails);
 

@@ -1,5 +1,5 @@
 import { faBicycle } from '@fortawesome/free-solid-svg-icons';
-import { BEND_NETWORK_CLASSES } from '@/data/bend-network';
+import { BIKE_NETWORK_CLASSES } from '@/data/bike-network';
 import { ToggleRow } from './MapLayersSection';
 
 interface BikeNetworkLayerProps {
@@ -26,7 +26,7 @@ export function BikeNetworkLayer({
         />
         {isActive && (
           <ul className="flex flex-col gap-1.5 px-2 pb-1">
-            {BEND_NETWORK_CLASSES.map((c) => (
+            {BIKE_NETWORK_CLASSES.map((c) => (
               <li
                 key={c.key}
                 className="flex items-center gap-2 text-xs text-gray-600"

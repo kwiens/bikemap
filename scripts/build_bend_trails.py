@@ -28,8 +28,9 @@ import glob
 import json
 import math
 import os
-import re
 from concurrent.futures import ThreadPoolExecutor
+
+from _geo import slugify
 
 # Reuse the elevation port + terrain sampling so Bend numbers match the client.
 from osm_trail_elevation import (
@@ -56,18 +57,6 @@ M_TO_MI = 1 / 1609.344
 DIFF_RATING = {"green": "easy", "blue": "intermediate", "black": "advanced",
                "double-black": "expert"}
 DIFF_RANK = {"green": 0, "blue": 1, "black": 2, "double-black": 3}
-
-
-def slugify(name: str) -> str:
-    """Match src/utils/string.ts slugify exactly (the client builds the elevation
-    JSON URL with it)."""
-    s = name.lower()
-    s = re.sub(r"['\"]", "", s)
-    s = re.sub(r"[/&]", "-", s)
-    s = re.sub(r"\s+", "-", s)
-    s = re.sub(r"-+", "-", s)
-    s = re.sub(r"^-|-$", "", s)
-    return s
 
 
 def clean_name(name: str) -> str:
