@@ -23,6 +23,14 @@ import {
   lookupPrecomputedElevation,
   buildOsmElevationProfile,
 } from '@/utils/osm-elevation';
+import {
+  BIKE_NETWORK_BASE_CLASSES,
+  BIKE_NETWORK_BASE_LAYER_ID,
+  BIKE_NETWORK_CLASSES,
+  BIKE_NETWORK_INFRA_CLASSES,
+  BIKE_NETWORK_INFRA_LAYER_ID,
+  BIKE_NETWORK_SOURCE_ID,
+} from '@/data/bike-network';
 import { MAP_EVENTS } from '@/events';
 
 // Route utilities
@@ -609,6 +617,156 @@ export function setOsmTrailsVisible(map: mapboxgl.Map, visible: boolean): void {
     if (map.getLayer(id)) {
       map.setLayoutProperty(id, 'visibility', value);
     }
+  }
+}
+
+// Anchor runtime overlays just beneath the first label so place/road names stay
+// legible. Undefined when the style has no symbol layers — then there are no
+// labels to obscure, so addLayer's default (append on top) is fine.
+function firstSymbolLayerId(map: mapboxgl.Map): string | undefined {
+  return map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+}
+
+const ROUND_LINE = {
+  'line-cap': 'round' as const,
+  'line-join': 'round' as const,
+};
+
+// --- Classified bike network (Casual overlay) --------------------------------
+
+// Built once: color by `class` via the shared match-expression builder.
+const BIKE_NETWORK_COLOR = buildColorExpression(
+  ['get', 'class'],
+  Object.fromEntries(BIKE_NETWORK_CLASSES.map((c) => [c.key, c.color])),
+);
+
+// Two stacked sub-layers: a thin base tint (calm/caution streets) under a
+// thicker infra layer (trails + bike lanes).
+const BIKE_NETWORK_LAYERS: {
+  id: string;
+  classes: string[];
+  width: mapboxgl.Expression;
+  opacity: number;
+}[] = [
+  {
+    id: BIKE_NETWORK_BASE_LAYER_ID,
+    classes: BIKE_NETWORK_BASE_CLASSES,
+    width: ['interpolate', ['linear'], ['zoom'], 11, 0.6, 16, 2.5],
+    opacity: 0.65,
+  },
+  {
+    id: BIKE_NETWORK_INFRA_LAYER_ID,
+    classes: BIKE_NETWORK_INFRA_CLASSES,
+    width: ['interpolate', ['linear'], ['zoom'], 11, 1.2, 16, 4],
+    opacity: 0.9,
+  },
+];
+
+// Attach the city's classified bike-network GeoJSON as the two stacked layers
+// above. Hidden until toggled. Idempotent.
+export function ensureBikeNetworkSource(map: mapboxgl.Map, url: string): void {
+  try {
+    if (!map.getSource(BIKE_NETWORK_SOURCE_ID)) {
+      map.addSource(BIKE_NETWORK_SOURCE_ID, { type: 'geojson', data: url });
+    }
+    const beforeId = firstSymbolLayerId(map);
+    for (const l of BIKE_NETWORK_LAYERS) {
+      if (map.getLayer(l.id)) continue;
+      map.addLayer(
+        {
+          id: l.id,
+          type: 'line',
+          source: BIKE_NETWORK_SOURCE_ID,
+          filter: ['in', ['get', 'class'], ['literal', l.classes]],
+          layout: { ...ROUND_LINE, visibility: 'none' },
+          paint: {
+            'line-color': BIKE_NETWORK_COLOR,
+            'line-width': l.width,
+            'line-opacity': l.opacity,
+          },
+        } as mapboxgl.LayerSpecification,
+        beforeId,
+      );
+    }
+  } catch (error) {
+    console.error('Failed to attach bike network:', error);
+  }
+}
+
+export function setBikeNetworkVisible(
+  map: mapboxgl.Map,
+  visible: boolean,
+): void {
+  const value = visible ? 'visible' : 'none';
+  for (const l of BIKE_NETWORK_LAYERS) {
+    if (map.getLayer(l.id)) {
+      map.setLayoutProperty(l.id, 'visibility', value);
+    }
+  }
+}
+
+// --- Inline (GeoJSON-backed) bike routes -------------------------------------
+
+const INLINE_ROUTES_SOURCE_ID = 'inline-routes-source';
+
+// Attach curated routes whose geometry ships as a static GeoJSON (one feature
+// per route, keyed by `id`) rather than a Mapbox Studio layer. Each route gets a
+// white casing, the colored line (`id === route.id`), and a wide transparent hit
+// target — the same `${route.id}` / `-casing` / `-hit` layer ids the existing
+// route selection, opacity, and click-handler code keys off, so they work
+// unchanged. Idempotent.
+export function ensureInlineRoutes(
+  map: mapboxgl.Map,
+  url: string,
+  routes: BikeRoute[],
+): void {
+  try {
+    if (!map.getSource(INLINE_ROUTES_SOURCE_ID)) {
+      map.addSource(INLINE_ROUTES_SOURCE_ID, { type: 'geojson', data: url });
+    }
+    const beforeId = firstSymbolLayerId(map);
+    for (const route of routes) {
+      const filter: mapboxgl.FilterSpecification = [
+        '==',
+        ['get', 'id'],
+        route.id,
+      ];
+      const sublayers = [
+        {
+          id: `${route.id}-casing`,
+          color: '#ffffff',
+          width: route.defaultWidth + 2,
+          opacity: 0.4,
+        },
+        {
+          id: route.id,
+          color: route.color,
+          width: route.defaultWidth,
+          opacity: route.opacity,
+        },
+        { id: `${route.id}-hit`, color: '#000000', width: 24, opacity: 0 },
+      ];
+      for (const s of sublayers) {
+        if (map.getLayer(s.id)) continue;
+        map.addLayer(
+          {
+            id: s.id,
+            type: 'line',
+            source: INLINE_ROUTES_SOURCE_ID,
+            filter,
+            layout: ROUND_LINE,
+            paint: {
+              'line-color': s.color,
+              'line-width': s.width,
+              'line-opacity': s.opacity,
+            },
+          },
+          beforeId,
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Failed to attach inline routes:', error);
   }
 }
 

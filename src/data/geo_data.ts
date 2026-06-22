@@ -21,6 +21,8 @@ export const mountainBikeConfig = activeCityData.mountainBike;
 export const trailMetadata = activeCityData.trailMetadata;
 export const hiddenStyleLayerIds = activeCityData.hiddenStyleLayerIds;
 export const regionFor = activeCityData.regionFor;
+export const bikeNetworkUrl = activeCityData.bikeNetworkUrl;
+export const bikeRoutesUrl = activeCityData.bikeRoutesUrl;
 
 export type { MapFeature } from './map-features';
 export const mapFeatures = activeCityData.mapFeatures;

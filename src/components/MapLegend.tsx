@@ -15,6 +15,7 @@ import {
   MapLayers,
   MapLayersSection,
   ToggleRow,
+  BikeNetworkLayer,
   AttractionsList,
   BikeResourcesList,
   BikeRentalList,
@@ -27,6 +28,7 @@ import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
 import { cn } from '@/lib/utils';
 import { mapConfig } from '@/config/map.config';
 import {
+  bikeNetworkUrl,
   bikeResources,
   bikeRoutes,
   mapFeatures,
@@ -67,6 +69,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
   const [showOsmTrails, setShowOsmTrails] = useState(false);
+  const [showBikeNetwork, setShowBikeNetwork] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -267,6 +270,17 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     );
   }, [showOsmTrails]);
 
+  // Classified bike-network overlay (Casual mode), independent of the markers.
+  const toggleBikeNetworkLayer = useCallback(() => {
+    const next = !showBikeNetwork;
+    setShowBikeNetwork(next);
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+        detail: { layer: 'bikeNetwork', visible: next },
+      }),
+    );
+  }, [showBikeNetwork]);
+
   // Function to center map on a specific location
   const centerOnLocation = useCallback(
     (location: LocationProps) => {
@@ -406,6 +420,13 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   selectedRoute={selectedRoute}
                   onRouteSelect={handleRouteSelect}
                 />
+
+                {bikeNetworkUrl && (
+                  <BikeNetworkLayer
+                    isActive={showBikeNetwork}
+                    onToggle={toggleBikeNetworkLayer}
+                  />
+                )}
 
                 <MapLayers
                   showAttractions={showAttractions}
