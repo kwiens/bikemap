@@ -23,6 +23,14 @@ import {
   lookupPrecomputedElevation,
   buildOsmElevationProfile,
 } from '@/utils/osm-elevation';
+import {
+  BEND_NETWORK_BASE_CLASSES,
+  BEND_NETWORK_BASE_LAYER_ID,
+  BEND_NETWORK_CLASSES,
+  BEND_NETWORK_INFRA_CLASSES,
+  BEND_NETWORK_INFRA_LAYER_ID,
+  BEND_NETWORK_SOURCE_ID,
+} from '@/data/bend-network';
 import { MAP_EVENTS } from '@/events';
 
 // Route utilities
@@ -609,6 +617,188 @@ export function setOsmTrailsVisible(map: mapboxgl.Map, visible: boolean): void {
     if (map.getLayer(id)) {
       map.setLayoutProperty(id, 'visibility', value);
     }
+  }
+}
+
+// --- Bend classified bike network (Casual overlay) ---------------------------
+
+function bendNetworkColorExpr(): mapboxgl.Expression {
+  const expr: (string | mapboxgl.Expression)[] = ['match', ['get', 'class']];
+  for (const c of BEND_NETWORK_CLASSES) {
+    expr.push(c.key, c.color);
+  }
+  expr.push('#9CA3AF'); // fallback grey
+  return expr as mapboxgl.Expression;
+}
+
+// Attach the city's classified bike-network GeoJSON as two stacked line layers:
+// a thin base tint (calm/caution streets) and a thicker infra layer (trails +
+// bike lanes) on top. Hidden until toggled. Idempotent.
+export function ensureBendNetworkSource(map: mapboxgl.Map, url: string): void {
+  try {
+    if (!map.getSource(BEND_NETWORK_SOURCE_ID)) {
+      map.addSource(BEND_NETWORK_SOURCE_ID, { type: 'geojson', data: url });
+    }
+    const color = bendNetworkColorExpr();
+    // Keep place/road labels on top.
+    const beforeId = map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+    const common = {
+      type: 'line' as const,
+      source: BEND_NETWORK_SOURCE_ID,
+      layout: {
+        'line-cap': 'round' as const,
+        'line-join': 'round' as const,
+        visibility: 'none' as const,
+      },
+    };
+    if (!map.getLayer(BEND_NETWORK_BASE_LAYER_ID)) {
+      map.addLayer(
+        {
+          ...common,
+          id: BEND_NETWORK_BASE_LAYER_ID,
+          filter: [
+            'in',
+            ['get', 'class'],
+            ['literal', BEND_NETWORK_BASE_CLASSES],
+          ],
+          paint: {
+            'line-color': color,
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              11,
+              0.6,
+              16,
+              2.5,
+            ],
+            'line-opacity': 0.65,
+          },
+        } as mapboxgl.LayerSpecification,
+        beforeId,
+      );
+    }
+    if (!map.getLayer(BEND_NETWORK_INFRA_LAYER_ID)) {
+      map.addLayer(
+        {
+          ...common,
+          id: BEND_NETWORK_INFRA_LAYER_ID,
+          filter: [
+            'in',
+            ['get', 'class'],
+            ['literal', BEND_NETWORK_INFRA_CLASSES],
+          ],
+          paint: {
+            'line-color': color,
+            'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.2, 16, 4],
+            'line-opacity': 0.9,
+          },
+        } as mapboxgl.LayerSpecification,
+        beforeId,
+      );
+    }
+  } catch (error) {
+    console.error('Failed to attach Bend bike network:', error);
+  }
+}
+
+export function setBendNetworkVisible(
+  map: mapboxgl.Map,
+  visible: boolean,
+): void {
+  const value = visible ? 'visible' : 'none';
+  for (const id of [BEND_NETWORK_BASE_LAYER_ID, BEND_NETWORK_INFRA_LAYER_ID]) {
+    if (map.getLayer(id)) {
+      map.setLayoutProperty(id, 'visibility', value);
+    }
+  }
+}
+
+// --- Inline (GeoJSON-backed) bike routes -------------------------------------
+
+const BEND_ROUTES_SOURCE_ID = 'bend-routes-source';
+
+// Attach curated routes whose geometry ships as a static GeoJSON (one feature
+// per route, keyed by `id`) rather than a Mapbox Studio layer. Creates a
+// casing + colored line + wide hit layer per route, each with id === route.id /
+// `${route.id}-casing` / `${route.id}-hit`, so the existing route selection,
+// opacity, and click-handler code (which keys off those layer ids) works
+// unchanged. Idempotent.
+export function ensureInlineRoutes(
+  map: mapboxgl.Map,
+  url: string,
+  routes: BikeRoute[],
+): void {
+  try {
+    if (!map.getSource(BEND_ROUTES_SOURCE_ID)) {
+      map.addSource(BEND_ROUTES_SOURCE_ID, { type: 'geojson', data: url });
+    }
+    // Keep routes beneath place/road labels.
+    const beforeId = map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+    for (const route of routes) {
+      const filter: mapboxgl.FilterSpecification = [
+        '==',
+        ['get', 'id'],
+        route.id,
+      ];
+      const layout = {
+        'line-cap': 'round' as const,
+        'line-join': 'round' as const,
+      };
+      if (!map.getLayer(`${route.id}-casing`)) {
+        map.addLayer(
+          {
+            id: `${route.id}-casing`,
+            type: 'line',
+            source: BEND_ROUTES_SOURCE_ID,
+            filter,
+            layout,
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': route.defaultWidth + 2,
+              'line-opacity': 0.4,
+            },
+          },
+          beforeId,
+        );
+      }
+      if (!map.getLayer(route.id)) {
+        map.addLayer(
+          {
+            id: route.id,
+            type: 'line',
+            source: BEND_ROUTES_SOURCE_ID,
+            filter,
+            layout,
+            paint: {
+              'line-color': route.color,
+              'line-width': route.defaultWidth,
+              'line-opacity': route.opacity,
+            },
+          },
+          beforeId,
+        );
+      }
+      if (!map.getLayer(`${route.id}-hit`)) {
+        map.addLayer(
+          {
+            id: `${route.id}-hit`,
+            type: 'line',
+            source: BEND_ROUTES_SOURCE_ID,
+            filter,
+            layout,
+            paint: {
+              'line-color': '#000000',
+              'line-width': 24,
+              'line-opacity': 0,
+            },
+          },
+          beforeId,
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Failed to attach inline routes:', error);
   }
 }
 

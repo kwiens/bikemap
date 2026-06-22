@@ -76,6 +76,7 @@ export default async function AboutPage() {
   const mapConfig = mapConfigForHostname(hostname);
   const region = mapConfig.region.displayName;
   const showBikeChattAssets = siteConfig.cityId === 'chattanooga';
+  const isBend = siteConfig.cityId === 'bend';
 
   return (
     <div className="min-h-screen bg-gray-50 fixed inset-0 overflow-y-auto z-[9999]">
@@ -218,6 +219,50 @@ export default async function AboutPage() {
             </div>
           </section>
         )}
+
+        {/* Data & credits */}
+        <section className="mb-14">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
+            Data & credits
+          </h2>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            Map data{' '}
+            <a
+              href="https://www.openstreetmap.org/copyright"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-gray-700"
+            >
+              © OpenStreetMap contributors
+            </a>{' '}
+            and{' '}
+            <a
+              href="https://www.mapbox.com/about/maps/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-gray-700"
+            >
+              © Mapbox
+            </a>
+            . Trail and bike-network classifications are derived from
+            OpenStreetMap.
+            {isBend && (
+              <>
+                {' '}
+                Bend&rsquo;s bike network was inspired by the{' '}
+                <a
+                  href="https://bendbikes.org/map/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-gray-700"
+                >
+                  Bend Bikes map
+                </a>
+                .
+              </>
+            )}
+          </p>
+        </section>
 
         {/* Footer */}
         <footer className="border-t border-gray-200 pt-8 pb-12 text-center text-sm text-gray-400">

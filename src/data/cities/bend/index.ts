@@ -7,6 +7,7 @@ import {
   OSM_TRAILS_TILEJSON_URL,
 } from '@/data/osm-trails';
 import { bendBikeResources } from './bike-resources';
+import { bendBikeRoutes } from './bike-routes.data';
 import { bendMapFeatures } from './map-features';
 import { bendMountainBikeTrails } from './mountain-bike-trails.data';
 
@@ -38,7 +39,7 @@ const REGION_MAP: Record<string, string> = {
 
 export const bendData: CityData = {
   cityId: 'bend',
-  bikeRoutes: [],
+  bikeRoutes: bendBikeRoutes,
   mapFeatures: bendMapFeatures,
   bikeResources: bendBikeResources,
   localResources: [
@@ -79,4 +80,8 @@ export const bendData: CityData = {
   // The current Mapbox Studio style is Chattanooga-specific. Until Bend has its
   // own curated route layers, hide Chattanooga route layers when Bend is active.
   hiddenStyleLayerIds: chattanoogaBikeRoutes.map((route) => route.id),
+  // OSM-derived classified bike network (Casual mode overlay).
+  bikeNetworkUrl: '/data/bend/bike-network.geojson',
+  // Curated greenway routes (geometry attached at runtime from GeoJSON).
+  bikeRoutesUrl: '/data/bend/routes.geojson',
 };

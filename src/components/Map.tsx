@@ -11,6 +11,8 @@ import {
   mountainBikeTrails,
   hiddenStyleLayerIds,
   trailMetadata,
+  bikeNetworkUrl,
+  bikeRoutesUrl,
 } from '@/data/geo_data';
 import {
   createLocationMarker,
@@ -43,6 +45,9 @@ import {
   ensureMtnBikeSource,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
+  ensureBendNetworkSource,
+  setBendNetworkVisible,
+  ensureInlineRoutes,
   registerOsmTrailSelection,
   hideStyleLayers,
   hideStrayStyleLayers,
@@ -105,6 +110,7 @@ const MapboxMap = memo(function MapboxMap() {
   // Desired OSM-trails visibility, tracked in a ref so a toggle flipped before
   // the style finishes loading can be replayed once the layers are attached.
   const osmTrailsVisibleRef = useRef(false);
+  const bendNetworkVisibleRef = useRef(false);
 
   // Trail auto-detection during ride recording
   const autoDetectEnabledRef = useRef(false);
@@ -552,6 +558,12 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
+    if (layer === 'bendNetwork') {
+      bendNetworkVisibleRef.current = visible;
+      if (bikeNetworkUrl) setBendNetworkVisible(map.current, visible);
+      return;
+    }
+
     if (visible) {
       updateRouteOpacity(map.current, bikeRoutes, null, {
         selected: 0.1,
@@ -870,6 +882,13 @@ const MapboxMap = memo(function MapboxMap() {
 
           hideStyleLayers(newMap, hiddenStyleLayerIds);
 
+          // Attach curated routes whose geometry ships as GeoJSON (not Studio
+          // layers) BEFORE the route styling/hit-handler blocks below, so they
+          // pick up the route.id layers exactly like Studio routes.
+          if (bikeRoutesUrl) {
+            ensureInlineRoutes(newMap, bikeRoutesUrl, bikeRoutes);
+          }
+
           // Set initial line width for specific layers
           if (style?.layers) {
             style.layers.forEach((layer) => {
@@ -1013,6 +1032,15 @@ const MapboxMap = memo(function MapboxMap() {
           ensureOsmTrailsSource(newMap);
           if (osmTrailsVisibleRef.current) {
             setOsmTrailsVisible(newMap, true);
+          }
+
+          // Attach the city's classified bike-network overlay (Casual mode),
+          // hidden until toggled. Only cities with a network URL get it.
+          if (bikeNetworkUrl) {
+            ensureBendNetworkSource(newMap, bikeNetworkUrl);
+            if (bendNetworkVisibleRef.current) {
+              setBendNetworkVisible(newMap, true);
+            }
           }
           initTrailBoundsFromDefaults(mountainBikeTrails);
 

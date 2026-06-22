@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""Build Bend's curated greenway/path routes from the OSM bike network.
+
+These are the "Casual" hero routes: named, mostly-paved multi-use paths (the
+Deschutes River Trail, Discovery Trail, etc.) — distinct from the MTB pane's
+singletrack. We collect every network feature sharing a route's name into one
+MultiLineString, compute its length + bounds, and emit:
+
+  - public/data/bend/routes.geojson           — geometry, keyed by route id
+  - src/data/cities/bend/bike-routes.data.ts  — BikeRoute[] metadata
+
+Run after scripts/build_bend_bike_network.py (it reads that output).
+  python scripts/build_bend_routes.py
+"""
+
+from __future__ import annotations
+
+import json
+import math
+import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+NETWORK = os.path.join(ROOT, "public", "data", "bend", "bike-network.geojson")
+OUT_GEOJSON = os.path.join(ROOT, "public", "data", "bend", "routes.geojson")
+OUT_TS = os.path.join(ROOT, "src", "data", "cities", "bend", "bike-routes.data.ts")
+
+M_TO_MI = 1 / 1609.344
+
+# Curated greenway routes: OSM name -> (display name, color, description).
+# Names match the `name` tag on OSM ways (collected across all segments).
+ROUTES = [
+    ("Deschutes River Trail", "Deschutes River Trail", "#2563EB",
+     "Bend's signature riverside path — mostly paved, linking the Old Mill, "
+     "downtown, and the river parks."),
+    ("Discovery Trail", "Discovery Trail", "#059669",
+     "Paved path winding through Bend's west-side neighborhoods and parks."),
+    ("Rimrock Trail", "Rimrock Trail", "#7C3AED",
+     "Paved path along the canyon rim on the northeast side."),
+    ("Haul Road Trail", "Haul Road Trail", "#F97316",
+     "Paved rail-trail-style path on the south side of town."),
+    ("Larkspur Trail", "Larkspur Trail", "#DB2777",
+     "Paved path connecting the Larkspur area toward Pilot Butte."),
+    ("Cascade Highlands Trail", "Cascade Highlands Trail", "#0891B2",
+     "Paved path through the Cascade Highlands on the southwest edge."),
+    ("Tumalo Creek Trail", "Tumalo Creek Trail", "#65A30D",
+     "Paved path tracing Tumalo Creek on the west side."),
+    ("West Bend Trail", "West Bend Trail", "#CA8A04",
+     "Paved path through the West Bend / Shevlin area."),
+]
+
+DEFAULT_WIDTH = 8
+
+
+def slugify(name: str) -> str:
+    import re
+    s = name.lower()
+    s = re.sub(r"['\"]", "", s)
+    s = re.sub(r"[/&]", "-", s)
+    s = re.sub(r"\s+", "-", s)
+    s = re.sub(r"-+", "-", s)
+    return re.sub(r"^-|-$", "", s)
+
+
+def line_len_mi(coords) -> float:
+    R = 6371000.0
+    t = 0.0
+    for a, b in zip(coords, coords[1:]):
+        dlat = math.radians(b[1] - a[1])
+        dlng = math.radians(b[0] - a[0])
+        t += R * 2 * math.asin(math.sqrt(
+            math.sin(dlat / 2) ** 2
+            + math.cos(math.radians(a[1])) * math.cos(math.radians(b[1]))
+            * math.sin(dlng / 2) ** 2))
+    return t * M_TO_MI
+
+
+def main():
+    with open(NETWORK, encoding="utf-8") as fh:
+        net = json.load(fh)
+
+    by_name: dict[str, list] = {}
+    for f in net["features"]:
+        nm = f["properties"].get("name")
+        if nm:
+            by_name.setdefault(nm, []).append(f["geometry"]["coordinates"])
+
+    features = []
+    ts_entries = []
+    missing = []
+    for osm_name, display, color, desc in ROUTES:
+        segs = by_name.get(osm_name)
+        if not segs:
+            missing.append(osm_name)
+            continue
+        rid = slugify(display)
+        dist = round(sum(line_len_mi(s) for s in segs), 1)
+        xs = [p[0] for s in segs for p in s]
+        ys = [p[1] for s in segs for p in s]
+        bounds = [round(min(xs), 6), round(min(ys), 6),
+                  round(max(xs), 6), round(max(ys), 6)]
+        features.append({
+            "type": "Feature",
+            "properties": {"id": rid, "name": display, "color": color},
+            "geometry": {"type": "MultiLineString", "coordinates": segs},
+        })
+        ts_entries.append({
+            "id": rid, "name": display, "color": color,
+            "description": desc, "distance": dist, "bounds": bounds,
+        })
+
+    if missing:
+        print(f"WARNING: no network features for: {missing}")
+
+    os.makedirs(os.path.dirname(OUT_GEOJSON), exist_ok=True)
+    with open(OUT_GEOJSON, "w", encoding="utf-8") as fh:
+        json.dump({"type": "FeatureCollection", "features": features},
+                  fh, separators=(",", ":"))
+
+    write_ts(ts_entries)
+    print(f"Wrote {len(features)} routes -> {OUT_GEOJSON}")
+    print(f"Wrote {len(ts_entries)} entries -> {OUT_TS}")
+    for e in ts_entries:
+        print(f"  {e['name']:26s} {e['distance']:5.1f} mi")
+
+
+def write_ts(entries):
+    def esc(s):
+        return s.replace("\\", "\\\\").replace("'", "\\'")
+
+    lines = [
+        "import { faRoute } from '@fortawesome/free-solid-svg-icons';",
+        "import type { BikeRoute } from '@/data/bike-routes';",
+        "",
+        "// Generated by scripts/build_bend_routes.py from the OSM bike network.",
+        "// Geometry lives in public/data/bend/routes.geojson (matched by `id`);",
+        "// these entries carry the display metadata. Do not edit by hand.",
+        "",
+        "export const bendBikeRoutes: BikeRoute[] = [",
+    ]
+    for e in entries:
+        b = ", ".join(str(x) for x in e["bounds"])
+        lines += [
+            "  {",
+            f"    id: '{esc(e['id'])}',",
+            f"    name: '{esc(e['name'])}',",
+            f"    color: '{e['color']}',",
+            f"    description: '{esc(e['description'])}',",
+            "    icon: faRoute,",
+            f"    defaultWidth: {DEFAULT_WIDTH},",
+            "    opacity: 1.0,",
+            f"    distance: {e['distance']},",
+            f"    defaultBounds: [{b}],",
+            "  },",
+        ]
+    lines += ["];", ""]
+    with open(OUT_TS, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
+
+
+if __name__ == "__main__":
+    main()

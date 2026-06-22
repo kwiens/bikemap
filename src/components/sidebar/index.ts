@@ -5,6 +5,7 @@ export { MountainBikeTrails } from './MountainBikeTrails';
 export { ElevationProfile } from './ElevationProfile';
 export { MapLayers } from './MapLayers';
 export { MapLayersSection, ToggleRow } from './MapLayersSection';
+export { BikeNetworkLayer } from './BikeNetworkLayer';
 export { AttractionsList } from './AttractionsList';
 export { BikeResourcesList } from './BikeResourcesList';
 export { BikeRentalList } from './BikeRentalList';
