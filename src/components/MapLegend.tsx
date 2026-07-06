@@ -1,72 +1,107 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { MAP_EVENTS } from '@/events';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
-import './map-legend.css';
+import {
+  faTimes,
+  faLayerGroup,
+  faMountain,
+} from '@fortawesome/free-solid-svg-icons';
 
 import {
-  SidebarHeader,
   BikeRoutes,
+  MountainBikeTrails,
   MapLayers,
+  MapLayersSection,
+  ToggleRow,
+  BikeNetworkLayer,
   AttractionsList,
   BikeResourcesList,
   BikeRentalList,
   InformationSection,
-  Footer,
   type LocationProps,
 } from './sidebar';
+import { getRideStyle } from './WelcomeModal';
+import { getSetting, setSetting } from '@/utils/settings';
+import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
+import { cn } from '@/lib/utils';
+import { mapConfig } from '@/config/map.config';
+import {
+  bikeNetworkUrl,
+  bikeResources,
+  bikeRoutes,
+  mapFeatures,
+  mountainBikeTrails,
+} from '@/data/geo_data';
+
+const hasRoutesSection =
+  bikeRoutes.length > 0 ||
+  mapFeatures.length > 0 ||
+  bikeResources.length > 0 ||
+  Boolean(mapConfig.gbfs);
+const hasCuratedTrails = mountainBikeTrails.length > 0;
+const hasTrailsSection = true;
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   // Track state in this parent component
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(() => getSetting('sidebarOpen') ?? true);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
+  const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
+    () => {
+      const saved = getSetting('activeTab');
+      if (saved === 'routes' && hasRoutesSection) return saved;
+      if (saved === 'trails' && hasTrailsSection) return saved;
+      if (getRideStyle() === 'mountain' && hasTrailsSection) return 'trails';
+      return hasRoutesSection ? 'routes' : 'trails';
+    },
+  );
+  const switchTab = (tab: 'routes' | 'trails') => {
+    if (tab === 'routes' && !hasRoutesSection) return;
+    if (tab === 'trails' && !hasTrailsSection) return;
+    setActiveSection(tab);
+    setSetting('activeTab', tab);
+  };
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
   const [showBikeRentals, setShowBikeRentals] = useState(false);
+  const [showOsmTrails, setShowOsmTrails] = useState(false);
+  const [showBikeNetwork, setShowBikeNetwork] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
-  const toggle = useCallback(() => {
-    setIsOpen(!isOpen);
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
 
-    // Dispatch event for map resizing
+  const toggle = useCallback(() => {
+    const next = !isOpenRef.current;
+    setIsOpen(next);
+    setSetting('sidebarOpen', next);
     window.dispatchEvent(
-      new CustomEvent('sidebar-toggle', {
-        detail: { isOpen: !isOpen },
+      new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
+        detail: { isOpen: next },
       }),
     );
-  }, [isOpen]);
+  }, []);
 
-  // Handle clicks outside the sidebar
+  // Handle clicks/taps outside the sidebar (mobile only)
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Only handle clicks on mobile (screen width <= 768px)
-      if (window.innerWidth > 768) {
-        return;
-      }
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (window.innerWidth > 768) return;
+      if (!isOpen) return;
+      if (toggleButtonRef.current?.contains(event.target as Node)) return;
+      if (sidebarRef.current?.contains(event.target as Node)) return;
 
-      // Don't close if clicking the toggle button
-      if (toggleButtonRef.current?.contains(event.target as Node)) {
-        return;
-      }
-
-      // Don't close if clicking inside the sidebar
-      if (sidebarRef.current?.contains(event.target as Node)) {
-        return;
-      }
-
-      // Close the sidebar if clicking outside
-      if (isOpen) {
-        toggle();
-      }
+      toggle();
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    // Use capture phase so we see the event before it reaches sidebar children
+    document.addEventListener('pointerdown', handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('pointerdown', handleClickOutside);
     };
   }, [isOpen, toggle]);
 
@@ -77,25 +112,57 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       const { routeId } = customEvent.detail;
       // Only update state, don't dispatch another event (map already handles the visual update)
       setSelectedRoute(routeId);
+      setSelectedTrail(null);
     };
 
-    window.addEventListener('route-select', handleMapRouteSelect);
+    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleMapRouteSelect);
     return () => {
-      window.removeEventListener('route-select', handleMapRouteSelect);
+      window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, handleMapRouteSelect);
     };
+  }, []);
+
+  // Listen for trail-select events from the map (when user clicks on a mountain bike trail)
+  useEffect(() => {
+    const handleMapTrailSelect = (event: Event) => {
+      const customEvent = event as CustomEvent<{ trailName: string }>;
+      const { trailName } = customEvent.detail;
+      setSelectedTrail(trailName);
+      setSelectedRoute(null);
+      setActiveSection('trails');
+    };
+
+    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleMapTrailSelect);
+    return () => {
+      window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleMapTrailSelect);
+    };
+  }, []);
+
+  // Listen for ride style chosen from welcome modal
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { style } = (e as CustomEvent).detail;
+      const tab = style === 'mountain' ? 'trails' : 'routes';
+      switchTab(tab);
+    };
+
+    window.addEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
+    return () =>
+      window.removeEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
   }, []);
 
   // Function to handle route selection
   const handleRouteSelect = useCallback(
     (routeId: string) => {
       setSelectedRoute(routeId);
+      setSelectedTrail(null);
 
       // Dispatch event for map to update route opacity
       window.dispatchEvent(
-        new CustomEvent('route-select', {
+        new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
           detail: { routeId },
         }),
       );
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
 
       // Close sidebar on mobile after selection
       if (window.innerWidth <= 768 && isOpen) {
@@ -104,6 +171,42 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     },
     [isOpen, toggle],
   );
+
+  // Function to handle trail selection
+  const handleTrailSelect = useCallback(
+    (trailName: string) => {
+      setSelectedTrail(trailName);
+      setSelectedRoute(null);
+
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
+          detail: { trailName },
+        }),
+      );
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
+
+      if (window.innerWidth <= 768 && isOpen) {
+        toggle();
+      }
+    },
+    [isOpen, toggle],
+  );
+
+  // Function to handle area (rec area heading) selection
+  const handleAreaSelect = useCallback((areaName: string) => {
+    setSelectedTrail(null);
+    setSelectedRoute(null);
+
+    // Deselect first — trail-deselect resets mountain bike opacity,
+    // so it must fire before area-select sets the highlight
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
+    window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.AREA_SELECT, {
+        detail: { areaName },
+      }),
+    );
+  }, []);
 
   // Helper to toggle a layer with radio-button behavior:
   // turning one layer ON turns the other two OFF
@@ -128,7 +231,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         if (stateMap[key] !== newValue) {
           setterMap[key](newValue);
           window.dispatchEvent(
-            new CustomEvent('layer-toggle', {
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
               detail: { layer: key, visible: newValue },
             }),
           );
@@ -153,12 +256,37 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     [toggleLayer],
   );
 
+  // Nationwide OSM bike trails toggle independently of the marker layers
+  // (it's a vector line layer, not part of the radio-button marker group).
+  // Compute next, set, then dispatch — dispatching inside the setState updater
+  // would double-fire under React StrictMode's double-invoked updaters.
+  const toggleOsmTrailsLayer = useCallback(() => {
+    const next = !showOsmTrails;
+    setShowOsmTrails(next);
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+        detail: { layer: 'osmTrails', visible: next },
+      }),
+    );
+  }, [showOsmTrails]);
+
+  // Classified bike-network overlay (Casual mode), independent of the markers.
+  const toggleBikeNetworkLayer = useCallback(() => {
+    const next = !showBikeNetwork;
+    setShowBikeNetwork(next);
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+        detail: { layer: 'bikeNetwork', visible: next },
+      }),
+    );
+  }, [showBikeNetwork]);
+
   // Function to center map on a specific location
   const centerOnLocation = useCallback(
     (location: LocationProps) => {
       // Dispatch event for map to center and show pin
       window.dispatchEvent(
-        new CustomEvent('center-location', {
+        new CustomEvent(MAP_EVENTS.CENTER_LOCATION, {
           detail: {
             location: location,
           },
@@ -179,11 +307,43 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       setSelectedRoute(null);
     };
 
-    window.addEventListener('route-deselect', handleRouteDeselect);
+    window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
 
     return () => {
-      window.removeEventListener('route-deselect', handleRouteDeselect);
+      window.removeEventListener(
+        MAP_EVENTS.ROUTE_DESELECT,
+        handleRouteDeselect,
+      );
     };
+  }, []);
+
+  // Listen for trail-deselect event
+  useEffect(() => {
+    const handleTrailDeselect = () => {
+      setSelectedTrail(null);
+    };
+
+    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
+
+    return () => {
+      window.removeEventListener(
+        MAP_EVENTS.TRAIL_DESELECT,
+        handleTrailDeselect,
+      );
+    };
+  }, []);
+
+  // Close when rides panel opens
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { isOpen: panelOpen } = (e as CustomEvent).detail;
+      if (panelOpen && isOpenRef.current) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
+    return () =>
+      window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
   }, []);
 
   return (
@@ -191,16 +351,21 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* Toggle button */}
-      <div className="toggle-button-container">
+      <div
+        className={cn(
+          'fixed left-4 top-[calc(1rem+env(safe-area-inset-top))]',
+          isOpen ? 'z-[960]' : 'z-[900]',
+        )}
+      >
         <button
           ref={toggleButtonRef}
           onClick={toggle}
-          className="toggle-button"
+          className={TOGGLE_BTN_CLASS}
           type="button"
         >
           <FontAwesomeIcon
             icon={isOpen ? faTimes : faLayerGroup}
-            className="toggle-button-icon"
+            className={TOGGLE_ICON_CLASS}
           />
         </button>
       </div>
@@ -208,46 +373,111 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {/* Sidebar - always in DOM but transforms off-screen when closed */}
       <div
         ref={sidebarRef}
-        className={`sidebar-container ${isOpen ? 'sidebar-visible' : 'sidebar-hidden'}`}
+        className={cn(
+          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-[950] overflow-hidden transition-transform duration-300 ease-in-out flex flex-col max-md:w-full max-md:max-w-[320px]',
+          isOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
       >
-        <SidebarHeader />
+        {/* Casual / MTB toggle in header */}
+        <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
+          <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
+            {hasRoutesSection && (
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
+                  activeSection === 'routes'
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700',
+                )}
+                onClick={() => switchTab('routes')}
+              >
+                Casual
+              </button>
+            )}
+            {hasTrailsSection && (
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
+                  activeSection === 'trails'
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700',
+                )}
+                onClick={() => switchTab('trails')}
+              >
+                MTB
+              </button>
+            )}
+          </div>
+        </div>
 
-        <div className="sidebar-content">
-          <div className="sidebar-inner-content">
-            <BikeRoutes
-              selectedRoute={selectedRoute}
-              onRouteSelect={handleRouteSelect}
-            />
+        <div className="overflow-y-auto flex-1 min-h-0">
+          <div className="px-4 pb-4 pt-2">
+            {activeSection === 'routes' && (
+              <>
+                <BikeRoutes
+                  selectedRoute={selectedRoute}
+                  onRouteSelect={handleRouteSelect}
+                />
 
-            <MapLayers
-              showAttractions={showAttractions}
-              showBikeResources={showBikeResources}
-              showBikeRentals={showBikeRentals}
-              onToggleAttractions={toggleAttractionLayer}
-              onToggleBikeResources={toggleBikeResourcesLayer}
-              onToggleBikeRentals={toggleBikeRentalsLayer}
-            />
+                {bikeNetworkUrl && (
+                  <BikeNetworkLayer
+                    isActive={showBikeNetwork}
+                    onToggle={toggleBikeNetworkLayer}
+                  />
+                )}
 
-            <AttractionsList
-              show={showAttractions}
-              onCenterLocation={centerOnLocation}
-            />
+                <MapLayers
+                  showAttractions={showAttractions}
+                  showBikeResources={showBikeResources}
+                  showBikeRentals={showBikeRentals}
+                  onToggleAttractions={toggleAttractionLayer}
+                  onToggleBikeResources={toggleBikeResourcesLayer}
+                  onToggleBikeRentals={toggleBikeRentalsLayer}
+                />
 
-            <BikeResourcesList
-              show={showBikeResources}
-              onCenterLocation={centerOnLocation}
-            />
+                <AttractionsList
+                  show={showAttractions}
+                  onCenterLocation={centerOnLocation}
+                />
 
-            <BikeRentalList
-              show={showBikeRentals}
-              onCenterLocation={centerOnLocation}
-            />
+                <BikeResourcesList
+                  show={showBikeResources}
+                  onCenterLocation={centerOnLocation}
+                />
+
+                <BikeRentalList
+                  show={showBikeRentals}
+                  onCenterLocation={centerOnLocation}
+                />
+              </>
+            )}
+
+            {activeSection === 'trails' && (
+              <>
+                <MapLayersSection>
+                  <ToggleRow
+                    icon={faMountain}
+                    label="Nationwide trails"
+                    isActive={showOsmTrails}
+                    onToggle={toggleOsmTrailsLayer}
+                  />
+                </MapLayersSection>
+
+                {hasCuratedTrails && (
+                  <MountainBikeTrails
+                    selectedTrail={selectedTrail}
+                    onTrailSelect={handleTrailSelect}
+                    onAreaSelect={handleAreaSelect}
+                  />
+                )}
+              </>
+            )}
 
             <InformationSection />
           </div>
         </div>
-
-        <Footer />
       </div>
     </>
   );

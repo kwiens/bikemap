@@ -1,7 +1,38 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMapMarkerAlt, faBicycle } from '@fortawesome/free-solid-svg-icons';
-import { ToggleSwitch } from './ToggleSwitch';
+import {
+  faMapMarkerAlt,
+  faBicycle,
+  type IconDefinition,
+} from '@fortawesome/free-solid-svg-icons';
+import { mapConfig } from '@/config/map.config';
+import { bikeResources, mapFeatures } from '@/data/geo_data';
+import { MapLayersSection, ToggleRow } from './MapLayersSection';
 import type { MapLayersProps } from './types';
+
+const layers: {
+  key: 'attractions' | 'bikeResources' | 'bikeRentals';
+  icon: IconDefinition;
+  label: string;
+  enabled: boolean;
+}[] = [
+  {
+    key: 'attractions',
+    icon: faMapMarkerAlt,
+    label: 'Attractions',
+    enabled: mapFeatures.length > 0,
+  },
+  {
+    key: 'bikeResources',
+    icon: faBicycle,
+    label: 'Bike Resources',
+    enabled: bikeResources.length > 0,
+  },
+  {
+    key: 'bikeRentals',
+    icon: faBicycle,
+    label: 'Bike Rentals',
+    enabled: Boolean(mapConfig.gbfs),
+  },
+];
 
 export function MapLayers({
   showAttractions,
@@ -11,70 +42,33 @@ export function MapLayers({
   onToggleBikeResources,
   onToggleBikeRentals,
 }: MapLayersProps) {
+  const stateMap: Record<string, boolean> = {
+    attractions: showAttractions,
+    bikeResources: showBikeResources,
+    bikeRentals: showBikeRentals,
+  };
+  const toggleMap: Record<string, () => void> = {
+    attractions: onToggleAttractions,
+    bikeResources: onToggleBikeResources,
+    bikeRentals: onToggleBikeRentals,
+  };
+  const visibleLayers = layers.filter((layer) => layer.enabled);
+
+  if (visibleLayers.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="section-container">
-      <h3 className="section-title">Map Layers</h3>
-      <div className="section-items">
-        {/* Attractions Layer Toggle */}
-        <div
-          onClick={onToggleAttractions}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onToggleAttractions();
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          className="layer-toggle"
-        >
-          <div className="card-header">
-            <FontAwesomeIcon icon={faMapMarkerAlt} className="layer-icon" />
-            <span className="layer-name">Attractions</span>
-          </div>
-          <ToggleSwitch isActive={showAttractions} />
-        </div>
-
-        {/* Bike Resources Layer Toggle */}
-        <div
-          onClick={onToggleBikeResources}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onToggleBikeResources();
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          className="layer-toggle"
-        >
-          <div className="card-header">
-            <FontAwesomeIcon icon={faBicycle} className="layer-icon" />
-            <span className="layer-name">Bike Resources</span>
-          </div>
-          <ToggleSwitch isActive={showBikeResources} />
-        </div>
-
-        {/* Bike Rentals Layer Toggle */}
-        <div
-          onClick={onToggleBikeRentals}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onToggleBikeRentals();
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          className="layer-toggle"
-        >
-          <div className="card-header">
-            <FontAwesomeIcon icon={faBicycle} className="layer-icon" />
-            <span className="layer-name">Bike Rentals</span>
-          </div>
-          <ToggleSwitch isActive={showBikeRentals} />
-        </div>
-      </div>
-    </div>
+    <MapLayersSection>
+      {visibleLayers.map(({ key, icon, label }) => (
+        <ToggleRow
+          key={key}
+          icon={icon}
+          label={label}
+          isActive={stateMap[key]}
+          onToggle={toggleMap[key]}
+        />
+      ))}
+    </MapLayersSection>
   );
 }

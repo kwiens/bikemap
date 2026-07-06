@@ -1,0 +1,11 @@
+# Python dependencies for the trail-data scripts (scripts/*.py).
+# Install into a virtualenv:
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install -r scripts/requirements.txt
+#
+# Only needed if you are curating mountain bike trail data — the Next.js app
+# itself has no Python dependency.
+
+requests>=2.31      # Mapbox vector-tile + Terrain-RGB HTTP fetches
+urllib3>=2.0        # Retry adapter used directly by add_trail_elevation.py
+Pillow>=10.0        # decodes Terrain-RGB PNG tiles for elevation sampling

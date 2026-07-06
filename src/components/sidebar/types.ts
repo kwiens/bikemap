@@ -3,10 +3,13 @@ import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 export interface LocationProps {
   name: string;
   description: string;
-  icon: IconDefinition;
+  icon?: IconDefinition;
   latitude?: number;
   longitude?: number;
   address?: string;
+  // [[minLng, minLat], [maxLng, maxLat]] — when set, the map fits these bounds
+  // instead of flying to a single point (used by the dockless fleet summary).
+  bounds?: [[number, number], [number, number]];
 }
 
 export interface ToggleSwitchProps {
@@ -43,7 +46,8 @@ export interface BikeRentalListProps {
   onCenterLocation: (location: LocationProps) => void;
 }
 
-export interface ExternalLinkProps {
-  href: string;
-  children: React.ReactNode;
+export interface MountainBikeTrailsProps {
+  selectedTrail: string | null;
+  onTrailSelect: (trailName: string) => void;
+  onAreaSelect: (areaName: string) => void;
 }

@@ -1,0 +1,250 @@
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import type mapboxgl from 'mapbox-gl';
+
+interface MockPopup {
+  isOpen: Mock;
+  remove: Mock;
+  on: Mock;
+  trigger: (event: 'open' | 'close') => void;
+}
+
+interface MockMarker {
+  getLngLat: Mock;
+  getPopup: Mock;
+  togglePopup: Mock;
+  addTo: Mock;
+  remove: Mock;
+}
+
+const makePopup = (open = false): MockPopup => {
+  let isOpen = open;
+  const listeners: Record<'open' | 'close', Array<() => void>> = {
+    open: [],
+    close: [],
+  };
+
+  return {
+    isOpen: vi.fn(() => isOpen),
+    remove: vi.fn(() => {
+      isOpen = false;
+      listeners.close.forEach((listener) => {
+        listener();
+      });
+    }),
+    on: vi.fn((event: 'open' | 'close', handler: () => void) => {
+      listeners[event].push(handler);
+    }),
+    trigger: (event: 'open' | 'close') => {
+      isOpen = event === 'open';
+      listeners[event].forEach((listener) => {
+        listener();
+      });
+    },
+  };
+};
+
+const makeMarker = (lng: number, lat: number): MockMarker => {
+  const popup = makePopup();
+  return {
+    getLngLat: vi.fn().mockReturnValue({ lng, lat }),
+    getPopup: vi.fn().mockReturnValue(popup),
+    togglePopup: vi.fn(() => popup.trigger('open')),
+    addTo: vi.fn().mockReturnThis(),
+    remove: vi.fn(),
+  };
+};
+
+function asMarker(marker: MockMarker): mapboxgl.Marker {
+  return marker as unknown as mapboxgl.Marker;
+}
+
+vi.mock('mapbox-gl', () => ({
+  default: {
+    Marker: vi.fn().mockImplementation(() => ({
+      getLngLat: vi.fn().mockReturnValue({ lng: 0, lat: 0 }),
+      getPopup: vi.fn(),
+      togglePopup: vi.fn(),
+      addTo: vi.fn().mockReturnThis(),
+      remove: vi.fn(),
+    })),
+    Popup: vi.fn(),
+    accessToken: '',
+  },
+}));
+
+import { MarkerManager, updateAccuracyCircle } from './MapMarkers';
+
+describe('MarkerManager', () => {
+  let manager: MarkerManager;
+
+  beforeEach(() => {
+    manager = new MarkerManager();
+  });
+
+  it('tracks markers added via setMarkers()', () => {
+    const m1 = makeMarker(1, 2);
+    const m2 = makeMarker(3, 4);
+
+    manager.setMarkers([asMarker(m1), asMarker(m2)]);
+
+    expect(manager.length).toBe(2);
+  });
+
+  it('findByCoordinates returns the correct marker', () => {
+    const m1 = makeMarker(-85.3, 35.0);
+    const m2 = makeMarker(-85.4, 35.1);
+
+    manager.setMarkers([asMarker(m1), asMarker(m2)]);
+
+    expect(manager.findByCoordinates(-85.3, 35.0)).toBe(asMarker(m1));
+    expect(manager.findByCoordinates(-85.4, 35.1)).toBe(asMarker(m2));
+  });
+
+  describe('openPopupFor()', () => {
+    it('is a callable method on MarkerManager instances', () => {
+      expect(typeof manager.openPopupFor).toBe('function');
+    });
+
+    it('opens the popup on the given marker', () => {
+      const marker = makeMarker(1, 2);
+
+      manager.setMarkers([asMarker(marker)]);
+      manager.openPopupFor(asMarker(marker));
+
+      expect(marker.togglePopup).toHaveBeenCalledOnce();
+    });
+
+    it('closes the previously active popup before opening the new one', () => {
+      const previousMarker = makeMarker(1, 2);
+      const nextMarker = makeMarker(3, 4);
+      const previousPopup = previousMarker.getPopup() as MockPopup;
+
+      manager.setMarkers([asMarker(previousMarker), asMarker(nextMarker)]);
+
+      manager.openPopupFor(asMarker(previousMarker));
+      manager.openPopupFor(asMarker(nextMarker));
+
+      expect(previousPopup.remove).toHaveBeenCalledOnce();
+      expect(nextMarker.togglePopup).toHaveBeenCalledOnce();
+    });
+
+    it('closes the previous popup when a new marker popup opens directly', () => {
+      const previousMarker = makeMarker(1, 2);
+      const nextMarker = makeMarker(3, 4);
+      const previousPopup = previousMarker.getPopup() as MockPopup;
+      const nextPopup = nextMarker.getPopup() as MockPopup;
+
+      manager.setMarkers([asMarker(previousMarker), asMarker(nextMarker)]);
+
+      previousPopup.trigger('open');
+      nextPopup.trigger('open');
+
+      expect(previousPopup.remove).toHaveBeenCalledOnce();
+    });
+
+    it('does not close the popup when the same marker is selected again', () => {
+      const marker = makeMarker(1, 2);
+      const popup = marker.getPopup() as MockPopup;
+
+      manager.setMarkers([asMarker(marker)]);
+
+      manager.openPopupFor(asMarker(marker));
+      manager.openPopupFor(asMarker(marker));
+
+      expect(popup.remove).not.toHaveBeenCalled();
+      expect(marker.togglePopup).toHaveBeenCalledOnce();
+    });
+
+    it('clears active marker when clear() is called', () => {
+      const marker = makeMarker(1, 2);
+      const popup = marker.getPopup() as MockPopup;
+      const nextMarker = makeMarker(3, 4);
+
+      manager.setMarkers([asMarker(marker), asMarker(nextMarker)]);
+      manager.openPopupFor(asMarker(marker));
+      manager.clear();
+      manager.setMarkers([asMarker(nextMarker)]);
+
+      // After clear(), opening a new popup should not try to close the old one
+      expect(() => manager.openPopupFor(asMarker(nextMarker))).not.toThrow();
+      expect(popup.remove).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('updateAccuracyCircle', () => {
+  function makeAccuracyMarker(lat: number) {
+    const el = document.createElement('div');
+    el.innerHTML = '<div class="location-accuracy"></div>';
+    return {
+      getElement: vi.fn(() => el),
+      getLngLat: vi.fn(() => ({ lat, lng: -85.3 })),
+      el,
+    } as unknown as mapboxgl.Marker & { el: HTMLDivElement };
+  }
+
+  it('sets width/height based on accuracy and zoom', () => {
+    const marker = makeAccuracyMarker(35.0);
+    updateAccuracyCircle(marker, 50, 15);
+
+    const circle = marker.el.querySelector('.location-accuracy') as HTMLElement;
+    const size = parseFloat(circle.style.width);
+    expect(size).toBeGreaterThan(0);
+    expect(circle.style.width).toBe(circle.style.height);
+  });
+
+  it('hides circle when accuracy resolves to fewer than 22px', () => {
+    const marker = makeAccuracyMarker(35.0);
+    // Very small accuracy at low zoom = tiny circle
+    updateAccuracyCircle(marker, 1, 5);
+
+    const circle = marker.el.querySelector('.location-accuracy') as HTMLElement;
+    expect(circle.style.display).toBe('none');
+  });
+
+  it('shows circle when accuracy is large enough', () => {
+    const marker = makeAccuracyMarker(35.0);
+    updateAccuracyCircle(marker, 100, 16);
+
+    const circle = marker.el.querySelector('.location-accuracy') as HTMLElement;
+    expect(circle.style.display).toBe('');
+    expect(parseFloat(circle.style.width)).toBeGreaterThan(22);
+  });
+
+  it('grows when zooming in', () => {
+    const marker = makeAccuracyMarker(35.0);
+    const circle = marker.el.querySelector('.location-accuracy') as HTMLElement;
+
+    updateAccuracyCircle(marker, 200, 15);
+    const sizeAtZoom15 = parseFloat(circle.style.width);
+
+    updateAccuracyCircle(marker, 200, 17);
+    const sizeAtZoom17 = parseFloat(circle.style.width);
+
+    expect(sizeAtZoom15).toBeGreaterThan(22);
+    expect(sizeAtZoom17).toBeGreaterThan(sizeAtZoom15);
+    // Each zoom level doubles, so 2 levels = 4x
+    expect(sizeAtZoom17 / sizeAtZoom15).toBeCloseTo(4, 1);
+  });
+
+  it('accounts for latitude in Mercator projection', () => {
+    const equator = makeAccuracyMarker(0);
+    const highLat = makeAccuracyMarker(60);
+
+    updateAccuracyCircle(equator, 200, 16);
+    updateAccuracyCircle(highLat, 200, 16);
+
+    const eqSize = parseFloat(
+      (equator.el.querySelector('.location-accuracy') as HTMLElement).style
+        .width,
+    );
+    const hlSize = parseFloat(
+      (highLat.el.querySelector('.location-accuracy') as HTMLElement).style
+        .width,
+    );
+
+    // At higher latitude, same meters = more pixels (Mercator stretching)
+    expect(eqSize).toBeGreaterThan(22);
+    expect(hlSize).toBeGreaterThan(eqSize);
+  });
+});

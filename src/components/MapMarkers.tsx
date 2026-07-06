@@ -4,6 +4,9 @@ import type {
   BikeResource,
   BikeRentalLocation,
 } from '@/data/geo_data';
+import { mapConfig } from '@/config/map.config';
+import { escapeHtml } from '@/utils/html';
+import { formatDistance } from '@/utils/format';
 
 // Helper function to ensure FontAwesome is loaded
 export const ensureFontAwesomeLoaded = () => {
@@ -24,8 +27,10 @@ ensureFontAwesomeLoaded();
 // Marker Manager class for managing collections of markers
 export class MarkerManager {
   private markers: mapboxgl.Marker[] = [];
+  private activeMarker: mapboxgl.Marker | null = null;
 
   add(marker: mapboxgl.Marker, map: mapboxgl.Map): void {
+    this.attachPopupHandlers(marker);
     this.markers.push(marker);
     marker.addTo(map);
   }
@@ -45,6 +50,7 @@ export class MarkerManager {
   clear(): void {
     this.hide();
     this.markers = [];
+    this.activeMarker = null;
   }
 
   findByCoordinates(lng: number, lat: number): mapboxgl.Marker | undefined {
@@ -58,13 +64,46 @@ export class MarkerManager {
     return this.markers;
   }
 
+  openPopupFor(marker: mapboxgl.Marker): void {
+    if (marker.getPopup()?.isOpen()) {
+      return;
+    }
+
+    marker.togglePopup();
+  }
+
   setMarkers(markers: mapboxgl.Marker[]): void {
     this.clear();
     this.markers = markers;
+    this.markers.forEach((marker) => {
+      this.attachPopupHandlers(marker);
+    });
   }
 
   get length(): number {
     return this.markers.length;
+  }
+
+  private attachPopupHandlers(marker: mapboxgl.Marker): void {
+    const popup = marker.getPopup();
+
+    if (!popup) {
+      return;
+    }
+
+    popup.on('open', () => {
+      if (this.activeMarker && this.activeMarker !== marker) {
+        this.activeMarker.getPopup()?.remove();
+      }
+
+      this.activeMarker = marker;
+    });
+
+    popup.on('close', () => {
+      if (this.activeMarker === marker) {
+        this.activeMarker = null;
+      }
+    });
   }
 }
 
@@ -96,6 +135,18 @@ function createMarkerElement(
   return el;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function shortAddress(address: string): string {
+  const { displayName, stateCode, stateName } = mapConfig.region;
+  return address
+    .replace(new RegExp(`,\\s*${escapeRegExp(displayName)}.*$`, 'i'), '')
+    .replace(new RegExp(`,\\s*${escapeRegExp(stateCode)}\\b.*$`, 'i'), '')
+    .replace(new RegExp(`,\\s*${escapeRegExp(stateName)}\\b.*$`, 'i'), '');
+}
+
 // Create popup HTML directly
 function createPopupHTML(
   name: string,
@@ -104,12 +155,12 @@ function createPopupHTML(
 ): string {
   return `
     <div class="map-popup">
-      <h3>${name}</h3>
-      <p>${description}</p>
+      <h3>${escapeHtml(name)}</h3>
+      <p>${escapeHtml(description)}</p>
       <p class="address">
         <strong>Address:</strong>
-        <a href="https://maps.google.com/?q=${address}" target="_blank" rel="noopener noreferrer">
-          ${address}
+        <a href="https://maps.google.com/?q=${encodeURIComponent(address)}" target="_blank" rel="noopener noreferrer">
+          ${escapeHtml(shortAddress(address))}
         </a>
       </p>
     </div>
@@ -153,18 +204,9 @@ export function createAttractionMarker(feature: MapFeature): mapboxgl.Marker {
 export function createBikeResourceMarker(
   resource: BikeResource,
 ): mapboxgl.Marker {
-  // Get icon class - default to bicycle
-  let iconClass = 'fa-bicycle';
-
-  if (resource.icon?.iconName) {
-    // Automatically construct the FontAwesome class from the icon name
-    iconClass = `fa-${resource.icon.iconName}`;
-  }
-
-  // Create element
   const el = createMarkerElement(
     'map-marker bike-marker',
-    iconClass,
+    'fa-bicycle',
     '#34d399',
   );
 
@@ -195,6 +237,7 @@ export function createLocationMarker(
 
   // Create inner elements
   el.innerHTML = `
+    <div class="location-accuracy"></div>
     <div class="location-dot"></div>
     <div class="location-pulse"></div>
   `;
@@ -204,6 +247,40 @@ export function createLocationMarker(
     element: el,
     anchor: 'center',
   }).setLngLat([longitude, latitude]);
+}
+
+/** Convert GPS accuracy (meters) to pixel diameter at a given lat/zoom */
+function accuracyToPixels(
+  meters: number,
+  latitude: number,
+  zoom: number,
+): number {
+  const metersPerPixel =
+    (156543.03392 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoom);
+  return meters / metersPerPixel;
+}
+
+/** Update the accuracy circle size on the location marker */
+export function updateAccuracyCircle(
+  marker: mapboxgl.Marker,
+  accuracy: number,
+  zoom: number,
+): void {
+  const el = marker
+    .getElement()
+    .querySelector('.location-accuracy') as HTMLElement | null;
+  if (!el) return;
+  const { lat } = marker.getLngLat();
+  // accuracy is a radius in meters; convert to diameter in pixels
+  const diameter = accuracyToPixels(accuracy * 2, lat, zoom);
+  // Hide if smaller than the dot
+  if (diameter < 22) {
+    el.style.display = 'none';
+  } else {
+    el.style.display = '';
+    el.style.width = `${diameter}px`;
+    el.style.height = `${diameter}px`;
+  }
 }
 
 // Helper function to create highlight marker
@@ -241,23 +318,34 @@ export function createBikeRentalMarker(
     '#9333EA',
   );
 
+  // Range is only meaningful for dockless vehicles that report a finite value.
+  const rangeMeters = location.currentRangeMeters;
+  const hasRange =
+    typeof rangeMeters === 'number' && Number.isFinite(rangeMeters);
+
   // Create popup HTML with rental-specific information
   const popupHTML = `
     <div class="map-popup">
-      <h3>${location.name}</h3>
-      <p>${location.description}</p>
+      <h3>${escapeHtml(location.name)}</h3>
+      <p>${escapeHtml(location.description)}</p>
       <p class="address">
         <strong>Address:</strong>
-        <a href="https://maps.google.com/?q=${location.address}" target="_blank" rel="noopener noreferrer">
-          ${location.address}
+        <a href="https://maps.google.com/?q=${encodeURIComponent(location.address)}" target="_blank" rel="noopener noreferrer">
+          ${escapeHtml(shortAddress(location.address))}
         </a>
       </p>
-      <p><strong>Type:</strong> ${location.rentalType}</p>
-      <p><strong>Price:</strong> ${location.price}</p>
-      <p><strong>Hours:</strong> ${location.hours}</p>
+      <p><strong>Type:</strong> ${escapeHtml(location.rentalType)}</p>
+      <p><strong>Price:</strong> ${escapeHtml(location.price)}</p>
+      <p><strong>Hours:</strong> ${escapeHtml(location.hours)}</p>
       ${location.availableBikes !== undefined ? `<p><strong>Available Bikes:</strong> ${location.availableBikes}</p>` : ''}
       ${location.availableDocks !== undefined ? `<p><strong>Available Docks:</strong> ${location.availableDocks}</p>` : ''}
+      ${hasRange ? `<p><strong>Range:</strong> ~${formatDistance(rangeMeters)} left</p>` : ''}
       ${location.isChargingStation ? '<p><strong>Charging Station Available</strong></p>' : ''}
+      ${
+        location.rentalUrl
+          ? `<p><a class="rental-link" href="${escapeHtml(location.rentalUrl)}" target="_blank" rel="noopener noreferrer">Rent in ${escapeHtml(mapConfig.gbfs?.providerName ?? 'app')} app →</a></p>`
+          : ''
+      }
     </div>
   `;
 

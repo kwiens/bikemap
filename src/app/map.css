@@ -1,101 +1,35 @@
-/* Map Container Styles */
-.map-container {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 500;
+/* Shift Mapbox zoom/compass controls down to align with toggle buttons */
+.mapboxgl-ctrl-top-right {
+  top: calc(68px + env(safe-area-inset-top)) !important;
+  right: 12px !important;
+  z-index: 900 !important;
+  transition: top 0.2s ease;
 }
 
-/* Route Selection Toast */
-.route-toast {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.65);
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 500;
-  z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  animation: toast-fade-in 0.3s ease-out;
-  pointer-events: none;
-}
-
-.route-toast.fade-out {
-  animation: toast-fade-out 0.3s ease-out forwards;
-}
-
-@keyframes toast-fade-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+/* On mobile, push controls below the recording HUD */
+@media (max-width: 767px) {
+  .recording-active .mapboxgl-ctrl-top-right {
+    top: calc(128px + env(safe-area-inset-top)) !important;
   }
 }
 
-@keyframes toast-fade-out {
-  from {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-10px);
-  }
-}
-
-/* Debug Mode Toggle */
-.location-watch-toggle {
-  position: absolute;
-  bottom: 5px;
-  right: 5px;
-  width: 40px;
-  height: 40px;
-  padding: 6px 12px;
-  border-radius: 50px;
-  cursor: pointer;
-  font-size: 12px;
-  z-index: 900;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: white;
-  transition: background-color 0.2s ease;
-
-  &.active {
-    background-color: rgb(165, 240, 255);
-  }
-
-  &:active {
-    background-color: #e5e5e5;
-  }
-
-  &.active:active {
-    background-color: rgb(145, 220, 235);
-  }
-
-  svg {
-    width: 20px;
-  }
-}
-
-/* Location Marker Styles */
+/* Location Marker Styles (Mapbox DOM API) */
 .current-location-marker {
   width: 22px;
   height: 22px;
   position: relative;
+  overflow: visible;
+}
+
+.location-accuracy {
+  background: rgba(66, 133, 244, 0.12);
+  border: 1px solid rgba(66, 133, 244, 0.25);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .location-dot {
@@ -134,7 +68,7 @@
   }
 }
 
-/* Highlight Marker Styles */
+/* Highlight Marker Styles (Mapbox DOM API) */
 .highlight-marker {
   width: 50px;
   height: 50px;
@@ -154,7 +88,7 @@
   }
 }
 
-/* Map Marker Styles */
+/* Map Marker Styles (Mapbox DOM API) */
 .map-marker {
   cursor: pointer;
 }
@@ -193,7 +127,7 @@
   color: #34d399;
 }
 
-/* Custom Popup Styling */
+/* Custom Popup Styling (Mapbox DOM API) */
 .custom-popup {
   border-radius: 12px !important;
   overflow: hidden;
@@ -205,7 +139,6 @@
   box-shadow: 0 3px 8px rgba(0,0,0,0.15);
 }
 
-/* First reset the button completely */
 .custom-popup .mapboxgl-popup-close-button {
   position: absolute;
   width: 30px;
@@ -220,7 +153,7 @@
   right: 5px;
   top: 5px;
   text-align: center;
-  line-height: 22px; /* Slightly less than height to shift up */
+  line-height: 22px;
   padding: 0;
   transition: background-color 0.2s;
 }
@@ -260,4 +193,19 @@
 
 .map-popup a:hover {
   text-decoration: underline;
+}
+
+.map-popup a.rental-link {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 6px 12px;
+  background-color: #9333ea;
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.map-popup a.rental-link:hover {
+  background-color: #7e22ce;
+  text-decoration: none;
 }

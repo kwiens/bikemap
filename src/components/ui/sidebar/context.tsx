@@ -3,12 +3,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  SIDEBAR_COOKIE_NAME,
-  SIDEBAR_COOKIE_MAX_AGE,
-  SIDEBAR_WIDTH,
-  SIDEBAR_KEYBOARD_SHORTCUT,
-} from './constants';
+import { SIDEBAR_WIDTH, SIDEBAR_KEYBOARD_SHORTCUT } from './constants';
 
 // Context type
 export type SidebarContextProps = {
@@ -67,9 +62,6 @@ export const SidebarProvider = React.forwardRef<
         } else {
           _setOpen(openState);
         }
-
-        // Set cookie to remember state
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
       },
       [setOpenProp, open],
     );

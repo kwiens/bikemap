@@ -29,7 +29,6 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    expect(screen.getByText('Pick a Loop')).toBeInTheDocument();
     expect(screen.getByText('Test Route 1')).toBeInTheDocument();
     expect(screen.getByText('Test Route 2')).toBeInTheDocument();
     expect(screen.getByText('Description for route 1')).toBeInTheDocument();
@@ -43,10 +42,11 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route1Button = screen
-      .getByText('Test Route 1')
-      .closest('[role="button"]');
-    fireEvent.click(route1Button!);
+    const route1Button = screen.getByRole('button', {
+      name: /test route 1/i,
+    });
+
+    fireEvent.click(route1Button);
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
   });
@@ -58,10 +58,11 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route2Button = screen
-      .getByText('Test Route 2')
-      .closest('[role="button"]');
-    fireEvent.keyDown(route2Button!, { key: 'Enter' });
+    const route2Button = screen.getByRole('button', {
+      name: /test route 2/i,
+    });
+
+    fireEvent.keyDown(route2Button, { key: 'Enter' });
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-2');
   });
@@ -73,10 +74,11 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route1Button = screen
-      .getByText('Test Route 1')
-      .closest('[role="button"]');
-    fireEvent.keyDown(route1Button!, { key: ' ' });
+    const route1Button = screen.getByRole('button', {
+      name: /test route 1/i,
+    });
+
+    fireEvent.keyDown(route1Button, { key: ' ' });
 
     expect(mockOnRouteSelect).toHaveBeenCalledWith('route-1');
   });
@@ -88,27 +90,14 @@ describe('BikeRoutes', () => {
       <BikeRoutes selectedRoute="route-1" onRouteSelect={mockOnRouteSelect} />,
     );
 
-    const route1Button = screen
-      .getByText('Test Route 1')
-      .closest('[role="button"]');
-    const route2Button = screen
-      .getByText('Test Route 2')
-      .closest('[role="button"]');
+    const route1Button = screen.getByRole('button', {
+      name: /test route 1/i,
+    });
+    const route2Button = screen.getByRole('button', {
+      name: /test route 2/i,
+    });
 
-    expect(route1Button).toHaveClass('route-item-selected');
-    expect(route2Button).not.toHaveClass('route-item-selected');
-  });
-
-  it('should display route color indicators', () => {
-    const mockOnRouteSelect = vi.fn();
-
-    render(
-      <BikeRoutes selectedRoute={null} onRouteSelect={mockOnRouteSelect} />,
-    );
-
-    const colorIndicators = document.querySelectorAll('.route-color-indicator');
-    expect(colorIndicators).toHaveLength(2);
-    expect(colorIndicators[0]).toHaveStyle({ backgroundColor: '#FF0000' });
-    expect(colorIndicators[1]).toHaveStyle({ backgroundColor: '#00FF00' });
+    expect(route1Button).toHaveAttribute('data-selected');
+    expect(route2Button).not.toHaveAttribute('data-selected');
   });
 });

@@ -1,7 +1,11 @@
-// GPX 1.1 generation from GeoJSON features
+// GPX 1.1 generation from GeoJSON features and recorded rides
 // Spec: https://www.topografix.com/gpx/1/1/
 
-function escapeXml(str: string): string {
+import type { StoredRidePoint } from '../data/ride';
+import { mapConfig } from '@/config/map.config';
+import { siteConfig } from '@/config/site.config';
+
+export function escapeXml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -55,6 +59,43 @@ export interface GpxRoute {
   features: GeoJSON.Feature[];
 }
 
+export interface RideGpxInput {
+  name: string;
+  points: StoredRidePoint[];
+}
+
+export function buildRideGpx(input: RideGpxInput): string {
+  const trkpts = input.points
+    .map((p) => {
+      const children: string[] = [];
+      if (p.altitude !== null) {
+        children.push(`        <ele>${p.altitude.toFixed(1)}</ele>`);
+      }
+      children.push(
+        `        <time>${new Date(p.timestamp).toISOString()}</time>`,
+      );
+      return `      <trkpt lat="${p.lat}" lon="${p.lng}">\n${children.join('\n')}\n      </trkpt>`;
+    })
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
+     version="1.1"
+     creator="${escapeXml(siteConfig.name)}">
+  <metadata>
+    <name>${escapeXml(input.name)}</name>
+  </metadata>
+  <trk>
+    <name>${escapeXml(input.name)}</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>`;
+}
+
 export function buildGpx(routes: GpxRoute[]): string | null {
   const tracks: string[] = [];
 
@@ -66,19 +107,20 @@ export function buildGpx(routes: GpxRoute[]): string | null {
 
   if (tracks.length === 0) return null;
 
+  const region = mapConfig.region.displayName;
   const metaName =
-    routes.length === 1 ? routes[0].name : 'Chattanooga Bike Routes';
+    routes.length === 1 ? routes[0].name : `${region} Bike Routes`;
   const metaDesc =
     routes.length === 1
       ? routes[0].description
-      : 'All bike routes in Chattanooga, TN';
+      : `All bike routes in ${region}`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx xmlns="http://www.topografix.com/GPX/1/1"
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
      xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
      version="1.1"
-     creator="Bike Chattanooga">
+     creator="${escapeXml(siteConfig.name)}">
   <metadata>
     <name>${escapeXml(metaName)}</name>
     <desc>${escapeXml(metaDesc)}</desc>

@@ -12,10 +12,28 @@ coverage
 .next/
 out/
 build
+*.tsbuildinfo
+
+# python (trail-data scripts)
+.venv/
+__pycache__/
+*.pyc
 
 # misc
 .DS_Store
 *.pem
+*.pdf
+
+# AI agent / editor local files
+.cursorrules
+.codex
+.claude
+
+# build artifacts
+tsconfig.tsbuildinfo
+
+# codex
+.codex
 
 # debug
 npm-debug.log*
@@ -45,3 +63,9 @@ yarn-error.log*
 /playwright/.cache/
 .auth/
 .env.test
+scripts/.tile_cache/
+scripts/.osm_cache/
+scripts/.*_run.log
+
+# scratch / local-only files
+tmp/

@@ -4,30 +4,18 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { bikeRoutes } from '@/data/geo_data';
+import { bikeRoutes, bikeRoutesUrl } from '@/data/geo_data';
 import { mapConfig } from '@/config/map.config';
 import { buildSvg } from '@/utils/svg';
 import { buildGpx } from '@/utils/gpx';
+import { slugify } from '@/utils/string';
+import { downloadFile } from '@/utils/format';
 
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
 
 interface RouteFeatures {
   routeId: string;
   features: GeoJSON.Feature[];
-}
-
-function downloadFile(content: string, filename: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '-');
 }
 
 const buttonStyle: React.CSSProperties = {
@@ -67,25 +55,44 @@ export default function ExportPage() {
     map.current = newMap;
 
     newMap.on('load', () => {
-      newMap.once('idle', () => {
-        const style = newMap.getStyle();
-        const results: RouteFeatures[] = [];
+      newMap.once('idle', async () => {
+        let results: RouteFeatures[] = [];
 
-        for (const route of bikeRoutes) {
-          const layer = style?.layers?.find((l) => l.id === route.id);
-          if (!layer) continue;
+        if (bikeRoutesUrl) {
+          // Inline routes: geometry lives in a static GeoJSON, not the Studio
+          // style — read it straight from the file (keyed by feature id).
+          try {
+            const fc = (await fetch(bikeRoutesUrl).then((r) =>
+              r.json(),
+            )) as GeoJSON.FeatureCollection;
+            const byId = new Map(
+              fc.features.map((f) => [f.properties?.id as string, f]),
+            );
+            results = bikeRoutes.flatMap((route) => {
+              const f = byId.get(route.id);
+              return f ? [{ routeId: route.id, features: [f] }] : [];
+            });
+          } catch (err) {
+            console.error('Failed to load route GeoJSON for export:', err);
+          }
+        } else {
+          const style = newMap.getStyle();
+          for (const route of bikeRoutes) {
+            const layer = style?.layers?.find((l) => l.id === route.id);
+            if (!layer) continue;
 
-          const sourceId = layer.source as string;
-          const sourceLayer = (layer as Record<string, unknown>)[
-            'source-layer'
-          ] as string;
-          if (!sourceId || !sourceLayer) continue;
+            const sourceId = layer.source as string;
+            const sourceLayer = (layer as Record<string, unknown>)[
+              'source-layer'
+            ] as string;
+            if (!sourceId || !sourceLayer) continue;
 
-          const features = newMap.querySourceFeatures(sourceId, {
-            sourceLayer,
-          });
+            const features = newMap.querySourceFeatures(sourceId, {
+              sourceLayer,
+            });
 
-          results.push({ routeId: route.id, features: [...features] });
+            results.push({ routeId: route.id, features: [...features] });
+          }
         }
 
         setRouteFeatures(results);
@@ -141,7 +148,11 @@ export default function ExportPage() {
     });
     const gpx = buildGpx(tracks);
     if (gpx)
-      downloadFile(gpx, 'chattanooga-bike-routes.gpx', 'application/gpx+xml');
+      downloadFile(
+        gpx,
+        `${slugify(mapConfig.region.displayName)}-bike-routes.gpx`,
+        'application/gpx+xml',
+      );
   }
 
   function handleDownloadAllSvg() {
