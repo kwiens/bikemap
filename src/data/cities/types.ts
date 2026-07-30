@@ -9,10 +9,11 @@ export type CityId = 'chattanooga' | 'bend';
 
 export interface CuratedTrailLayerConfig {
   layerId: string;
-  sourceLayer: string;
+  sourceLayer?: string;
   trailProp: string;
   sourceId?: string;
   tilesetUrl?: string;
+  geojsonUrl?: string;
   metadata?: Record<string, TrailMeta>;
   // How a curated trail entry maps to features in this layer:
   //  - 'name'  (default): match trailProp against the trail's name

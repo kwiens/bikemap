@@ -12,10 +12,11 @@ elevation port in osm_trail_elevation.py), and emit:
 
   - public/data/elevation/<slug>.json            — per-trail profile for the pane
   - src/data/cities/bend/mountain-bike-trails.data.ts — the curated array
+  - public/data/bend/trails.geojson                  — exact rendered geometry
 
 We measure from OSM, not from bendbikerides' path (their geometry is only a
-fingerprint for matching). Trails render by OSM_ID, so each entry carries the
-matched `osmIds`.
+fingerprint for matching). The generated GeoJSON and elevation profiles share
+the exact same ordered OSM-derived segments; `osmIds` remain as provenance.
 
   python scripts/build_bend_trails.py [--min-cover 0.55] [--workers 4]
 """
@@ -60,6 +61,7 @@ MATCH_CSV = os.path.join(ROOT, "data", "bend-osm-match.csv")
 JSONL = os.path.join(ROOT, "data", "bend-bike-rides.jsonl")
 ELEV_DIR = os.path.join(ROOT, "public", "data", "elevation")
 DATA_TS = os.path.join(ROOT, "src", "data", "cities", "bend", "mountain-bike-trails.data.ts")
+GEOJSON_OUT = os.path.join(ROOT, "public", "data", "bend", "trails.geojson")
 
 M_TO_FT = 3.280839895
 M_TO_MI = 1 / 1609.344
@@ -67,6 +69,8 @@ PROFILE_GAP_THRESHOLD_FT = 50.0
 TRACE_MIN_WAY_SHARE = 0.001
 TRACE_MIN_COVERAGE = 0.90
 TRACE_TOLERANCE_M = 35.0
+TRACE_WAY_JOIN_TOLERANCE_M = 3.0
+TRACE_WAY_SWITCH_MAX_M = SAMPLE_STEP_M * 3
 
 # bendbikerides difficulty -> our rating; pick the hardest across segments.
 DIFF_RATING = {"green": "easy", "blue": "intermediate", "black": "advanced",
@@ -163,6 +167,34 @@ def segment_gap_details(segments: list[list[list[float]]]) -> list[dict]:
     ]
 
 
+def profile_points_to_geometry(
+    profile: list[list[float]],
+    gap_details: list[dict],
+) -> list[list[list[float]]]:
+    """Split profile coordinates at known source-segment boundaries."""
+    if not profile:
+        return []
+    boundaries = {
+        (tuple(detail["from"]), tuple(detail["to"]))
+        for detail in gap_details
+        if detail.get("from") and detail.get("to")
+    }
+    current = [[profile[0][2], profile[0][3]]]
+    segments = []
+    for left, right in zip(profile, profile[1:]):
+        left_coord = [left[2], left[3]]
+        right_coord = [right[2], right[3]]
+        if (tuple(left_coord), tuple(right_coord)) in boundaries:
+            if len(current) >= 2:
+                segments.append(current)
+            current = [right_coord]
+        elif right_coord != current[-1]:
+            current.append(right_coord)
+    if len(current) >= 2:
+        segments.append(current)
+    return segments
+
+
 @dataclass
 class TraceResult:
     segments: list[list[list[float]]]
@@ -211,17 +243,40 @@ def trace_reference_path(
     traced_segments = []
     matched = total = 0
 
+    def connected_way_switch(
+        previous_id: int,
+        next_id: int,
+        previous_point: list[float],
+        next_point: list[float],
+    ) -> bool:
+        """Return whether a way switch follows a shared endpoint junction."""
+        previous = candidate_ways[previous_id]
+        next_geometry = candidate_ways[next_id]
+        for previous_end in (previous[0], previous[-1]):
+            for next_end in (next_geometry[0], next_geometry[-1]):
+                if haversine_m(*previous_end, *next_end) > TRACE_WAY_JOIN_TOLERANCE_M:
+                    continue
+                distance_via_join = (
+                    haversine_m(*previous_point, *previous_end)
+                    + haversine_m(*next_end, *next_point)
+                )
+                if distance_via_join <= TRACE_WAY_SWITCH_MAX_M:
+                    return True
+        return False
+
     for reference in reference_segments:
         if len(reference) < 2:
             continue
         samples = densify_line([list(point) for point in reference], SAMPLE_STEP_M)
         current = []
+        current_way_id = None
         for sample in samples:
             total += 1
             px, py = project(sample)
             best_distance_sq = tolerance_sq
             best_point = None
-            for geometry in projected_ways.values():
+            best_way_id = None
+            for osm_id, geometry in projected_ways.items():
                 for (ax, ay), (bx, by) in zip(geometry, geometry[1:]):
                     dx, dy = bx - ax, by - ay
                     denominator = dx * dx + dy * dy
@@ -234,17 +289,34 @@ def trace_reference_path(
                     if distance_sq < best_distance_sq:
                         best_distance_sq = distance_sq
                         best_point = snapped
+                        best_way_id = osm_id
 
             if best_point is None:
                 if len(current) >= 2:
                     traced_segments.append(current)
                 current = []
+                current_way_id = None
                 continue
 
             matched += 1
             snapped_lnglat = unproject(best_point)
+            if (
+                current
+                and current_way_id is not None
+                and best_way_id != current_way_id
+                and not connected_way_switch(
+                    current_way_id,
+                    best_way_id,
+                    current[-1],
+                    snapped_lnglat,
+                )
+            ):
+                if len(current) >= 2:
+                    traced_segments.append(current)
+                current = []
             if not current or haversine_m(*current[-1], *snapped_lnglat) > 0.1:
                 current.append(snapped_lnglat)
+            current_way_id = best_way_id
 
         if len(current) >= 2:
             traced_segments.append(current)
@@ -352,6 +424,40 @@ def build_trail(
         "geometry_gaps_ft": [detail["feet"] for detail in gap_details],
         "geometry_gap_details": gap_details,
         "geometry_source": geometry_source,
+        "geometry": profile_points_to_geometry(profile, gap_details),
+    }
+
+
+def existing_profile_fallback(slug: str) -> dict | None:
+    """Keep a last-known profile when its curated OSM source disappeared."""
+    path = os.path.join(ELEV_DIR, f"{slug}.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            existing = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    profile = existing.get("profile", [])
+    gap_details = existing.get("geometryGapDetails", [])
+    geometry = profile_points_to_geometry(profile, gap_details)
+    if not profile or not geometry:
+        return None
+    lngs = [point[2] for point in profile]
+    lats = [point[3] for point in profile]
+    distance_ft = existing.get("distance", profile[-1][0])
+    return {
+        "distance_mi": round(distance_ft / 5280, 2),
+        "gain_ft": existing.get("gain", 0),
+        "loss_ft": existing.get("loss", 0),
+        "min_ft": existing.get("min", 0),
+        "max_ft": existing.get("max", 0),
+        "bounds": [min(lngs), min(lats), max(lngs), max(lats)],
+        "profile": profile,
+        "distance_ft": distance_ft,
+        "geometry_coverage": 0.0,
+        "geometry_gaps_ft": [detail["feet"] for detail in gap_details],
+        "geometry_gap_details": gap_details,
+        "geometry_source": "existing-profile-fallback",
+        "geometry": geometry,
     }
 
 
@@ -359,11 +465,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--min-cover", type=float, default=0.55)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument(
+        "--geojson-only",
+        action="store_true",
+        help="rebuild rendered geometry from existing elevation profiles",
+    )
     args = ap.parse_args()
 
-    print("Loading OSM ways ...")
-    ways = load_ways()
-    match_ways, match_grid = load_match_ways()
     with open(JSONL, encoding="utf-8") as fh:
         meta = {json.loads(l)["slug"]: json.loads(l) for l in fh}
 
@@ -374,6 +482,19 @@ def main():
                     float(r["covered_frac"]) >= args.min_cover:
                 selected.append(r)
     print(f"{len(selected)} trails selected (strong/good, cover>={args.min_cover})")
+
+    if args.geojson_only:
+        write_geojson_from_profiles(selected)
+        print(f"Wrote {len(selected)} trail geometries -> {GEOJSON_OUT}")
+        return
+
+    print("Loading OSM ways ...")
+    ways = load_ways()
+    if not ways:
+        raise RuntimeError(
+            f"no OSM ways found at {CACHE_GLOB}; refusing to overwrite generated data"
+        )
+    match_ways, match_grid = load_match_ways()
 
     os.makedirs(ELEV_DIR, exist_ok=True)
 
@@ -420,6 +541,8 @@ def main():
                     trace.coverage if trace else float(r["covered_frac"])
                 ),
             )
+        if not built:
+            built = existing_profile_fallback(r["slug"])
         if not built:
             return None
         m = meta.get(r["slug"], {})
@@ -483,24 +606,59 @@ def main():
             json.dump(prof, fh, separators=(",", ":"))
 
     write_data_ts(trails)
+    write_geojson(trails)
     print(f"\nWrote {len(trails)} trails -> {DATA_TS}")
+    print(f"Wrote {len(trails)} trail geometries -> {GEOJSON_OUT}")
     print(f"Wrote {len(trails)} elevation profiles -> {ELEV_DIR}/")
+    fallback_slugs = [
+        trail["slug_out"]
+        for trail in trails
+        if trail["geometry_source"] == "existing-profile-fallback"
+    ]
+    if fallback_slugs:
+        print(
+            "WARNING: retained last-known geometry without a current OSM source: "
+            + ", ".join(fallback_slugs)
+        )
     skipped = len(selected) - len(trails)
     if skipped:
         print(f"({skipped} selected trails produced no geometry/profile)")
 
 
 def write_data_ts(trails: list[dict]) -> None:
-    def esc(s: str) -> str:
-        return s.replace("\\", "\\\\").replace("'", "\\'")
+    def quote(s: str) -> str:
+        escaped = s.replace("\\", "\\\\")
+        if "'" in escaped:
+            return f'"{escaped.replace(chr(34), chr(92) + chr(34))}"'
+        return f"'{escaped}'"
+
+    def number_array(prop: str, values: list[int]) -> list[str]:
+        joined = ", ".join(str(value) for value in values)
+        single_line = f"    {prop}: [{joined}],"
+        if len(single_line) <= 80:
+            return [single_line]
+        lines = [f"    {prop}: ["]
+        current = "      "
+        for value in values:
+            token = f"{value},"
+            candidate = f"{current}{' ' if current.strip() else ''}{token}"
+            if len(candidate) > 80 and current.strip():
+                lines.append(current)
+                current = f"      {token}"
+            else:
+                current = candidate
+        if current.strip():
+            lines.append(current)
+        lines.append("    ],")
+        return lines
 
     lines = [
         "import { faMountain } from '@fortawesome/free-solid-svg-icons';",
         "import type { MountainBikeTrail } from '@/data/mountain-bike-trails';",
         "",
         "// Generated by scripts/build_bend_trails.py from OSM geometry. Do not",
-        "// edit by hand — rerun the script. Trails render by OSM_ID (osmIds);",
-        "// length + elevation are sampled from Mapbox Terrain-RGB.",
+        "// edit by hand — rerun the script. Trails render from the generated",
+        "// Bend GeoJSON; osmIds retain the source-way provenance.",
         "",
         "const TRAIL_COLOR_EASY = '#16A34A';",
         "const TRAIL_COLOR_INTERMEDIATE = '#2563EB';",
@@ -522,10 +680,10 @@ def write_data_ts(trails: list[dict]) -> None:
         rating = t["rating"]
         lines += [
             "  {",
-            f"    slug: '{esc(t['slug_out'])}',",
-            f"    trailName: '{esc(t['trailName'])}',",
-            f"    displayName: '{esc(t['display'])}',",
-            f"    recArea: '{esc(t['recArea'])}',",
+            f"    slug: {quote(t['slug_out'])},",
+            f"    trailName: {quote(t['trailName'])},",
+            f"    displayName: {quote(t['display'])},",
+            f"    recArea: {quote(t['recArea'])},",
             f"    rating: '{rating}',",
             f"    color: trailColor('{rating}'),",
             f"    distance: {t['distance_mi']},",
@@ -534,13 +692,60 @@ def write_data_ts(trails: list[dict]) -> None:
             f"    elevationMin: {t['min_ft']},",
             f"    elevationMax: {t['max_ft']},",
             f"    defaultBounds: [{', '.join(str(x) for x in t['bounds'])}],",
-            f"    osmIds: [{', '.join(str(x) for x in t['ids'])}],",
+            *number_array("osmIds", t["ids"]),
             "    icon: faMountain,",
             "  },",
         ]
     lines += ["];", ""]
     with open(DATA_TS, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))
+
+
+def write_geojson(trails: list[dict]) -> None:
+    features = [
+        {
+            "type": "Feature",
+            "properties": {
+                "Trail": trail["trailName"],
+                "slug": trail["slug_out"],
+                "osmIds": trail["ids"],
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": trail["geometry"],
+            },
+        }
+        for trail in trails
+    ]
+    os.makedirs(os.path.dirname(GEOJSON_OUT), exist_ok=True)
+    with open(GEOJSON_OUT, "w", encoding="utf-8") as fh:
+        json.dump(
+            {"type": "FeatureCollection", "features": features},
+            fh,
+            separators=(",", ":"),
+        )
+
+
+def write_geojson_from_profiles(rows: list[dict[str, str]]) -> None:
+    trails = []
+    for row in rows:
+        slug = row["slug"]
+        path = os.path.join(ELEV_DIR, f"{slug}.json")
+        with open(path, encoding="utf-8") as fh:
+            profile = json.load(fh)
+        gap_details = profile.get("geometryGapDetails", [])
+        geometry = profile_points_to_geometry(profile.get("profile", []), gap_details)
+        if not geometry:
+            raise RuntimeError(f"profile has no renderable geometry: {slug}")
+        trails.append(
+            {
+                "trailName": profile["trail"],
+                "slug_out": slug,
+                "ids": [int(value) for value in row["osm_ids"].split(";") if value],
+                "geometry": geometry,
+            }
+        )
+    write_geojson(trails)
 
 
 if __name__ == "__main__":

@@ -15,7 +15,9 @@ from build_bend_trails import (
     TraceResult,
     better_trace,
     build_trail,
+    existing_profile_fallback,
     order_segments,
+    profile_points_to_geometry,
     trace_reference_path,
 )
 
@@ -72,6 +74,59 @@ class OrderSegmentsTest(unittest.TestCase):
 
 
 class ProfileAuditTest(unittest.TestCase):
+    def test_existing_profile_fallback_is_explicitly_flagged(self):
+        data = {
+            "trail": "Missing Source",
+            "distance": 100,
+            "gain": 10,
+            "loss": 5,
+            "min": 4000,
+            "max": 4010,
+            "geometryGapDetails": [],
+            "profile": [
+                [0, 4000, -121.0, 44.0],
+                [100, 4010, -120.999, 44.0],
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with open(
+                os.path.join(temp_dir, "missing-source.json"),
+                "w",
+                encoding="utf-8",
+            ) as fh:
+                json.dump(data, fh)
+            with patch("build_bend_trails.ELEV_DIR", temp_dir):
+                fallback = existing_profile_fallback("missing-source")
+
+        self.assertIsNotNone(fallback)
+        self.assertEqual(fallback["geometry_coverage"], 0.0)
+        self.assertEqual(fallback["geometry_source"], "existing-profile-fallback")
+
+    def test_render_geometry_splits_at_profile_gap_boundaries(self):
+        points = [
+            [0, 4000, -121.0, 44.0],
+            [100, 4010, -120.999, 44.0],
+            [200, 4020, -120.998, 44.001],
+            [300, 4030, -120.997, 44.001],
+        ]
+        details = [
+            {
+                "feet": 300,
+                "from": [-120.999, 44.0],
+                "to": [-120.998, 44.001],
+            }
+        ]
+
+        geometry = profile_points_to_geometry(points, details)
+
+        self.assertEqual(
+            geometry,
+            [
+                [[-121.0, 44.0], [-120.999, 44.0]],
+                [[-120.998, 44.001], [-120.997, 44.001]],
+            ],
+        )
+
     def test_detects_zero_distance_coordinate_teleport(self):
         data = {
             "profile": [
@@ -159,6 +214,20 @@ class ReferenceTraceTest(unittest.TestCase):
         self.assertEqual(len(trace.segments), 1)
         self.assertEqual(trace.gaps_ft, [])
         self.assertAlmostEqual(trace.segments[0][0][1], 0.00001)
+
+    def test_splits_trace_when_nearby_candidate_ways_are_disconnected(self):
+        reference = [[(-121.0, 44.0), (-120.999, 44.0)]]
+        ways = {
+            1: [[-121.0, 44.0001], [-120.9995, 44.0001]],
+            2: [[-120.9995, 43.9999], [-120.999, 43.9999]],
+        }
+
+        trace = trace_reference_path(reference, [1, 2], ways, tolerance_m=25)
+
+        self.assertEqual(trace.coverage, 1.0)
+        self.assertEqual(len(trace.segments), 2)
+        self.assertEqual(len(trace.gaps_ft), 1)
+        self.assertGreater(trace.gaps_ft[0], 50)
 
     def test_profile_distance_advances_across_a_known_gap(self):
         ways = {
