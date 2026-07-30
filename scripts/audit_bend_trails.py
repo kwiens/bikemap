@@ -26,7 +26,6 @@ import os
 import sys
 from dataclasses import asdict, dataclass
 
-from _geo import slugify
 from build_bend_trails import (
     JSONL,
     MATCH_CSV,
@@ -89,8 +88,8 @@ def source_gap_issues(
     return issues
 
 
-def load_profile(trail: str) -> dict | None:
-    path = os.path.join(ELEV_DIR, f"{slugify(trail)}.json")
+def load_profile(slug: str) -> dict | None:
+    path = os.path.join(ELEV_DIR, f"{slug}.json")
     if not os.path.exists(path):
         return None
 
@@ -144,7 +143,7 @@ def profile_teleport_issues(
     threshold_ft: float,
     profile: dict | None = None,
 ) -> list[Issue]:
-    profile = profile or load_profile(trail)
+    profile = profile or load_profile(slug)
     if profile is None:
         return [Issue(trail, slug, "missing_profile", 0, 0)]
     points = profile.get("profile", [])
@@ -189,7 +188,7 @@ def audit(
     issues = []
     for row in rows:
         trail = names.get(row["slug"], row["name"])
-        profile = load_profile(trail)
+        profile = load_profile(row["slug"])
         if profile is None:
             issues.append(Issue(trail, row["slug"], "missing_profile", 0, 0))
             continue

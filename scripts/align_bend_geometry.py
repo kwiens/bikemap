@@ -379,7 +379,7 @@ def main():
             "covered_frac", "n_osm_ways", "name_check", "osm_primary_name",
             "osm_mtb_scale", "osm_ids"]
     with open(CSV_OUT, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=cols)
+        w = csv.DictWriter(fh, fieldnames=cols, lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
 

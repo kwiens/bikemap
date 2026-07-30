@@ -21,6 +21,7 @@ function trailColor(rating: string): string {
 
 export const bendMountainBikeTrails: MountainBikeTrail[] = [
   {
+    slug: 'cole-loop',
     trailName: 'Cole Loop',
     displayName: 'Cole Loop',
     recArea: 'Bend Area',
@@ -36,6 +37,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'cole-loop-pine-ridge',
     trailName: 'Cole Loop (Pine Ridge)',
     displayName: 'Cole Loop (Pine Ridge)',
     recArea: 'Bend Area',
@@ -51,6 +53,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'dead-mountain',
     trailName: 'Dead Mountain',
     displayName: 'Dead Mountain',
     recArea: 'Bend Area',
@@ -66,6 +69,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'edison-lava',
     trailName: 'Edison-Lava',
     displayName: 'Edison-Lava',
     recArea: 'Bend Area',
@@ -81,6 +85,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'gray-butte',
     trailName: 'Gray Butte',
     displayName: 'Gray Butte',
     recArea: 'Bend Area',
@@ -96,6 +101,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'homestead',
     trailName: 'Homestead',
     displayName: 'Homestead',
     recArea: 'Bend Area',
@@ -111,6 +117,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'larison-creek',
     trailName: 'Larison Creek',
     displayName: 'Larison Creek',
     recArea: 'Bend Area',
@@ -126,6 +133,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-north-fork-to-mrazek',
     trailName: 'Metolius Windigo: North Fork to Mrazek',
     displayName: 'Metolius Windigo: North Fork to Mrazek',
     recArea: 'Bend Area',
@@ -141,6 +149,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-99-lower',
     trailName: 'Metolius-Windigo: 99 Lower',
     displayName: 'Metolius-Windigo: 99 Lower',
     recArea: 'Bend Area',
@@ -156,6 +165,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-99-upper',
     trailName: 'Metolius-Windigo: 99 Upper',
     displayName: 'Metolius-Windigo: 99 Upper',
     recArea: 'Bend Area',
@@ -171,6 +181,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-lava-lake',
     trailName: 'Metolius-Windigo: Lava Lake',
     displayName: 'Metolius-Windigo: Lava Lake',
     recArea: 'Bend Area',
@@ -186,6 +197,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-todd-lake',
     trailName: 'Metolius-Windigo: Todd Lake',
     displayName: 'Metolius-Windigo: Todd Lake',
     recArea: 'Bend Area',
@@ -201,6 +213,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'north-fork',
     trailName: 'North Fork',
     displayName: 'North Fork',
     recArea: 'Bend Area',
@@ -216,6 +229,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'river-trail',
     trailName: 'River Trail',
     displayName: 'River Trail',
     recArea: 'Bend Area',
@@ -231,6 +245,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'blue-belly-loop',
     trailName: 'Blue Belly Loop',
     displayName: 'Blue Belly Loop',
     recArea: 'Cline Butte',
@@ -246,6 +261,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'blue-belly-stem',
     trailName: 'Blue Belly Stem',
     displayName: 'Blue Belly Stem',
     recArea: 'Cline Butte',
@@ -261,6 +277,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'bull-snake',
     trailName: 'Bull Snake',
     displayName: 'Bull Snake',
     recArea: 'Cline Butte',
@@ -276,6 +293,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'chainbreak',
     trailName: 'Chainbreak',
     displayName: 'Chainbreak',
     recArea: 'Cline Butte',
@@ -291,6 +309,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'cline-butte-xc-trail',
     trailName: 'Cline Butte XC Trail',
     displayName: 'Cline Butte XC Trail',
     recArea: 'Cline Butte',
@@ -306,6 +325,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'cover-charge',
     trailName: 'Cover Charge',
     displayName: 'Cover Charge',
     recArea: 'Cline Butte',
@@ -321,6 +341,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'crossfire',
     trailName: 'Crossfire',
     displayName: 'Crossfire',
     recArea: 'Cline Butte',
@@ -336,6 +357,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'hummingbird',
     trailName: 'Hummingbird',
     displayName: 'Hummingbird',
     recArea: 'Cline Butte',
@@ -351,6 +373,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'karman-line',
     trailName: 'Karman Line',
     displayName: 'Karman Line',
     recArea: 'Cline Butte',
@@ -366,6 +389,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'legal-eagle',
     trailName: 'Legal Eagle',
     displayName: 'Legal Eagle',
     recArea: 'Cline Butte',
@@ -381,6 +405,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'positive-vibrations',
     trailName: 'Positive Vibrations',
     displayName: 'Positive Vibrations',
     recArea: 'Cline Butte',
@@ -396,6 +421,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'rattler',
     trailName: 'Rattler',
     displayName: 'Rattler',
     recArea: 'Cline Butte',
@@ -411,6 +437,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'return-policy',
     trailName: 'Return Policy',
     displayName: 'Return Policy',
     recArea: 'Cline Butte',
@@ -426,6 +453,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'ridge-runner',
     trailName: 'Ridge Runner',
     displayName: 'Ridge Runner',
     recArea: 'Cline Butte',
@@ -441,6 +469,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'stinger-east',
     trailName: 'Stinger East',
     displayName: 'Stinger East',
     recArea: 'Cline Butte',
@@ -456,6 +485,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'stinger-west',
     trailName: 'Stinger West',
     displayName: 'Stinger West',
     recArea: 'Cline Butte',
@@ -471,6 +501,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'the-goat',
     trailName: 'The Goat',
     displayName: 'The Goat',
     recArea: 'Cline Butte',
@@ -486,6 +517,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'the-saddle',
     trailName: 'The Saddle',
     displayName: 'The Saddle',
     recArea: 'Cline Butte',
@@ -501,6 +533,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'trail-1',
     trailName: 'Trail 1',
     displayName: 'Trail 1',
     recArea: 'Cline Butte',
@@ -516,6 +549,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'trail-2',
     trailName: 'Trail 2',
     displayName: 'Trail 2',
     recArea: 'Cline Butte',
@@ -531,6 +565,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'trail-3',
     trailName: 'Trail 3',
     displayName: 'Trail 3',
     recArea: 'Cline Butte',
@@ -546,6 +581,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'whiptail',
     trailName: 'Whiptail',
     displayName: 'Whiptail',
     recArea: 'Cline Butte',
@@ -561,6 +597,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'arnold-ice-cave',
     trailName: 'Arnold Ice Cave',
     displayName: 'Arnold Ice Cave',
     recArea: 'East of Bend',
@@ -576,6 +613,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'coyote-loop',
     trailName: 'Coyote Loop',
     displayName: 'Coyote Loop',
     recArea: 'East of Bend',
@@ -591,6 +629,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'crazy-horse',
     trailName: 'Crazy Horse',
     displayName: 'Crazy Horse',
     recArea: 'East of Bend',
@@ -606,6 +645,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'crooked-arm',
     trailName: 'Crooked Arm',
     displayName: 'Crooked Arm',
     recArea: 'East of Bend',
@@ -621,6 +661,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'escape-from-moscow',
     trailName: 'Escape from Moscow',
     displayName: 'Escape from Moscow',
     recArea: 'East of Bend',
@@ -636,6 +677,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'has-no-horse',
     trailName: 'Has No Horse',
     displayName: 'Has No Horse',
     recArea: 'East of Bend',
@@ -651,6 +693,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'holy-loop',
     trailName: 'Holy Loop',
     displayName: 'Holy Loop',
     recArea: 'East of Bend',
@@ -666,6 +709,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'holy-loop-connector',
     trailName: 'Holy Loop Connector',
     displayName: 'Holy Loop Connector',
     recArea: 'East of Bend',
@@ -681,6 +725,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'horse-butte',
     trailName: 'Horse Butte',
     displayName: 'Horse Butte',
     recArea: 'East of Bend',
@@ -696,6 +741,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'parkway',
     trailName: 'Parkway',
     displayName: 'Parkway',
     recArea: 'East of Bend',
@@ -711,6 +757,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'sand-canyon',
     trailName: 'Sand Canyon',
     displayName: 'Sand Canyon',
     recArea: 'East of Bend',
@@ -726,6 +773,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'swamp-wells',
     trailName: 'Swamp Wells',
     displayName: 'Swamp Wells',
     recArea: 'East of Bend',
@@ -741,6 +789,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'crater-rim',
     trailName: 'Crater Rim',
     displayName: 'Crater Rim',
     recArea: 'La Pine',
@@ -756,6 +805,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'bones',
     trailName: 'Bones',
     displayName: 'Bones',
     recArea: 'Madras',
@@ -771,6 +821,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'bridge-to-nowhere',
     trailName: 'Bridge to Nowhere',
     displayName: 'Bridge to Nowhere',
     recArea: 'Madras',
@@ -786,6 +837,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'cobra-dh',
     trailName: 'Cobra DH',
     displayName: 'Cobra DH',
     recArea: 'Madras',
@@ -801,6 +853,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'galyen-stallion',
     trailName: 'Galyen Stallion',
     displayName: 'Galyen Stallion',
     recArea: 'Madras',
@@ -816,6 +869,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'gut-punch',
     trailName: 'Gut Punch',
     displayName: 'Gut Punch',
     recArea: 'Madras',
@@ -831,6 +885,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'mormon-mission',
     trailName: 'Mormon Mission',
     displayName: 'Mormon Mission',
     recArea: 'Madras',
@@ -846,6 +901,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'olympus',
     trailName: 'Olympus',
     displayName: 'Olympus',
     recArea: 'Madras',
@@ -861,6 +917,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'peek-a-boo',
     trailName: 'Peek A Boo',
     displayName: 'Peek A Boo',
     recArea: 'Madras',
@@ -876,6 +933,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'the-ravine',
     trailName: 'The Ravine',
     displayName: 'The Ravine',
     recArea: 'Madras',
@@ -891,6 +949,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'trestle',
     trailName: 'Trestle',
     displayName: 'Trestle',
     recArea: 'Madras',
@@ -906,6 +965,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'trestle-return',
     trailName: 'Trestle Return',
     displayName: 'Trestle Return',
     recArea: 'Madras',
@@ -921,6 +981,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'big-bark',
     trailName: 'Big Bark',
     displayName: 'Big Bark',
     recArea: 'Maston',
@@ -936,6 +997,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'fat-rabbit-loop',
     trailName: 'Fat Rabbit Loop',
     displayName: 'Fat Rabbit Loop',
     recArea: 'Maston',
@@ -951,6 +1013,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'headgate',
     trailName: 'Headgate',
     displayName: 'Headgate',
     recArea: 'Maston',
@@ -966,6 +1029,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'juniper-trailhead',
     trailName: 'Juniper Trailhead',
     displayName: 'Juniper Trailhead',
     recArea: 'Maston',
@@ -981,6 +1045,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'lost-dream',
     trailName: 'Lost Dream',
     displayName: 'Lost Dream',
     recArea: 'Maston',
@@ -996,6 +1061,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'maston-tie',
     trailName: 'Maston Tie',
     displayName: 'Maston Tie',
     recArea: 'Maston',
@@ -1011,6 +1077,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'oregon-sunshine',
     trailName: 'Oregon Sunshine',
     displayName: 'Oregon Sunshine',
     recArea: 'Maston',
@@ -1026,6 +1093,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'pumice-foot',
     trailName: 'Pumice Foot',
     displayName: 'Pumice Foot',
     recArea: 'Maston',
@@ -1041,6 +1109,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'rockbar',
     trailName: 'Rockbar',
     displayName: 'Rockbar',
     recArea: 'Maston',
@@ -1056,6 +1125,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'talon-trail',
     trailName: 'Talon Trail',
     displayName: 'Talon Trail',
     recArea: 'Maston',
@@ -1071,6 +1141,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'castle-rock',
     trailName: 'Castle Rock',
     displayName: 'Castle Rock',
     recArea: 'McKenzie',
@@ -1086,6 +1157,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'clear-lake',
     trailName: 'Clear Lake',
     displayName: 'Clear Lake',
     recArea: 'McKenzie',
@@ -1101,6 +1173,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'king-castle',
     trailName: 'King Castle',
     displayName: 'King Castle',
     recArea: 'McKenzie',
@@ -1116,6 +1189,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'mckenzie-river-trail',
     trailName: 'McKenzie River Trail',
     displayName: 'McKenzie River Trail',
     recArea: 'McKenzie',
@@ -1134,6 +1208,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'oleary-mountain',
     trailName: "O'Leary Mountain",
     displayName: "O'Leary Mountain",
     recArea: 'McKenzie',
@@ -1149,6 +1224,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'olallie-trail',
     trailName: 'Olallie Trail',
     displayName: 'Olallie Trail',
     recArea: 'McKenzie',
@@ -1164,6 +1240,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'bachy-west-xc',
     trailName: 'Bachy West XC',
     displayName: 'Bachy West XC',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1179,6 +1256,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'big-wood',
     trailName: 'Big Wood',
     displayName: 'Big Wood',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1194,6 +1272,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'blade-runner',
     trailName: 'Blade Runner',
     displayName: 'Blade Runner',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1209,6 +1288,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'cone-run',
     trailName: 'Cone Run',
     displayName: 'Cone Run',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1224,6 +1304,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'evergreen',
     trailName: 'Evergreen',
     displayName: 'Evergreen',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1239,6 +1320,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'hanger',
     trailName: 'Hanger',
     displayName: 'Hanger',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1254,6 +1336,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'hot-dust',
     trailName: 'Hot Dust',
     displayName: 'Hot Dust',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1269,6 +1352,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'rattlesnake',
     trailName: 'Rattlesnake',
     displayName: 'Rattlesnake',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1284,6 +1368,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'redline',
     trailName: 'Redline',
     displayName: 'Redline',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1299,6 +1384,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'rockfall',
     trailName: 'Rockfall',
     displayName: 'Rockfall',
     recArea: 'Mt. Bachelor Bike Park',
@@ -1314,6 +1400,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'farewell',
     trailName: 'Farewell',
     displayName: 'Farewell',
     recArea: 'North of Skyliner',
@@ -1329,6 +1416,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'mrazek',
     trailName: 'Mrazek (Lower)',
     displayName: 'Mrazek (Lower)',
     recArea: 'North of Skyliner',
@@ -1344,6 +1432,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'mrazek-upper',
     trailName: 'Mrazek (Upper)',
     displayName: 'Mrazek (Upper)',
     recArea: 'North of Skyliner',
@@ -1359,6 +1448,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'shevlin',
     trailName: 'Shevlin',
     displayName: 'Shevlin',
     recArea: 'North of Skyliner',
@@ -1374,6 +1464,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'tumalo-creek',
     trailName: 'Tumalo Creek',
     displayName: 'Tumalo Creek',
     recArea: 'North of Skyliner',
@@ -1389,6 +1480,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'alpine-chrome-toilet',
     trailName: 'Alpine (Chrome Toilet)',
     displayName: 'Alpine (Chrome Toilet)',
     recArea: 'Oakridge',
@@ -1404,6 +1496,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'alpine-lower',
     trailName: 'Alpine (Lower)',
     displayName: 'Alpine (Lower)',
     recArea: 'Oakridge',
@@ -1419,6 +1512,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'alpine-upper',
     trailName: 'Alpine (Upper)',
     displayName: 'Alpine (Upper)',
     recArea: 'Oakridge',
@@ -1434,6 +1528,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'goodman-creek',
     trailName: 'Goodman Creek',
     displayName: 'Goodman Creek',
     recArea: 'Oakridge',
@@ -1449,6 +1544,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'indigo-extension',
     trailName: 'Indigo Extension',
     displayName: 'Indigo Extension',
     recArea: 'Oakridge',
@@ -1464,6 +1560,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'indigo-lake',
     trailName: 'Indigo Lake',
     displayName: 'Indigo Lake',
     recArea: 'Oakridge',
@@ -1479,6 +1576,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'june-lake',
     trailName: 'June Lake',
     displayName: 'June Lake',
     recArea: 'Oakridge',
@@ -1494,6 +1592,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'larison-rock',
     trailName: 'Larison Rock',
     displayName: 'Larison Rock',
     recArea: 'Oakridge',
@@ -1509,6 +1608,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'middle-fork-willamette',
     trailName: 'Middle Fork Willamette',
     displayName: 'Middle Fork Willamette',
     recArea: 'Oakridge',
@@ -1524,6 +1624,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'middle-fork-willamette-lower',
     trailName: 'Middle Fork Willamette (Lower)',
     displayName: 'Middle Fork Willamette (Lower)',
     recArea: 'Oakridge',
@@ -1539,6 +1640,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'north-fork-3666',
     trailName: 'North Fork #3666',
     displayName: 'North Fork #3666',
     recArea: 'Oakridge',
@@ -1554,6 +1656,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'sawtooth-mountain',
     trailName: 'Sawtooth Mountain',
     displayName: 'Sawtooth Mountain',
     recArea: 'Oakridge',
@@ -1569,6 +1672,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'timpanogas-lake',
     trailName: 'Timpanogas Lake',
     displayName: 'Timpanogas Lake',
     recArea: 'Oakridge',
@@ -1584,6 +1688,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'tire-mountain',
     trailName: 'Tire Mountain',
     displayName: 'Tire Mountain',
     recArea: 'Oakridge',
@@ -1599,6 +1704,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'bens-trail',
     trailName: "Ben's Trail",
     displayName: "Ben's Trail",
     recArea: "Phil's Trail Complex",
@@ -1614,6 +1720,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'cod',
     trailName: 'COD',
     displayName: 'COD',
     recArea: "Phil's Trail Complex",
@@ -1629,6 +1736,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'elv',
     trailName: 'ELV',
     displayName: 'ELV',
     recArea: "Phil's Trail Complex",
@@ -1644,6 +1752,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'ext',
     trailName: 'EXT',
     displayName: 'EXT',
     recArea: "Phil's Trail Complex",
@@ -1659,6 +1768,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'expressway',
     trailName: 'Expressway',
     displayName: 'Expressway',
     recArea: "Phil's Trail Complex",
@@ -1674,6 +1784,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'grand-slam',
     trailName: 'Grand Slam',
     displayName: 'Grand Slam',
     recArea: "Phil's Trail Complex",
@@ -1689,6 +1800,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'kgb',
     trailName: 'K.G.B.',
     displayName: 'K.G.B.',
     recArea: "Phil's Trail Complex",
@@ -1704,6 +1816,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'kents-trail',
     trailName: "Kent's Trail",
     displayName: "Kent's Trail",
     recArea: "Phil's Trail Complex",
@@ -1719,6 +1832,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'lower-whoops',
     trailName: 'Lower Whoops',
     displayName: 'Lower Whoops',
     recArea: "Phil's Trail Complex",
@@ -1734,6 +1848,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'mtb',
     trailName: 'MTB',
     displayName: 'MTB',
     recArea: "Phil's Trail Complex",
@@ -1749,6 +1864,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'marvins-garden',
     trailName: "Marvin's Garden",
     displayName: "Marvin's Garden",
     recArea: "Phil's Trail Complex",
@@ -1767,6 +1883,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'phils-trail',
     trailName: "Phil's Trail",
     displayName: "Phil's Trail",
     recArea: "Phil's Trail Complex",
@@ -1782,6 +1899,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'pinedrops',
     trailName: 'Pinedrops',
     displayName: 'Pinedrops',
     recArea: "Phil's Trail Complex",
@@ -1797,6 +1915,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'skyliner',
     trailName: 'Skyliner',
     displayName: 'Skyliner',
     recArea: "Phil's Trail Complex",
@@ -1812,6 +1931,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'storm-king-upper',
     trailName: 'Storm King (Upper)',
     displayName: 'Storm King (Upper)',
     recArea: "Phil's Trail Complex",
@@ -1827,6 +1947,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'ticket-to-ride',
     trailName: 'Ticket to Ride',
     displayName: 'Ticket to Ride',
     recArea: "Phil's Trail Complex",
@@ -1842,6 +1963,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'upper-whoops',
     trailName: 'Upper Whoops',
     displayName: 'Upper Whoops',
     recArea: "Phil's Trail Complex",
@@ -1857,6 +1979,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'voodoo',
     trailName: 'Voodoo',
     displayName: 'Voodoo',
     recArea: "Phil's Trail Complex",
@@ -1872,6 +1995,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'voodoo-child',
     trailName: 'Voodoo Child',
     displayName: 'Voodoo Child',
     recArea: "Phil's Trail Complex",
@@ -1887,6 +2011,215 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'antiques-roadshow',
+    trailName: 'Antiques Roadshow',
+    displayName: 'Antiques Roadshow',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 0.63,
+    elevationGain: 79,
+    elevationLoss: 105,
+    elevationMin: 3012,
+    elevationMax: 3096,
+    defaultBounds: [-120.873454, 44.293213, -120.867604, 44.294313],
+    osmIds: [1002155713],
+    icon: faMountain,
+  },
+  {
+    slug: 'brewers-choice',
+    trailName: "Brewer's Choice",
+    displayName: "Brewer's Choice",
+    recArea: 'Prineville & Ochocos',
+    rating: 'easy',
+    color: trailColor('easy'),
+    distance: 1.02,
+    elevationGain: 111,
+    elevationLoss: 96,
+    elevationMin: 2913,
+    elevationMax: 3030,
+    defaultBounds: [-120.873532, 44.294375, -120.867419, 44.296586],
+    osmIds: [601941765],
+    icon: faMountain,
+  },
+  {
+    slug: 'cougar-creek',
+    trailName: 'Cougar Creek',
+    displayName: 'Cougar Creek',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 7.7,
+    elevationGain: 955,
+    elevationLoss: 1768,
+    elevationMin: 3438,
+    elevationMax: 4883,
+    defaultBounds: [-120.44859, 44.5139, -120.372549, 44.548129],
+    osmIds: [947056317, 5391951],
+    icon: faMountain,
+  },
+  {
+    slug: 'independent-mine',
+    trailName: 'Independent Mine',
+    displayName: 'Independent Mine',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 4.14,
+    elevationGain: 1222,
+    elevationLoss: 196,
+    elevationMin: 5893,
+    elevationMax: 6926,
+    defaultBounds: [-120.373878, 44.319358, -120.343526, 44.339883],
+    osmIds: [496018736, 5356618],
+    icon: faMountain,
+  },
+  {
+    slug: 'lookout-mountain',
+    trailName: 'Lookout Mountain',
+    displayName: 'Lookout Mountain',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 11.07,
+    elevationGain: 1740,
+    elevationLoss: 3202,
+    elevationMin: 4015,
+    elevationMax: 6918,
+    defaultBounds: [-120.430165, 44.326203, -120.348903, 44.395785],
+    osmIds: [5345726, 562605869],
+    icon: faMountain,
+  },
+  {
+    slug: 'motherlode',
+    trailName: 'Motherlode',
+    displayName: 'Motherlode',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 1.18,
+    elevationGain: 767,
+    elevationLoss: 0,
+    elevationMin: 5913,
+    elevationMax: 6684,
+    defaultBounds: [-120.364974, 44.326554, -120.357696, 44.339858],
+    osmIds: [5356626],
+    icon: faMountain,
+  },
+  {
+    slug: 'pebbles',
+    trailName: 'Pebbles',
+    displayName: 'Pebbles',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 0.55,
+    elevationGain: 62,
+    elevationLoss: 0,
+    elevationMin: 2987,
+    elevationMax: 3056,
+    defaultBounds: [-120.874387, 44.29453, -120.869107, 44.299311],
+    osmIds: [601936990],
+    icon: faMountain,
+  },
+  {
+    slug: 'rim-trail',
+    trailName: 'Rim Trail',
+    displayName: 'Rim Trail',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 1.49,
+    elevationGain: 41,
+    elevationLoss: 21,
+    elevationMin: 3221,
+    elevationMax: 3256,
+    defaultBounds: [-120.874059, 44.287804, -120.85177, 44.293252],
+    osmIds: [1002155718, 1002155720],
+    icon: faMountain,
+  },
+  {
+    slug: 'rocky-raccoon',
+    trailName: 'Rocky Raccoon',
+    displayName: 'Rocky Raccoon',
+    recArea: 'Prineville & Ochocos',
+    rating: 'easy',
+    color: trailColor('easy'),
+    distance: 0.8,
+    elevationGain: 76,
+    elevationLoss: 68,
+    elevationMin: 2903,
+    elevationMax: 3001,
+    defaultBounds: [-120.87081, 44.296435, -120.866861, 44.299523],
+    osmIds: [601941767, 1002155716],
+    icon: faMountain,
+  },
+  {
+    slug: 'round-mountain',
+    trailName: 'Round Mountain',
+    displayName: 'Round Mountain',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 8.62,
+    elevationGain: 1846,
+    elevationLoss: 1705,
+    elevationMin: 5378,
+    elevationMax: 6659,
+    defaultBounds: [-120.35391, 44.349212, -120.332844, 44.428211],
+    osmIds: [496018743, 496018740],
+    icon: faMountain,
+  },
+  {
+    slug: 'scotty-creek',
+    trailName: 'Scotty Creek',
+    displayName: 'Scotty Creek',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 4.21,
+    elevationGain: 2166,
+    elevationLoss: 0,
+    elevationMin: 3483,
+    elevationMax: 5653,
+    defaultBounds: [-120.45469, 44.502449, -120.432302, 44.54427],
+    osmIds: [1113676702, 947416537],
+    icon: faMountain,
+  },
+  {
+    slug: 'the-crossing',
+    trailName: 'The Crossing',
+    displayName: 'The Crossing',
+    recArea: 'Prineville & Ochocos',
+    rating: 'intermediate',
+    color: trailColor('intermediate'),
+    distance: 0.55,
+    elevationGain: 0,
+    elevationLoss: 182,
+    elevationMin: 3039,
+    elevationMax: 3226,
+    defaultBounds: [-120.875065, 44.293054, -120.871697, 44.294792],
+    osmIds: [1002155709],
+    icon: faMountain,
+  },
+  {
+    slug: 'trashalanche',
+    trailName: 'Trashalanche!',
+    displayName: 'Trashalanche!',
+    recArea: 'Prineville & Ochocos',
+    rating: 'easy',
+    color: trailColor('easy'),
+    distance: 0.85,
+    elevationGain: 159,
+    elevationLoss: 0,
+    elevationMin: 3059,
+    elevationMax: 3226,
+    defaultBounds: [-120.874064, 44.292549, -120.866851, 44.294288],
+    osmIds: [601946826],
+    icon: faMountain,
+  },
+  {
+    slug: 'green-ridge',
     trailName: 'Green Ridge',
     displayName: 'Green Ridge',
     recArea: 'Sisters',
@@ -1902,6 +2235,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'lake-creek',
     trailName: 'Lake Creek',
     displayName: 'Lake Creek',
     recArea: 'Sisters',
@@ -1917,6 +2251,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-black-butte',
     trailName: 'Metolius-Windigo (Black Butte)',
     displayName: 'Metolius-Windigo (Black Butte)',
     recArea: 'Sisters',
@@ -1932,6 +2267,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'upper-butte-loop',
     trailName: 'Upper Butte Loop',
     displayName: 'Upper Butte Loop',
     recArea: 'Sisters',
@@ -1947,6 +2283,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'afternoon-delight',
     trailName: 'Afternoon Delight',
     displayName: 'Afternoon Delight',
     recArea: 'Sunriver',
@@ -1962,6 +2299,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'black-rock',
     trailName: 'Black Rock',
     displayName: 'Black Rock',
     recArea: 'Sunriver',
@@ -1977,6 +2315,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'chain-reaction',
     trailName: 'Chain Reaction',
     displayName: 'Chain Reaction',
     recArea: 'Sunriver',
@@ -1992,6 +2331,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'deschutes-river-trail',
     trailName: 'Deschutes River Trail',
     displayName: 'Deschutes River Trail',
     recArea: 'Sunriver',
@@ -2010,6 +2350,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'elko-point',
     trailName: 'Elko Point',
     displayName: 'Elko Point',
     recArea: 'Sunriver',
@@ -2025,6 +2366,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'roundabout',
     trailName: 'Roundabout',
     displayName: 'Roundabout',
     recArea: 'Sunriver',
@@ -2040,6 +2382,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'royal-flush',
     trailName: 'Royal Flush',
     displayName: 'Royal Flush',
     recArea: 'Sunriver',
@@ -2055,6 +2398,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'flagline-access',
     trailName: 'Flagline Access',
     displayName: 'Flagline Access',
     recArea: 'Swampy Lakes',
@@ -2072,6 +2416,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'flagline-tie',
     trailName: 'Flagline Tie',
     displayName: 'Flagline Tie',
     recArea: 'Swampy Lakes',
@@ -2087,6 +2432,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'lower-flagline',
     trailName: 'Lower Flagline',
     displayName: 'Lower Flagline',
     recArea: 'Swampy Lakes',
@@ -2102,6 +2448,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-happy-valley',
     trailName: 'Metolius-Windigo: Happy Valley',
     displayName: 'Metolius-Windigo: Happy Valley',
     recArea: 'Swampy Lakes',
@@ -2117,6 +2464,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-ramble-on',
     trailName: 'Metolius-Windigo: Ramble on',
     displayName: 'Metolius-Windigo: Ramble on',
     recArea: 'Swampy Lakes',
@@ -2132,6 +2480,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'middle-flagline',
     trailName: 'Middle Flagline',
     displayName: 'Middle Flagline',
     recArea: 'Swampy Lakes',
@@ -2147,6 +2496,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'ridge-loop-trail',
     trailName: 'Ridge Loop Trail',
     displayName: 'Ridge Loop Trail',
     recArea: 'Swampy Lakes',
@@ -2162,6 +2512,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'sst',
     trailName: 'SST',
     displayName: 'SST',
     recArea: 'Swampy Lakes',
@@ -2177,6 +2528,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'sector-16',
     trailName: 'Sector 16',
     displayName: 'Sector 16',
     recArea: 'Swampy Lakes',
@@ -2192,6 +2544,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'sourth-fork',
     trailName: 'South Fork',
     displayName: 'South Fork',
     recArea: 'Swampy Lakes',
@@ -2207,6 +2560,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'swampy-lakes-loop',
     trailName: 'Swampy Lakes Loop',
     displayName: 'Swampy Lakes Loop',
     recArea: 'Swampy Lakes',
@@ -2222,6 +2576,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'swampydutchman',
     trailName: 'Swampy/Dutchman',
     displayName: 'Swampy/Dutchman',
     recArea: 'Swampy Lakes',
@@ -2237,6 +2592,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'swede-ridge',
     trailName: 'Swede Ridge',
     displayName: 'Swede Ridge',
     recArea: 'Swampy Lakes',
@@ -2252,6 +2608,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'tumalo-ridge',
     trailName: 'Tumalo Ridge',
     displayName: 'Tumalo Ridge',
     recArea: 'Swampy Lakes',
@@ -2267,6 +2624,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'upper-flagline',
     trailName: 'Upper Flagline',
     displayName: 'Upper Flagline',
     recArea: 'Swampy Lakes',
@@ -2282,6 +2640,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'vista-butte',
     trailName: 'Vista Butte',
     displayName: 'Vista Butte',
     recArea: 'Swampy Lakes',
@@ -2297,6 +2656,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'jim-weaver-loop',
     trailName: 'Jim Weaver Loop',
     displayName: 'Jim Weaver Loop',
     recArea: 'Waldo Lake',
@@ -2312,6 +2672,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-waldo-north',
     trailName: 'Metolius-Windigo (Waldo North)',
     displayName: 'Metolius-Windigo (Waldo North)',
     recArea: 'Waldo Lake',
@@ -2327,6 +2688,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'metolius-windigo-waldo-south',
     trailName: 'Metolius-Windigo (Waldo South)',
     displayName: 'Metolius-Windigo (Waldo South)',
     recArea: 'Waldo Lake',
@@ -2342,6 +2704,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'skyline',
     trailName: 'Skyline',
     displayName: 'Skyline',
     recArea: 'Waldo Lake',
@@ -2357,6 +2720,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: '50-shades-of-blue',
     trailName: '50 Shades of Blue',
     displayName: '50 Shades of Blue',
     recArea: 'Wanoga Sno Park',
@@ -2372,6 +2736,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'catch-and-release',
     trailName: 'Catch & Release',
     displayName: 'Catch & Release',
     recArea: 'Wanoga Sno Park',
@@ -2387,6 +2752,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'dinah-moe-humm',
     trailName: 'Dinah Moe Humm',
     displayName: 'Dinah Moe Humm',
     recArea: 'Wanoga Sno Park',
@@ -2402,6 +2768,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'duodenum',
     trailName: 'Duodenum',
     displayName: 'Duodenum',
     recArea: 'Wanoga Sno Park',
@@ -2417,6 +2784,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'funner',
     trailName: 'Funner',
     displayName: 'Funner',
     recArea: 'Wanoga Sno Park',
@@ -2432,6 +2800,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'kiwa-butte',
     trailName: 'Kiwa Butte',
     displayName: 'Kiwa Butte',
     recArea: 'Wanoga Sno Park',
@@ -2447,6 +2816,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'lone-wolf',
     trailName: 'Lone Wolf',
     displayName: 'Lone Wolf',
     recArea: 'Wanoga Sno Park',
@@ -2462,6 +2832,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'lorax',
     trailName: 'Lorax',
     displayName: 'Lorax',
     recArea: 'Wanoga Sno Park',
@@ -2477,6 +2848,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'pondo',
     trailName: 'Pondo',
     displayName: 'Pondo',
     recArea: 'Wanoga Sno Park',
@@ -2492,6 +2864,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'steve-larsen',
     trailName: 'Steve Larsen',
     displayName: 'Steve Larsen',
     recArea: 'Wanoga Sno Park',
@@ -2507,6 +2880,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'storm-king-lower',
     trailName: 'Storm King (Lower)',
     displayName: 'Storm King (Lower)',
     recArea: 'Wanoga Sno Park',
@@ -2522,6 +2896,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'tiddlywinks-lower',
     trailName: 'Tiddlywinks (Lower)',
     displayName: 'Tiddlywinks (Lower)',
     recArea: 'Wanoga Sno Park',
@@ -2537,6 +2912,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'tiddlywinks-upper',
     trailName: 'Tiddlywinks (Upper)',
     displayName: 'Tiddlywinks (Upper)',
     recArea: 'Wanoga Sno Park',
@@ -2552,6 +2928,7 @@ export const bendMountainBikeTrails: MountainBikeTrail[] = [
     icon: faMountain,
   },
   {
+    slug: 'tylers-traverse',
     trailName: "Tyler's Traverse",
     displayName: "Tyler's Traverse",
     recArea: 'Wanoga Sno Park',

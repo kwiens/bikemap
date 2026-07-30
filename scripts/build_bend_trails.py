@@ -437,15 +437,19 @@ def main():
             if (i + 1) % 25 == 0:
                 print(f"  {i + 1}/{len(selected)}")
 
-    # unique trailName/slug
-    seen, trails = {}, []
+    # Keep the source slug as the public asset/deep-link identifier. Display
+    # names are not stable URL keys (parentheses, punctuation, and even the
+    # occasional upstream typo make name-derived slugs differ from the route).
+    seen_slugs, seen_names, trails = set(), set(), []
     for t in sorted(results, key=lambda t: (t["recArea"], t["display"])):
         name = t["display"]
-        slug = slugify(name)
-        if slug in seen:
+        if name in seen_names:
             name = f"{t['display']} ({t['recArea']})"
-            slug = slugify(name)
-        seen[slug] = True
+        seen_names.add(name)
+        slug = t["slug"]
+        if slug in seen_slugs:
+            raise ValueError(f"duplicate Bend source slug: {slug}")
+        seen_slugs.add(slug)
         t["trailName"] = name
         t["slug_out"] = slug
         trails.append(t)
@@ -465,9 +469,17 @@ def main():
             "geometrySource": t["geometry_source"],
             "profile": t["profile"],
         }
-        with open(
-            os.path.join(ELEV_DIR, f"{t['slug_out']}.json"), "w", encoding="utf-8"
-        ) as fh:
+        output_path = os.path.join(ELEV_DIR, f"{t['slug_out']}.json")
+        legacy_path = os.path.join(ELEV_DIR, f"{slugify(t['trailName'])}.json")
+        if legacy_path != output_path and os.path.exists(legacy_path):
+            try:
+                with open(legacy_path, encoding="utf-8") as fh:
+                    legacy_profile = json.load(fh)
+            except (OSError, ValueError):
+                legacy_profile = {}
+            if legacy_profile.get("trail") == t["trailName"]:
+                os.unlink(legacy_path)
+        with open(output_path, "w", encoding="utf-8") as fh:
             json.dump(prof, fh, separators=(",", ":"))
 
     write_data_ts(trails)
@@ -510,6 +522,7 @@ def write_data_ts(trails: list[dict]) -> None:
         rating = t["rating"]
         lines += [
             "  {",
+            f"    slug: '{esc(t['slug_out'])}',",
             f"    trailName: '{esc(t['trailName'])}',",
             f"    displayName: '{esc(t['display'])}',",
             f"    recArea: '{esc(t['recArea'])}',",

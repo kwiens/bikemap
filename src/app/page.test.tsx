@@ -25,6 +25,7 @@ vi.mock('@/components/WelcomeModal', () => ({
 vi.mock('@/data/geo_data', () => ({
   mountainBikeTrails: [
     {
+      slug: 'mouse-creek',
       trailName: 'Mouse Creek Greenway Phase 1',
       displayName: 'Mouse Creek Greenway Phase 1',
       recArea: 'Cleveland',
@@ -70,11 +71,7 @@ describe('Home — share link URL parameter handling', () => {
   });
 
   it('dispatches TRAIL_SELECT on MAP_READY when ?trail= matches', () => {
-    window.history.replaceState(
-      null,
-      '',
-      '/?trail=mouse-creek-greenway-phase-1',
-    );
+    window.history.replaceState(null, '', '/?trail=mouse-creek');
     render(<Home />);
 
     // Before MAP_READY fires, no TRAIL_SELECT should have been dispatched
@@ -138,11 +135,7 @@ describe('Home — share link URL parameter handling', () => {
   });
 
   it('only fires once even if MAP_READY is dispatched multiple times', () => {
-    window.history.replaceState(
-      null,
-      '',
-      '/?trail=mouse-creek-greenway-phase-1',
-    );
+    window.history.replaceState(null, '', '/?trail=mouse-creek');
     render(<Home />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
@@ -156,11 +149,7 @@ describe('Home — share link URL parameter handling', () => {
 
   it('selects immediately via __mapReady flag without waiting for event', () => {
     (window as unknown as Record<string, boolean>).__mapReady = true;
-    window.history.replaceState(
-      null,
-      '',
-      '/?trail=mouse-creek-greenway-phase-1',
-    );
+    window.history.replaceState(null, '', '/?trail=mouse-creek');
     render(<Home />);
 
     // Should have dispatched immediately, without needing MAP_READY event
@@ -174,11 +163,7 @@ describe('Home — share link URL parameter handling', () => {
   });
 
   it('prefers trail param when both trail and route are present', () => {
-    window.history.replaceState(
-      null,
-      '',
-      '/?trail=mouse-creek-greenway-phase-1&route=zoo-loop',
-    );
+    window.history.replaceState(null, '', '/?trail=mouse-creek&route=zoo-loop');
     render(<Home />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
