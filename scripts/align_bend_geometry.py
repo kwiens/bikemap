@@ -287,7 +287,7 @@ def match_trail(
         for wid, pw in proj_ways:
             for (ax, ay), (bx, by) in zip(pw, pw[1:]):
                 # cheap reject on x-range
-                if px < min(ax, bx) - TOL_M or px > max(ax, bx) + TOL_M:
+                if px < min(ax, bx) - tolerance_m or px > max(ax, bx) + tolerance_m:
                     continue
                 d2 = pt_seg_d2(px, py, ax, ay, bx, by)
                 if d2 < best_d2:

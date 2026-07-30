@@ -1,9 +1,11 @@
 import json
+import math
 import os
 import tempfile
 import unittest
 from unittest.mock import patch
 
+from align_bend_geometry import Way, match_trail
 from audit_bend_trails import (
     geometry_quality_issues,
     profile_teleport_issues,
@@ -103,6 +105,41 @@ class ProfileAuditTest(unittest.TestCase):
 
 
 class ReferenceTraceTest(unittest.TestCase):
+    def test_match_trail_applies_fallback_tolerance_to_x_prefilter(self):
+        reference_lng = -121.3
+        reference_lat = 44.0
+        offset_lng = 30 / (
+            111320.0 * math.cos(math.radians(reference_lat))
+        )
+        reference = [
+            [
+                (reference_lng, reference_lat),
+                (reference_lng, reference_lat + 0.001),
+            ]
+        ]
+        way = Way(
+            1,
+            "Offset trail",
+            None,
+            [
+                (reference_lng + offset_lng, reference_lat),
+                (reference_lng + offset_lng, reference_lat + 0.001),
+            ],
+        )
+        grid = {
+            (int(reference_lng / 0.02), int(reference_lat / 0.02)): {way.id}
+        }
+
+        coverage, matches = match_trail(
+            reference,
+            {way.id: way},
+            grid,
+            tolerance_m=35.0,
+        )
+
+        self.assertEqual(coverage, 1.0)
+        self.assertEqual([way_id for way_id, _share in matches], [way.id])
+
     def test_prefers_cleaner_trace_over_higher_tolerance_regression(self):
         clean = TraceResult([[[0, 0], [1, 1]]], 0.93, [])
         regressed = TraceResult([[[0, 0], [1, 1]]], 1.0, [3500])
