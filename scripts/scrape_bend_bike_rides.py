@@ -27,6 +27,7 @@ from urllib.request import Request, urlopen
 SITEMAP = "https://bendbikerides.com/sitemap.xml"
 BASE = "https://bendbikerides.com"
 UA = "Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0"
+NON_TRAIL_SLUGS = {"complex", "map"}
 OUT_DIR = Path(__file__).resolve().parent.parent / "data"
 CSV_PATH = OUT_DIR / "bend-bike-rides.csv"
 JSONL_PATH = OUT_DIR / "bend-bike-rides.jsonl"
@@ -43,7 +44,13 @@ def get(url: str) -> str:
 
 def slugs_from_sitemap() -> list[str]:
     xml = get(SITEMAP)
-    return [m for m in re.findall(r"<loc>https://bendbikerides\.com/trail/([^<]+)</loc>", xml)]
+    return [
+        slug
+        for slug in re.findall(
+            r"<loc>https://bendbikerides\.com/trail/([^<]+)</loc>", xml
+        )
+        if slug not in NON_TRAIL_SLUGS
+    ]
 
 
 def _jstr(s: str) -> str:
@@ -110,6 +117,19 @@ def parse(html: str, slug: str) -> dict | None:
     closures = [_jstr(c) for c in
                 re.findall(r'name:"((?:[^"\\]|\\.)*)"', closure_blob.group(1) if closure_blob else "")]
     fp = re.search(r'flagPoint:\$R\[\d+\]=\[([-\d.]+),([-\d.]+)\]', blob)
+    bounds = re.search(
+        r'bounds:\$R\[\d+\]=\[(?:\$R\[\d+\]=)?\[([-\d.]+),([-\d.]+)\],'
+        r'(?:\$R\[\d+\]=)?\[([-\d.]+),([-\d.]+)\]\]',
+        blob,
+    )
+    if fp:
+        flag_lng, flag_lat = float(fp.group(1)), float(fp.group(2))
+    elif bounds:
+        west, south, east, north = (float(bounds.group(i)) for i in range(1, 5))
+        flag_lng = (west + east) / 2
+        flag_lat = (south + north) / 2
+    else:
+        flag_lng = flag_lat = None
     pm = re.search(r'path:\$R\[\d+\]=\[([^\]]*)\]', blob)
 
     # Pull all elevation stats from inside the single elevation object, so
@@ -146,8 +166,8 @@ def parse(html: str, slug: str) -> dict | None:
         "complex_slug": cm.group(2) if cm else None,
         "closure": ";".join(closures),
         "pois": ";".join(pois),
-        "flag_lat": float(fp.group(2)) if fp else None,
-        "flag_lng": float(fp.group(1)) if fp else None,
+        "flag_lat": flag_lat,
+        "flag_lng": flag_lng,
         "path": ",".join(re.findall(r'"([^"]+)"', pm.group(1))) if pm else None,
     }
 
@@ -201,7 +221,12 @@ def main() -> None:
         "closure", "pois", "flag_lat", "flag_lng",
     ]
     with CSV_PATH.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=csv_cols, extrasaction="ignore")
+        w = csv.DictWriter(
+            f,
+            fieldnames=csv_cols,
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
         w.writeheader()
         for r in records:
             row = dict(r)

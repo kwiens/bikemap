@@ -1,5 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { regionFor, mountainBikeTrails } from './mountain-bike-trails';
+import {
+  regionFor,
+  mountainBikeTrails,
+  slugForTrail,
+  type MountainBikeTrail,
+} from './mountain-bike-trails';
+
+describe('slugForTrail', () => {
+  const trail = {
+    trailName: 'Mrazek (Lower)',
+  } as MountainBikeTrail;
+
+  it('uses a canonical source slug when present', () => {
+    expect(slugForTrail({ ...trail, slug: 'mrazek' })).toBe('mrazek');
+  });
+
+  it('falls back to the display-name slug', () => {
+    expect(slugForTrail(trail)).toBe('mrazek-(lower)');
+  });
+});
 
 describe('regionFor', () => {
   it('maps 5 Points to Lookout Mountain', () => {

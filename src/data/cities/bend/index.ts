@@ -1,20 +1,15 @@
 import { faBicycle, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { bikeRoutes as chattanoogaBikeRoutes } from '@/data/bike-routes';
 import type { CityData } from '@/data/cities/types';
-import {
-  OSM_TRAILS_SOURCE_ID,
-  OSM_TRAILS_SOURCE_LAYER,
-  OSM_TRAILS_TILEJSON_URL,
-} from '@/data/osm-trails';
 import { bendBikeResources } from './bike-resources';
 import { bendBikeRoutes } from './bike-routes.data';
 import { bendMapFeatures } from './map-features';
 import { bendMountainBikeTrails } from './mountain-bike-trails.data';
 
-// Bend's curated MTB trails render from the shared nationwide OSM trails tileset
-// (the curated entries carry the matched OSM way ids). Match by OSM_ID, and the
-// base layer filter is restricted to the union of curated ids (see map.ts).
+// Bend's curated MTB trails render from generated GeoJSON so the map uses the
+// same ordered/clipped OSM-derived geometry as each elevation profile.
 const BEND_MTB_LAYER_ID = 'bend-mtb-trails';
+const BEND_MTB_SOURCE_ID = 'bend-mtb-trails-source';
 
 // recArea (trail "complex" from bendbikerides) -> geographic region for the
 // sidebar grouping. Areas not listed fall back to 'Central Oregon'.
@@ -67,11 +62,10 @@ export const bendData: CityData = {
     layers: [
       {
         layerId: BEND_MTB_LAYER_ID,
-        sourceId: OSM_TRAILS_SOURCE_ID,
-        tilesetUrl: OSM_TRAILS_TILEJSON_URL,
-        sourceLayer: OSM_TRAILS_SOURCE_LAYER,
-        trailProp: 'OSM_ID',
-        matchBy: 'osmId',
+        sourceId: BEND_MTB_SOURCE_ID,
+        geojsonUrl: '/data/bend/trails.geojson',
+        trailProp: 'Trail',
+        matchBy: 'name',
       },
     ],
     hiddenTrails: [],

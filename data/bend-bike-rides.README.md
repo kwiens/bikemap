@@ -39,7 +39,7 @@ Re-run with: `python scripts/scrape_bend_bike_rides.py`
 | `elev_gain_m`/`elev_loss_m` + `_ft` | climbing / descending (source meters; feet derived) |
 | `elev_min_m`, `elev_max_m` | elevation bounds (meters) |
 | `pois` | associated points of interest (`;`-joined) |
-| `flag_lat`, `flag_lng` | representative map point |
+| `flag_lat`, `flag_lng` | representative map point; current payloads derive this from the trail bounds center |
 
 Units note: the source stores distance and elevation in **meters**; the `_mi`/`_ft`
 columns are our conversions.
