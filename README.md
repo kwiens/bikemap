@@ -80,14 +80,13 @@ src/
 │   ├── site.config.ts     Branding / app identity
 │   └── map.config.ts      Geo-specific configuration (Mapbox, GBFS, region)
 ├── data/                  Routes, trails, shops, POIs — see docs/DATA.md
-├── hooks/                 useRideRecording, useWakeLock, useMapResize,
-│                          useToast, use-mobile
+├── hooks/                 useRideRecording, useWakeLock, useMapResize, useToast
 ├── utils/                 ride-stats, ride-storage (IndexedDB), dem (Terrain-RGB
 │                          elevation correction), gpx, compass, map, format, ...
 ├── events.ts              Custom DOM event constants
 └── lib/utils.ts           cn() — clsx + tailwind-merge
 
-public/data/elevation/     Per-trail elevation JSON
+public/data/elevation/     Per-trail elevation JSON (per-city subdirs)
 public/terrain/            Pre-cached DEM tiles (region-specific; see docs/DEPLOYING.md)
 scripts/                   Python tooling for trails & elevation
 ```
@@ -96,7 +95,7 @@ scripts/                   Python tooling for trails & elevation
 
 - **Framework**: Next.js 16 (App Router) + React 19
 - **Map**: Mapbox GL JS 3
-- **Styling**: Tailwind CSS, shadcn/ui primitives, Radix UI
+- **Styling**: Tailwind CSS
 - **Icons**: Font Awesome, lucide-react
 - **Storage**: IndexedDB (rides) and cookies (settings)
 - **PWA**: Service worker + Web App Manifest

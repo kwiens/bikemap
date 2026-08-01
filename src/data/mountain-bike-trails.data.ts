@@ -1,22 +1,6 @@
 import { faRoute, faMountain } from '@fortawesome/free-solid-svg-icons';
 import type { MountainBikeTrail } from './mountain-bike-trails';
-
-// Trail colors by difficulty rating
-const TRAIL_COLOR_EASY = '#16A34A';
-const TRAIL_COLOR_INTERMEDIATE = '#2563EB';
-const TRAIL_COLOR_ADVANCED = '#374151';
-const TRAIL_COLOR_EXPERT = '#000000';
-const TRAIL_COLOR_UNRATED = '#6B7280';
-const TRAIL_COLOR_GREENWAY = '#059669';
-
-function trailColor(rating: string, isGreenway: boolean): string {
-  if (isGreenway) return TRAIL_COLOR_GREENWAY;
-  if (rating === 'easy') return TRAIL_COLOR_EASY;
-  if (rating === 'intermediate') return TRAIL_COLOR_INTERMEDIATE;
-  if (rating === 'advanced') return TRAIL_COLOR_ADVANCED;
-  if (rating === 'expert') return TRAIL_COLOR_EXPERT;
-  return TRAIL_COLOR_UNRATED;
-}
+import { trailColor } from './trail-metadata';
 
 export const mountainBikeTrails: MountainBikeTrail[] = [
   // Bauxite Ridge/White Oak Mountain

@@ -45,6 +45,7 @@ from PIL import Image
 
 # Reuse the app's token resolver and retry-configured HTTP session so token
 # logic lives in exactly one place.
+from _geo import haversine_m
 from add_trail_elevation import _get_mapbox_token, _session
 
 # --- Constants ---------------------------------------------------------------
@@ -54,7 +55,6 @@ from add_trail_elevation import _get_mapbox_token, _session
 TERRAIN_ZOOM = 14
 TILE_SIZE = 256
 SAMPLE_STEP_M = 20
-EARTH_RADIUS_M = 6371000.0
 
 # Ported verbatim from src/utils/ride-stats.ts. Keep in sync.
 ELEVATION_DEAD_BAND = 3
@@ -139,16 +139,6 @@ US_STATE_BBOX = {
 
 
 # --- Geometry helpers --------------------------------------------------------
-
-def haversine_m(lng1, lat1, lng2, lat2):
-    """Great-circle distance in meters (matches ride-stats haversineDistance)."""
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlng / 2) ** 2)
-    return EARTH_RADIUS_M * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
 
 def line_length_m(line):
     """Total length of a [[lng, lat], ...] polyline in meters."""

@@ -7,32 +7,13 @@
  * The tile set covers the greater Chattanooga area at z13 (256px, ~16m/pixel).
  */
 
+import {
+  TERRAIN_TILE_SIZE as TILE_SIZE,
+  decodeTerrainRgb,
+  lngLatToTilePixel,
+} from './terrain-rgb';
+
 const TILE_ZOOM = 13;
-const TILE_SIZE = 256;
-
-/** Convert lat/lng to tile coordinates and pixel offset within the tile */
-function latLngToTilePixel(
-  lat: number,
-  lng: number,
-): { tileX: number; tileY: number; pixelX: number; pixelY: number } {
-  const n = 2 ** TILE_ZOOM;
-  const xFloat = ((lng + 180) / 360) * n;
-  const latRad = (lat * Math.PI) / 180;
-  const yFloat =
-    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
-
-  const tileX = Math.floor(xFloat);
-  const tileY = Math.floor(yFloat);
-  const pixelX = Math.floor((xFloat - tileX) * TILE_SIZE);
-  const pixelY = Math.floor((yFloat - tileY) * TILE_SIZE);
-
-  return { tileX, tileY, pixelX, pixelY };
-}
-
-/** Decode elevation from Terrain-RGB pixel values */
-function decodeElevation(r: number, g: number, b: number): number {
-  return -10000 + (r * 65536 + g * 256 + b) * 0.1;
-}
 
 // Cache loaded tile image data to avoid re-fetching
 const tileCache = new Map<string, ImageData | null>();
@@ -77,12 +58,12 @@ export async function getElevation(
   lat: number,
   lng: number,
 ): Promise<number | null> {
-  const { tileX, tileY, pixelX, pixelY } = latLngToTilePixel(lat, lng);
-  const tile = await loadTile(tileX, tileY);
+  const { x, y, px, py } = lngLatToTilePixel(lng, lat, TILE_ZOOM);
+  const tile = await loadTile(x, y);
   if (!tile) return null;
 
-  const idx = (pixelY * TILE_SIZE + pixelX) * 4;
-  return decodeElevation(
+  const idx = (py * TILE_SIZE + px) * 4;
+  return decodeTerrainRgb(
     tile.data[idx],
     tile.data[idx + 1],
     tile.data[idx + 2],
@@ -106,8 +87,8 @@ export async function correctElevations<
   // Pre-load all needed tiles in parallel
   const tileKeys = new Set<string>();
   for (const p of points) {
-    const { tileX, tileY } = latLngToTilePixel(p.lat, p.lng);
-    tileKeys.add(`${tileX}/${tileY}`);
+    const { x, y } = lngLatToTilePixel(p.lng, p.lat, TILE_ZOOM);
+    tileKeys.add(`${x}/${y}`);
   }
 
   await Promise.all(
@@ -122,20 +103,20 @@ export async function correctElevations<
   let prevKey: string | null = null;
 
   for (const p of points) {
-    const { tileX, tileY, pixelX, pixelY } = latLngToTilePixel(p.lat, p.lng);
-    const tile = tileCache.get(`${tileX}/${tileY}`);
+    const { x, y, px, py } = lngLatToTilePixel(p.lng, p.lat, TILE_ZOOM);
+    const tile = tileCache.get(`${x}/${y}`);
 
     let fixed: T;
     let key: string;
     if (tile) {
-      const idx = (pixelY * TILE_SIZE + pixelX) * 4;
-      const demAlt = decodeElevation(
+      const idx = (py * TILE_SIZE + px) * 4;
+      const demAlt = decodeTerrainRgb(
         tile.data[idx],
         tile.data[idx + 1],
         tile.data[idx + 2],
       );
       fixed = { ...p, altitude: demAlt };
-      key = `${tileX}/${tileY}/${pixelX}/${pixelY}`;
+      key = `${x}/${y}/${px}/${py}`;
     } else {
       fixed = p;
       key = `gps/${corrected.length}`; // unique — never dedup GPS-only points

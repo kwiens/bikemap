@@ -14,11 +14,12 @@ Usage: python scripts/validate_trails.py [trail_name]
 Requires: pip install Pillow requests
 """
 
-import gzip, json, math, os, re, struct, sys
+import gzip, json, os, re, struct, sys
 
 # Reuse the MVT decoder and tile fetching from add_trail_elevation.py
 # Import by adding the scripts dir to path
 sys.path.insert(0, os.path.dirname(__file__))
+from _geo import TOLERANCE, dist_deg
 from add_trail_elevation import (
     extract_all_trails,
     deduplicate_segments,
@@ -30,10 +31,6 @@ from add_trail_elevation import (
 
 GAP_THRESHOLD_FT = 200  # Flag gaps larger than this
 ELEV_JUMP_THRESHOLD_FT = 50  # Flag elevation jumps larger than this
-
-
-def dist_deg(a, b):
-    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
 def analyze_segments(trail_name, raw_segments):
@@ -48,9 +45,7 @@ def analyze_segments(trail_name, raw_segments):
     if len(segments) == 1:
         return issues, segments, [{'segments': [0], 'gaps': []}]
 
-    # Try chaining with detailed tracking
-    TOLERANCE = 0.0003  # ~100ft in degrees
-
+    # Try chaining with detailed tracking (shared TOLERANCE from _geo)
     remaining = list(range(len(segments)))
     remaining.sort(key=lambda i: len(segments[i]), reverse=True)
 
@@ -179,7 +174,7 @@ def check_elevation_profile(trail_name):
     slug = re.sub(r'\s+', '-', slug)
     slug = re.sub(r'-+', '-', slug).strip('-')
 
-    path = os.path.join('public/data/elevation', f'{slug}.json')
+    path = os.path.join('public/data/elevation/chattanooga', f'{slug}.json')
     if not os.path.exists(path):
         return []
 

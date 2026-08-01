@@ -29,65 +29,98 @@ gh issue view [number]                              # View issue details
 
 ## Architecture
 
-This is a Next.js 15 App Router application displaying an interactive Mapbox map of Chattanooga bike routes and resources.
+This is a Next.js App Router application displaying an interactive Mapbox map of bike routes, trails, and resources. It is **multi-city**: Chattanooga, TN ([bikechatt.com](https://bikechatt.com)) and Bend, OR (ridebend.org) run from the same codebase, selected per-request by hostname (or `NEXT_PUBLIC_CITY_ID` in development).
 
 ### Project Structure
 
 ```
 src/
-├── app/                    # Next.js App Router pages
+├── app/                    # Next.js App Router pages (/, /about, /export)
 ├── components/
-│   ├── Map.tsx            # Main map orchestrator
+│   ├── Map.tsx            # Main map orchestrator (init, markers, custom events, GPS)
 │   ├── MapLegend.tsx      # Sidebar container with state management
 │   ├── MapMarkers.tsx     # Marker factory and MarkerManager class
-│   └── sidebar/           # Extracted sidebar components
-│       ├── BikeRoutes.tsx, MapLayers.tsx, etc.
+│   ├── RidesPanel.tsx     # Ride recording controls + history panel
+│   ├── WelcomeModal.tsx   # First-run onboarding & ride-style preference
+│   ├── PwaInstallPrompt.tsx
+│   └── sidebar/           # Sidebar components
+│       ├── BikeRoutes, MountainBikeTrails, MapLayers(Section), BikeNetworkLayer
+│       ├── AttractionsList, BikeResourcesList, BikeRentalList (LocationList shared base)
+│       ├── ElevationProfile.tsx  # Bottom elevation pane (trails, OSM ways, rides)
+│       ├── RideHistory.tsx, RideDetail.tsx
+│       ├── SidebarCard.tsx, ToggleSwitch.tsx, a11y.ts (pressableProps)
 │       ├── types.ts       # Shared interfaces
 │       └── index.ts       # Barrel export
 ├── config/
-│   └── map.config.ts      # Centralized geo config (for multi-geography support)
+│   ├── map.config.ts      # Per-city geo config + city resolution (hostname/env)
+│   └── site.config.ts     # Per-city branding (name, URL, theme, storage prefix)
 ├── data/
-│   ├── geo_data.ts        # Static routes, attractions, bike shops
-│   └── gbfs.ts            # Live bike share API integration
-├── hooks/
-│   ├── useToast.ts        # Toast notification with auto-dismiss
-│   ├── useMapResize.ts    # Window/sidebar resize handling
-│   └── useLocationTracking.ts
-└── utils/
-    └── map.ts             # Geocoding, route opacity, bounds utilities
+│   ├── cities/            # THE city registry: types.ts (CityData contract),
+│   │   │                  # index.ts (cityDataById + activeCityData)
+│   │   ├── chattanooga/   # Chattanooga CityData (arrays live in top-level src/data/*)
+│   │   └── bend/          # Bend CityData + data files
+│   ├── geo_data.ts        # Barrel over activeCityData — components import from here
+│   ├── mapbox-style.ts    # What the shared Studio style bakes in (style-owned layers)
+│   ├── bike-routes|map-features|bike-resources|local-resources.ts  # Types + Chattanooga data
+│   ├── mountain-bike-trails(.data).ts  # MTB types/constants + Chattanooga trail array
+│   ├── trail-metadata.ts  # Rating→color palette (trailColor) + GIS name metadata
+│   ├── osm-trails.ts      # Nationwide OSM trails layer constants
+│   ├── bike-network.ts    # Classified bike-network overlay constants
+│   ├── ride.ts            # Ride recording types
+│   └── gbfs.ts            # Live bike share API integration (station + free-bike)
+├── hooks/                 # useRideRecording, useWakeLock, useMapResize, useToast
+├── utils/
+│   ├── map.ts             # Map layer plumbing, selection, bounds, geocoding
+│   ├── terrain-rgb.ts     # Shared Terrain-RGB decode + tile math
+│   ├── dem.ts             # Ride elevation correction (pre-cached z13 tiles)
+│   ├── osm-elevation.ts   # OSM trail elevation (live z14 tiles + precomputed)
+│   ├── ride-stats.ts, ride-storage.ts (IndexedDB), gpx.ts, compass.ts
+│   ├── request-hostname.ts # Server-side hostname resolution (shared by layout/manifest/about)
+│   └── format.ts, settings.ts, string.ts, svg.ts, html.ts
+├── events.ts              # MAP_EVENTS — all custom DOM event names
+└── lib/utils.ts           # cn() — clsx + tailwind-merge
 ```
+
+### Multi-City Architecture
+
+- **`src/data/cities/types.ts`** defines `CityData` — the contract for what a city provides (routes, features, resources, MTB trail config, regionFor, optional `bikeNetworkUrl`/`bikeRoutesUrl`).
+- **`src/data/cities/index.ts`** registers cities in `cityDataById` and exposes `activeCityData`.
+- **City resolution** happens in `map.config.ts`: `resolveActiveCityId()` checks the hostname against `NEXT_PUBLIC_CITY_HOST_MAP`, falling back to `NEXT_PUBLIC_CITY_ID`, then Chattanooga. `parseCityId` derives valid ids from `cityConfigs` keys — adding a city to the registry is sufficient. Server components (`layout.tsx`, `manifest.ts`, `about/page.tsx`) resolve per-request via `getRequestHostname()`; client code binds `activeCityData` at module load (works because the map is client-only).
+- **Style ownership** (`src/data/mapbox-style.ts`): the shared Mapbox Studio style is Chattanooga's. `hiddenStyleLayerIdsFor(city)` computes which style-baked route layers a city must hide (everything it doesn't own) — a new city never imports another city's data.
+- **Per-city static data** lives under `public/data/<city>/` (GeoJSON) and `public/data/elevation/<city>/` (per-trail elevation JSONs — city-scoped so same-named trails can't collide).
+- Adding a city: extend `CityId`, add a `MapConfig` + `SiteConfig`, create `src/data/cities/<city>/`, register it in `cityDataById`, add the hostname to `NEXT_PUBLIC_CITY_HOST_MAP`, and provide `public/data/<city>/` assets.
 
 ### Core Data Flow
 
 1. **Page Entry** (`src/app/page.tsx`): Dynamically imports Map component with SSR disabled (Mapbox requires browser)
 2. **Map Component** (`src/components/Map.tsx`): Main orchestrator that initializes Mapbox, manages markers, and handles custom events
 3. **Data Sources** (`src/data/`):
-   - `geo_data.ts`: Static data for bike routes, attractions, bike shops (BikeRoute, MapFeature, BikeResource interfaces)
-   - `gbfs.ts`: Live bike share station data from Chattanooga GBFS API
-
-### Configuration
-
-`src/config/map.config.ts` centralizes all geography-specific settings:
-- Mapbox access token and style URL
-- Default map view (center, zoom, pitch, bearing)
-- GBFS API endpoints
-- Region metadata
-
-This enables future multi-geography support by swapping config files.
+   - `geo_data.ts`: barrel re-exporting the **active city's** data (`bikeRoutes`, `mapFeatures`, `bikeResources`, `mountainBikeTrails`, `elevationBasePath`, ...) — components import from here and stay city-agnostic
+   - `gbfs.ts`: live bike share data (station-based for Chattanooga, free-bike/Veo for Bend — a discriminated `GBFSConfig` union)
 
 ### Event-Driven Communication
 
-The app uses custom DOM events (`window.dispatchEvent`) for component communication:
+The app uses custom DOM events (`window.dispatchEvent`) for component communication. **All event names live in `src/events.ts` (`MAP_EVENTS`)** — never use string literals. The full set:
 
-| Event | Dispatched By | Handled By | Purpose |
-|-------|--------------|------------|---------|
-| `route-select` | Sidebar, Map | Map, Sidebar | Bidirectional sync: highlights route on map AND in sidebar |
-| `layer-toggle` | Sidebar | Map | Shows/hides marker layers (attractions, bikeResources, bikeRentals) |
-| `center-location` | Sidebar | Map | Pans map to a specific location |
-| `route-deselect` | Sidebar | Map | Resets all route opacities |
-| `sidebar-toggle` | Sidebar | Map | Triggers map resize after sidebar animation |
+| Event | Purpose |
+|-------|---------|
+| `route-select` / `route-deselect` | Curated route selection (bidirectional Map ⇄ sidebar; deselect resets route opacity on the map) |
+| `trail-select` / `trail-deselect` | Curated MTB trail selection (bidirectional; drives elevation pane) |
+| `osm-trail-select` | Nationwide OSM trail clicked — carries a ready-built `ElevationProfile` |
+| `area-select` | Rec-area heading clicked — zoom to area bounds |
+| `layer-toggle` | Show/hide a layer: `attractions`, `bikeResources`, `bikeRentals` (radio-style markers), `osmTrails`, `bikeNetwork` |
+| `center-location` | Pan map to a location (and open its popup) |
+| `sidebar-toggle` | Sidebar opened/closed — map resize + elevation pane layout |
+| `elevation-hover` | Elevation chart hover — moves the map hover marker |
+| `location-update` | GPS fix — recenter / elevation-pane location dot |
+| `ride-style-chosen` | Welcome modal preference — selects default sidebar tab |
+| `ride-recording-start/stop/update` | Ride recorder lifecycle → live map track |
+| `ride-select` / `ride-deselect` | Saved ride selection (map track + elevation pane + panel) |
+| `rides-panel-toggle` | Rides panel opened/closed (closes the sidebar, with a `sidebar-toggle` dispatch) |
+| `toast` | Show a toast via the map's toast host |
+| `map-ready` | Map fully initialized (also sets `window.__mapReady` for late listeners) |
 
-**Important**: `route-select` is bidirectional - both Map and MapLegend listen for it. When clicking a route on the map, the map dispatches the event and MapLegend updates its selection state. When clicking in the sidebar, MapLegend dispatches the event and Map handles the visual update.
+**Important**: `route-select` and `trail-select` are bidirectional — both Map and MapLegend listen. When clicking on the map, the map dispatches and MapLegend updates its selection state; when clicking in the sidebar, MapLegend dispatches and Map handles the visual update. Event payloads are untyped (`CustomEvent.detail`) — check the dispatching site for the shape.
 
 ### Marker System
 
@@ -182,7 +215,7 @@ python scripts/add_trail_elevation.py
 **Important**: Short trails (under ~0.5 mi) may not appear at the default z12 zoom level. The script retries at z14 for missing trails, but very short trails may require z15. When running the script for a single trail and it reports "not found", fetch the geometry manually at z15 with an expanded bounding box covering the trail's area (see the script source for `extract_all_trails(zoom, bbox)`).
 
 The script outputs:
-- `public/data/elevation/{slug}.json` — per-trail elevation profile (distance, gain, loss, min, max, coordinate samples)
+- `public/data/elevation/chattanooga/{slug}.json` — per-trail elevation profile (distance, gain, loss, min, max, coordinate samples). Elevation JSONs are city-scoped: Bend's live in `public/data/elevation/bend/` (written by `scripts/build_bend_trails.py`), and the client fetches from `elevationBasePath` (`geo_data.ts`).
 - Updates `src/data/mountain-bike-trails.data.ts` — summary stats (distance, elevationGain, elevationLoss, elevationMin, elevationMax)
 
 #### Adding a New Trail
@@ -322,12 +355,7 @@ All component styling uses Tailwind utility classes. The only remaining custom C
 
 Tests are in `*.test.ts` or `*.test.tsx` files adjacent to their source files. Run with `pnpm test:run`.
 
-Key test files:
-- `src/utils/map.test.ts` - Utility function tests
-- `src/config/map.config.test.ts` - Configuration tests
-- `src/hooks/useToast.test.ts` - Hook tests
-- `src/components/sidebar/BikeRoutes.test.tsx` - Component tests
-- `src/data/gbfs.test.ts` - API integration tests
+Coverage spans ~30 test files: map utilities (`src/utils/map.test.ts`), config/city selection (`src/config/map.config.test.ts`), GBFS (`src/data/gbfs.test.ts`), ride recording/stats/storage (`src/hooks/useRideRecording.test.ts`, `src/utils/ride-*.test.ts`, `src/utils/elevation-accuracy.test.ts`), elevation (`dem`, `osm-elevation`, `gpx`), and components (`MapLegend`, `RidesPanel`, sidebar components). `src/components/Map.tsx` has no tests (known gap — see the deferred GPS/compass hook extraction).
 
 ### Mapbox Testing Limitations
 

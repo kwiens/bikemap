@@ -5,7 +5,7 @@ Fetches trail geometry directly from Mapbox Vector Tiles and samples elevation
 from Terrain-RGB tiles. No browser extraction needed.
 
 Output:
-  - public/data/elevation/{slug}.json  — per-trail elevation profiles
+  - public/data/elevation/chattanooga/{slug}.json  — per-trail elevation profiles
   - src/data/mountain-bike-trails.data.ts  — summary stats (gain, loss, min, max)
 
 Usage: python scripts/add_trail_elevation.py
@@ -18,6 +18,8 @@ from PIL import Image
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+from _geo import M_TO_FT, TOLERANCE, dist_deg, haversine_m, slugify
 
 # Session with automatic retries for transient failures
 _session = requests.Session()
@@ -79,8 +81,8 @@ TERRAIN_ZOOM = 15
 TILE_SIZE = 256
 SAMPLE_STEP_FT = 25
 METERS_TO_FEET = 3.28084
-EARTH_RADIUS_FT = 20902231.0
-OUTPUT_DIR = 'public/data/elevation'
+# City-scoped: this pipeline serves the Chattanooga MTB tileset (MVT_TILESET).
+OUTPUT_DIR = 'public/data/elevation/chattanooga'
 GEO_DATA_PATH = 'src/data/mountain-bike-trails.data.ts'
 TILE_CACHE_DIR = 'scripts/.tile_cache'
 
@@ -383,12 +385,7 @@ def get_elevation_ft(lng, lat):
 
 def haversine_ft(lng1, lat1, lng2, lat2):
     """Great-circle distance in feet between two points."""
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlng / 2) ** 2)
-    return EARTH_RADIUS_FT * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return haversine_m(lng1, lat1, lng2, lat2) * M_TO_FT
 
 
 def deduplicate_segments(segments):
@@ -421,11 +418,6 @@ def chain_segments(segments):
     """
     if len(segments) <= 1:
         return segments
-
-    TOLERANCE = 0.0003  # ~100ft in degrees
-
-    def dist_deg(a, b):
-        return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
     # Start with the longest segment
     remaining = list(range(len(segments)))
@@ -625,16 +617,6 @@ def generate_profile(trail_name, segments):
         'max': max_elev if max_elev != float('-inf') else 0,
         'profile': profile,
     }
-
-
-def slugify(name):
-    """Convert trail name to URL-safe filename slug."""
-    s = name.lower()
-    s = re.sub(r"['\"]", '', s)
-    s = re.sub(r'[/&]', '-', s)
-    s = re.sub(r'\s+', '-', s)
-    s = re.sub(r'-+', '-', s)
-    return s.strip('-')
 
 
 # ============================================================

@@ -10,7 +10,9 @@ export { AttractionsList } from './AttractionsList';
 export { BikeResourcesList } from './BikeResourcesList';
 export { BikeRentalList } from './BikeRentalList';
 export { InformationSection } from './InformationSection';
-export { SidebarCard } from './SidebarCard';
+export { LocationList } from './LocationList';
+export { SidebarCard, type SidebarCardColorTheme } from './SidebarCard';
+export { pressableProps } from './a11y';
 
 // Types
 export type {

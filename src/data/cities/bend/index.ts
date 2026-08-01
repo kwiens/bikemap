@@ -1,5 +1,4 @@
 import { faBicycle, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
-import { bikeRoutes as chattanoogaBikeRoutes } from '@/data/bike-routes';
 import type { CityData } from '@/data/cities/types';
 import {
   OSM_TRAILS_SOURCE_ID,
@@ -75,11 +74,7 @@ export const bendData: CityData = {
       },
     ],
     hiddenTrails: [],
-    strayStyleLayers: ['Chatt_TPL_Trails-public'],
   },
-  // The current Mapbox Studio style is Chattanooga-specific. Until Bend has its
-  // own curated route layers, hide Chattanooga route layers when Bend is active.
-  hiddenStyleLayerIds: chattanoogaBikeRoutes.map((route) => route.id),
   // OSM-derived classified bike network (Casual mode overlay).
   bikeNetworkUrl: '/data/bend/bike-network.geojson',
   // Curated greenway routes (geometry attached at runtime from GeoJSON).

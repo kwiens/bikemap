@@ -21,6 +21,10 @@ export const MAX_ACCURACY_M = 30;
 const STOP_SPEED = 0.5;
 // Duration threshold: must be stopped for this long to count (ms)
 const STOP_DURATION_MS = 10_000;
+// Cap on a single point-to-point time delta counted as moving (ms). GPS points
+// arrive ~1/s; a larger gap means signal loss or a pause — counting the whole
+// gap would inflate moving time (and deflate average speed).
+const MAX_SEGMENT_MS = 30_000;
 // Max plausible cycling speed (m/s, ~89 mph)
 const MAX_PLAUSIBLE_SPEED = 40;
 // EMA smoothing factor for elevation (0–1).  Lower = heavier smoothing.
@@ -104,7 +108,7 @@ export function computeMovingTime(points: AnyRidePoint[]): number {
         }
         stopStart = null;
       }
-      movingMs += dt;
+      movingMs += Math.min(dt, MAX_SEGMENT_MS);
     }
   }
 

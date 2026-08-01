@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   cityConfigs,
   cityIdForHostname,
-  getGBFSUrl,
   mapConfig,
   parseCityId,
   resolveActiveCityId,
@@ -45,30 +44,6 @@ describe('map.config', () => {
 
     it('should have debug settings', () => {
       expect(typeof mapConfig.debug.showLocationTracker).toBe('boolean');
-    });
-  });
-
-  describe('getGBFSUrl', () => {
-    it('should return full URL for stationInformation', () => {
-      expect(mapConfig.gbfs?.type).toBe('station');
-      if (mapConfig.gbfs?.type !== 'station') return;
-
-      const url = getGBFSUrl('stationInformation');
-      expect(url).toBe(
-        `${mapConfig.gbfs.baseUrl}${mapConfig.gbfs.endpoints.stationInformation}`,
-      );
-      expect(url).toContain('station_information');
-    });
-
-    it('should return full URL for stationStatus', () => {
-      expect(mapConfig.gbfs?.type).toBe('station');
-      if (mapConfig.gbfs?.type !== 'station') return;
-
-      const url = getGBFSUrl('stationStatus');
-      expect(url).toBe(
-        `${mapConfig.gbfs.baseUrl}${mapConfig.gbfs.endpoints.stationStatus}`,
-      );
-      expect(url).toContain('station_status');
     });
   });
 

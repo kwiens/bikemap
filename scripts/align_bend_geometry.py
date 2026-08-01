@@ -34,6 +34,8 @@ import unicodedata
 from collections import defaultdict
 from difflib import SequenceMatcher
 
+from _geo import M_TO_MI, haversine_m
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CACHE_GLOB = os.path.join(HERE, ".osm_cache", "oregon_*.json")
@@ -230,11 +232,8 @@ def load_ways():
 
 
 def haversine_mi(a, b, c, d):
-    R = 6371.0
-    p1, p2 = math.radians(a), math.radians(c)
-    dp, dl = math.radians(c - a), math.radians(d - b)
-    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return 2 * R * math.asin(math.sqrt(h)) * 0.621371
+    """Distance in miles; args are (lat1, lng1, lat2, lng2) — note lat-first."""
+    return haversine_m(b, a, d, c) * M_TO_MI
 
 
 def candidate_ids(grid, bbox):

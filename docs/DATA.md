@@ -81,12 +81,12 @@ pointless, they get overwritten. See [DEPLOYING.md](DEPLOYING.md) for setup.
 
 | Script | Writes |
 |---|---|
-| `add_trail_elevation.py` | `MountainBikeTrail` elevation stats (`elevationGain/Loss/Min/Max`, `distance`) + per-trail `public/data/elevation/{slug}.json` |
+| `add_trail_elevation.py` | `MountainBikeTrail` elevation stats (`elevationGain/Loss/Min/Max`, `distance`) + per-trail `public/data/elevation/chattanooga/{slug}.json` |
 | `add_trail_bounds.py` | `MountainBikeTrail.defaultBounds` and `distance` |
 | `validate_trails.py` | Read-only — flags geometry/elevation anomalies |
 | `mtb_project_trail_validation.py` | Read-only — compares local curated MTB trails with minimal MTB Project route metadata; see [MTB_PROJECT_VALIDATION.md](MTB_PROJECT_VALIDATION.md) |
 
-### Per-trail elevation JSON (`public/data/elevation/{slug}.json`)
+### Per-trail elevation JSON (`public/data/elevation/<city>/{slug}.json`)
 
 Written by `add_trail_elevation.py`, consumed by the elevation chart:
 

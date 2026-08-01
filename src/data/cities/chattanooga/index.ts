@@ -48,7 +48,5 @@ export const chattanoogaData: CityData = {
       },
     ],
     hiddenTrails: HIDDEN_TRAILS,
-    strayStyleLayers: ['Chatt_TPL_Trails-public'],
   },
-  hiddenStyleLayerIds: [],
 };

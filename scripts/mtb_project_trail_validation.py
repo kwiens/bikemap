@@ -35,6 +35,8 @@ from typing import Any
 
 import requests
 
+from _geo import M_TO_MI, haversine_m
+
 
 ROOT = Path(__file__).resolve().parents[1]
 GRAPHQL_ENDPOINT = "https://api.production.onxmaps.com/v1/supergraph/"
@@ -812,21 +814,15 @@ def center(bounds: tuple[float, float, float, float]) -> tuple[float, float]:
 
 
 def haversine_miles(a: tuple[float, float], b: list[float] | tuple[float, float]) -> float:
-    radius_mi = 3958.7613
     lng1, lat1 = a
     lng2, lat2 = b
-    d_lat = math.radians(lat2 - lat1)
-    d_lng = math.radians(lng2 - lng1)
-    lat1_rad = math.radians(lat1)
-    lat2_rad = math.radians(lat2)
-    h = math.sin(d_lat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(d_lng / 2) ** 2
-    return 2 * radius_mi * math.asin(math.sqrt(h))
+    return haversine_m(lng1, lat1, lng2, lat2) * M_TO_MI
 
 
 def meters_to_miles(value: Any) -> float | None:
     if value is None:
         return None
-    return float(value) * 0.000621371192
+    return float(value) * M_TO_MI
 
 
 def write_report_csv(report: dict[str, Any], path: Path) -> None:

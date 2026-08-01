@@ -18,8 +18,7 @@ city and the test of whether the pattern scales.
   `data/bend-osm-match.csv`.
 - Bend bike resources + map features (concurrent session).
 - Nationwide OSM trails layer + precomputed elevation for OR and TN.
-- onX validation tooling (`scripts/mtb_project_trail_validation.py`,
-  `onx_trail_validation.py`).
+- onX validation tooling (`scripts/mtb_project_trail_validation.py`).
 
 **Assessment:** Bend's MTB pane is solid; Bend overall is ~70% feature-complete
 vs Chattanooga. Biggest gaps below.
@@ -96,7 +95,7 @@ Pick one to invest in next:
 - [ ] **`Map.tsx` decomposition** — extract the GPS/compass hook + add Map tests
   (the last open-source-cleanup item).
 - [ ] **onX validation tool hardening** — review items in
-  `onx_trail_validation.py` (empty-name Levenshtein → 1.0, unguarded
+  `mtb_project_trail_validation.py` (empty-name Levenshtein → 1.0, unguarded
   `route['location']` sub-fields, meters-assumption on onX length). Owned by the
   validation-tool author; coordinate before editing.
 - [ ] **Branch coordination** — multiple agents have been amending/pushing the

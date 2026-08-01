@@ -24,15 +24,14 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from _geo import M_TO_FT, M_TO_MI
+
 SITEMAP = "https://bendbikerides.com/sitemap.xml"
 BASE = "https://bendbikerides.com"
 UA = "Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0"
 OUT_DIR = Path(__file__).resolve().parent.parent / "data"
 CSV_PATH = OUT_DIR / "bend-bike-rides.csv"
 JSONL_PATH = OUT_DIR / "bend-bike-rides.jsonl"
-
-M_TO_MI = 1 / 1609.344
-M_TO_FT = 3.280839895
 
 
 def get(url: str) -> str:
