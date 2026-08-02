@@ -41,8 +41,12 @@ def _read_mapbox_token():
         return token.strip()
 
     root = os.path.join(os.path.dirname(__file__), '..')
-    for env_file in ('.env.local', '.env'):
-        path = os.path.join(root, env_file)
+    explicit_env = os.environ.get('BIKEMAP_ENV_FILE')
+    env_paths = ([explicit_env] if explicit_env else []) + [
+        os.path.join(root, '.env.local'),
+        os.path.join(root, '.env'),
+    ]
+    for path in env_paths:
         if not os.path.exists(path):
             continue
         with open(path) as f:

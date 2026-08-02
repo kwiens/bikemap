@@ -209,7 +209,7 @@ export function calculateTrailBounds(
     if (!source) continue;
 
     const features = map.querySourceFeatures(source, {
-      sourceLayer: cfg.sourceLayer,
+      ...(cfg.sourceLayer ? { sourceLayer: cfg.sourceLayer } : {}),
       filter: trailMatchExpr(cfg, trailName),
     });
 
@@ -288,10 +288,11 @@ export function getAreaBounds(
 // containing mountain bike trails with its own property names
 interface TrailLayerConfig {
   layerId: string;
-  sourceLayer: string;
+  sourceLayer?: string;
   trailProp: string; // feature property containing the trail name
   sourceId?: string;
   tilesetUrl?: string;
+  geojsonUrl?: string;
   matchBy?: 'name' | 'osmId';
   // Maps the raw feature-property value (e.g. tileset 'Trail' name) to the
   // line color. Falls back to UNRATED_COLOR for anything unlisted.
@@ -450,22 +451,25 @@ function sourceIdForLayer(
   return layer?.source ?? cfg.sourceId ?? null;
 }
 
-// Attach any city-managed curated trail tilesets that are not already baked
-// into the Mapbox Studio style. Idempotent: skips existing sources/layers.
+// Attach any city-managed curated trail vector/GeoJSON sources that are not
+// already baked into the Mapbox Studio style. Idempotent: skips existing ones.
 export function ensureMtnBikeSource(map: mapboxgl.Map): void {
   try {
     for (const cfg of TRAIL_LAYERS) {
-      if (!cfg.sourceId || !cfg.tilesetUrl) continue;
+      if (!cfg.sourceId || (!cfg.tilesetUrl && !cfg.geojsonUrl)) continue;
 
-      ensureSource(map, cfg.sourceId, {
-        type: 'vector',
-        url: cfg.tilesetUrl,
-      });
+      ensureSource(
+        map,
+        cfg.sourceId,
+        cfg.geojsonUrl
+          ? { type: 'geojson', data: cfg.geojsonUrl }
+          : { type: 'vector', url: cfg.tilesetUrl as string },
+      );
       addLayerOnce(map, {
         id: cfg.layerId,
         type: 'line',
         source: cfg.sourceId,
-        'source-layer': cfg.sourceLayer,
+        ...(cfg.sourceLayer ? { 'source-layer': cfg.sourceLayer } : {}),
         layout: ROUND_LINE_LIMIT,
         paint: {
           'line-color': UNRATED_COLOR,
@@ -557,14 +561,11 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
     );
     const beforeId = firstCuratedLayer?.layerId;
 
-    // When a curated layer renders from this same source by OSM_ID (e.g. Bend),
-    // exclude those way ids here so curated trails aren't stroked twice and so
-    // curated clicks win over the nationwide hit layer.
-    const curatedIds = mountainBikeConfig.layers.some(
-      (l) => l.matchBy === 'osmId',
-    )
-      ? mountainBikeTrails.flatMap((t) => t.osmIds ?? []).map(String)
-      : [];
+    // Exclude source ways represented by curated trails so they aren't stroked
+    // twice and curated clicks win over the nationwide hit layer.
+    const curatedIds = mountainBikeTrails
+      .flatMap((t) => t.osmIds ?? [])
+      .map(String);
     const baseFilter: mapboxgl.FilterSpecification =
       curatedIds.length > 0
         ? [
@@ -1078,7 +1079,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
           id: s.id,
           type: 'line',
           source,
-          'source-layer': cfg.sourceLayer,
+          ...(cfg.sourceLayer ? { 'source-layer': cfg.sourceLayer } : {}),
           layout: ROUND_LINE_LIMIT,
           paint: s.paint,
         },

@@ -6,6 +6,7 @@ import React, { useEffect } from 'react';
 import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
 import { WelcomeModal } from '@/components/WelcomeModal';
 import { mountainBikeTrails, bikeRoutes } from '@/data/geo_data';
+import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
 import { MAP_EVENTS } from '@/events';
 
@@ -31,7 +32,7 @@ export default function Home(): ReactElement {
     const selectFromUrl = () => {
       if (trailSlug) {
         const found = mountainBikeTrails.find(
-          (t) => slugify(t.trailName) === trailSlug,
+          (t) => slugForTrail(t) === trailSlug,
         );
         if (found) {
           window.dispatchEvent(

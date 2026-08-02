@@ -38,7 +38,10 @@ from _geo import M_TO_MI, haversine_m
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-CACHE_GLOB = os.path.join(HERE, ".osm_cache", "oregon_*.json")
+CACHE_GLOB = os.environ.get(
+    "BEND_OSM_CACHE_GLOB",
+    os.path.join(HERE, ".osm_cache", "oregon_*.json"),
+)
 JSONL_IN = os.path.join(ROOT, "data", "bend-bike-rides.jsonl")
 CSV_OUT = os.path.join(ROOT, "data", "bend-osm-match.csv")
 
@@ -246,7 +249,13 @@ def candidate_ids(grid, bbox):
     return out
 
 
-def match_trail(segments, ways, grid):
+def match_trail(
+    segments,
+    ways,
+    grid,
+    min_way_share=MIN_WAY_SHARE,
+    tolerance_m=TOL_M,
+):
     """Map-match (lng,lat) segments. Returns (covered_frac, [(way_id, share)])."""
     allpts = [p for seg in segments for p in seg]
     if len(allpts) < 2:
@@ -268,7 +277,7 @@ def match_trail(segments, ways, grid):
         pw = [proj(lng, lat) for lng, lat in w.pts]
         proj_ways.append((wid, pw))
 
-    tol2 = TOL_M ** 2
+    tol2 = tolerance_m ** 2
     counts: dict[int, int] = defaultdict(int)
     covered = 0
     for px, py in samples:
@@ -277,7 +286,7 @@ def match_trail(segments, ways, grid):
         for wid, pw in proj_ways:
             for (ax, ay), (bx, by) in zip(pw, pw[1:]):
                 # cheap reject on x-range
-                if px < min(ax, bx) - TOL_M or px > max(ax, bx) + TOL_M:
+                if px < min(ax, bx) - tolerance_m or px > max(ax, bx) + tolerance_m:
                     continue
                 d2 = pt_seg_d2(px, py, ax, ay, bx, by)
                 if d2 < best_d2:
@@ -289,7 +298,7 @@ def match_trail(segments, ways, grid):
     n = len(samples)
     covered_frac = covered / n if n else 0.0
     kept = sorted(
-        ((wid, c / n) for wid, c in counts.items() if c / n >= MIN_WAY_SHARE),
+        ((wid, c / n) for wid, c in counts.items() if c / n >= min_way_share),
         key=lambda t: -t[1],
     )
     return covered_frac, kept
@@ -369,7 +378,7 @@ def main():
             "covered_frac", "n_osm_ways", "name_check", "osm_primary_name",
             "osm_mtb_scale", "osm_ids"]
     with open(CSV_OUT, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=cols)
+        w = csv.DictWriter(fh, fieldnames=cols, lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
 

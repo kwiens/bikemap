@@ -7,8 +7,12 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
-import { elevationBasePath } from '@/data/geo_data';
+import {
+  elevationBasePath,
+  mountainBikeTrails,
+  type ElevationProfile as ElevationProfileData,
+} from '@/data/geo_data';
+import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
 import { downloadFile } from '@/utils/format';
 import { buildProfileGpx } from '@/utils/gpx';
@@ -33,6 +37,11 @@ const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 
 const GRADE_YELLOW = 12;
 const GRADE_RED = 25;
+
+function profileSlug(trailName: string): string {
+  const trail = mountainBikeTrails.find((item) => item.trailName === trailName);
+  return trail ? slugForTrail(trail) : slugify(trailName);
+}
 const MAX_GRADIENT_STOPS = 200;
 
 const CHART_SVG_CLASS =
@@ -195,7 +204,7 @@ export function ElevationProfile() {
       window.history.replaceState(
         null,
         '',
-        `?trail=${encodeURIComponent(slugify(name))}`,
+        `?trail=${encodeURIComponent(profileSlug(name))}`,
       );
     };
     // OSM trails ship a ready-built profile (no curated JSON to load by name),
@@ -406,7 +415,7 @@ export function ElevationProfile() {
     setLocationIndex(null);
 
     const controller = new AbortController();
-    const slug = encodeURIComponent(slugify(trailName));
+    const slug = encodeURIComponent(profileSlug(trailName));
     fetch(`${elevationBasePath}/${slug}.json`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);

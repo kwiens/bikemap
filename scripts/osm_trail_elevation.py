@@ -76,7 +76,10 @@ CELL_DEG_DEFAULT = 0.5
 
 OUTPUT_DIR = 'public/data/osm-elevation'
 MANIFEST_PATH = os.path.join(OUTPUT_DIR, 'index.json')
-TILE_CACHE_DIR = 'scripts/.tile_cache/terrain14'
+TILE_CACHE_DIR = os.environ.get(
+    'OSM_TERRAIN_CACHE_DIR',
+    'scripts/.tile_cache/terrain14',
+)
 OVERPASS_CACHE_DIR = 'scripts/.osm_cache'
 
 # US state + DC bounding boxes as (minLng, minLat, maxLng, maxLat). Padded so a
