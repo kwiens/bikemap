@@ -60,6 +60,7 @@ import {
   toLngLatBounds,
 } from '@/utils/map';
 import { loadRide } from '@/utils/ride-storage';
+import { splitRideSegments } from '@/data/ride';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
 import { HeadingSmoother } from '@/utils/compass';
@@ -145,8 +146,10 @@ const MapboxMap = memo(function MapboxMap() {
     const ride = await loadRide(rideId);
     if (!ride) return;
 
-    const coords: [number, number][] = ride.points.map((p) => [p.lng, p.lat]);
-    addRideLayer(map.current, coords);
+    const segments = splitRideSegments(ride.points).map((segment) =>
+      segment.map((p) => [p.lng, p.lat] as [number, number]),
+    );
+    addRideLayer(map.current, segments);
 
     // Dim other routes/trails
     updateRouteOpacity(map.current, bikeRoutes, null, {
@@ -177,7 +180,7 @@ const MapboxMap = memo(function MapboxMap() {
   useEffect(() => {
     const selectHandler = (e: Event) => handleRideSelect(e as CustomEvent);
     const deselectHandler = () => handleRideDeselect();
-    const liveCoords: [number, number][] = [];
+    const liveSegments: [number, number][][] = [[]];
     let updateSkip = 0;
     const DETECT_INTERVAL_MS = 3000;
     const DETECT_CONFIRM_COUNT = 3; // ~9s before first auto-select
@@ -187,19 +190,27 @@ const MapboxMap = memo(function MapboxMap() {
       if (!map.current) return;
       const detail = (e as CustomEvent).detail;
 
-      // Batch restore (continueRide) — push all points and render once
-      if (detail.points) {
-        liveCoords.push(...(detail.points as [number, number][]));
-        updateRideLayer(map.current, liveCoords);
+      // Batch restore (continueRide) — replace all segments and render once
+      if (detail.segments) {
+        liveSegments.length = 0;
+        liveSegments.push(...(detail.segments as [number, number][][]));
+        updateRideLayer(map.current, liveSegments);
         return;
       }
 
-      const { point } = detail;
-      liveCoords.push(point);
+      const { point, segmentStart } = detail;
+      if (segmentStart && liveSegments[liveSegments.length - 1].length > 0) {
+        liveSegments.push([]);
+      }
+      liveSegments[liveSegments.length - 1].push(point);
       // Throttle Mapbox setData to every 3rd point
       updateSkip++;
-      if (liveCoords.length >= 2 && updateSkip >= 3) {
-        updateRideLayer(map.current, liveCoords);
+      const pointCount = liveSegments.reduce(
+        (count, segment) => count + segment.length,
+        0,
+      );
+      if (pointCount >= 2 && updateSkip >= 3) {
+        updateRideLayer(map.current, liveSegments);
         updateSkip = 0;
       }
 
@@ -238,10 +249,15 @@ const MapboxMap = memo(function MapboxMap() {
     };
     const stopHandler = () => {
       // Flush any unrendered points so the full route is briefly visible
-      if (map.current && liveCoords.length >= 2) {
-        updateRideLayer(map.current, liveCoords);
+      const pointCount = liveSegments.reduce(
+        (count, segment) => count + segment.length,
+        0,
+      );
+      if (map.current && pointCount >= 2) {
+        updateRideLayer(map.current, liveSegments);
       }
-      liveCoords.length = 0;
+      liveSegments.length = 0;
+      liveSegments.push([]);
       if (map.current) removeRideLayer(map.current);
     };
 

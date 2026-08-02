@@ -26,16 +26,15 @@ import os
 import sys
 from dataclasses import asdict, dataclass
 
+from _geo import M_TO_FT, haversine_m
 from build_bend_trails import (
     JSONL,
     MATCH_CSV,
     clean_name,
 )
-from osm_trail_elevation import haversine_m
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ELEV_DIR = os.path.join(ROOT, "public", "data", "elevation")
-M_TO_FT = 3.280839895
+ELEV_DIR = os.path.join(ROOT, "public", "data", "elevation", "bend")
 DEFAULT_GAP_FT = 50.0
 MIN_GEOMETRY_COVERAGE = 0.90
 

@@ -9,6 +9,7 @@ import {
   computeBounds,
   computeRideStats,
   rideToElevationProfile,
+  pointsToElevationProfile,
 } from './ride-stats';
 
 function makePoint(overrides?: Partial<RidePoint>): RidePoint {
@@ -109,6 +110,20 @@ describe('computeDistance', () => {
     // Both segments touching the inaccurate point are skipped
     expect(d).toBe(0);
   });
+
+  it('does not bridge an explicit segment break', () => {
+    const points = [
+      makePoint({ lat: 35, lng: -85.3 }),
+      makePoint({ lat: 35.001, lng: -85.3 }),
+      makePoint({ lat: 44, lng: -121.3, segmentStart: true }),
+      makePoint({ lat: 44.001, lng: -121.3 }),
+    ];
+
+    const expected =
+      haversineDistance(35, -85.3, 35.001, -85.3) +
+      haversineDistance(44, -121.3, 44.001, -121.3);
+    expect(computeDistance(points)).toBeCloseTo(expected);
+  });
 });
 
 // --- computeMovingTime ---
@@ -155,6 +170,32 @@ describe('computeMovingTime', () => {
     // Stop from t=1000 to t=7000 = 6s < 10s, counted as moving: 6000ms
     // Last interval (moving): 1000ms
     expect(moving).toBe(8000 - 1000); // total elapsed minus first timestamp offset
+  });
+
+  it('does not count time across a segment break', () => {
+    const points = [
+      makePoint({ timestamp: 1000 }),
+      makePoint({ timestamp: 2000 }),
+      makePoint({ timestamp: 3_602_000, segmentStart: true }),
+      makePoint({ timestamp: 3_603_000 }),
+    ];
+    expect(computeMovingTime(points)).toBe(2000);
+  });
+
+  it('caps gaps and respects breaks for stored points without speed', () => {
+    const points = [
+      { lng: -85.3, lat: 35, altitude: 200, timestamp: 1000 },
+      { lng: -85.3, lat: 35.001, altitude: 200, timestamp: 2000 },
+      {
+        lng: -121.3,
+        lat: 44,
+        altitude: 500,
+        timestamp: 3_602_000,
+        segmentStart: true,
+      },
+      { lng: -121.3, lat: 44.001, altitude: 500, timestamp: 3_603_000 },
+    ];
+    expect(computeMovingTime(points)).toBe(2000);
   });
 });
 
@@ -256,6 +297,21 @@ describe('computeElevation', () => {
     const { gain } = computeElevation(points);
     // Should still detect most of the climb despite gaps
     expect(gain).toBeGreaterThan(50);
+  });
+
+  it('smooths elevation independently across segment breaks', () => {
+    const first = makeTrack(20, { startAlt: 100, altStep: 0 });
+    const second = makeTrack(20, {
+      startLat: 44,
+      startLng: -121.3,
+      startAlt: 1000,
+      altStep: 0,
+    });
+    second[0].segmentStart = true;
+
+    const { min, max } = computeElevation([...first, ...second]);
+    expect(min).toBeCloseTo(100);
+    expect(max).toBeCloseTo(1000);
   });
 });
 
@@ -457,6 +513,20 @@ describe('rideToElevationProfile', () => {
     for (let i = 1; i < p.profile.length; i++) {
       expect(p.profile[i][0]).toBeGreaterThan(p.profile[i - 1][0]);
     }
+  });
+
+  it('does not advance profile distance across a segment break', () => {
+    const points = makeTrack(10, { startAlt: 200 });
+    points[5] = {
+      ...points[5],
+      lat: 44,
+      lng: -121.3,
+      segmentStart: true,
+    };
+    const profile = pointsToElevationProfile(points, 'Segmented Ride');
+
+    expect(profile).not.toBeNull();
+    expect(profile?.profile[5][0]).toBe(profile?.profile[4][0]);
   });
 
   it('converts elevation to feet', () => {

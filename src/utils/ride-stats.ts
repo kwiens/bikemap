@@ -65,6 +65,7 @@ export function haversineDistance(
 export function computeDistance(points: AnyRidePoint[]): number {
   let total = 0;
   for (let i = 1; i < points.length; i++) {
+    if (points[i].segmentStart) continue;
     const acc = 'accuracy' in points[i] ? (points[i] as RidePoint).accuracy : 0;
     const prevAcc =
       'accuracy' in points[i - 1] ? (points[i - 1] as RidePoint).accuracy : 0;
@@ -82,16 +83,27 @@ export function computeDistance(points: AnyRidePoint[]): number {
 export function computeMovingTime(points: AnyRidePoint[]): number {
   if (points.length < 2) return 0;
 
-  // If points lack speed data (StoredRidePoint), return total elapsed time
+  // Stored points lack speed data, so count every recorded interval as moving,
+  // while still excluding explicit breaks and capping GPS/background gaps.
   const hasSpeed = 'speed' in points[0];
   if (!hasSpeed) {
-    return points[points.length - 1].timestamp - points[0].timestamp;
+    let movingMs = 0;
+    for (let i = 1; i < points.length; i++) {
+      if (points[i].segmentStart) continue;
+      const dt = points[i].timestamp - points[i - 1].timestamp;
+      movingMs += Math.min(Math.max(dt, 0), MAX_SEGMENT_MS);
+    }
+    return movingMs;
   }
 
   let movingMs = 0;
   let stopStart: number | null = null;
 
   for (let i = 1; i < points.length; i++) {
+    if (points[i].segmentStart) {
+      stopStart = null;
+      continue;
+    }
     const prevSpeed = (points[i - 1] as RidePoint).speed ?? 0;
     const dt = points[i].timestamp - points[i - 1].timestamp;
 
@@ -131,20 +143,37 @@ export function computeMovingTime(points: AnyRidePoint[]): number {
  */
 export const ELEVATION_SMOOTH_HALF = 5; // 11-point centered window
 
-function smoothAltitudes(points: { altitude: number | null }[]): number[] {
-  const alts = points.map((p) => p.altitude);
-  const result: number[] = new Array(alts.length).fill(Number.NaN);
+function smoothAltitudes(
+  points: { altitude: number | null; segmentStart?: boolean }[],
+): number[] {
+  const result: number[] = new Array(points.length).fill(Number.NaN);
+  let start = 0;
 
+  for (let end = 1; end <= points.length; end++) {
+    if (end < points.length && !points[end].segmentStart) continue;
+    smoothAltitudeSegment(points, start, end, result);
+    start = end;
+  }
+
+  return result;
+}
+
+function smoothAltitudeSegment(
+  points: { altitude: number | null }[],
+  start: number,
+  end: number,
+  result: number[],
+): void {
   // Collect non-null indices and values
   const rawVals: number[] = [];
   const idxs: number[] = [];
-  for (let i = 0; i < alts.length; i++) {
-    if (alts[i] !== null) {
-      rawVals.push(alts[i] as number);
+  for (let i = start; i < end; i++) {
+    if (points[i].altitude !== null) {
+      rawVals.push(points[i].altitude as number);
       idxs.push(i);
     }
   }
-  if (rawVals.length === 0) return result;
+  if (rawVals.length === 0) return;
 
   // Spike rejection: replace readings that jump >threshold from running EMA.
   // Uses a faster EMA (alpha=0.3) than the main smoothing so it tracks
@@ -174,8 +203,6 @@ function smoothAltitudes(points: { altitude: number | null }[]): number[] {
     for (let j = lo; j <= hi; j++) sum += vals[j];
     result[idxs[i]] = sum / (hi - lo + 1);
   }
-
-  return result;
 }
 
 export function computeElevation(points: AnyRidePoint[]): {
@@ -199,13 +226,18 @@ export function computeElevation(points: AnyRidePoint[]): {
   let distSinceAnchor = 0;
 
   for (let i = 0; i < smoothed.length; i++) {
+    if (points[i].segmentStart) {
+      anchor = null;
+      distSinceAnchor = 0;
+    }
+
     const alt = smoothed[i];
     if (Number.isNaN(alt)) continue;
     if (alt < min) min = alt;
     if (alt > max) max = alt;
 
     // Accumulate horizontal distance since last anchor update
-    if (anchor !== null && i > 0) {
+    if (anchor !== null && i > 0 && !points[i].segmentStart) {
       distSinceAnchor += haversineDistance(
         points[i - 1].lat,
         points[i - 1].lng,
@@ -315,7 +347,12 @@ export function rideToElevationProfile(
 
 /** Build an elevation profile from raw GPS points (works for both saved rides and live recording). */
 export function pointsToElevationProfile(
-  points: { lat: number; lng: number; altitude: number | null }[],
+  points: {
+    lat: number;
+    lng: number;
+    altitude: number | null;
+    segmentStart?: boolean;
+  }[],
   name: string,
   stats?: {
     distance?: number; // meters — used for consistent total distance
@@ -335,7 +372,7 @@ export function pointsToElevationProfile(
   for (let i = 0; i < points.length; i++) {
     if (Number.isNaN(smoothed[i])) continue;
 
-    if (i > 0) {
+    if (i > 0 && !points[i].segmentStart) {
       const seg = haversineDistance(
         points[i - 1].lat,
         points[i - 1].lng,

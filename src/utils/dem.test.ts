@@ -133,6 +133,22 @@ describe('DEM pixel deduplication', () => {
     expect(deduplicated.length).toBe(1);
   });
 
+  it('preserves a segment start on the same DEM pixel', async () => {
+    const points = [
+      { lat: 35.05, lng: -85.3, altitude: 200 },
+      {
+        lat: 35.0500001,
+        lng: -85.3,
+        altitude: 201,
+        segmentStart: true,
+      },
+    ];
+    const { deduplicated } = await correctElevations(points);
+
+    expect(deduplicated).toHaveLength(2);
+    expect(deduplicated[1].segmentStart).toBe(true);
+  });
+
   it('keeps points that land on different DEM pixels', async () => {
     const points = [
       { lat: 35.05, lng: -85.3, altitude: 200 },

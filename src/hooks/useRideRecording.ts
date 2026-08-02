@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RecordedRide, RidePoint, StoredRidePoint } from '../data/ride';
-import { generateRideName } from '../data/ride';
+import { generateRideName, splitRideSegments } from '../data/ride';
 
 type NotifyCallback = (message: string) => void;
 
@@ -153,6 +153,7 @@ export function useRideRecording(
     setElapsedTime(0);
     setLiveDistance(0);
     setLiveElevationGain(0);
+    segmentBreakRef.current = false;
   }, []);
 
   // Shared: start GPS watch, elapsed timer, and periodic save
@@ -189,6 +190,10 @@ export function useRideRecording(
           lowSpeedCountRef.current = 0;
         }
 
+        const prev = pointsRef.current[pointsRef.current.length - 1];
+        const startsNewSegment = Boolean(prev && segmentBreakRef.current);
+        segmentBreakRef.current = false;
+
         const point: RidePoint = {
           lng: position.coords.longitude,
           lat: position.coords.latitude,
@@ -196,8 +201,8 @@ export function useRideRecording(
           accuracy: position.coords.accuracy,
           speed: position.coords.speed,
           timestamp: position.timestamp,
+          ...(startsNewSegment && { segmentStart: true }),
         };
-        const prev = pointsRef.current[pointsRef.current.length - 1];
         pointsRef.current.push(point);
 
         // GPS is confirmed working — safe to clear progress on future cleanup
@@ -205,7 +210,10 @@ export function useRideRecording(
 
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-            detail: { point: [point.lng, point.lat] as [number, number] },
+            detail: {
+              point: [point.lng, point.lat] as [number, number],
+              segmentStart: startsNewSegment,
+            },
           }),
         );
 
@@ -214,9 +222,7 @@ export function useRideRecording(
         // segment after a manual pause is skipped entirely: points were
         // dropped while paused, so this segment may teleport across whatever
         // ground was covered in the meantime.
-        if (prev && segmentBreakRef.current) {
-          segmentBreakRef.current = false;
-        } else if (prev) {
+        if (prev && !startsNewSegment) {
           const segDist = haversineDistance(
             prev.lat,
             prev.lng,
@@ -236,6 +242,12 @@ export function useRideRecording(
         // Filter 1: skip readings with poor altitude accuracy
         const altAccuracy = position.coords.altitudeAccuracy;
         const altValue = point.altitude;
+
+        if (startsNewSegment) {
+          emaAltRef.current = null;
+          altAnchorRef.current = null;
+          distSinceAnchorRef.current = 0;
+        }
 
         if (
           altValue !== null &&
@@ -338,6 +350,7 @@ export function useRideRecording(
     pausedTimeRef.current = 0;
     pauseStartRef.current = 0;
     lowSpeedCountRef.current = 0;
+    segmentBreakRef.current = false;
 
     setElapsedTime(0);
     setLiveDistance(0);
@@ -385,8 +398,14 @@ export function useRideRecording(
       lng: number;
       altitude: number | null;
       timestamp: number;
+      segmentStart?: boolean;
     }[],
-    demDeduped?: { lat: number; lng: number; altitude: number | null }[],
+    demDeduped?: {
+      lat: number;
+      lng: number;
+      altitude: number | null;
+      segmentStart?: boolean;
+    }[],
   ): RecordedRide {
     const stats = computeRideStats(points);
 
@@ -411,11 +430,12 @@ export function useRideRecording(
     // and elevation profiles use terrain elevation, not noisy GPS.
     const source = demCorrected ?? points;
     const storedPoints: StoredRidePoint[] = source.map(
-      ({ lng, lat, altitude, timestamp }) => ({
+      ({ lng, lat, altitude, timestamp, segmentStart }) => ({
         lng,
         lat,
         altitude,
         timestamp,
+        ...(segmentStart && { segmentStart: true }),
       }),
     );
     return {
@@ -532,6 +552,7 @@ export function useRideRecording(
     pausedRef.current = false;
     manualPauseRef.current = false;
     lowSpeedCountRef.current = 0;
+    segmentBreakRef.current = true;
 
     // Recompute distance from saved points
     const dist = computeDistance(data.points);
@@ -561,12 +582,12 @@ export function useRideRecording(
     preserveProgressRef.current = true;
 
     // Draw existing track on map in a single batch
-    const coords = data.points.map(
-      (pt) => [pt.lng, pt.lat] as [number, number],
+    const segments = splitRideSegments(data.points).map((segment) =>
+      segment.map((pt) => [pt.lng, pt.lat] as [number, number]),
     );
     window.dispatchEvent(
       new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-        detail: { points: coords },
+        detail: { segments },
       }),
     );
 

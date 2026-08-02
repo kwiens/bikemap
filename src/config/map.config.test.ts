@@ -85,6 +85,8 @@ describe('map.config', () => {
       expect(parseCityId('chattanooga')).toBe('chattanooga');
       expect(parseCityId(undefined)).toBe('chattanooga');
       expect(parseCityId('not-a-city')).toBe('chattanooga');
+      expect(parseCityId('toString')).toBe('chattanooga');
+      expect(parseCityId('__proto__')).toBe('chattanooga');
     });
 
     it('maps production hostnames to city ids', () => {

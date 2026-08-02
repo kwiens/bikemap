@@ -1,7 +1,7 @@
 // GPX 1.1 generation from GeoJSON features, recorded rides, and elevation
 // profiles. Spec: https://www.topografix.com/gpx/1/1/
 
-import type { StoredRidePoint } from '../data/ride';
+import { splitRideSegments, type StoredRidePoint } from '../data/ride';
 import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
 import { FEET_PER_METER } from './format';
@@ -66,16 +66,21 @@ export interface RideGpxInput {
 }
 
 export function buildRideGpx(input: RideGpxInput): string {
-  const trkpts = input.points
-    .map((p) => {
-      const children: string[] = [];
-      if (p.altitude !== null) {
-        children.push(`        <ele>${p.altitude.toFixed(1)}</ele>`);
-      }
-      children.push(
-        `        <time>${new Date(p.timestamp).toISOString()}</time>`,
-      );
-      return `      <trkpt lat="${p.lat}" lon="${p.lng}">\n${children.join('\n')}\n      </trkpt>`;
+  const trksegs = splitRideSegments(input.points)
+    .map((segment) => {
+      const trkpts = segment
+        .map((p) => {
+          const children: string[] = [];
+          if (p.altitude !== null) {
+            children.push(`        <ele>${p.altitude.toFixed(1)}</ele>`);
+          }
+          children.push(
+            `        <time>${new Date(p.timestamp).toISOString()}</time>`,
+          );
+          return `      <trkpt lat="${p.lat}" lon="${p.lng}">\n${children.join('\n')}\n      </trkpt>`;
+        })
+        .join('\n');
+      return `    <trkseg>\n${trkpts}\n    </trkseg>`;
     })
     .join('\n');
 
@@ -90,9 +95,7 @@ export function buildRideGpx(input: RideGpxInput): string {
   </metadata>
   <trk>
     <name>${escapeXml(input.name)}</name>
-    <trkseg>
-${trkpts}
-    </trkseg>
+${trksegs}
   </trk>
 </gpx>`;
 }

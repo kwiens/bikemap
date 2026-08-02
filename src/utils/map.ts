@@ -1240,7 +1240,7 @@ const RIDE_LINE_COLOR = '#ff6b35';
 
 export function addRideLayer(
   map: mapboxgl.Map,
-  coordinates: [number, number][],
+  segments: [number, number][][],
 ): void {
   removeRideLayer(map);
 
@@ -1249,7 +1249,10 @@ export function addRideLayer(
     data: {
       type: 'Feature',
       properties: {},
-      geometry: { type: 'LineString', coordinates },
+      geometry: {
+        type: 'MultiLineString',
+        coordinates: segments.filter((segment) => segment.length >= 2),
+      },
     },
   });
 
@@ -1268,7 +1271,7 @@ export function addRideLayer(
 
 export function updateRideLayer(
   map: mapboxgl.Map,
-  coordinates: [number, number][],
+  segments: [number, number][][],
 ): void {
   const source = map.getSource(RIDE_SOURCE_ID) as
     | mapboxgl.GeoJSONSource
@@ -1277,10 +1280,13 @@ export function updateRideLayer(
     source.setData({
       type: 'Feature',
       properties: {},
-      geometry: { type: 'LineString', coordinates },
+      geometry: {
+        type: 'MultiLineString',
+        coordinates: segments.filter((segment) => segment.length >= 2),
+      },
     });
   } else {
-    addRideLayer(map, coordinates);
+    addRideLayer(map, segments);
   }
 }
 

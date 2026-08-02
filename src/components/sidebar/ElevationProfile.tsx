@@ -49,6 +49,8 @@ const CHART_SVG_CLASS =
 const ACTION_BTN_CLASS =
   'bg-transparent border-none cursor-pointer text-gray-400 text-2xl px-2 py-1 rounded hover:text-gray-600 hover:bg-gray-50';
 
+type ProfileSource = 'trail' | 'osm' | 'route' | 'ride' | null;
+
 export function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
   if (g <= GRADE_YELLOW) {
@@ -177,6 +179,7 @@ export function findClosestProfileIndex(
 
 export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
+  const [profileSource, setProfileSource] = useState<ProfileSource>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -188,7 +191,7 @@ export function ElevationProfile() {
   const [ridesPanelOpen, setRidesPanelOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   // Track whether current profile is from a route, trail, or ride selection
-  const sourceRef = useRef<'trail' | 'osm' | 'route' | 'ride' | null>(null);
+  const sourceRef = useRef<ProfileSource>(null);
   const rideIdRef = useRef<string | null>(null);
   // Keep profile in a ref so location handler always sees latest
   const profileRef = useRef<ElevationProfileData | null>(null);
@@ -199,6 +202,7 @@ export function ElevationProfile() {
     const handleTrailSelect = (e: Event) => {
       const { trailName: name } = (e as CustomEvent).detail;
       sourceRef.current = 'trail';
+      setProfileSource('trail');
       rideIdRef.current = null;
       setTrailName(name);
       window.history.replaceState(
@@ -216,6 +220,7 @@ export function ElevationProfile() {
         profile: ElevationProfileData;
       };
       sourceRef.current = 'osm';
+      setProfileSource('osm');
       rideIdRef.current = null;
       // Cache keys are namespaced by source: an OSM way sharing a curated
       // trail's name must not shadow the curated /data/elevation JSON.
@@ -234,6 +239,7 @@ export function ElevationProfile() {
       // only ever 'trail' or 'ride', so the old `=== 'route'` guard never hit.)
       if (sourceRef.current !== null) {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
@@ -243,6 +249,7 @@ export function ElevationProfile() {
     const handleTrailDeselect = () => {
       if (sourceRef.current === 'trail' || sourceRef.current === 'osm') {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         window.history.replaceState(null, '', window.location.pathname);
       }
@@ -250,6 +257,7 @@ export function ElevationProfile() {
     const handleRouteDeselect = () => {
       if (sourceRef.current === 'route') {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         window.history.replaceState(null, '', window.location.pathname);
       }
@@ -268,6 +276,7 @@ export function ElevationProfile() {
       if (!ride || latestRideId !== rideId) return; // stale check
       const elevProfile = rideToElevationProfile(ride);
       sourceRef.current = 'ride';
+      setProfileSource('ride');
       rideIdRef.current = rideId;
       if (elevProfile) {
         setTrailName(ride.name);
@@ -286,6 +295,7 @@ export function ElevationProfile() {
     const handleRideDeselect = () => {
       if (sourceRef.current === 'ride') {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
@@ -296,6 +306,7 @@ export function ElevationProfile() {
       // Hide elevation profile during recording — not enough data for a
       // meaningful chart and the panel just gets in the way.
       sourceRef.current = null;
+      setProfileSource(null);
       setTrailName(null);
       setProfile(null);
       profileRef.current = null;
@@ -303,6 +314,7 @@ export function ElevationProfile() {
     const handleRecordingStop = () => {
       if (sourceRef.current === 'ride') {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
@@ -392,9 +404,9 @@ export function ElevationProfile() {
     }
 
     // Ride profiles are set directly by the RIDE_SELECT handler — skip fetch
-    if (sourceRef.current === 'ride') return;
+    if (profileSource === 'ride') return;
 
-    const cacheKey = `${sourceRef.current ?? 'trail'}:${trailName}`;
+    const cacheKey = `${profileSource ?? 'trail'}:${trailName}`;
     const cached = profileCache.get(cacheKey);
     if (cached) {
       setProfile(cached);
@@ -406,7 +418,7 @@ export function ElevationProfile() {
 
     // OSM profiles are seeded into the cache by their select handler and have
     // no curated JSON to fetch — a miss here just means nothing to show.
-    if (sourceRef.current === 'osm') return;
+    if (profileSource === 'osm') return;
 
     setLoading(true);
     setProfile(null);
@@ -432,7 +444,7 @@ export function ElevationProfile() {
       });
 
     return () => controller.abort();
-  }, [trailName]);
+  }, [trailName, profileSource]);
 
   // Measure chart width via ResizeObserver
   useEffect(() => {
@@ -550,7 +562,7 @@ export function ElevationProfile() {
       )}
     >
       <div className="flex items-center gap-3 mb-1">
-        {sourceRef.current === 'ride' && rideIdRef.current ? (
+        {profileSource === 'ride' && rideIdRef.current ? (
           <button
             type="button"
             onClick={() => {

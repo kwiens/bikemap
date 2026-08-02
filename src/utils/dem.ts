@@ -82,7 +82,12 @@ export async function getElevation(
  * Points outside the cached tile area keep their GPS altitude.
  */
 export async function correctElevations<
-  T extends { lat: number; lng: number; altitude: number | null },
+  T extends {
+    lat: number;
+    lng: number;
+    altitude: number | null;
+    segmentStart?: boolean;
+  },
 >(points: T[]): Promise<{ corrected: T[]; deduplicated: T[] }> {
   // Pre-load all needed tiles in parallel
   const tileKeys = new Set<string>();
@@ -125,7 +130,7 @@ export async function correctElevations<
     corrected.push(fixed);
 
     // Collapse consecutive points on the same DEM pixel
-    if (key !== prevKey) {
+    if (key !== prevKey || p.segmentStart) {
       deduplicated.push(fixed);
       prevKey = key;
     }

@@ -185,7 +185,7 @@ export function resolveActiveCityId(hostname?: string): CityId {
 }
 
 function parseCityIdOrUndefined(value: string | undefined): CityId | undefined {
-  return value !== undefined && value in cityConfigs
+  return value !== undefined && Object.hasOwn(cityConfigs, value)
     ? (value as CityId)
     : undefined;
 }
