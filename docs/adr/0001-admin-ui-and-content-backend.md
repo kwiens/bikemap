@@ -62,14 +62,29 @@ built on Drizzle and hands us the client at `payload.db.drizzle`.
 - Server components can call it directly as a typed function, with no HTTP request.
 - MIT (C6). Works with Next 16 as of 3.73; we're on 16.2.7.
 - Access control, jobs, drafts, and versions (C5).
-- Ships PostGIS support: `extensions: ['postgis']` and an exported
-  `geometryColumn(name, type, srid)` covering POINT through MULTIPOLYGON.
+- Turns on the extension for us: `extensions: ['postgis']` runs
+  `CREATE EXTENSION IF NOT EXISTS "postgis"` on connect. *(Verified against
+  `@payloadcms/drizzle` 3.87.0.)*
 
 **Cons**
-- **PostGIS support stops at the column (C1).** Payload can create a geometry
-  column, but its field types only go as far as `point`. A MultiLineString isn't
-  something Payload understands, so it won't appear in the API, can't be queried
-  through Payload, and can't be edited in its admin. Workable, but only with the
+- **PostGIS support stops at points (C1) — and it's narrower than it first
+  looked.** The exported `geometryColumn` takes *only a name* and hardcodes
+  `geometry(Point)`; there is no type or SRID parameter. It exists to back
+  Payload's own `point` field, not as a general geometry helper:
+
+  ```js
+  // @payloadcms/drizzle/postgres — the whole implementation
+  export const geometryColumn = (name) => customType({
+    dataType() { return `geometry(Point)` },
+    fromDriver(value) { return parseEWKB(value) },
+    toDriver(value) { return `SRID=4326;point(${value[0]} ${value[1]})` },
+  })(name)
+  ```
+
+  So a MultiLineString is doubly unsupported: Payload has no field type for it,
+  *and* the column helper can't declare one. **We write our own Drizzle
+  `customType` under either path below** — it's about fifteen lines modeled on
+  the above, but it's ours to write and maintain. Workable, but only with the
   design below.
 - **Payload writes the schema for our content (C2)**, rather than us writing it.
   Less of a problem now that C2 is about controlling the schema rather than using
@@ -96,8 +111,8 @@ geometry lives in its own table keyed by trail id, which our code owns and a
 custom map view edits.
 
 This is a supported approach, not a hack — `beforeSchemaInit` exists to "extend
-your database structure with tables that won't be managed by Payload," and
-`geometryColumn` is exported for the column. **Details in
+your database structure with tables that won't be managed by Payload." The
+column itself is our own `customType`, same as Path A. **Details in
 [Appendix A](#appendix-a--path-b-in-detail).**
 
 *Risk:* low — nothing fights Payload, nothing to recheck on upgrade. *Cost:* two
@@ -313,22 +328,37 @@ postgresAdapter({
 })
 ```
 
-**2. Define the geometry table** as normal Drizzle, using Payload's own helper:
+**2. Write the column type.** Payload's exported `geometryColumn` is Point-only
+(see above), so the MultiLineString column is ours:
 
 ```ts
 // db/geometry.ts
+import { customType } from 'drizzle-orm/pg-core'
+
+export const multiLineString = customType<{
+  data: GeoJSON.MultiLineString
+  driverData: string
+}>({
+  dataType: () => 'geometry(MultiLineString,4326)',
+  fromDriver: (v) => parseEwkbToGeoJSON(v),
+  toDriver: (v) => sql`ST_GeomFromGeoJSON(${JSON.stringify(v)})`,
+})
+```
+
+**3. Define the geometry table** as normal Drizzle:
+
+```ts
 import { pgTable, integer, index } from 'drizzle-orm/pg-core'
-import { geometryColumn } from '@payloadcms/db-postgres'
 
 export const trailGeometry = pgTable('trail_geometry', {
   trailId: integer('trail_id').primaryKey(),   // points at Payload's trails.id
-  geom: geometryColumn('geom', 'MULTILINESTRING', 4326),
+  geom: multiLineString('geom'),
 }, (t) => ({
   geomIdx: index('trail_geometry_geom_idx').using('gist', t.geom),
 }))
 ```
 
-**3. Tell Payload it exists**, so it doesn't delete it in development:
+**4. Tell Payload it exists**, so it doesn't delete it in development:
 
 ```ts
 beforeSchemaInit: [
@@ -339,7 +369,7 @@ beforeSchemaInit: [
 ]
 ```
 
-**4. Read and write it** through `payload.db.drizzle`, converting in SQL:
+**5. Read and write it** through `payload.db.drizzle`, converting in SQL:
 
 ```ts
 // read
@@ -355,7 +385,7 @@ await payload.db.drizzle.insert(trailGeometry)
   .onConflictDoUpdate({ target: trailGeometry.trailId, set: { geom: g } })
 ```
 
-**5. Edit it in the admin** with a `type: 'ui'` field on the trails collection.
+**6. Edit it in the admin** with a `type: 'ui'` field on the trails collection.
 `ui` fields render a component and store nothing, which is what we want. It talks
 to a custom endpoint running the queries above, and that component is where our
 existing map code gets reused.
@@ -387,12 +417,21 @@ messier. **Prefer the separate table**: it's entirely ours, migrations included.
 
 Path B is a supported approach, which strengthens Payload. But look at what gets
 built either way: the map editor, the read/write endpoint, the permission checks,
-and the transaction handling. A custom admin needs all the same geometry work
-**without** the extra wiring — no registration step, no risk of the table being
-dropped, no transaction bridging, no id-type coupling.
+the transaction handling, **and now the column type itself**. A custom admin
+needs all the same geometry work **without** the extra wiring — no registration
+step, no risk of the table being dropped, no transaction bridging, no id-type
+coupling.
 
 So Payload's real advantage stays login, roles, drafts, versions, and audit. The
 geometry work costs slightly more there, not less.
+
+**One correction since this was drafted:** an earlier version of this appendix had
+Path B calling `geometryColumn('geom', 'MULTILINESTRING', 4326)`, which does not
+exist — the helper is Point-only. That mattered because "Payload exports the
+column helper" read as a point in Path B's favour, and it isn't one: both paths
+need the same hand-written `customType`. It doesn't flip the recommendation, but
+it removes one of Path B's advantages over Path A, and it's a reminder that the
+Payload PostGIS story is thinner than the docs make it look.
 
 ---
 
@@ -405,8 +444,11 @@ geometry work costs slightly more there, not less.
 - Payload — [Postgres adapter](https://payloadcms.com/docs/database/postgres)
   (schema hooks, `extensions`, `push`) ·
   [transactions](https://payloadcms.com/docs/database/transactions) ·
-  [`geometryColumn`](https://tessl.io/registry/tessl/npm-payloadcms--db-postgres/3.54.0/files/docs/index.md) ·
-  [point field](https://payloadcms.com/docs/fields/point)
+  [point field](https://payloadcms.com/docs/fields/point) ·
+  `geometryColumn` read from the published package source
+  (`@payloadcms/drizzle` 3.87.0, `dist/postgres/schema/geometryColumn.js`) —
+  a third-party registry summary previously cited here described a
+  `(name, type, srid)` signature that the package does not have
 - Strapi — [PostGIS](https://strapi.io/integrations/postgis) ·
   [geometry-fields plugin](https://github.com/MarkovMedia/strapi-v5-geometry-fields) ·
   [location plugin](https://github.com/notum-cz/strapi-plugin-location)
