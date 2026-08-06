@@ -14,6 +14,10 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
+// The public app pulls this in from its own layout, but the (payload) route
+// group is a separate tree — without it the map renders with broken controls
+// and a warning from Mapbox on every load.
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { useField } from '@payloadcms/ui';
 import { mapConfig } from '@/config/map.config';
 import {
@@ -151,17 +155,30 @@ export function OsmWayPicker({ path }: { path: string }) {
       return;
     }
 
+    const isSelected = [
+      'in',
+      ['to-string', ['get', 'OSM_ID']],
+      ['literal', ids.map(String)],
+    ];
+
     map.setPaintProperty(PICKER_LAYER_ID, 'line-color', [
       'case',
-      ['in', ['to-string', ['get', 'OSM_ID']], ['literal', ids.map(String)]],
+      isSelected,
       SELECTED_COLOR,
       UNSELECTED_COLOR,
     ]);
+    // `zoom` may only appear at the top level of an `interpolate`/`step`, so the
+    // selected/unselected choice goes in the interpolation *outputs* rather than
+    // wrapping the interpolation in a `case` — that form is rejected outright
+    // and leaves the layer unstyled.
     map.setPaintProperty(PICKER_LAYER_ID, 'line-width', [
-      'case',
-      ['in', ['to-string', ['get', 'OSM_ID']], ['literal', ids.map(String)]],
-      5,
-      ['interpolate', ['linear'], ['zoom'], 10, 1.5, 16, 4],
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      10,
+      ['case', isSelected, 4, 1.5],
+      16,
+      ['case', isSelected, 7, 4],
     ]);
   }, [ids, ready]);
 
