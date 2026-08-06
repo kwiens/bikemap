@@ -111,13 +111,14 @@ export const Trails: CollectionConfig = {
       type: 'row',
       fields: [
         {
-          name: 'recArea',
-          type: 'text',
+          name: 'area',
+          type: 'relationship',
+          relationTo: 'trail-areas',
           required: true,
-          index: true,
           admin: {
             width: '50%',
-            description: 'Recreation area grouping, e.g. "Stringers Ridge".',
+            description:
+              'Recreation area. Manage the list under Map content → Trail areas.',
           },
         },
         {

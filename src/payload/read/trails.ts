@@ -58,7 +58,24 @@ function osmIdsFor(value: Trail['osmIds']): number[] | undefined {
   return ids.length > 0 ? ids : undefined;
 }
 
+/**
+ * `area` is a relationship, so at depth 1 it arrives as the related document.
+ * The app has always worked with a plain `recArea` string, so unwrap it here
+ * rather than teach every consumer about the join.
+ */
+function areaOf(trail: Trail): { name: string; region?: string } {
+  const area = trail.area;
+  if (area && typeof area === 'object') {
+    return {
+      name: area.name ?? '',
+      region: area.region ?? undefined,
+    };
+  }
+  return { name: '' };
+}
+
 function toMountainBikeTrail(trail: Trail): MountainBikeTrail {
+  const area = areaOf(trail);
   return {
     color: colorFor(trail),
     defaultBounds: boundsFor(trail.bounds),
@@ -75,7 +92,10 @@ function toMountainBikeTrail(trail: Trail): MountainBikeTrail {
     // `rating` is a select with an explicit 'unrated' option; the app's type
     // uses '' for the same thing.
     rating: trail.rating === 'unrated' ? '' : (trail.rating ?? ''),
-    recArea: trail.recArea ?? '',
+    recArea: area.name,
+    // Set only when the area carries one; the app falls back to its built-in
+    // REGION_MAP otherwise.
+    region: area.region,
     slug: trail.slug ?? undefined,
     trailName: trail.trailName ?? '',
   };
@@ -123,7 +143,8 @@ export async function getCityTrails(city: CityId): Promise<CityTrailData> {
     const payload = await getPayload({ config });
     const result = await payload.find({
       collection: 'trails',
-      depth: 0,
+      // 1 so the `area` relationship resolves to its document rather than an id.
+      depth: 1,
       // One city's curated trails is a few hundred rows; paging them would just
       // add round trips.
       limit: 2000,

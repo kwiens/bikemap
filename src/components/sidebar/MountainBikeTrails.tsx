@@ -5,7 +5,7 @@ import {
   faChevronDown,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
-import { regionFor } from '@/data/geo_data';
+import { regionOf } from '@/data/trail-region';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import type { MountainBikeTrailsProps } from './types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
@@ -13,7 +13,7 @@ import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 function groupTrailsByRegionAndArea() {
   const grouped = new Map<string, Map<string, MountainBikeTrail[]>>();
   for (const trail of getMountainBikeTrails()) {
-    const region = regionFor(trail.recArea);
+    const region = regionOf(trail);
     const { recArea } = trail;
     if (!grouped.has(region)) {
       grouped.set(region, new Map());
@@ -127,7 +127,7 @@ export function MountainBikeTrails({
     const q = searchQuery.trim().toLowerCase();
     if (!q) return null;
     return getMountainBikeTrails().filter((trail) => {
-      const region = regionFor(trail.recArea);
+      const region = regionOf(trail);
       return (
         trail.trailName.toLowerCase().includes(q) ||
         trail.displayName.toLowerCase().includes(q) ||
@@ -144,7 +144,7 @@ export function MountainBikeTrails({
       (t) => t.trailName === selectedTrail,
     );
     if (!trail) return;
-    const region = regionFor(trail.recArea);
+    const region = regionOf(trail);
     setExpandedRegions((prev) => {
       if (prev.has(region)) return prev;
       return new Set(prev).add(region);

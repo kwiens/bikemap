@@ -1,6 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
-import { mountainBikeConfig, regionFor, trailMetadata } from '@/data/geo_data';
+import { mountainBikeConfig, trailMetadata } from '@/data/geo_data';
+import { regionOf } from '@/data/trail-region';
 import {
   getMountainBikeTrails,
   onMountainBikeTrailsChange,
@@ -204,8 +205,7 @@ export function getAreaBounds(
   const bounds = new mapboxgl.LngLatBounds();
   let hasCoords = false;
   for (const trail of trails) {
-    if (trail.recArea !== areaName && regionFor(trail.recArea) !== areaName)
-      continue;
+    if (trail.recArea !== areaName && regionOf(trail) !== areaName) continue;
     if (trail.bounds) {
       bounds.extend(trail.bounds);
       hasCoords = true;
@@ -1194,7 +1194,7 @@ export function highlightMtnBikeArea(
   areaName: string,
 ): void {
   const matchedTrails = trails.filter(
-    (t) => t.recArea === areaName || regionFor(t.recArea) === areaName,
+    (t) => t.recArea === areaName || regionOf(t) === areaName,
   );
   if (matchedTrails.length === 0) return;
 

@@ -379,7 +379,8 @@ overwritten on the next save.
 - `src/payload/read/trails.ts` — reads trails back out for the public map
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
-- `src/payload/collections/Organizations.ts` — the trail-org dropdown's options
+- `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind
+  the trail-org and recreation-area dropdowns
 - `scripts/seed/{bend,chattanooga}.ts` — one script per city; their pipelines
   differ (Bend has osmIds + geometry, Chattanooga has neither), and **only Bend
   is seeded by default**
@@ -405,6 +406,10 @@ Things to know before touching it:
 - **Bulk writes must pass `context: { skipOsmRebuild: true }`**, or the
   `beforeChange` hook fires one Overpass request per row and gets the machine
   rate-limited. Trails with `geometrySource: 'imported'` are skipped anyway.
+- **Group trails with `regionOf(trail)`** (`@/data/trail-region`), never
+  `regionFor(recArea)` directly. Trail areas carry an editable `region`;
+  `regionOf` prefers it and falls back to the city's hardcoded `REGION_MAP`, so
+  calling `regionFor` straight bypasses anything set in the admin.
 - **Theme the admin with CSS variables, never Payload's selectors.** Defaults
   live in `src/app/(payload)/custom.css`; the DB-backed overrides come from the
   Theme global. Class names like `.btn__content` are internals that move between
