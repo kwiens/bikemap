@@ -10,6 +10,15 @@ import { getMountainBikeTrails } from '@/data/trail-source';
 import type { MountainBikeTrailsProps } from './types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 
+/**
+ * Groups the current trail list region -> area -> trails, with a trail count
+ * per region.
+ *
+ * Called during render rather than at module scope: trails arrive from the
+ * database via `setMountainBikeTrails` while this component's module is being
+ * imported, so anything computed at import time captures the checked-in
+ * fallback data and never sees a database row.
+ */
 function groupTrailsByRegionAndArea() {
   const grouped = new Map<string, Map<string, MountainBikeTrail[]>>();
   for (const trail of getMountainBikeTrails()) {
@@ -25,16 +34,15 @@ function groupTrailsByRegionAndArea() {
     }
     areas.get(recArea)?.push(trail);
   }
-  return grouped;
-}
 
-const regionGroups = groupTrailsByRegionAndArea();
+  const counts = new Map<string, number>();
+  for (const [region, areas] of grouped) {
+    let count = 0;
+    for (const trails of areas.values()) count += trails.length;
+    counts.set(region, count);
+  }
 
-const regionTrailCounts = new Map<string, number>();
-for (const [region, areas] of regionGroups) {
-  let count = 0;
-  for (const trails of areas.values()) count += trails.length;
-  regionTrailCounts.set(region, count);
+  return { counts, grouped };
 }
 
 function toggleSet(
@@ -121,6 +129,13 @@ export function MountainBikeTrails({
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // The trail list is fixed for the life of the page, so this runs once —
+  // but it has to run during render, not at import. See the note above.
+  const { counts: regionTrailCounts, grouped: regionGroups } = useMemo(
+    () => groupTrailsByRegionAndArea(),
+    [],
+  );
 
   // Filter trails by search query (matches trail name, area, or region)
   const searchResults = useMemo(() => {
