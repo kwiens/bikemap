@@ -65,6 +65,18 @@ export interface MapConfig {
   };
 }
 
+// The upstream Open Bike Map style. Its `composite` source merges Mapbox's own
+// tilesets with private `swuller.*` ones, so **only a token on that account can
+// render it** — every other token gets a 404 for the whole composite, which
+// silently blanks the entire basemap while runtime-attached sources (GeoJSON
+// overlays, the OSM trails tileset) keep drawing. The symptom is a map showing
+// trails floating on nothing.
+//
+// A fork therefore needs its own style: set NEXT_PUBLIC_MAPBOX_STYLE_URL.
+const DEFAULT_STYLE_URL = 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt';
+
+const styleUrl = process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL || DEFAULT_STYLE_URL;
+
 // Chattanooga configuration
 const chattanoogaConfig: MapConfig = {
   cityId: 'chattanooga',
@@ -73,7 +85,7 @@ const chattanoogaConfig: MapConfig = {
     // Public (pk.*) Mapbox token — set NEXT_PUBLIC_MAPBOX_TOKEN in .env.local
     // and in your host's environment for production. See .env.example.
     accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '',
-    styleUrl: 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt',
+    styleUrl,
   },
 
   defaultView: {
@@ -111,7 +123,7 @@ const bendConfig: MapConfig = {
 
   mapbox: {
     accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '',
-    styleUrl: 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt',
+    styleUrl,
   },
 
   defaultView: {
