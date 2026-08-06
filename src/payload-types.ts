@@ -68,6 +68,7 @@ export interface Config {
   blocks: {};
   collections: {
     trails: Trail;
+    organizations: Organization;
     users: User;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
@@ -77,6 +78,7 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     trails: TrailsSelect<false> | TrailsSelect<true>;
+    organizations: OrganizationsSelect<false> | OrganizationsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -87,8 +89,12 @@ export interface Config {
     defaultIDType: number;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    theme: Theme;
+  };
+  globalsSelect: {
+    theme: ThemeSelect<false> | ThemeSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -136,6 +142,10 @@ export interface Trail {
    * Canonical slug when it differs from the trail name. Also names the elevation profile JSON.
    */
   slug?: string | null;
+  /**
+   * Who builds and maintains this trail. Manage the list under Map content → Organizations.
+   */
+  organization?: (number | null) | Organization;
   /**
    * Recreation area grouping, e.g. "Stringers Ridge".
    */
@@ -214,6 +224,37 @@ export interface Trail {
   _status?: ('draft' | 'published') | null;
 }
 /**
+ * The clubs and agencies that maintain trails. Anything added here becomes selectable on a trail.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "organizations".
+ */
+export interface Organization {
+  id: number;
+  /**
+   * Full name, e.g. "Central Oregon Trail Alliance".
+   */
+  name: string;
+  /**
+   * e.g. "COTA". Shown where space is tight.
+   */
+  abbreviation?: string | null;
+  /**
+   * Optional. Leave blank for an organization that works across several cities.
+   */
+  city?: ('chattanooga' | 'bend') | null;
+  /**
+   * Where riders can find them — membership, trail reports.
+   */
+  url?: string | null;
+  /**
+   * A sentence or two. Optional.
+   */
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
@@ -273,6 +314,10 @@ export interface PayloadLockedDocument {
         value: number | Trail;
       } | null)
     | ({
+        relationTo: 'organizations';
+        value: number | Organization;
+      } | null)
+    | ({
         relationTo: 'users';
         value: number | User;
       } | null);
@@ -327,6 +372,7 @@ export interface TrailsSelect<T extends boolean = true> {
   city?: T;
   trailName?: T;
   slug?: T;
+  organization?: T;
   recArea?: T;
   rating?: T;
   kind?: T;
@@ -344,6 +390,19 @@ export interface TrailsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "organizations_select".
+ */
+export interface OrganizationsSelect<T extends boolean = true> {
+  name?: T;
+  abbreviation?: T;
+  city?: T;
+  url?: T;
+  description?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -409,6 +468,50 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * How the admin looks. Changes apply on the next page load. Clear a field to fall back to the default.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "theme".
+ */
+export interface Theme {
+  id: number;
+  /**
+   * Focus rings and highlights. Default #c3f44d.
+   */
+  accentColor?: string | null;
+  /**
+   * Deep brand colour. Default #1a434e.
+   */
+  deepColor?: string | null;
+  /**
+   * The cast of the greys everything is built from. Applies to both light and dark mode, because Payload derives dark mode by inverting the same scale.
+   */
+  neutralTint?: ('cool' | 'neutral' | 'warm') | null;
+  cornerStyle?: ('sharp' | 'soft' | 'round') | null;
+  fontFamily?: ('geist' | 'system' | 'serif') | null;
+  /**
+   * Escape hatch for anything the fields above do not cover. Injected verbatim into the admin. Admins only — treat it as code.
+   */
+  customCss?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "theme_select".
+ */
+export interface ThemeSelect<T extends boolean = true> {
+  accentColor?: T;
+  deepColor?: T;
+  neutralTint?: T;
+  cornerStyle?: T;
+  fontFamily?: T;
+  customCss?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
