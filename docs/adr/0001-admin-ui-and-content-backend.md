@@ -296,6 +296,124 @@ screen built end to end our way, or Path B under Payload.
 
 ---
 
+## Spike results
+
+Two spikes were built. The second replaced the first, and the reason it did is
+the useful part.
+
+### Spike 1 — Payload with real PostGIS geometry (`feat/payload-postgis`)
+
+Built "Path A": trail geometry as a real `geometry(MultiLineString,4326)` column
+on Payload's own table, swapped in via `afterSchemaInit` over a field declared
+as `json`. **It worked, and most of the predicted problems didn't happen.**
+
+- Payload's migration generator emitted the swapped column type *and* the GiST
+  indexes unprompted, for both `trails` and `_trails_v`. This was the stated main
+  risk, and it did not materialise.
+- Geometry saved inside Payload's own transaction and landed in version history
+  (406 rows, 406 versions) — which Path B could not have done.
+- Payload's REST API returned `geom` as GeoJSON, so the `customType`
+  round-tripped through Payload's own read path.
+- Spatial reads through `payload.db.drizzle` cut a city's GeoJSON from 1.78 MB to
+  58 KB with bbox + simplification, GiST index confirmed in use.
+- `ST_Length` cross-checked the hand-maintained `distance` field to 0.024 mi mean
+  error, and surfaced multi-part Bend trails whose stored distance counts gaps
+  the geometry doesn't contain.
+
+So the geometry objection to Payload in the table above is weaker than this ADR
+originally concluded. The comparison's "⚠️ via Path B" for C1 understates it.
+
+### Why it was abandoned anyway
+
+Reviewing it against the actual requirement — *display and edit trail lines,
+show path and elevation* — none of that capability was needed:
+
+| | Used today? |
+|---|---|
+| Serve a city's trails as GeoJSON | jsonb is simpler; it's already GeoJSON |
+| bbox filter, simplification | nice to have; 1.7 MB static files work fine |
+| `ST_Length`, `ST_Extent` | the scripts already compute these |
+| Nearest-trail | the client has every trail loaded |
+| Vector tiles (`ST_AsMVT`) | not used — rendering is Mapbox Studio |
+
+The cost was a hand-written 230-line Drizzle `customType` including an EWKB
+parser, plus 188 lines of tests for it. That's the piece least worth maintaining
+for capability the app doesn't exercise.
+
+*(Worth recording for whoever revisits this: `jsonb` + a
+`GENERATED ALWAYS AS (ST_GeomFromGeoJSON(geom_json)) STORED` geometry column
+gets every spatial capability with **no** custom type at all. Verified on PostGIS
+3.4 — the function is `IMMUTABLE`, the GiST index works on the generated column,
+writing it directly is refused, and invalid GeoJSON is rejected at insert. If
+spatial querying is ever wanted, that's the cheap way in.)*
+
+### Spike 2 — OSM-referenced trails (`feat/osm-trail-builder`)
+
+The insight that made spike 1 moot: **for a bike map, the geometry is already
+mapped, in OSM.** Bend's pipeline had established this — its trails are built
+from OSM ways and carry `osmIds` as provenance — but only offline, in Python.
+
+Spike 2 makes it an online flow. A trail stores the OSM ways it rides on, and a
+`beforeChange` hook rebuilds geometry, distance, elevation, and bounds from
+Overpass + Mapbox Terrain-RGB on save. Details in
+[the guide](../guides/osm-trail-editor.md).
+
+**Verified end to end:** creating a trail with a name and three OSM way ids
+produced an 11.66 mi, 897-vertex MultiLineString with elevation gain/loss/min/max
+and bounds, with no geometry authored by hand. Elevation matched the Python
+pipeline's numbers for the same trail (min 2917/2917 ft, max 4079/4083 ft).
+
+What this changes about the decision:
+
+- **Geometry stops being authored, so it stops being the hard part.** No drawing
+  tool, no PostGIS, no geometry storage worth protecting — the stored line is a
+  cache that can be rebuilt from OSM at any time.
+- **The trail editor is a way-picker**, which is dramatically less to build than
+  vertex editing, and it fits inside Payload as a custom field component.
+- **Fixes go upstream.** A curator correcting a line edits OSM, and every
+  consumer benefits — which fits this project's copyleft intent better than a
+  private copy.
+- **It removes a recurring maintenance failure.** Chattanooga renders from a
+  Mapbox Studio tileset that keeps getting renamed and swapped upstream (see the
+  length of CLAUDE.md's section on it). Unifying both cities on OSM deletes that
+  failure mode.
+
+### What is still open
+
+The spike **does not** settle the ADR's original question, which was never
+really about geometry: *who edits the curation layer, and how?* If editing stays
+with maintainers, files plus PRs remains a legitimate answer and the audit can
+run in CI. A CMS earns its place when non-maintainers set names and ratings
+without a GitHub account.
+
+Two concrete unknowns, both testable:
+
+1. **Whole ways vs. trimmed ways.** The Python pipeline traced an external
+   reference polyline and used only the portion of each way a trail covers; an
+   online editor has no such reference, so it picks whole ways. Across 9 sampled
+   Bend trails, **7 matched within 0%** — but Cole Loop ran 12% long and Tumalo
+   Creek 10% short. A trim control (click a start and end point) closes this.
+2. **Does Chattanooga generalise?** Its 220 trails have no `osmIds` and render
+   from a GIS tileset. A naive name match against OSM hits 45%, but that's a
+   floor — Bend's matcher works geometrically for exactly this reason. Running
+   `scripts/align_bend_geometry.py` against Tennessee would answer it cheaply.
+
+### Findings independent of any of this
+
+True of Payload regardless of how geometry is stored:
+
+- **The project must be ESM.** Payload 3's CLI cannot load a config from a
+  CommonJS project. One file (`.lintstagedrc.js` → `.cjs`) had to move.
+- **`/api/<collection>` is Payload's.** Our own route at `/api/trails` silently
+  shadowed the trails collection's list endpoint.
+- **`graphql` must be pinned to v16**; Payload peer-depends on `^16.8.1` and a
+  fresh install pulls 17.
+- **`@payloadcms/richtext-lexical` breaks the CLI** with a top-level-await error
+  under its CJS loader. Dropped, as there are no rich-text fields.
+- **Payload's `geometryColumn` is Point-only** — see the correction above.
+
+---
+
 ## Licensing notes
 
 Three things turned up while checking C6:
