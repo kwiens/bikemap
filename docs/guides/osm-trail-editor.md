@@ -229,8 +229,11 @@ deploy:
 
 | Collection | What it is |
 |---|---|
-| **Trail areas** | Recreation areas trails group under — "Phil's Trail Complex" |
+| **Trail complexes** | What trails group under — "Phil's Trail Complex", "Swampy Lakes" |
 | **Organizations** | The clubs and agencies that maintain trails — COTA, SORBA |
+
+The sidebar hierarchy is **region → trail complex → trail**, so a complex is the
+middle level and `region` is a field on it.
 
 Payload keeps both honest: renaming one updates every trail pointing at it, and
 it blocks deleting one still in use. Editors read the lists; admins curate them.
@@ -238,11 +241,11 @@ it blocks deleting one still in use. Editors read the lists; admins curate them.
 `recArea` used to be free text, which meant a typo silently created a new
 sidebar grouping that looked real.
 
-### Trail areas also move `region` out of code
+### Trail complexes also move `region` out of code
 
-The sidebar groups areas into regions ("Bend", "Cascade Lakes"), and that
-mapping was a hardcoded `REGION_MAP` per city — so adding an area meant editing
-TypeScript. It's now a field on the area.
+The sidebar groups complexes into regions ("Bend", "Cascade Lakes"), and that
+mapping was a hardcoded `REGION_MAP` per city — so adding a complex meant
+editing TypeScript. It's now a field on the complex.
 
 `regionOf(trail)` in `src/data/trail-region.ts` is what every grouping call site
 uses: it prefers the stored region and falls back to the built-in map when there
@@ -252,6 +255,18 @@ database the source of truth where it has an answer. **Group by `regionOf`, not
 
 The seed populates `region` from each city's `regionFor`, so the mapping arrives
 already filled in rather than blank.
+
+**Naming:** only the admin labels say "trail complex". The slug and table are
+still `trail-areas`, and the app-level field is still `recArea` — renaming those
+would mean a migration plus a sweep through the checked-in data files and the
+Python scripts that write them, for no user-visible gain.
+
+### City is hidden in the admin
+
+A deployment serves one city, so the `city` picker is hidden on trails,
+complexes, and organizations, defaulting to `activeCityId`. The column stays:
+`getCityTrails` filters on it, the seeds set it per city, and editor access is
+scoped by it. Removing `hidden` brings the picker back for a multi-city admin.
 
 ## Things that will trip you up
 

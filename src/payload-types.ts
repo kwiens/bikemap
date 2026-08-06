@@ -149,7 +149,7 @@ export interface Trail {
    */
   organization?: (number | null) | Organization;
   /**
-   * Recreation area. Manage the list under Map content → Trail areas.
+   * Manage the list under Map content → Trail complexes.
    */
   area: number | TrailArea;
   rating: 'easy' | 'intermediate' | 'advanced' | 'expert' | 'unrated';
@@ -241,9 +241,6 @@ export interface Organization {
    * e.g. "COTA". Shown where space is tight.
    */
   abbreviation?: string | null;
-  /**
-   * Optional. Leave blank for an organization that works across several cities.
-   */
   city?: ('chattanooga' | 'bend') | null;
   /**
    * Where riders can find them — membership, trail reports.
@@ -257,7 +254,7 @@ export interface Organization {
   createdAt: string;
 }
 /**
- * Recreation areas trails are grouped under. Anything added here becomes selectable on a trail.
+ * Trail complexes trails are grouped under, and the region each sits in. Anything added here becomes selectable on a trail.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "trail-areas".
@@ -270,7 +267,7 @@ export interface TrailArea {
   name: string;
   city: 'chattanooga' | 'bend';
   /**
-   * The heading this area sits under in the sidebar, e.g. "Bend" or "Lookout Mountain". Leave blank to use the built-in mapping.
+   * The heading this complex sits under in the sidebar — the level above it, e.g. "Bend" or "Cascade Lakes". Leave blank to use the built-in mapping.
    */
   region?: string | null;
   /**
