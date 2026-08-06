@@ -18,7 +18,7 @@ Content backend (Payload + OSM — see below):
 ```bash
 pnpm db:up              # Start local Postgres via docker compose
 pnpm db:migrate         # Apply migrations
-pnpm db:seed            # Import the checked-in trail arrays into Payload
+pnpm db:seed:bend       # Import Bend's trails (Chattanooga has its own script)
 pnpm generate:types     # Regenerate src/payload-types.ts after a collection change
 pnpm generate:importmap # Regenerate the admin import map after adding a component
 ```
@@ -377,7 +377,9 @@ overwritten on the next save.
 - `src/payload/osm/build.ts` — orchestrates the above
 - `src/payload/components/OsmWayPicker.tsx` — the map picker admin field
 - `src/payload/read/trails.ts` — reads trails back out for the public map
-- `scripts/seed-trails.ts` — one-time import of the checked-in trail arrays
+- `scripts/seed/{bend,chattanooga}.ts` — one script per city; their pipelines
+  differ (Bend has osmIds + geometry, Chattanooga has neither), and **only Bend
+  is seeded by default**
 
 **How the public map gets its trails.** `src/app/(frontend)/page.tsx` is a
 server component: it calls `getCityTrails()` (Payload's Local API — a typed
