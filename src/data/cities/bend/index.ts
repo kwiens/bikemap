@@ -63,7 +63,10 @@ export const bendData: CityData = {
       {
         layerId: BEND_MTB_LAYER_ID,
         sourceId: BEND_MTB_SOURCE_ID,
-        geojsonUrl: '/data/bend/trails.geojson',
+        // Served from Payload. public/data/bend/trails.geojson is still the
+        // source the database was seeded from, and remains the fallback if the
+        // API is unreachable.
+        geojsonUrl: '/api/map/trails?city=bend',
         trailProp: 'Trail',
         matchBy: 'name',
       },

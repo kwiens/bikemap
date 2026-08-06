@@ -145,7 +145,9 @@ export const Trails: CollectionConfig = {
     {
       name: 'osmIds',
       type: 'json',
-      required: true,
+      // Not required: trails imported from a source other than OSM (today,
+      // Chattanooga — its geometry lives in a Mapbox tileset and it has no way
+      // ids) are legitimate rows. `geometrySource` records which kind this is.
       admin: {
         components: {
           Field: '@/payload/components/OsmWayPicker#OsmWayPicker',
@@ -154,6 +156,21 @@ export const Trails: CollectionConfig = {
           'The OSM ways this trail rides on. Pick them on the map — everything below is rebuilt from them when you save.',
       },
       validate: validateOsmIds,
+    },
+    {
+      name: 'geometrySource',
+      type: 'select',
+      required: true,
+      defaultValue: 'osm',
+      options: [
+        { label: 'Rebuilt from OSM ways', value: 'osm' },
+        { label: 'Imported — not maintained here', value: 'imported' },
+      ],
+      admin: {
+        description:
+          'Imported trails keep whatever geometry and measurements came with them; the OSM rebuild leaves them alone. Set this to OSM once the trail has been matched to way ids.',
+        position: 'sidebar',
+      },
     },
     {
       name: 'rebuildGeometry',
@@ -259,8 +276,16 @@ export const Trails: CollectionConfig = {
 function validateOsmIds(value: unknown): string | true {
   const raw = typeof value === 'string' ? tryParse(value) : value;
 
-  if (!Array.isArray(raw) || raw.length === 0) {
-    return 'Pick at least one OSM way for this trail.';
+  // Empty is allowed — an imported trail has no way ids yet. The rebuild hook
+  // simply has nothing to do until some are picked.
+  if (raw === null || raw === undefined) {
+    return true;
+  }
+  if (!Array.isArray(raw)) {
+    return 'OSM ways must be a list of way ids.';
+  }
+  if (raw.length === 0) {
+    return true;
   }
   if (raw.length > MAX_WAYS_PER_REQUEST) {
     return `A trail can reference at most ${MAX_WAYS_PER_REQUEST} OSM ways; this has ${raw.length}.`;

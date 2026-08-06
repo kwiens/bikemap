@@ -7,10 +7,8 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import {
-  mountainBikeTrails,
-  type ElevationProfile as ElevationProfileData,
-} from '@/data/geo_data';
+import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
+import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
 import { downloadFile } from '@/utils/format';
@@ -39,7 +37,9 @@ const GRADE_YELLOW = 12;
 const GRADE_RED = 25;
 
 function profileSlug(trailName: string): string {
-  const trail = mountainBikeTrails.find((item) => item.trailName === trailName);
+  const trail = getMountainBikeTrails().find(
+    (item) => item.trailName === trailName,
+  );
   return trail ? slugForTrail(trail) : slugify(trailName);
 }
 const MAX_GRADIENT_STOPS = 200;

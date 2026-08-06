@@ -1,11 +1,10 @@
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
+import { mountainBikeConfig, regionFor, trailMetadata } from '@/data/geo_data';
 import {
-  mountainBikeConfig,
-  mountainBikeTrails,
-  regionFor,
-  trailMetadata,
-} from '@/data/geo_data';
+  getMountainBikeTrails,
+  onMountainBikeTrailsChange,
+} from '@/data/trail-source';
 import { RATING_COLORS, UNRATED_COLOR } from '@/data/trail-metadata';
 import {
   OSM_TRAILS_SOURCE_ID,
@@ -239,9 +238,28 @@ interface TrailLayerConfig {
   toRawName: (displayName: string) => string;
 }
 
+// These two lookups are derived from the trail list, which now arrives from the
+// database at render time rather than being fixed at import time. Building them
+// lazily (and dropping them when the list changes) keeps the derivation in one
+// place instead of forcing every caller to thread trails through.
+let trailByNameCache: Map<string, MountainBikeTrail> | null = null;
+let osmIdOwnerCache: Map<string, MountainBikeTrail> | null = null;
+
+onMountainBikeTrailsChange(() => {
+  trailByNameCache = null;
+  osmIdOwnerCache = null;
+});
+
 // Look up a curated trail by its trailName (used to resolve osmIds for layers
 // that match by OSM_ID rather than by name).
-const TRAIL_BY_NAME = new Map(mountainBikeTrails.map((t) => [t.trailName, t]));
+function trailByName(): Map<string, MountainBikeTrail> {
+  if (!trailByNameCache) {
+    trailByNameCache = new Map(
+      getMountainBikeTrails().map((t) => [t.trailName, t]),
+    );
+  }
+  return trailByNameCache;
+}
 
 // A single OSM way can be shared by several curated trails (named trails that
 // physically overlap on one way). Pick ONE deterministic owner per way id so
@@ -249,7 +267,11 @@ const TRAIL_BY_NAME = new Map(mountainBikeTrails.map((t) => [t.trailName, t]));
 // silent array-order tiebreak. Owner = most specific (fewest ways), then
 // shortest, then name, so a short trail that *is* the way wins over a long
 // trail merely passing through it.
-const OSM_ID_OWNER: Map<string, MountainBikeTrail> = (() => {
+function osmIdOwner(): Map<string, MountainBikeTrail> {
+  if (osmIdOwnerCache) {
+    return osmIdOwnerCache;
+  }
+
   const owner = new Map<string, MountainBikeTrail>();
   const moreSpecific = (
     a: MountainBikeTrail,
@@ -263,15 +285,17 @@ const OSM_ID_OWNER: Map<string, MountainBikeTrail> = (() => {
     if (ad !== bd) return ad < bd;
     return a.trailName < b.trailName;
   };
-  for (const trail of mountainBikeTrails) {
+  for (const trail of getMountainBikeTrails()) {
     for (const id of trail.osmIds ?? []) {
       const key = String(id);
       const cur = owner.get(key);
       if (!cur || moreSpecific(trail, cur)) owner.set(key, trail);
     }
   }
+
+  osmIdOwnerCache = owner;
   return owner;
-})();
+}
 
 // The key expression a layer's color/match expressions read. OSM_ID is numeric
 // in the tiles; coerce to string so literal id lists compare reliably.
@@ -287,7 +311,7 @@ function trailMatchExpr(
   trailName: string,
 ): mapboxgl.Expression {
   if (cfg.matchBy === 'osmId') {
-    const ids = (TRAIL_BY_NAME.get(trailName)?.osmIds ?? []).map(String);
+    const ids = (trailByName().get(trailName)?.osmIds ?? []).map(String);
     return ['in', ['to-string', ['get', 'OSM_ID']], ['literal', ids]];
   }
   return ['==', ['get', cfg.trailProp], cfg.toRawName(trailName)];
@@ -297,7 +321,7 @@ function trailMatchExpr(
 // Uses the same deterministic owner as the color expression so a clicked
 // segment's name and its color can never disagree.
 export function trailNameForOsmId(osmId: string | number): string | null {
-  return OSM_ID_OWNER.get(String(osmId))?.trailName ?? null;
+  return osmIdOwner().get(String(osmId))?.trailName ?? null;
 }
 
 // Boolean "does this feature belong to any of these trails?" expression.
@@ -335,7 +359,7 @@ function buildTrailLayerConfig(): TrailLayerConfig[] {
       // Color keyed by OSM_ID, using the deterministic per-way owner so a
       // shared way is colored as the same trail a click would select.
       colorMap = {};
-      for (const [id, trail] of OSM_ID_OWNER) colorMap[id] = trail.color;
+      for (const [id, trail] of osmIdOwner()) colorMap[id] = trail.color;
     } else if (hasMetadata) {
       colorMap = Object.fromEntries(
         Object.entries(metadata).map(([rawName, meta]) => [
@@ -345,7 +369,7 @@ function buildTrailLayerConfig(): TrailLayerConfig[] {
       );
     } else {
       colorMap = Object.fromEntries(
-        mountainBikeTrails.map((trail) => [trail.trailName, trail.color]),
+        getMountainBikeTrails().map((trail) => [trail.trailName, trail.color]),
       );
     }
     const displayToRaw = Object.fromEntries(
@@ -508,7 +532,7 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
 
     // Exclude source ways represented by curated trails so they aren't stroked
     // twice and curated clicks win over the nationwide hit layer.
-    const curatedIds = mountainBikeTrails
+    const curatedIds = getMountainBikeTrails()
       .flatMap((t) => t.osmIds ?? [])
       .map(String);
     const baseFilter: mapboxgl.FilterSpecification =
@@ -1083,7 +1107,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
     // bike route layers.
     let filter: mapboxgl.FilterSpecification | null = null;
     if (cfg.matchBy === 'osmId') {
-      const curatedIds = mountainBikeTrails
+      const curatedIds = getMountainBikeTrails()
         .flatMap((t) => t.osmIds ?? [])
         .map(String);
       filter = [

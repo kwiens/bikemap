@@ -7,9 +7,9 @@ from OSM server-side. No Python, no local tooling, no drawing.
 See [ADR-0001](../adr/0001-admin-ui-and-content-backend.md) for how this was
 chosen.
 
-**Status: working spike.** The public map still renders from the TypeScript data
-in `src/data/`; nothing here is load-bearing yet, and the app runs fine without a
-database.
+**The public map now reads trails from Payload.** It still falls back to the
+checked-in data in `src/data/` when there is no database, so the app runs fine
+without one — see [Reading trails on the public map](#reading-trails-on-the-public-map).
 
 ## The idea
 
@@ -38,6 +38,7 @@ What it buys:
 ```bash
 docker compose up -d      # Postgres on :5432
 pnpm db:migrate           # create the schema
+pnpm db:seed              # import the 406 checked-in trails
 pnpm dev                  # /admin — first visit creates the admin user
 ```
 
@@ -114,6 +115,47 @@ Across 9 sampled Bend trails 7 matched within 0%, because OSM splits ways at
 junctions. Cole Loop (+12%) and Tumalo Creek (−10%) are the exceptions. The fix,
 when needed: let an editor click a start and end point to trim the first and last
 way.
+
+## Reading trails on the public map
+
+The map at `/` is a **server component**. It reads Payload through the Local API
+— a typed function call, no HTTP hop — and passes the trails into the client map
+as props:
+
+```
+app/(frontend)/page.tsx   getCityTrails(activeCityId)   ← Local API, revalidate 60
+        ↓ props
+HomeClient.tsx            setMountainBikeTrails(trails) ← during render
+        ↓
+data/trail-source.ts      getMountainBikeTrails()       ← what every consumer reads
+```
+
+Consumers call `getMountainBikeTrails()` rather than importing an array, because
+a `const` binding would capture the checked-in data at import time and never see
+the database rows. `utils/map.ts` builds its `trailByName` / `osmIdOwner` lookups
+lazily for the same reason, and drops them when the list changes.
+
+Geometry follows the same path: Bend's curated layer points at
+`/api/map/trails?city=bend` instead of the static file.
+
+### It degrades rather than breaks
+
+`getCityTrails` **never throws**. No `DATABASE_URL`, an unreachable database, or
+an empty result all return an empty list, and `setMountainBikeTrails` ignores an
+empty list — so the checked-in data stays in place and the map still renders.
+Losing the CMS must not take the public map down with it.
+
+**One gap:** that fallback covers trail *metadata*, not *geometry*. With the
+database down, `/api/map/trails` returns 503 and Bend's curated lines won't
+draw, even though the sidebar still lists them. Restoring a static-file fallback
+for geometry is unfinished work.
+
+### Cache
+
+`revalidate = 60` on both the page and the API, so an edit in `/admin` is live
+within a minute without a rebuild. Trail edits are rare and the payload is a few
+hundred rows, so this serves a cached render and refreshes in the background
+rather than hitting the database per request.
 
 ## Things that will trip you up
 
