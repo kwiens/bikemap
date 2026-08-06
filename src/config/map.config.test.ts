@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   cityConfigs,
   cityIdForHostname,
@@ -16,6 +16,45 @@ describe('map.config', () => {
       expect(typeof mapConfig.mapbox.accessToken).toBe('string');
       expect(mapConfig.mapbox.styleUrl).toBeDefined();
       expect(mapConfig.mapbox.styleUrl).toMatch(/^mapbox:\/\/styles\//);
+    });
+
+    it('takes the style URL from NEXT_PUBLIC_MAPBOX_STYLE_URL', async () => {
+      // A fork cannot render the upstream style: its composite source pulls in
+      // private swuller.* tilesets, so any other token 404s the whole composite
+      // and the basemap silently disappears. This override is the fix, and it
+      // was documented but not wired up — hence the test.
+      const previous = process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL;
+      process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL =
+        'mapbox://styles/mapbox/outdoors-v12';
+
+      try {
+        vi.resetModules();
+        const fresh = await import('./map.config');
+        for (const config of Object.values(fresh.cityConfigs)) {
+          expect(config.mapbox.styleUrl).toBe(
+            'mapbox://styles/mapbox/outdoors-v12',
+          );
+        }
+      } finally {
+        restoreEnv('NEXT_PUBLIC_MAPBOX_STYLE_URL', previous);
+        vi.resetModules();
+      }
+    });
+
+    it('falls back to the upstream style when the override is unset', async () => {
+      const previous = process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL;
+      delete process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL;
+
+      try {
+        vi.resetModules();
+        const fresh = await import('./map.config');
+        expect(fresh.mapConfig.mapbox.styleUrl).toMatch(
+          /^mapbox:\/\/styles\/swuller\//,
+        );
+      } finally {
+        restoreEnv('NEXT_PUBLIC_MAPBOX_STYLE_URL', previous);
+        vi.resetModules();
+      }
     });
 
     it('should have valid default view settings', () => {
