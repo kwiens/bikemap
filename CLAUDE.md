@@ -380,6 +380,14 @@ Things to know before touching it:
 
 - **The project is ESM** (`"type": "module"` — Payload 3's CLI requires it). New
   root config files must be ESM or `.cjs`.
+- **There is no root `src/app/layout.tsx`, on purpose.** Payload's `RootLayout`
+  renders its own `<html>`/`<body>`, so a shared root layout would nest a second
+  `<html>` inside it — which silently breaks the admin (inputs stop responding
+  to clicks). The public app lives in `src/app/(frontend)/` with its own layout,
+  Payload in `src/app/(payload)/`. **Don't add a layout at `src/app/`.**
+- **Metadata files stay at `src/app/`**, not in a route group: `favicon.ico` and
+  `manifest.ts` 404 from inside `(frontend)` because Next resolves them from the
+  app root.
 - **Never add a route at `/api/<collection-name>`.** Payload mounts its REST API
   at `/api/<collection>`, so such a route silently shadows that collection's
   list endpoint.

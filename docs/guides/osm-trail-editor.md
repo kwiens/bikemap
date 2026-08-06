@@ -128,6 +128,12 @@ the first and last way (`turf.lineSlice` or equivalent). Not built yet.
 
 - **The project is ESM** (`"type": "module"`) — Payload 3's CLI requires it. New
   root config files must be ESM or `.cjs`.
+- **The app has no root layout.** Payload's `RootLayout` renders its own
+  `<html>`/`<body>`, so the public app had to move into `src/app/(frontend)/`
+  with its own layout. Leaving a layout at `src/app/` nests a second `<html>`
+  inside Payload's, and the symptom is not an obvious crash — the admin renders
+  but its inputs stop accepting clicks. `favicon.ico` and `manifest.ts` stay at
+  `src/app/`, since Next resolves metadata files from the app root.
 - **Don't add a route at `/api/<collection-name>`.** Payload mounts its REST API
   there, so `/api/trails` would shadow the trails collection's list endpoint.
 - **`graphql` is pinned to v16.** Payload peer-depends on `^16.8.1`; a fresh
