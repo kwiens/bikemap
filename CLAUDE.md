@@ -380,7 +380,9 @@ overwritten on the next save.
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
 - `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind
-  the trail-org and recreation-area dropdowns
+  the trail-org and trail-complex dropdowns. The sidebar hierarchy is
+  **region → trail complex → trail**; "trail complex" is an admin **label**
+  only, the slug/table stay `trail-areas` and the app field stays `recArea`
 - `scripts/seed/{bend,chattanooga}.ts` — one script per city; their pipelines
   differ (Bend has osmIds + geometry, Chattanooga has neither), and **only Bend
   is seeded by default**

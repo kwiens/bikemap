@@ -15,7 +15,7 @@ export const Organizations: CollectionConfig = {
   slug: 'organizations',
   admin: {
     useAsTitle: 'name',
-    defaultColumns: ['name', 'abbreviation', 'city', 'url'],
+    defaultColumns: ['name', 'abbreviation', 'url'],
     description:
       'The clubs and agencies that maintain trails. Anything added here becomes selectable on a trail.',
     group: 'Map content',
@@ -60,10 +60,9 @@ export const Organizations: CollectionConfig = {
         { label: 'Chattanooga', value: 'chattanooga' },
         { label: 'Bend', value: 'bend' },
       ],
-      admin: {
-        description:
-          'Optional. Leave blank for an organization that works across several cities.',
-      },
+      // Hidden: a deployment serves one city. Left blank an organization
+      // applies everywhere, which is the right default here.
+      admin: { hidden: true },
     },
     {
       name: 'url',
