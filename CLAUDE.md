@@ -13,6 +13,15 @@ pnpm lint         # Run ESLint + Biome lint + Biome format checks
 pnpm lint:fix     # Auto-fix linting/formatting issues
 ```
 
+Content backend (Payload + OSM, spike — see below):
+
+```bash
+pnpm db:up              # Start local Postgres via docker compose
+pnpm db:migrate         # Apply migrations
+pnpm generate:types     # Regenerate src/payload-types.ts after a collection change
+pnpm generate:importmap # Regenerate the admin import map after adding a component
+```
+
 ## Git & GitHub
 
 Use `gh` CLI for GitHub operations:
@@ -344,7 +353,55 @@ Use Chrome DevTools MCP server for visual verification:
 - Dispatch custom events to test event handlers
 - Cannot test direct map layer interactions (requires manual testing)
 
+## Content Backend (Payload + OSM)
+
+**Status: spike.** The map still renders from the TypeScript data in `src/data/`;
+the app runs fine with no database. Full guide:
+[`docs/guides/osm-trail-editor.md`](docs/guides/osm-trail-editor.md). Rationale
+and spike results:
+[`docs/adr/0001`](docs/adr/0001-admin-ui-and-content-backend.md).
+
+Payload 3 runs inside this Next app (admin at `/admin`, config at
+`src/payload.config.ts`).
+
+**The core idea: a trail does not own its geometry.** It stores the OSM ways it
+rides on (`osmIds`), and the `resolveOsmGeometry` `beforeChange` hook rebuilds
+`geom`, `distance`, `elevation*`, and `bounds` from Overpass + Mapbox
+Terrain-RGB on save. Those fields are read-only in the admin — hand edits get
+overwritten on the next save.
+
+- `src/payload/osm/overpass.ts` — fetch full-resolution ways by id (retry/backoff)
+- `src/payload/osm/assemble.ts` — join ways end to end; report gaps, never drop
+- `src/payload/osm/terrain.ts` — terrain sampling via `sharp` (Node has no canvas)
+- `src/payload/osm/build.ts` — orchestrates the above
+- `src/payload/components/OsmWayPicker.tsx` — the map picker admin field
+
+Things to know before touching it:
+
+- **The project is ESM** (`"type": "module"` — Payload 3's CLI requires it). New
+  root config files must be ESM or `.cjs`.
+- **Never add a route at `/api/<collection-name>`.** Payload mounts its REST API
+  at `/api/<collection>`, so such a route silently shadows that collection's
+  list endpoint.
+- **Geometry is stored as plain `jsonb`, deliberately.** It is a cache rebuilt
+  from OSM, not a source of truth, so there is no PostGIS column. If spatial
+  querying is ever needed, ADR-0001 records the cheap way to add it (a generated
+  column) — don't hand-write a Drizzle `customType`.
+- **Overpass is a shared community endpoint.** It rate-limits (429) and sheds
+  load (504) routinely. The client retries with backoff; don't script bulk
+  requests against the public instance.
+- **Geometry rebuilds only when `osmIds` change**, or when the `rebuildGeometry`
+  checkbox is ticked. Don't make the hook unconditional — it costs an Overpass
+  round trip plus terrain sampling.
+- **`push` is off**; the schema changes only through `pnpm db:migrate:create`.
+  Re-run `pnpm generate:types` after any collection change and commit both.
+- **Re-run `pnpm generate:importmap`** after adding or renaming an admin
+  component, or Payload won't find it.
+- **Generated, lint-excluded**: `src/payload-types.ts`, `src/migrations/`,
+  `src/app/(payload)/admin/importMap.js`.
+
 ## Configuration & Secrets
 
 - Mapbox credentials belong in `.env.local`; see `.env.example` for required keys.
 - Never commit secrets or `.env.local` to version control.
+- `DATABASE_URL` and `PAYLOAD_SECRET` are only needed for the content backend.
