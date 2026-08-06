@@ -148,7 +148,7 @@ export interface Trail {
   /**
    * The OSM ways this trail rides on. Pick them on the map — everything below is rebuilt from them when you save.
    */
-  osmIds:
+  osmIds?:
     | {
         [k: string]: unknown;
       }
@@ -157,6 +157,10 @@ export interface Trail {
     | number
     | boolean
     | null;
+  /**
+   * Imported trails keep whatever geometry and measurements came with them; the OSM rebuild leaves them alone. Set this to OSM once the trail has been matched to way ids.
+   */
+  geometrySource: 'osm' | 'imported';
   /**
    * Rebuild from OSM on the next save even if the ways have not changed. Use after a trail has been rerouted or fixed upstream.
    */
@@ -327,6 +331,7 @@ export interface TrailsSelect<T extends boolean = true> {
   rating?: T;
   kind?: T;
   osmIds?: T;
+  geometrySource?: T;
   rebuildGeometry?: T;
   osmReport?: T;
   distance?: T;

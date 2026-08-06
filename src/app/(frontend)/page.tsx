@@ -1,76 +1,27 @@
-'use client';
-
+/**
+ * The public map, rendered on the server so trail content comes from Payload.
+ *
+ * This is a server component: it reads the database through Payload's Local
+ * API (a typed function call, no HTTP hop) and hands the result to the client
+ * map as props. An editor's change is live on the next revalidation, with no
+ * rebuild and no client-side fetch waterfall.
+ *
+ * If there is no database — or it's unreachable — `getCityTrails` returns an
+ * empty list and the client falls back to the checked-in data in `src/data/`.
+ * The public map keeps working either way.
+ */
 import type { ReactElement } from 'react';
-import dynamic from 'next/dynamic';
-import React, { useEffect } from 'react';
-import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
-import { WelcomeModal } from '@/components/WelcomeModal';
-import { mountainBikeTrails, bikeRoutes } from '@/data/geo_data';
-import { slugForTrail } from '@/data/mountain-bike-trails';
-import { slugify } from '@/utils/string';
-import { MAP_EVENTS } from '@/events';
+import { activeCityId } from '@/config/map.config';
+import { getCityTrails } from '@/payload/read/trails';
+import HomeClient from './HomeClient';
 
-// Dynamically import the Map component with no SSR since Mapbox requires window
-const BikeMap = dynamic(() => import('@/components/Map'), {
-  ssr: false,
-  loading: () => (
-    <div className="fixed inset-0 flex items-center justify-center bg-gray-100">
-      Loading map...
-    </div>
-  ),
-});
+// Trail edits are rare and the payload is a few hundred rows, so serve a cached
+// render and refresh it in the background rather than hitting the database on
+// every request.
+export const revalidate = 60;
 
-export default function Home(): ReactElement {
-  // On mount, check URL for shared trail/route link and auto-select
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const trailSlug = params.get('trail');
-    const routeSlug = params.get('route');
+export default async function Home(): Promise<ReactElement> {
+  const { trails } = await getCityTrails(activeCityId);
 
-    if (!trailSlug && !routeSlug) return;
-
-    const selectFromUrl = () => {
-      if (trailSlug) {
-        const found = mountainBikeTrails.find(
-          (t) => slugForTrail(t) === trailSlug,
-        );
-        if (found) {
-          window.dispatchEvent(
-            new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-              detail: { trailName: found.trailName },
-            }),
-          );
-        }
-      } else if (routeSlug) {
-        const found = bikeRoutes.find((r) => slugify(r.name) === routeSlug);
-        if (found) {
-          window.dispatchEvent(
-            new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
-              detail: { routeId: found.id },
-            }),
-          );
-        }
-      }
-    };
-
-    // If the map already initialized before this effect ran, select now.
-    // Otherwise wait for the MAP_READY event.
-    if ((window as unknown as Record<string, boolean>).__mapReady) {
-      selectFromUrl();
-      return;
-    }
-    window.addEventListener(MAP_EVENTS.MAP_READY, selectFromUrl, {
-      once: true,
-    });
-    return () =>
-      window.removeEventListener(MAP_EVENTS.MAP_READY, selectFromUrl);
-  }, []);
-
-  return (
-    <main className="overflow-hidden fixed inset-0 m-0 p-0">
-      <BikeMap />
-      <PwaInstallPrompt />
-      <WelcomeModal />
-    </main>
-  );
+  return <HomeClient trails={trails} />;
 }

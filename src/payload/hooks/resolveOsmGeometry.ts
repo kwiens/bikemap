@@ -36,11 +36,26 @@ function sameIds(a: number[], b: number[]): boolean {
 }
 
 export const resolveOsmGeometry: CollectionBeforeChangeHook = async ({
+  context,
   data,
   originalDoc,
   operation,
   req,
 }) => {
+  // Bulk imports bring their own geometry and measurements. Without this, a
+  // seed of a few hundred trails would fire one Overpass request each and get
+  // the machine rate-limited long before it finished.
+  if (context?.skipOsmRebuild) {
+    return data;
+  }
+
+  // Trails whose geometry came from somewhere else (a Mapbox tileset, say) are
+  // not maintained from OSM, so leave what they arrived with alone.
+  const source = data.geometrySource ?? originalDoc?.geometrySource;
+  if (source === 'imported') {
+    return data;
+  }
+
   const osmIds = readOsmIds(data.osmIds);
   const previousIds = readOsmIds(originalDoc?.osmIds);
 

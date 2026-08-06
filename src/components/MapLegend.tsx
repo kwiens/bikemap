@@ -32,15 +32,14 @@ import {
   bikeResources,
   bikeRoutes,
   mapFeatures,
-  mountainBikeTrails,
 } from '@/data/geo_data';
+import { getMountainBikeTrails } from '@/data/trail-source';
 
 const hasRoutesSection =
   bikeRoutes.length > 0 ||
   mapFeatures.length > 0 ||
   bikeResources.length > 0 ||
   Boolean(mapConfig.gbfs);
-const hasCuratedTrails = mountainBikeTrails.length > 0;
 const hasTrailsSection = true;
 
 // Main provider component
@@ -465,7 +464,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   />
                 </MapLayersSection>
 
-                {hasCuratedTrails && (
+                {getMountainBikeTrails().length > 0 && (
                   <MountainBikeTrails
                     selectedTrail={selectedTrail}
                     onTrailSelect={handleTrailSelect}
