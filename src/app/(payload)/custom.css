@@ -1,0 +1,119 @@
+/**
+ * Admin theming.
+ *
+ * Payload's admin is themed through CSS custom properties rather than by
+ * overriding component styles, so this file sets variables and almost nothing
+ * else. That matters for upgrades: variables are a supported surface, whereas
+ * selectors like `.btn--style-primary .btn__content` are internals that move.
+ *
+ * Two things make this cheap:
+ *
+ *  1. `--theme-elevation-*` (the greys everything is built from) all resolve to
+ *     a `--color-base-*` scale, and dark mode *inverts* that scale — elevation-0
+ *     is base-0 in light and base-900 in dark. So retinting the base scale once
+ *     re-tints both themes coherently, with Payload's own inversion intact.
+ *  2. This stylesheet is unlayered, and Payload's own styles live in
+ *     `@layer payload-default, payload`. Unlayered rules beat layered ones in
+ *     the cascade, so nothing here needs `!important`.
+ */
+
+:root {
+  /* --- Neutrals -----------------------------------------------------------
+   * Payload ships a pure grey ramp (r = g = b). These are the same lightness
+   * steps shifted slightly cool, so the chrome sits with the app's teal
+   * (#1a434e) instead of fighting it. Keeping the steps means contrast ratios
+   * carry over unchanged.
+   */
+  --color-base-0: rgb(255, 255, 255);
+  --color-base-50: rgb(246, 248, 249);
+  --color-base-100: rgb(238, 241, 243);
+  --color-base-150: rgb(227, 232, 234);
+  --color-base-200: rgb(214, 220, 223);
+  --color-base-300: rgb(184, 194, 198);
+  --color-base-400: rgb(148, 161, 166);
+  --color-base-500: rgb(111, 125, 131);
+  --color-base-600: rgb(86, 98, 104);
+  --color-base-700: rgb(63, 74, 79);
+  --color-base-800: rgb(42, 51, 56);
+  --color-base-850: rgb(31, 39, 43);
+  --color-base-900: rgb(20, 26, 29);
+  --color-base-950: rgb(10, 14, 16);
+  --color-base-1000: rgb(0, 0, 0);
+
+  /* --- Shape --------------------------------------------------------------
+   * Payload's 3/4/8px corners read as older UI. Softer radii are the single
+   * biggest visual change here.
+   */
+  --style-radius-s: 6px;
+  --style-radius-m: 10px;
+  --style-radius-l: 16px;
+
+  /* Geist, loaded by the admin layout. The fallback stack matches Payload's
+   * default so nothing shifts if the font fails to load. */
+  --font-body:
+    var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+
+  /* Brand lime. Used only for focus, which keeps it as an accent rather than
+   * something competing with the content. */
+  --brand-accent: #c3f44d;
+  --brand-deep: #1a434e;
+}
+
+/* Focus ring — brand lime, and thick enough to be unmissable on both themes.
+ * Payload drives every focus outline through this one variable. */
+:root {
+  --accessibility-outline: 2px solid var(--brand-accent);
+  --accessibility-outline-offset: 2px;
+}
+
+/* Smooth the fonts the way the public app does, so the two don't look like
+ * different products. */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Slightly tighter, more modern heading rhythm. Payload's defaults are set for
+ * long-form prose; an admin is mostly labels and short strings. */
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.015em;
+}
+
+/* The login screen is the first thing anyone sees, and by default it's a bare
+ * white page. A soft brand-tinted wash costs nothing and makes it look
+ * deliberate. */
+.login {
+  background:
+    radial-gradient(
+      ellipse at top,
+      color-mix(in srgb, var(--brand-accent) 12%, transparent),
+      transparent 60%
+    ),
+    var(--theme-bg);
+}
+
+/* Payload renders the whole app inside a scroll container; a thin styled
+ * scrollbar reads as more finished than the OS default on desktop. */
+@supports selector(::-webkit-scrollbar) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--theme-elevation-200);
+    border: 2px solid var(--theme-bg);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-elevation-300);
+  }
+}

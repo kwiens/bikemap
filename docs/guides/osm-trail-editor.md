@@ -188,6 +188,50 @@ within a minute without a rebuild. Trail edits are rare and the payload is a few
 hundred rows, so this serves a cached render and refreshes in the background
 rather than hitting the database per request.
 
+## Admin appearance
+
+Two layers, so the common case needs no code:
+
+1. **`src/app/(payload)/custom.css`** — the defaults. Sets CSS custom properties
+   only, never Payload's own selectors, because variables are a supported
+   surface and class names like `.btn__content` are internals that move between
+   releases. It's unlayered while Payload's styles live in
+   `@layer payload-default, payload`, so unlayered rules win and nothing needs
+   `!important`.
+2. **Settings → Theme** (`/admin/globals/theme`) — editable in the UI, stored in
+   the database, injected by the admin layout as variables that override the
+   stylesheet. Colour swatches, corner style, font, neutral tint, plus a custom
+   CSS escape hatch.
+
+Every theme field is optional: an unset field falls through to the stylesheet
+default, so clearing a field is how you reset it.
+
+**The one trick worth knowing:** `--theme-elevation-*` — the greys the whole UI
+is built from — all resolve to a `--color-base-*` scale, and Payload derives
+dark mode by *inverting* that scale. So retinting the base ramp once themes both
+modes coherently, which is why "neutral tint" is a single setting rather than
+two.
+
+`customCss` is injected verbatim, so `sanitizeCss` strips `<` and `>` — a stray
+`</style>` would otherwise turn styling into markup. It's admin-only, but
+"trusted input" is exactly how injection bugs get written.
+
+Like the trail reader, `getThemeCss` **never throws**: no database, an
+unreachable one, or an unset global all return an empty string and the
+stylesheet defaults stand. Nobody should be locked out of the admin by a theme
+row.
+
+## Organizations
+
+Trail organizations — the clubs and agencies that maintain trails — are their
+own collection at `/admin/collections/organizations`, and Trails references one
+through a `relationship` field.
+
+That's a collection rather than a hardcoded `select` so the options are editable
+without a deploy, and Payload keeps them honest: renaming an org updates every
+trail pointing at it, and it blocks deleting one still in use. Editors can read
+the list; only admins can change it.
+
 ## Things that will trip you up
 
 The full list lives in [CLAUDE.md](../../CLAUDE.md); this is the one that costs

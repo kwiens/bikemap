@@ -99,6 +99,15 @@ export const Trails: CollectionConfig = {
       },
     },
     {
+      name: 'organization',
+      type: 'relationship',
+      relationTo: 'organizations',
+      admin: {
+        description:
+          'Who builds and maintains this trail. Manage the list under Map content → Organizations.',
+      },
+    },
+    {
       type: 'row',
       fields: [
         {

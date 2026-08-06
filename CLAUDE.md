@@ -377,6 +377,9 @@ overwritten on the next save.
 - `src/payload/osm/build.ts` — orchestrates the above
 - `src/payload/components/OsmWayPicker.tsx` — the map picker admin field
 - `src/payload/read/trails.ts` — reads trails back out for the public map
+- `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
+  at `/admin/globals/theme` and injected by the admin layout
+- `src/payload/collections/Organizations.ts` — the trail-org dropdown's options
 - `scripts/seed/{bend,chattanooga}.ts` — one script per city; their pipelines
   differ (Bend has osmIds + geometry, Chattanooga has neither), and **only Bend
   is seeded by default**
@@ -402,6 +405,14 @@ Things to know before touching it:
 - **Bulk writes must pass `context: { skipOsmRebuild: true }`**, or the
   `beforeChange` hook fires one Overpass request per row and gets the machine
   rate-limited. Trails with `geometrySource: 'imported'` are skipped anyway.
+- **Theme the admin with CSS variables, never Payload's selectors.** Defaults
+  live in `src/app/(payload)/custom.css`; the DB-backed overrides come from the
+  Theme global. Class names like `.btn__content` are internals that move between
+  releases. `--theme-elevation-*` resolves to a `--color-base-*` scale that dark
+  mode *inverts*, so retinting that ramp themes both modes at once.
+- **`getThemeCss` never throws**, same rule as `getCityTrails` — a theme row
+  must never lock anyone out of the admin. Its `customCss` is injected verbatim,
+  so `sanitizeCss` strips `<`/`>`; don't remove that.
 - **The project is ESM** (`"type": "module"` — Payload 3's CLI requires it). New
   root config files must be ESM or `.cjs`.
 - **There is no root `src/app/layout.tsx`, on purpose.** Payload's `RootLayout`

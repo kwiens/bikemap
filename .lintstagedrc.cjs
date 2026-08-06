@@ -7,12 +7,18 @@ module.exports = {
     'biome format --write --no-errors-on-unmatched',
   ],
   '*.{json,jsonc}': (filenames) => {
-    // Filter out files in public directory
+    // Drop paths Biome is configured to ignore. Passing only ignored paths
+    // makes Biome exit non-zero ("No files were processed"), which fails the
+    // commit — and a commit touching just a generated migration does exactly
+    // that. --no-errors-on-unmatched covers the rest.
     const filtered = filenames.filter(
-      (f) => !f.startsWith('public/') && !f.includes('/public/'),
+      (f) =>
+        !f.startsWith('public/') &&
+        !f.includes('/public/') &&
+        !f.includes('/src/migrations/'),
     );
     return filtered.length > 0
-      ? [`biome format --write ${filtered.join(' ')}`]
+      ? [`biome format --write --no-errors-on-unmatched ${filtered.join(' ')}`]
       : [];
   },
 };
