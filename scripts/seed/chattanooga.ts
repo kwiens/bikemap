@@ -24,7 +24,14 @@
  * Re-running is safe: rows match on (trailName, city) and update.
  */
 import { chattanoogaData } from '../../src/data/cities/chattanooga';
-import { connect, parseArgs, report, run, upsertTrail } from './shared';
+import {
+  connect,
+  parseArgs,
+  report,
+  run,
+  upsertArea,
+  upsertTrail,
+} from './shared';
 
 run(async () => {
   const { dryRun } = parseArgs(process.argv.slice(2));
@@ -35,6 +42,9 @@ run(async () => {
     `chattanooga: importing ${trails.length} trails (metadata only — geometry stays in the Mapbox tileset)`,
   );
 
+  // Areas are created on first mention; the cache keeps that to one
+  // lookup per area rather than one per trail.
+  const areas = new Map<string, number>();
   let created = 0;
   let updated = 0;
 
@@ -43,7 +53,16 @@ run(async () => {
       continue;
     }
 
+    const areaId = await upsertArea(
+      payload,
+      'chattanooga',
+      trail.recArea,
+      chattanoogaData.regionFor(trail.recArea),
+      areas,
+    );
+
     const result = await upsertTrail(payload, {
+      areaId,
       city: 'chattanooga',
       geom: null,
       geometrySource: 'imported',

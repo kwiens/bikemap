@@ -221,16 +221,37 @@ unreachable one, or an unset global all return an empty string and the
 stylesheet defaults stand. Nobody should be locked out of the admin by a theme
 row.
 
-## Organizations
+## Reference collections
 
-Trail organizations — the clubs and agencies that maintain trails — are their
-own collection at `/admin/collections/organizations`, and Trails references one
-through a `relationship` field.
+Two fields on a trail are dropdowns backed by their own collections rather than
+free text or a hardcoded `select`, so their options are editable without a
+deploy:
 
-That's a collection rather than a hardcoded `select` so the options are editable
-without a deploy, and Payload keeps them honest: renaming an org updates every
-trail pointing at it, and it blocks deleting one still in use. Editors can read
-the list; only admins can change it.
+| Collection | What it is |
+|---|---|
+| **Trail areas** | Recreation areas trails group under — "Phil's Trail Complex" |
+| **Organizations** | The clubs and agencies that maintain trails — COTA, SORBA |
+
+Payload keeps both honest: renaming one updates every trail pointing at it, and
+it blocks deleting one still in use. Editors read the lists; admins curate them.
+
+`recArea` used to be free text, which meant a typo silently created a new
+sidebar grouping that looked real.
+
+### Trail areas also move `region` out of code
+
+The sidebar groups areas into regions ("Bend", "Cascade Lakes"), and that
+mapping was a hardcoded `REGION_MAP` per city — so adding an area meant editing
+TypeScript. It's now a field on the area.
+
+`regionOf(trail)` in `src/data/trail-region.ts` is what every grouping call site
+uses: it prefers the stored region and falls back to the built-in map when there
+isn't one. That keeps the checked-in data working unchanged while making the
+database the source of truth where it has an answer. **Group by `regionOf`, not
+`regionFor`** — the latter can't see the database.
+
+The seed populates `region` from each city's `regionFor`, so the mapping arrives
+already filled in rather than blank.
 
 ## Things that will trip you up
 

@@ -68,6 +68,7 @@ export interface Config {
   blocks: {};
   collections: {
     trails: Trail;
+    'trail-areas': TrailArea;
     organizations: Organization;
     users: User;
     'payload-kv': PayloadKv;
@@ -78,6 +79,7 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     trails: TrailsSelect<false> | TrailsSelect<true>;
+    'trail-areas': TrailAreasSelect<false> | TrailAreasSelect<true>;
     organizations: OrganizationsSelect<false> | OrganizationsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -147,9 +149,9 @@ export interface Trail {
    */
   organization?: (number | null) | Organization;
   /**
-   * Recreation area grouping, e.g. "Stringers Ridge".
+   * Recreation area. Manage the list under Map content → Trail areas.
    */
-  recArea: string;
+  area: number | TrailArea;
   rating: 'easy' | 'intermediate' | 'advanced' | 'expert' | 'unrated';
   /**
    * Drives the line color and marker icon. Colors are derived from kind + rating rather than stored, so a palette change is one code edit.
@@ -255,6 +257,30 @@ export interface Organization {
   createdAt: string;
 }
 /**
+ * Recreation areas trails are grouped under. Anything added here becomes selectable on a trail.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-areas".
+ */
+export interface TrailArea {
+  id: number;
+  /**
+   * As shown in the sidebar, e.g. "Phil's Trail Complex".
+   */
+  name: string;
+  city: 'chattanooga' | 'bend';
+  /**
+   * The heading this area sits under in the sidebar, e.g. "Bend" or "Lookout Mountain". Leave blank to use the built-in mapping.
+   */
+  region?: string | null;
+  /**
+   * Optional.
+   */
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
@@ -312,6 +338,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'trails';
         value: number | Trail;
+      } | null)
+    | ({
+        relationTo: 'trail-areas';
+        value: number | TrailArea;
       } | null)
     | ({
         relationTo: 'organizations';
@@ -373,7 +403,7 @@ export interface TrailsSelect<T extends boolean = true> {
   trailName?: T;
   slug?: T;
   organization?: T;
-  recArea?: T;
+  area?: T;
   rating?: T;
   kind?: T;
   osmIds?: T;
@@ -390,6 +420,18 @@ export interface TrailsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-areas_select".
+ */
+export interface TrailAreasSelect<T extends boolean = true> {
+  name?: T;
+  city?: T;
+  region?: T;
+  description?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

@@ -26,6 +26,7 @@ import {
   report,
   repoRoot,
   run,
+  upsertArea,
   upsertTrail,
   type MultiLineString,
 } from './shared';
@@ -64,6 +65,9 @@ run(async () => {
     `bend: importing ${trails.length} trails (${geometry.size} geometries in ${GEOJSON})`,
   );
 
+  // Areas are created on first mention; the cache keeps that to one
+  // lookup per area rather than one per trail.
+  const areas = new Map<string, number>();
   let created = 0;
   let updated = 0;
   let withGeometry = 0;
@@ -81,7 +85,16 @@ run(async () => {
       continue;
     }
 
+    const areaId = await upsertArea(
+      payload,
+      'bend',
+      trail.recArea,
+      bendData.regionFor(trail.recArea),
+      areas,
+    );
+
     const result = await upsertTrail(payload, {
+      areaId,
       city: 'bend',
       geom,
       // Only trails that actually reference OSM ways can be rebuilt from them.
