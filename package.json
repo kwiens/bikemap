@@ -20,7 +20,8 @@
     "db:up": "docker compose up -d",
     "db:migrate": "payload migrate",
     "db:migrate:create": "payload migrate:create",
-    "db:seed": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-trails.ts"
+    "db:seed:bend": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/bend.ts",
+    "db:seed:chattanooga": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/chattanooga.ts"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",

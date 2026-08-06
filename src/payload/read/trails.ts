@@ -91,14 +91,22 @@ export interface CityTrailData {
     }[];
     type: 'FeatureCollection';
   };
-  /** True when these came from the database rather than the checked-in files. */
-  fromDatabase: boolean;
+  /**
+   * Why there might be no trails, which callers need to tell apart:
+   *
+   *   ok           rows were found
+   *   empty        the database answered, this city just has none seeded
+   *   unavailable  no DATABASE_URL, or the query failed
+   *
+   * Reporting `empty` as `unavailable` would send someone debugging a database
+   * that is working perfectly well.
+   */
+  status: 'empty' | 'ok' | 'unavailable';
   trails: MountainBikeTrail[];
 }
 
-const EMPTY: CityTrailData = {
-  fromDatabase: false,
-  geojson: { features: [], type: 'FeatureCollection' },
+const NONE = {
+  geojson: { features: [], type: 'FeatureCollection' as const },
   trails: [],
 };
 
@@ -108,7 +116,7 @@ const EMPTY: CityTrailData = {
  */
 export async function getCityTrails(city: CityId): Promise<CityTrailData> {
   if (!process.env.DATABASE_URL) {
-    return EMPTY;
+    return { ...NONE, status: 'unavailable' };
   }
 
   try {
@@ -127,7 +135,7 @@ export async function getCityTrails(city: CityId): Promise<CityTrailData> {
     });
 
     if (result.docs.length === 0) {
-      return EMPTY;
+      return { ...NONE, status: 'empty' };
     }
 
     const trails = result.docs.map(toMountainBikeTrail);
@@ -145,8 +153,8 @@ export async function getCityTrails(city: CityId): Promise<CityTrailData> {
       }));
 
     return {
-      fromDatabase: true,
       geojson: { features, type: 'FeatureCollection' },
+      status: 'ok',
       trails,
     };
   } catch (error) {
@@ -156,6 +164,6 @@ export async function getCityTrails(city: CityId): Promise<CityTrailData> {
       `Could not read trails for "${city}" from Payload; falling back to the checked-in data.`,
       error,
     );
-    return EMPTY;
+    return { ...NONE, status: 'unavailable' };
   }
 }
