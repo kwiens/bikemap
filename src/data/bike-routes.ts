@@ -12,6 +12,8 @@ export interface BikeRoute {
   defaultWidth: number; // Default line width
   opacity: number; // Line opacity (0-1)
   distance: number; // Route distance in miles
+  reverseDirection?: boolean; // Flip arrow direction on this route
+  hideArrows?: boolean; // Don't show directional arrows on this route
   defaultBounds?: [number, number, number, number]; // [swLng, swLat, neLng, neLat] fallback
   bounds?: mapboxgl.LngLatBounds; // Runtime-calculated bounds
 }
@@ -26,6 +28,7 @@ export const bikeRoutes: BikeRoute[] = [
     defaultWidth: 8,
     opacity: 1.0,
     distance: 7.7,
+    reverseDirection: true,
     defaultBounds: [-85.326925, 35.028003, -85.301479, 35.061734],
   },
   {
@@ -61,6 +64,7 @@ export const bikeRoutes: BikeRoute[] = [
     defaultWidth: 8,
     opacity: 1.0,
     distance: 9.9,
+    hideArrows: true,
     defaultBounds: [-85.260157, 35.042472, -85.212365, 35.089989],
   },
   {

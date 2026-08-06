@@ -34,6 +34,7 @@ import {
   flyToBounds,
   calculateRouteBounds,
   findLocationInArray,
+  createArrowSdfImage,
   calculateTrailBounds,
   initTrailBoundsFromDefaults,
   initRouteBoundsFromDefaults,
@@ -877,6 +878,11 @@ const MapboxMap = memo(function MapboxMap() {
           // Find the road-label layer — route lines will be inserted
           // just below it so street names remain visible on top of routes.
           const style = newMap.getStyle();
+
+          // Register SDF arrow image for route direction indicators
+          const arrowImage = createArrowSdfImage(20);
+          newMap.addImage('route-direction-arrow', arrowImage, { sdf: true });
+
           let firstLabelId: string | undefined;
           if (style?.layers) {
             for (const l of style.layers) {
@@ -951,6 +957,34 @@ const MapboxMap = memo(function MapboxMap() {
                   const bounds = calculateRouteBounds(newMap, route, layer);
                   if (bounds) {
                     route.bounds = bounds;
+                  }
+
+                  // Add directional arrow symbol layer
+                  const sourceId = layer.source as string;
+                  const sourceLayer = (layer as Record<string, unknown>)[
+                    'source-layer'
+                  ] as string;
+                  if (sourceId && sourceLayer && !route.hideArrows) {
+                    newMap.addLayer({
+                      id: `${route.id}-arrows`,
+                      type: 'symbol',
+                      source: sourceId,
+                      'source-layer': sourceLayer,
+                      layout: {
+                        'symbol-placement': 'line',
+                        'symbol-spacing': 160,
+                        'icon-image': 'route-direction-arrow',
+                        'icon-size': 1.2,
+                        'icon-rotate': route.reverseDirection ? 180 : 0,
+                        'icon-rotation-alignment': 'map',
+                        'icon-allow-overlap': true,
+                        'icon-ignore-placement': true,
+                      },
+                      paint: {
+                        'icon-color': route.color,
+                        'icon-opacity': 0.2,
+                      },
+                    });
                   }
                 }
               }
