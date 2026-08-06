@@ -13,11 +13,12 @@ pnpm lint         # Run ESLint + Biome lint + Biome format checks
 pnpm lint:fix     # Auto-fix linting/formatting issues
 ```
 
-Content backend (Payload + OSM, spike — see below):
+Content backend (Payload + OSM — see below):
 
 ```bash
 pnpm db:up              # Start local Postgres via docker compose
 pnpm db:migrate         # Apply migrations
+pnpm db:seed            # Import the checked-in trail arrays into Payload
 pnpm generate:types     # Regenerate src/payload-types.ts after a collection change
 pnpm generate:importmap # Regenerate the admin import map after adding a component
 ```
@@ -355,8 +356,8 @@ Use Chrome DevTools MCP server for visual verification:
 
 ## Content Backend (Payload + OSM)
 
-**Status: spike.** The map still renders from the TypeScript data in `src/data/`;
-the app runs fine with no database. Full guide:
+**The public map reads trails from Payload**, falling back to the TypeScript data
+in `src/data/` when there is no database — so the app still runs without one. Full guide:
 [`docs/guides/osm-trail-editor.md`](docs/guides/osm-trail-editor.md). Rationale
 and spike results:
 [`docs/adr/0001`](docs/adr/0001-admin-ui-and-content-backend.md).
@@ -375,9 +376,30 @@ overwritten on the next save.
 - `src/payload/osm/terrain.ts` — terrain sampling via `sharp` (Node has no canvas)
 - `src/payload/osm/build.ts` — orchestrates the above
 - `src/payload/components/OsmWayPicker.tsx` — the map picker admin field
+- `src/payload/read/trails.ts` — reads trails back out for the public map
+- `scripts/seed-trails.ts` — one-time import of the checked-in trail arrays
+
+**How the public map gets its trails.** `src/app/(frontend)/page.tsx` is a
+server component: it calls `getCityTrails()` (Payload's Local API — a typed
+function call, no HTTP hop) and passes trails into `HomeClient` as props, which
+publishes them to `src/data/trail-source.ts` during render. `revalidate = 60`
+on both the page and `/api/map/trails`, so an admin edit is live within a minute
+without a rebuild.
 
 Things to know before touching it:
 
+- **Never `import { mountainBikeTrails }`** — call `getMountainBikeTrails()`
+  from `@/data/trail-source`. A `const` binding captures the checked-in data at
+  import time and never sees the database rows. Anything derived from the list
+  must be built lazily and invalidated via `onMountainBikeTrailsChange` — see
+  the `trailByName` / `osmIdOwner` lookups in `utils/map.ts`.
+- **`getCityTrails` never throws.** No `DATABASE_URL`, an unreachable database,
+  or an empty result all return an empty list, and `setMountainBikeTrails`
+  ignores an empty list so the checked-in data stays in place. Preserve that —
+  losing the CMS must not take the public map down.
+- **Bulk writes must pass `context: { skipOsmRebuild: true }`**, or the
+  `beforeChange` hook fires one Overpass request per row and gets the machine
+  rate-limited. Trails with `geometrySource: 'imported'` are skipped anyway.
 - **The project is ESM** (`"type": "module"` — Payload 3's CLI requires it). New
   root config files must be ESM or `.cjs`.
 - **There is no root `src/app/layout.tsx`, on purpose.** Payload's `RootLayout`

@@ -19,7 +19,8 @@
     "generate:importmap": "payload generate:importmap",
     "db:up": "docker compose up -d",
     "db:migrate": "payload migrate",
-    "db:migrate:create": "payload migrate:create"
+    "db:migrate:create": "payload migrate:create",
+    "db:seed": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-trails.ts"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
@@ -42,6 +43,7 @@
     "payload": "3.87.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7"
   },
