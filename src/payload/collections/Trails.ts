@@ -1,5 +1,6 @@
 import type { Access, CollectionConfig } from 'payload';
 import { resolveOsmGeometry } from '@/payload/hooks/resolveOsmGeometry';
+import { activeCityId } from '@/config/map.config';
 import { MAX_WAYS_PER_REQUEST } from '@/payload/osm/overpass';
 
 /**
@@ -34,9 +35,9 @@ export const Trails: CollectionConfig = {
   slug: 'trails',
   admin: {
     useAsTitle: 'displayName',
-    defaultColumns: ['displayName', 'recArea', 'rating', 'distance', 'city'],
+    defaultColumns: ['displayName', 'area', 'rating', 'distance'],
     group: 'Map content',
-    listSearchableFields: ['displayName', 'trailName', 'recArea'],
+    listSearchableFields: ['displayName', 'trailName'],
   },
   // Published trails are public; everything else needs a login.
   access: {
@@ -63,7 +64,7 @@ export const Trails: CollectionConfig = {
           type: 'text',
           required: true,
           admin: {
-            width: '50%',
+            width: '100%',
             description: 'Human-friendly name shown in the sidebar and pane.',
           },
         },
@@ -71,11 +72,18 @@ export const Trails: CollectionConfig = {
           name: 'city',
           type: 'select',
           required: true,
+          defaultValue: activeCityId,
           options: [
             { label: 'Chattanooga', value: 'chattanooga' },
             { label: 'Bend', value: 'bend' },
           ],
-          admin: { width: '50%' },
+          admin: {
+            // Hidden because a deployment serves one city, so asking on every
+            // trail is noise. The column stays: getCityTrails filters on it,
+            // the seeds set it per city, and editor access is scoped by it.
+            // Drop `hidden` to bring the picker back for a multi-city admin.
+            hidden: true,
+          },
         },
       ],
     },
@@ -115,10 +123,10 @@ export const Trails: CollectionConfig = {
           type: 'relationship',
           relationTo: 'trail-areas',
           required: true,
+          label: 'Trail complex',
           admin: {
             width: '50%',
-            description:
-              'Recreation area. Manage the list under Map content → Trail areas.',
+            description: 'Manage the list under Map content → Trail complexes.',
           },
         },
         {
