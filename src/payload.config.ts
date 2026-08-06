@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { postgresAdapter } from '@payloadcms/db-postgres';
 import { buildConfig } from 'payload';
 import { Organizations } from './payload/collections/Organizations';
+import { TrailAreas } from './payload/collections/TrailAreas';
 import { Trails } from './payload/collections/Trails';
 import { Users } from './payload/collections/Users';
 import { Theme } from './payload/globals/Theme';
@@ -24,7 +25,7 @@ export default buildConfig({
       titleSuffix: '— Open Bike Map',
     },
   },
-  collections: [Trails, Organizations, Users],
+  collections: [Trails, TrailAreas, Organizations, Users],
   globals: [Theme],
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

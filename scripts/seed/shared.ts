@@ -74,7 +74,55 @@ export interface SeedResult {
   withGeometry: number;
 }
 
+/**
+ * Creates the trail's recreation area if it doesn't exist yet, and returns its
+ * id. The source data carries the area as a plain string, so the first trail
+ * mentioning an area is what brings it into being.
+ *
+ * `region` comes from the city's own `regionFor`, which is the hardcoded map
+ * this collection exists to replace — seeding it means the mapping arrives in
+ * the database already populated rather than blank.
+ */
+export async function upsertArea(
+  payload: Payload,
+  city: CityId,
+  name: string,
+  region: string,
+  cache: Map<string, number>,
+): Promise<number> {
+  const key = `${city}:${name}`;
+  const cached = cache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const existing = await payload.find({
+    collection: 'trail-areas',
+    depth: 0,
+    limit: 1,
+    pagination: false,
+    where: {
+      and: [{ name: { equals: name } }, { city: { equals: city } }],
+    },
+  });
+
+  const id =
+    existing.docs.length > 0
+      ? existing.docs[0].id
+      : (
+          await payload.create({
+            collection: 'trail-areas',
+            data: { city, name, region },
+          })
+        ).id;
+
+  cache.set(key, id);
+  return id;
+}
+
 export interface UpsertArgs {
+  /** Id of the trail's recreation area, from `upsertArea`. */
+  areaId: number;
   city: CityId;
   /** Geometry for this trail, when the city has any. */
   geom: MultiLineString | null;
@@ -97,10 +145,11 @@ export interface UpsertArgs {
  */
 export async function upsertTrail(
   payload: Payload,
-  { city, geom, geometrySource, trail }: UpsertArgs,
+  { areaId, city, geom, geometrySource, trail }: UpsertArgs,
 ): Promise<'created' | 'updated'> {
   const data = {
     _status: 'published' as const,
+    area: areaId,
     bounds: trail.defaultBounds ?? null,
     city,
     displayName: trail.displayName,
@@ -116,7 +165,6 @@ export async function upsertTrail(
     kind: kindFor(trail),
     osmIds: (trail.osmIds ?? null) as Trail['osmIds'],
     rating: ratingFor(trail),
-    recArea: trail.recArea,
     slug: trail.slug ?? null,
     trailName: trail.trailName,
   };
