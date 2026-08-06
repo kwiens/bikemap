@@ -31,16 +31,19 @@ export async function GET(request: Request) {
     );
   }
 
-  const { fromDatabase, geojson } = await getCityTrails(city);
+  const { geojson, status } = await getCityTrails(city);
 
-  if (!fromDatabase) {
-    // Better an explicit error than an empty FeatureCollection, which the map
-    // would render as "this city has no trails".
+  if (status === 'unavailable') {
     return NextResponse.json(
       { error: 'Trail database is unavailable.' },
       { status: 503 },
     );
   }
+
+  // `empty` is a real answer, not a failure: a city with no seeded trails (or
+  // one whose geometry lives elsewhere, like Chattanooga's Mapbox tileset)
+  // legitimately has no curated GeoJSON. Reporting that as 503 would send
+  // someone debugging a database that is working fine.
 
   return NextResponse.json(geojson, {
     headers: {

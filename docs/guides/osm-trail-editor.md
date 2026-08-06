@@ -38,7 +38,7 @@ What it buys:
 ```bash
 docker compose up -d      # Postgres on :5432
 pnpm db:migrate           # create the schema
-pnpm db:seed              # import the 406 checked-in trails
+pnpm db:seed:bend         # import Bend's 182 trails
 pnpm dev                  # /admin — first visit creates the admin user
 ```
 
@@ -138,12 +138,43 @@ lazily for the same reason, and drops them when the list changes.
 Geometry follows the same path: Bend's curated layer points at
 `/api/map/trails?city=bend` instead of the static file.
 
+### Seeding
+
+One script per city, because their pipelines genuinely differ:
+
+| | `pnpm db:seed:bend` | `pnpm db:seed:chattanooga` |
+|---|---|---|
+| Trails | 182 | 224 |
+| Geometry | `public/data/bend/trails.geojson`, by slug | none — its lines live in a Mapbox tileset |
+| `osmIds` | yes | none |
+| `geometrySource` | `osm` — rebuildable from OSM | `imported` — the rebuild hook skips it |
+
+**Only Bend is seeded by default.** Chattanooga doesn't fit the OSM-referenced
+model yet, so importing it would add several hundred rows the editor can't
+meaningfully work on. Run its script deliberately when you want them; whether
+its trails *can* be matched to OSM ways is the open question in ADR-0001.
+
+Both take `--dry-run`, and both pass `context.skipOsmRebuild` — without it the
+`beforeChange` hook fires one Overpass request per row and gets the machine
+rate-limited. Re-running either is safe: rows match on `(trailName, city)`.
+
 ### It degrades rather than breaks
 
-`getCityTrails` **never throws**. No `DATABASE_URL`, an unreachable database, or
-an empty result all return an empty list, and `setMountainBikeTrails` ignores an
-empty list — so the checked-in data stays in place and the map still renders.
-Losing the CMS must not take the public map down with it.
+`getCityTrails` **never throws**, and it distinguishes three outcomes so callers
+don't confuse them:
+
+| `status` | Meaning | API returns |
+|---|---|---|
+| `ok` | rows found | the FeatureCollection |
+| `empty` | database answered; this city has none seeded | an empty FeatureCollection, 200 |
+| `unavailable` | no `DATABASE_URL`, or the query failed | 503 |
+
+`empty` is a real answer, not a failure — reporting it as 503 would send someone
+debugging a database that is working fine.
+
+In every no-rows case the client keeps the checked-in data, because
+`setMountainBikeTrails` ignores an empty list. Losing the CMS must not take the
+public map down with it.
 
 **One gap:** that fallback covers trail *metadata*, not *geometry*. With the
 database down, `/api/map/trails` returns 503 and Bend's curated lines won't
