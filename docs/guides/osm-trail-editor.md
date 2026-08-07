@@ -82,81 +82,57 @@ boundaries, so what gets *stored* comes from Overpass. This is the same choice
 
 - **OSM ways** — the map picker. Click a trail to add it, click again to remove.
   Order matters for trails that double back, so pick them in riding order.
-- **Derived from OSM** — a collapsed, read-only panel with the build report,
-  distance, elevation, bounds, and geometry. Hand edits would be overwritten on
-  the next save, which is why it's read-only.
+- **Derived from OSM** — read-only build report, distance, elevation, bounds.
 - **Rebuild geometry** — force a refresh when a trail changed upstream.
 
-The build report is the important one. Referencing OSM has real failure modes,
-and they're silent unless surfaced:
+The build report is the important one, because referencing OSM has real failure
+modes and they are silent unless surfaced:
 
-- a way was **deleted or renumbered** upstream → listed as missing, the trail is
-  still built from the rest
-- the picked ways **don't connect** → kept as separate parts with the gap
-  measured, rather than a piece being quietly dropped
-- **Overpass was busy** → the previous geometry is kept and the save still
-  succeeds; save again to retry
+| What happened | What you get |
+|---|---|
+| A way was deleted or renumbered upstream | listed as missing; the trail still builds from the rest |
+| The picked ways don't connect | kept as separate parts, with the gap measured |
+| Overpass was busy | previous geometry kept, save still succeeds — save again to retry |
 
 ## Accuracy
 
-Rebuilding Bend's Cole Loop from its three way ids, against what the Python
-pipeline produced:
+Bend's Cole Loop rebuilt from its three way ids, against the Python pipeline:
 
-| | Python | This | |
-|---|---|---|---|
-| min elevation (ft) | 2917 | 2917 | ✅ |
-| max elevation (ft) | 4079 | 4083 | ✅ |
-| distance (mi) | 10.42 | 11.66 | ⚠️ +12% |
+| | Python | This |
+|---|---|---|
+| min elevation (ft) | 2917 | 2917 |
+| max elevation (ft) | 4079 | 4083 |
+| distance (mi) | 10.42 | 11.66 |
 
-Elevation matches, which confirms the DEM sampling and unit conversion. The
-distance gap is **a difference in definition, not a bug**, and it's the main
-open question in this design:
+Elevation matching confirms the DEM sampling and unit conversion. The distance
+gap is **a difference in definition, not a bug**: `build_bend_trails.py` traces a
+reference polyline and uses only the portion of each way a trail covers, while
+this uses whole ways — an online editor has no reference polyline, because the
+editor *is* the reference.
 
-- `build_bend_trails.py` traces an external reference polyline onto OSM, so it
-  uses only the *portion* of each way the curated trail covers.
-- This uses **whole ways** — there's no reference polyline in an online flow,
-  because the editor is the reference.
-
-Measured across a sample of 9 Bend trails, **7 matched within 0%**: for most
-trails the whole ways *are* the trail, because OSM splits ways at junctions.
-Cole Loop (+12%) and Tumalo Creek (−10%) are the exceptions.
-
-**The fix, when it's needed:** let an editor click a start and end point to trim
-the first and last way (`turf.lineSlice` or equivalent). Not built yet.
+Across 9 sampled Bend trails 7 matched within 0%, because OSM splits ways at
+junctions. Cole Loop (+12%) and Tumalo Creek (−10%) are the exceptions. The fix,
+when needed: let an editor click a start and end point to trim the first and last
+way.
 
 ## Things that will trip you up
 
-- **The project is ESM** (`"type": "module"`) — Payload 3's CLI requires it. New
-  root config files must be ESM or `.cjs`.
-- **The app has no root layout.** Payload's `RootLayout` renders its own
-  `<html>`/`<body>`, so the public app had to move into `src/app/(frontend)/`
-  with its own layout. Leaving a layout at `src/app/` nests a second `<html>`
-  inside Payload's, and the symptom is not an obvious crash — the admin renders
-  but its inputs stop accepting clicks. `favicon.ico` and `manifest.ts` stay at
-  `src/app/`, since Next resolves metadata files from the app root.
-- **Don't add a route at `/api/<collection-name>`.** Payload mounts its REST API
-  there, so `/api/trails` would shadow the trails collection's list endpoint.
-- **`graphql` is pinned to v16.** Payload peer-depends on `^16.8.1`; a fresh
-  install pulls 17.
-- **Overpass is a shared community endpoint.** It rate-limits (429) and sheds
-  load (504) routinely — the client retries with backoff, and it's easy to get
-  temporarily blocked when scripting bulk requests. Point `--overpass-url` style
-  overrides at a private instance for anything bulk.
-- **`push` is off.** Schema changes go through `pnpm db:migrate:create`; re-run
-  `pnpm generate:types` after a collection change and commit both.
-- **Re-run `pnpm generate:importmap`** after adding or renaming an admin
-  component, or Payload won't find it.
-- **Generated, lint-excluded**: `src/payload-types.ts`, `src/migrations/`,
-  `src/app/(payload)/admin/importMap.js`.
+The full list lives in [CLAUDE.md](../../CLAUDE.md); this is the one that costs
+the most time to diagnose.
+
+**The app has no root layout, on purpose.** Payload's `RootLayout` renders its
+own `<html>`/`<body>`, so the public app lives in `src/app/(frontend)/` with its
+own. A layout at `src/app/` nests a second `<html>` inside Payload's, and the
+symptom is not a crash — the admin renders and its inputs silently stop
+accepting clicks. `favicon.ico` and `manifest.ts` stay at `src/app/`, since Next
+resolves metadata files from the app root.
 
 ## Not built yet
 
-- **Trimming ways** to a start/end point — see Accuracy above.
-- **Trails not in OSM.** Every trail must be mapped upstream first. Brand-new or
-  deliberately unmapped trails need either an OSM edit or a local-geometry
-  escape hatch.
-- **Migrating the existing 406 trails.** Chattanooga's trails have no `osmIds`
-  at all — they render from a Mapbox Studio tileset. Whether they can move to
-  this model is an open question worth testing with
-  `scripts/align_bend_geometry.py` against Tennessee.
+- **Trimming ways** to a start/end point — see Accuracy.
+- **Trails not in OSM.** Every trail must be mapped upstream first; brand-new or
+  deliberately unmapped ones need an OSM edit or a local-geometry escape hatch.
+- **Migrating Chattanooga's 220 trails.** They have no `osmIds` and render from
+  a Mapbox tileset. Worth testing with `scripts/align_bend_geometry.py` against
+  Tennessee.
 - **Serving the map from the database.** Still reads `src/data/`.
