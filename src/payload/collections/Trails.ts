@@ -228,13 +228,28 @@ export const Trails: CollectionConfig = {
               label: 'Condition reports',
               admin: {
                 description:
-                  'Close this trail to new rider reports. The trail complex and Settings → Condition reporting can close it too; any one is enough.',
+                  'Log what this trail is like, and see what riders have said. Closing it below stops rider reports; the trail complex and Settings → Condition reporting can close it too, and any one is enough.',
                 initCollapsed: true,
               },
-              fields: conditionLockFields({
-                effect: 'for this trail',
-                example: 'Closed for logging until 1 May.',
-              }),
+              fields: [
+                {
+                  name: 'conditionLog',
+                  type: 'ui',
+                  label: 'Log a condition',
+                  admin: {
+                    components: {
+                      Field:
+                        '@/payload/components/TrailConditionLog#TrailConditionLog',
+                    },
+                  },
+                },
+                // Closing comes after logging: logging is the daily action, and
+                // closing is the rare, deliberate one.
+                ...conditionLockFields({
+                  effect: 'for this trail',
+                  example: 'Closed for logging until 1 May.',
+                }),
+              ],
             },
             {
               type: 'collapsible',
