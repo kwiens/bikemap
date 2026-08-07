@@ -1,0 +1,12 @@
+# Generated files. Marking them keeps them out of the diff by default in review
+# and out of language statistics — they are still committed and still reviewed
+# on purpose, just not line by line.
+#
+# The migration snapshots are the reason this file exists: a single schema
+# snapshot is ~2,500 lines of machine-written JSON that nobody reads, and it
+# otherwise dominates the diff of any PR that touches the schema.
+
+pnpm-lock.yaml                          linguist-generated=true
+src/payload-types.ts                    linguist-generated=true
+src/migrations/*.json                   linguist-generated=true
+src/app/(payload)/admin/importMap.js    linguist-generated=true
