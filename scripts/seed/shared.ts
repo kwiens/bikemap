@@ -104,7 +104,7 @@ export async function loadVocabulary(payload: Payload): Promise<Vocabulary> {
     if (id === undefined) {
       await payload.create({
         collection: 'trail-condition-types',
-        data: { ...seed, active: true },
+        data: { ...seed, active: true, marksClosed: seed.marksClosed === true },
       });
     }
   }

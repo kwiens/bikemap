@@ -433,6 +433,10 @@ export interface TrailConditionType {
    */
   active?: boolean | null;
   /**
+   * Draws the trail as a red dashed line, and the badge stops expiring — a closure holds until someone reports something else. Nothing to do with the “closed to new reports” switches on a trail.
+   */
+  marksClosed?: boolean | null;
+  /**
    * What this means locally. Optional.
    */
   description?: string | null;
@@ -669,6 +673,7 @@ export interface TrailConditionTypesSelect<T extends boolean = true> {
   color?: T;
   sortOrder?: T;
   active?: T;
+  marksClosed?: T;
   description?: T;
   updatedAt?: T;
   createdAt?: T;

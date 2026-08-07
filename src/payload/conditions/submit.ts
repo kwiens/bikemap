@@ -200,6 +200,7 @@ export async function submitConditionReport(
       ok: true,
       report: {
         color: type.color || DEFAULT_CONDITION_COLOR,
+        marksClosed: type.marksClosed === true,
         name: type.name,
         observedAt: input.observedAt.toISOString(),
         source: 'public',

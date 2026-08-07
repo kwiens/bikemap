@@ -17,6 +17,7 @@ const lockedReason = vi.fn<(slug: string) => null | string>(() => null);
 
 const fresh: ConditionReport = {
   color: '#b45309',
+  marksClosed: false,
   name: 'Muddy — stay off',
   observedAt: new Date().toISOString(),
   source: 'public',

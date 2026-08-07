@@ -10,10 +10,7 @@ import 'server-only';
 import { getPayload } from 'payload';
 import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
-import {
-  CONDITION_SUMMARY_DAYS,
-  DEFAULT_CONDITION_COLOR,
-} from '@/data/condition-vocabulary';
+import { DEFAULT_CONDITION_COLOR } from '@/data/condition-vocabulary';
 import {
   type ConditionOption,
   type ConditionReport,
@@ -61,6 +58,7 @@ function toReport(report: TrailCondition): ConditionReport | null {
   }
   return {
     color: type.color || DEFAULT_CONDITION_COLOR,
+    marksClosed: type.marksClosed === true,
     name: type.name,
     observedAt: new Date(report.observedAt).toISOString(),
     source: report.source === 'admin' ? 'admin' : 'public',
@@ -75,13 +73,6 @@ const NO_SUMMARY: ConditionSummary = {
   // Open: a failure should not read as a deliberate closure.
   reporting: { enabled: true, message: '' },
 };
-
-/** The cutoff the summary query uses, as an ISO string. */
-function summaryCutoff(now = new Date()): string {
-  const cutoff = new Date(now);
-  cutoff.setDate(cutoff.getDate() - CONDITION_SUMMARY_DAYS);
-  return cutoff.toISOString();
-}
 
 /**
  * The trails closed to new reports, and the note to show for each.
@@ -184,12 +175,16 @@ export async function getConditionSummary(
         limit: 5000,
         pagination: false,
         sort: '-observedAt',
+        // No date floor. A closure holds until someone reports something else,
+        // so the newest report per trail has to be found at any age — a window
+        // would quietly reopen a trail shut last season. Freshness is applied
+        // per report on the client, which is where the rule lives.
+        //
+        // The limit is the bound instead: newest-first means the newest report
+        // per trail is in there while total non-hidden reports stay under it.
+        // Past that, the answer is a current-condition column on the trail.
         where: {
-          and: [
-            { city: { equals: city } },
-            { hidden: { not_equals: true } },
-            { observedAt: { greater_than: summaryCutoff() } },
-          ],
+          and: [{ city: { equals: city } }, { hidden: { not_equals: true } }],
         },
       }),
       payload.findGlobal({ slug: 'condition-reporting', depth: 0 }),

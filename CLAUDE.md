@@ -633,6 +633,15 @@ else.
   `CONDITION_FRESH_DAYS` (14) and stays in history. A stale condition is worse
   than none: a green "Dry" pill from October is wrong in March in a way that
   looks authoritative. `ConditionBadge` owns that rule for both surfaces.
+- **A closure is the exception, and never expires.** A condition type flagged
+  `marksClosed` (seeded on "Closed") draws the trail as a **red dashed overlay**
+  above its normal line, and its badge holds until someone reports something
+  else — a trail does not reopen because nobody rode it for a fortnight. Ask
+  `isConditionCurrent`, not `isConditionFresh`, on anything user-facing. This is
+  also why `getConditionSummary` has **no date floor**: a window would quietly
+  reopen a trail shut last season. Which conditions close is **data** — nothing
+  matches on the value `'closed'`. The "closed to reports" switches are
+  moderation and deliberately do *not* mark the map.
 - **`ElevationProfile` no longer requires a chart to open.** Its guard is now
   `hasProfile || hasConditions`, with the chart, y-axis, stats and GPX button
   conditional — otherwise conditions would be invisible on exactly the trails
