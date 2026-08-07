@@ -9,16 +9,9 @@
  * The trail's geometry is *derived*, never authored. Re-running this against a
  * refreshed OSM extract is how a rerouted trail updates itself.
  */
-import { M_TO_FT, METERS_TO_MILES } from '@/payload/osm/units';
-import {
-  assembleWays,
-  boundsOf,
-  lengthMeters,
-  type AssemblyGap,
-} from './assemble';
+import { assembleWays, NOTABLE_GAP_M, type AssemblyGap } from './assemble';
+import { measureParts, type MeasureOptions } from './measure';
 import { fetchWaysByIds, type OverpassOptions } from './overpass';
-import { sampleTerrain } from './terrain';
-import { computeElevation, pointsToElevationProfile } from '@/utils/ride-stats';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
 
 export interface BuiltTrail {
@@ -52,18 +45,7 @@ export interface BuildReport {
   resolvedIds: number[];
 }
 
-export interface BuildOptions extends OverpassOptions {
-  /** Mapbox token for terrain sampling; elevation is skipped without one. */
-  mapboxToken?: string;
-  /** Set false to skip terrain sampling (faster; used by tests). */
-  withElevation?: boolean;
-}
-
-/**
- * A trail assembled from ways that don't touch is usually a mistake — a wrong
- * way picked, or a missing connector. Anything beyond this is called out.
- */
-const NOTABLE_GAP_M = 50;
+export interface BuildOptions extends MeasureOptions, OverpassOptions {}
 
 export async function buildTrailFromOsm(
   osmIds: number[],
@@ -129,43 +111,19 @@ export async function buildTrailFromOsm(
     );
   }
 
-  const meters = lengthMeters(parts);
-  const line = parts.flat();
-
-  let profile: ElevationProfile | null = null;
-  let gain: number | null = null;
-  let loss: number | null = null;
-  let min: number | null = null;
-  let max: number | null = null;
-
-  if (options.withElevation !== false && options.mapboxToken) {
-    const points = await sampleTerrain(line, options.mapboxToken);
-    if (points) {
-      const elevation = computeElevation(
-        points as Parameters<typeof computeElevation>[0],
-      );
-      gain = Math.round(elevation.gain * M_TO_FT);
-      loss = Math.round(elevation.loss * M_TO_FT);
-      min = Math.round(elevation.min * M_TO_FT);
-      max = Math.round(elevation.max * M_TO_FT);
-      profile = pointsToElevationProfile(points, name);
-    } else {
-      warnings.push(
-        'No elevation data could be read for this trail; distance is still accurate.',
-      );
-    }
-  }
+  const measured = await measureParts(parts, name, options);
+  warnings.push(...measured.warnings);
 
   return {
-    bounds: boundsOf(parts),
-    distance: Number((meters * METERS_TO_MILES).toFixed(2)),
-    elevationGain: gain,
-    elevationLoss: loss,
-    elevationMax: max,
-    elevationMin: min,
+    bounds: measured.bounds,
+    distance: measured.distance,
+    elevationGain: measured.elevationGain,
+    elevationLoss: measured.elevationLoss,
+    elevationMax: measured.elevationMax,
+    elevationMin: measured.elevationMin,
     geometry:
       parts.length > 0 ? { coordinates: parts, type: 'MultiLineString' } : null,
-    profile,
+    profile: measured.profile,
     report: { gaps, missingIds, resolvedIds: orderedIds, warnings },
   };
 }

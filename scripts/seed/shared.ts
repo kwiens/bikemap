@@ -12,7 +12,16 @@ import { fileURLToPath } from 'node:url';
 import { getPayload, type Payload } from 'payload';
 import config from '../../src/payload.config';
 import type { CityId } from '../../src/data/cities/types';
-import type { MountainBikeTrail } from '../../src/data/mountain-bike-trails';
+import {
+  type MountainBikeTrail,
+  slugForTrail,
+} from '../../src/data/mountain-bike-trails';
+import {
+  DEFAULT_KIND_VALUE,
+  DEFAULT_KINDS,
+  DEFAULT_RATINGS,
+  UNRATED_VALUE,
+} from '../../src/data/trail-vocabulary';
 import type { Trail } from '../../src/payload-types';
 
 export const repoRoot = path.resolve(
@@ -20,13 +29,19 @@ export const repoRoot = path.resolve(
   '../..',
 );
 
-const RATINGS: Trail['rating'][] = [
-  'easy',
-  'intermediate',
-  'advanced',
-  'expert',
-  'unrated',
-];
+/**
+ * The vocabulary rows a trail points at, resolved once and reused.
+ *
+ * Ratings and kinds are collections now, so a trail carries an id rather than a
+ * literal. The migration seeds the defaults, but the seed creates anything
+ * missing too — a database restored from before the vocabularies existed, or
+ * one where a row was deleted, should still take a seed rather than fail a few
+ * hundred times over.
+ */
+export interface Vocabulary {
+  kinds: Map<string, number>;
+  ratings: Map<string, number>;
+}
 
 export interface MultiLineString {
   coordinates: [number, number][][];
@@ -45,18 +60,78 @@ export async function connect(): Promise<Payload> {
   return getPayload({ config });
 }
 
-/** '' in the source data means "not rated", which the select stores explicitly. */
-export function ratingFor(trail: MountainBikeTrail): Trail['rating'] {
-  if (trail.rating === '') {
-    return 'unrated';
-  }
-  const rating = trail.rating as Trail['rating'];
-  if (!RATINGS.includes(rating)) {
-    throw new Error(
-      `Trail "${trail.trailName}" has rating "${trail.rating}", expected one of: ${RATINGS.join(', ')}`,
+/** For a dry run, which writes nothing and so resolves nothing. */
+export function emptyVocabulary(): Vocabulary {
+  return { kinds: new Map(), ratings: new Map() };
+}
+
+/**
+ * Loads the rating and kind vocabularies, creating any default row that is
+ * missing, and returns a value → id lookup for each.
+ *
+ * Done once per seed rather than per trail: a few hundred trails share five
+ * ratings between them.
+ */
+export async function loadVocabulary(payload: Payload): Promise<Vocabulary> {
+  const ratings = new Map<string, number>();
+  const kinds = new Map<string, number>();
+
+  for (const seed of DEFAULT_RATINGS) {
+    const id = await findByValue(payload, 'trail-ratings', seed.value);
+    ratings.set(
+      seed.value,
+      id ??
+        (await payload.create({ collection: 'trail-ratings', data: seed })).id,
     );
   }
-  return rating;
+
+  for (const seed of DEFAULT_KINDS) {
+    const id = await findByValue(payload, 'trail-kinds', seed.value);
+    kinds.set(
+      seed.value,
+      id ??
+        (await payload.create({ collection: 'trail-kinds', data: seed })).id,
+    );
+  }
+
+  return { kinds, ratings };
+}
+
+/**
+ * An existing row's id, or undefined.
+ *
+ * A row that is already there is left completely alone: a curator may have
+ * recoloured or renamed it, and reseeding *trails* has no business undoing
+ * that.
+ */
+async function findByValue(
+  payload: Payload,
+  collection: 'trail-kinds' | 'trail-ratings',
+  value: string,
+): Promise<number | undefined> {
+  const existing = await payload.find({
+    collection,
+    depth: 0,
+    limit: 1,
+    pagination: false,
+    where: { value: { equals: value } },
+  });
+  return existing.docs[0]?.id;
+}
+
+/** '' in the source data means "not rated", which the vocabulary has a row for. */
+export function ratingIdFor(
+  trail: MountainBikeTrail,
+  vocabulary: Vocabulary,
+): number {
+  const value = trail.rating === '' ? UNRATED_VALUE : trail.rating;
+  const id = vocabulary.ratings.get(value);
+  if (id === undefined) {
+    throw new Error(
+      `Trail "${trail.trailName}" has rating "${trail.rating}", which is not in the vocabulary: ${[...vocabulary.ratings.keys()].join(', ')}`,
+    );
+  }
+  return id;
 }
 
 /**
@@ -64,8 +139,19 @@ export function ratingFor(trail: MountainBikeTrail): Trail['rating'] {
  * singletrack. Storing the distinction rather than the icon lets the app derive
  * both icon and colour from it.
  */
-export function kindFor(trail: MountainBikeTrail): Trail['kind'] {
-  return trail.icon?.iconName === 'route' ? 'greenway' : 'trail';
+export function kindIdFor(
+  trail: MountainBikeTrail,
+  vocabulary: Vocabulary,
+): number {
+  const value =
+    trail.icon?.iconName === 'route' ? 'greenway' : DEFAULT_KIND_VALUE;
+  const id = vocabulary.kinds.get(value);
+  if (id === undefined) {
+    throw new Error(
+      `Trail "${trail.trailName}" has kind "${value}", which is not in the vocabulary.`,
+    );
+  }
+  return id;
 }
 
 export interface SeedResult {
@@ -124,6 +210,8 @@ export interface UpsertArgs {
   /** Id of the trail's recreation area, from `upsertArea`. */
   areaId: number;
   city: CityId;
+  /** Rating and kind lookups, from `loadVocabulary`. */
+  vocabulary: Vocabulary;
   /** Geometry for this trail, when the city has any. */
   geom: MultiLineString | null;
   /**
@@ -145,7 +233,7 @@ export interface UpsertArgs {
  */
 export async function upsertTrail(
   payload: Payload,
-  { areaId, city, geom, geometrySource, trail }: UpsertArgs,
+  { areaId, city, geom, geometrySource, trail, vocabulary }: UpsertArgs,
 ): Promise<'created' | 'updated'> {
   const data = {
     _status: 'published' as const,
@@ -162,10 +250,13 @@ export async function upsertTrail(
     // GeoJSON shape has to be widened at this boundary.
     geom: geom as Trail['geom'],
     geometrySource,
-    kind: kindFor(trail),
+    kind: kindIdFor(trail, vocabulary),
     osmIds: (trail.osmIds ?? null) as Trail['osmIds'],
-    rating: ratingFor(trail),
-    slug: trail.slug ?? null,
+    rating: ratingIdFor(trail, vocabulary),
+    // `slugForTrail` is the same rule the admin and the client use: an explicit
+    // slug when the trail has one, its slugified name otherwise. It is required
+    // now, because it is the key the elevation profile is looked up by.
+    slug: slugForTrail(trail),
     trailName: trail.trailName,
   };
 

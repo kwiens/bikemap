@@ -60,6 +60,16 @@ function toggleSet(
   });
 }
 
+/**
+ * The swatch shape per rating — the green circle / blue square / black diamond
+ * convention riders already read.
+ *
+ * Ratings are curated in the admin now, so a trail can arrive carrying one this
+ * map has never heard of. `shapeFor` falls back rather than indexing straight
+ * in: a miss used to yield `undefined`, which left the swatch with no classes
+ * at all and collapsed it to nothing — the trail's colour simply vanished from
+ * the list. The custom rating still shows, in its own colour, as a circle.
+ */
 const TRAIL_SHAPE: Record<string, string> = {
   easy: 'shrink-0 w-3 h-3 rounded-full',
   intermediate: 'shrink-0 w-3 h-3 rounded-sm',
@@ -67,6 +77,10 @@ const TRAIL_SHAPE: Record<string, string> = {
   expert: 'shrink-0 w-2.5 h-2.5 rotate-45 rounded-[1px]',
   unrated: 'shrink-0 w-3 h-3 rounded-full',
 };
+
+function shapeFor(rating: string | undefined): string {
+  return TRAIL_SHAPE[rating || 'unrated'] ?? TRAIL_SHAPE.unrated;
+}
 
 function TrailRow({
   trail,
@@ -102,7 +116,7 @@ function TrailRow({
     >
       <div className="flex items-center gap-3">
         <div
-          className={TRAIL_SHAPE[trail.rating || 'unrated']}
+          className={shapeFor(trail.rating)}
           style={{ backgroundColor: trail.color }}
         />
         <span className="font-medium text-[13px]">{trail.displayName}</span>

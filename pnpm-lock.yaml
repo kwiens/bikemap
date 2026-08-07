@@ -77,6 +77,12 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.19(tsx@4.23.6)(yaml@2.9.0))
+      terra-draw:
+        specifier: ^1.32.2
+        version: 1.32.2
+      terra-draw-mapbox-gl-adapter:
+        specifier: ^1.4.0
+        version: 1.4.0(mapbox-gl@3.24.0)(terra-draw@1.32.2)
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.4.16
@@ -4391,6 +4397,15 @@ packages:
     resolution: {integrity: sha512-3ofp+LL8E+pK/JuPLPggVAIaEuhvIz4qNcf3nA1Xn2o/7fb7s/TYpHhwGDv1ZU3PkBluUVaF8PyCHcm48cKLWQ==}
     engines: {node: '>=14.0.0'}
     hasBin: true
+
+  terra-draw-mapbox-gl-adapter@1.4.0:
+    resolution: {integrity: sha512-wsAkLX1asSI1XnVu39GCnEJNID1XqlHrTuPjxcBdwOCBisvhtXLsdOdeNxmBo6jtY/UWczTsQBqa2UaWIYydjA==}
+    peerDependencies:
+      mapbox-gl: ^3.9.2
+      terra-draw: ^1.0.0
+
+  terra-draw@1.32.2:
+    resolution: {integrity: sha512-ysy1EBhvYbMqddv4+LyNmb56DpZLGPP9QO/I5kZoD4PArRJekOBlvXPKjo9w+jikcOEMgHUSw2G7AHLqI2QoiA==}
 
   thenify-all@1.6.0:
     resolution: {integrity: sha512-RNxQH/qI8/t3thXJDwcstUO4zeqo64+Uy/+sNVRBx4Xn2OX+OZ9oP+iJnNFqplFra2ZUVeKCSa2oVWi3T4uVmA==}
@@ -9053,6 +9068,13 @@ snapshots:
     transitivePeerDependencies:
       - tsx
       - yaml
+
+  terra-draw-mapbox-gl-adapter@1.4.0(mapbox-gl@3.24.0)(terra-draw@1.32.2):
+    dependencies:
+      mapbox-gl: 3.24.0
+      terra-draw: 1.32.2
+
+  terra-draw@1.32.2: {}
 
   thenify-all@1.6.0:
     dependencies:
