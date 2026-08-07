@@ -33,7 +33,7 @@ export const TrailAreas: CollectionConfig = {
     defaultColumns: ['name', 'region'],
     description:
       'Trail complexes trails are grouped under, and the region each sits in. Anything added here becomes selectable on a trail.',
-    group: 'Map content',
+    group: 'Lists',
     listSearchableFields: ['name', 'region'],
   },
   access: {

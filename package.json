@@ -21,7 +21,8 @@
     "db:migrate": "payload migrate",
     "db:migrate:create": "payload migrate:create",
     "db:seed:bend": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/bend.ts",
-    "db:seed:chattanooga": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/chattanooga.ts"
+    "db:seed:chattanooga": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/chattanooga.ts",
+    "backfill:elevation": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/backfill-elevation-profiles.ts"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
@@ -46,7 +47,9 @@
     "react-dom": "^19.2.7",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "terra-draw": "^1.32.2",
+    "terra-draw-mapbox-gl-adapter": "^1.4.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",

@@ -69,6 +69,8 @@ export interface Config {
   collections: {
     trails: Trail;
     'trail-areas': TrailArea;
+    'trail-ratings': TrailRating;
+    'trail-kinds': TrailKind;
     organizations: Organization;
     users: User;
     'payload-kv': PayloadKv;
@@ -80,6 +82,8 @@ export interface Config {
   collectionsSelect: {
     trails: TrailsSelect<false> | TrailsSelect<true>;
     'trail-areas': TrailAreasSelect<false> | TrailAreasSelect<true>;
+    'trail-ratings': TrailRatingsSelect<false> | TrailRatingsSelect<true>;
+    'trail-kinds': TrailKindsSelect<false> | TrailKindsSelect<true>;
     organizations: OrganizationsSelect<false> | OrganizationsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -132,34 +136,43 @@ export interface UserAuthOperations {
 export interface Trail {
   id: number;
   /**
-   * Human-friendly name shown in the sidebar and pane.
-   */
-  displayName: string;
-  city: 'chattanooga' | 'bend';
-  /**
-   * The raw `Trail` property value from the Mapbox tileset. This is the join key to rendered features — change it only if the upstream GIS data changed.
+   * The name everything else follows from. It is also the raw `Trail` value from the Mapbox tileset and the join key to rendered features — so on an existing trail, change it only if the upstream GIS data changed.
    */
   trailName: string;
+  city: 'chattanooga' | 'bend';
   /**
-   * Canonical slug when it differs from the trail name. Also names the elevation profile JSON.
+   * Manage the list under Lists → Trail complexes.
    */
-  slug?: string | null;
+  area: number | TrailArea;
   /**
-   * Who builds and maintains this trail. Manage the list under Map content → Organizations.
+   * Who looks after this trail. Manage the list under Lists → Stewards.
    */
   organization?: (number | null) | Organization;
   /**
-   * Manage the list under Map content → Trail complexes.
+   * Manage the list under Lists → Trail ratings.
    */
-  area: number | TrailArea;
-  rating: 'easy' | 'intermediate' | 'advanced' | 'expert' | 'unrated';
+  rating: number | TrailRating;
   /**
-   * Drives the line color and marker icon. Colors are derived from kind + rating rather than stored, so a palette change is one code edit.
+   * Drives the line colour and sidebar icon, both of which come from the kind and rating rows rather than being stored per trail. Manage the list under Lists → Trail kinds.
    */
-  kind: 'trail' | 'greenway';
+  kind: number | TrailKind;
   /**
-   * The OSM ways this trail rides on. Pick them on the map — everything below is rebuilt from them when you save.
+   * The name riders see in the sidebar and the elevation pane.
    */
+  displayName: string;
+  /**
+   * Identifies the trail in URLs and names its elevation profile. Changing it on an existing trail moves where that profile is looked up.
+   */
+  slug: string;
+  geom?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   osmIds?:
     | {
         [k: string]: unknown;
@@ -170,11 +183,7 @@ export interface Trail {
     | boolean
     | null;
   /**
-   * Imported trails keep whatever geometry and measurements came with them; the OSM rebuild leaves them alone. Set this to OSM once the trail has been matched to way ids.
-   */
-  geometrySource: 'osm' | 'imported';
-  /**
-   * Rebuild from OSM on the next save even if the ways have not changed. Use after a trail has been rerouted or fixed upstream.
+   * Re-derive on the next save even if nothing changed. For an OSM trail that refetches the ways; for an edited one it just re-measures the line.
    */
   rebuildGeometry?: boolean | null;
   osmReport?:
@@ -210,9 +219,9 @@ export interface Trail {
     | boolean
     | null;
   /**
-   * GeoJSON MultiLineString (EPSG:4326) assembled from the OSM ways. A cache of what OSM says, not a source of truth.
+   * The per-point elevation chart, sampled on save. Trails in the checked-in data are served from public/data/elevation instead; this is what a trail created here draws from.
    */
-  geom?:
+  elevationProfile?:
     | {
         [k: string]: unknown;
       }
@@ -221,12 +230,40 @@ export interface Trail {
     | number
     | boolean
     | null;
+  /**
+   * OSM trails rebuild their line from the picked ways on every save. Edited trails keep the line as drawn — the map sets this for you the first time you move a point. Imported trails are left alone entirely.
+   */
+  geometrySource: 'osm' | 'edited' | 'imported';
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
 }
 /**
- * The clubs and agencies that maintain trails. Anything added here becomes selectable on a trail.
+ * Trail complexes trails are grouped under, and the region each sits in. Anything added here becomes selectable on a trail.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-areas".
+ */
+export interface TrailArea {
+  id: number;
+  /**
+   * As shown in the sidebar, e.g. "Phil's Trail Complex".
+   */
+  name: string;
+  city: 'chattanooga' | 'bend';
+  /**
+   * The heading this complex sits under in the sidebar — the level above it, e.g. "Bend" or "Cascade Lakes". Leave blank to use the built-in mapping.
+   */
+  region?: string | null;
+  /**
+   * Optional.
+   */
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * The clubs and agencies that look after trails — volunteer groups and land managers alike. Anything added here becomes selectable on a trail.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "organizations".
@@ -254,22 +291,60 @@ export interface Organization {
   createdAt: string;
 }
 /**
- * Trail complexes trails are grouped under, and the region each sits in. Anything added here becomes selectable on a trail.
+ * How trails are graded, and the colour each grade draws in. Anything added here becomes selectable on a trail.
  *
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "trail-areas".
+ * via the `definition` "trail-ratings".
  */
-export interface TrailArea {
+export interface TrailRating {
   id: number;
   /**
-   * As shown in the sidebar, e.g. "Phil's Trail Complex".
+   * As shown in the admin, e.g. "Intermediate".
    */
   name: string;
-  city: 'chattanooga' | 'bend';
   /**
-   * The heading this complex sits under in the sidebar — the level above it, e.g. "Bend" or "Cascade Lakes". Leave blank to use the built-in mapping.
+   * The stable key the map and sidebar match on, e.g. "intermediate". Lowercase and dashes.
    */
-  region?: string | null;
+  value: string;
+  /**
+   * The colour trails with this rating draw in.
+   */
+  color: string;
+  /**
+   * Low to high, easiest first. Orders this list and the dropdown on a trail.
+   */
+  sortOrder: number;
+  /**
+   * What this grade means locally. Optional.
+   */
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * The sorts of trail on the map, and how each is drawn. Anything added here becomes selectable on a trail.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-kinds".
+ */
+export interface TrailKind {
+  id: number;
+  /**
+   * As shown in the admin, e.g. "Greenway".
+   */
+  name: string;
+  /**
+   * The stable key the map matches on, e.g. "greenway". Lowercase and dashes.
+   */
+  value: string;
+  /**
+   * Marks trails of this kind in the sidebar.
+   */
+  icon: 'mountain' | 'route';
+  /**
+   * Optional. Overrides the rating colour — leave blank to let difficulty decide.
+   */
+  color?: string | null;
   /**
    * Optional.
    */
@@ -278,15 +353,20 @@ export interface TrailArea {
   createdAt: string;
 }
 /**
+ * Who can sign in and edit.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
 export interface User {
   id: number;
   name?: string | null;
-  role: 'admin' | 'editor';
   /**
-   * Which city this editor can change. Ignored for admins, who can edit every city.
+   * One role for now. Adding another here is what turns the access rules across the collections into a real distinction.
+   */
+  role: 'admin';
+  /**
+   * Which city this user can change. Ignored for admins, who can edit every city.
    */
   city?: ('chattanooga' | 'bend') | null;
   updatedAt: string;
@@ -339,6 +419,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'trail-areas';
         value: number | TrailArea;
+      } | null)
+    | ({
+        relationTo: 'trail-ratings';
+        value: number | TrailRating;
+      } | null)
+    | ({
+        relationTo: 'trail-kinds';
+        value: number | TrailKind;
       } | null)
     | ({
         relationTo: 'organizations';
@@ -395,16 +483,16 @@ export interface PayloadMigration {
  * via the `definition` "trails_select".
  */
 export interface TrailsSelect<T extends boolean = true> {
-  displayName?: T;
-  city?: T;
   trailName?: T;
-  slug?: T;
-  organization?: T;
+  city?: T;
   area?: T;
+  organization?: T;
   rating?: T;
   kind?: T;
+  displayName?: T;
+  slug?: T;
+  geom?: T;
   osmIds?: T;
-  geometrySource?: T;
   rebuildGeometry?: T;
   osmReport?: T;
   distance?: T;
@@ -413,7 +501,8 @@ export interface TrailsSelect<T extends boolean = true> {
   elevationMin?: T;
   elevationMax?: T;
   bounds?: T;
-  geom?: T;
+  elevationProfile?: T;
+  geometrySource?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -426,6 +515,32 @@ export interface TrailAreasSelect<T extends boolean = true> {
   name?: T;
   city?: T;
   region?: T;
+  description?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-ratings_select".
+ */
+export interface TrailRatingsSelect<T extends boolean = true> {
+  name?: T;
+  value?: T;
+  color?: T;
+  sortOrder?: T;
+  description?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-kinds_select".
+ */
+export interface TrailKindsSelect<T extends boolean = true> {
+  name?: T;
+  value?: T;
+  icon?: T;
+  color?: T;
   description?: T;
   updatedAt?: T;
   createdAt?: T;

@@ -26,6 +26,16 @@ import type { OsmWay } from './overpass';
  */
 export const JOIN_TOLERANCE_M = 25;
 
+/**
+ * A gap bigger than this is called out to the editor.
+ *
+ * Parts that don't touch are usually a mistake — a wrong way picked, a missing
+ * connector, or a hand edit that pulled an endpoint away from its neighbour.
+ * Below this, it's the near-miss noise that {@link JOIN_TOLERANCE_M} exists to
+ * absorb and not worth a warning.
+ */
+export const NOTABLE_GAP_M = 50;
+
 export interface AssemblyGap {
   /** Distance in meters between the two parts that failed to join. */
   distanceMeters: number;
@@ -127,13 +137,35 @@ export function assembleWays(ways: OsmWay[]): AssembledGeometry {
     runs.push(growRun(segments));
   }
 
-  // Report the shortest hop between consecutive parts — that's the distance a
-  // curator would need to close, and it tells them whether they're missing a
-  // connecting way or picked something unrelated.
+  const parts = runs.map((run) => run.coordinates);
+
+  return {
+    gaps: gapsBetweenParts(parts),
+    orderedIds: runs.flatMap((run) => run.ids),
+    parts,
+  };
+}
+
+/**
+ * Reports the shortest hop between each consecutive pair of parts, worst first.
+ *
+ * That distance is what a curator would have to close, and it tells them
+ * whether they're missing a connecting way or picked something unrelated.
+ *
+ * Separate from {@link assembleWays} because hand-edited geometry needs the same
+ * check: dragging an endpoint away from its neighbour opens a gap just as
+ * surely as picking the wrong way does, and it should be reported the same way.
+ */
+export function gapsBetweenParts(parts: [number, number][][]): AssemblyGap[] {
   const gaps: AssemblyGap[] = [];
-  for (let i = 1; i < runs.length; i++) {
-    const previous = runs[i - 1].coordinates;
-    const current = runs[i].coordinates;
+
+  for (let i = 1; i < parts.length; i++) {
+    const previous = parts[i - 1];
+    const current = parts[i];
+    if (previous.length === 0 || current.length === 0) {
+      continue;
+    }
+    // Either end of either part may be the one that was meant to join.
     const candidates = [
       distanceBetween(previous[previous.length - 1], current[0]),
       distanceBetween(
@@ -149,13 +181,8 @@ export function assembleWays(ways: OsmWay[]): AssembledGeometry {
       toPart: i,
     });
   }
-  gaps.sort((a, b) => b.distanceMeters - a.distanceMeters);
 
-  return {
-    gaps,
-    orderedIds: runs.flatMap((run) => run.ids),
-    parts: runs.map((run) => run.coordinates),
-  };
+  return gaps.sort((a, b) => b.distanceMeters - a.distanceMeters);
 }
 
 /** Total length in meters across all parts. Gaps are not counted. */

@@ -26,6 +26,8 @@ import {
   report,
   repoRoot,
   run,
+  emptyVocabulary,
+  loadVocabulary,
   upsertArea,
   upsertTrail,
   type MultiLineString,
@@ -68,6 +70,10 @@ run(async () => {
   // Areas are created on first mention; the cache keeps that to one
   // lookup per area rather than one per trail.
   const areas = new Map<string, number>();
+  // Ratings and kinds are collections now, so resolve them once up front rather
+  // than looking each up per trail. Skipped for a dry run, which must not write
+  // anything — and nothing reads it on that path.
+  const vocabulary = dryRun ? emptyVocabulary() : await loadVocabulary(payload);
   let created = 0;
   let updated = 0;
   let withGeometry = 0;
@@ -95,6 +101,7 @@ run(async () => {
 
     const result = await upsertTrail(payload, {
       areaId,
+      vocabulary,
       city: 'bend',
       geom,
       // Only trails that actually reference OSM ways can be rebuilt from them.

@@ -1,24 +1,39 @@
 import type { CollectionConfig } from 'payload';
 
 /**
- * Trail organizations — the clubs and agencies that build and maintain trails
- * (COTA in Bend, SORBA around Chattanooga, land managers, and so on).
+ * Stewards — whoever looks after a trail. Volunteer clubs (COTA in Bend, SORBA
+ * around Chattanooga) and the land managers whose ground the trail crosses
+ * (Deschutes National Forest, parks departments) sit in the same list, because
+ * from a trail's point of view they answer the same question.
+ *
+ * "Steward" rather than "organization" because it says what the relationship
+ * *is*. It is also the word the trail world already uses — IMBA and the land
+ * agencies both — and it covers a volunteer club and a national forest equally
+ * well, where "builder" or "land manager" each only fit half the list.
+ *
+ * **Labels only.** The slug stays `organizations` and the field on a trail stays
+ * `organization`, exactly as "trail complex" is an admin label over
+ * `trail-areas`/`recArea`. Renaming the slug would mean a migration plus a sweep
+ * through the seeds and the read path, for nothing a curator would notice.
  *
  * This exists as its own collection rather than a hardcoded `select` on Trails
- * so the options are editable in the admin, at
- * `/admin/collections/organizations`, without a deploy. Trails reference it
+ * so the options are editable in the admin without a deploy. Trails reference it
  * through a `relationship` field, which Payload renders as a searchable
- * dropdown and keeps referentially honest — renaming an org here updates every
+ * dropdown and keeps referentially honest — renaming one here updates every
  * trail pointing at it, and Payload blocks deleting one that's still in use.
  */
 export const Organizations: CollectionConfig = {
   slug: 'organizations',
+  labels: {
+    plural: 'Stewards',
+    singular: 'Steward',
+  },
   admin: {
     useAsTitle: 'name',
     defaultColumns: ['name', 'abbreviation', 'url'],
     description:
-      'The clubs and agencies that maintain trails. Anything added here becomes selectable on a trail.',
-    group: 'Map content',
+      'The clubs and agencies that look after trails — volunteer groups and land managers alike. Anything added here becomes selectable on a trail.',
+    group: 'Lists',
     listSearchableFields: ['name', 'abbreviation'],
   },
   access: {

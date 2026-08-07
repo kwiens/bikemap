@@ -16,26 +16,24 @@ import 'server-only';
  * and the caller falls back to the checked-in data — losing the CMS must not
  * take the public map down with it.
  */
-import { faMountain, faRoute } from '@fortawesome/free-solid-svg-icons';
 import { getPayload } from 'payload';
 import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
-import { RATING_COLORS, UNRATED_COLOR } from '@/data/trail-metadata';
-import type { Trail } from '@/payload-types';
-
-/** Greenways are drawn in their own green regardless of difficulty. */
-const GREENWAY_COLOR = '#059669';
+import { appearanceFor } from './appearance';
+import type { Trail, TrailKind, TrailRating } from '@/payload-types';
 
 /**
- * Colour is derived rather than stored, so changing the palette is one edit
- * here instead of a migration over every row.
+ * `rating` and `kind` are relationships, so at depth 1 they arrive as the
+ * related document — but only if the row still points at one. A rating deleted
+ * out from under a trail leaves an id, or null, and neither should throw.
  */
-function colorFor(trail: Trail): string {
-  if (trail.kind === 'greenway') {
-    return GREENWAY_COLOR;
-  }
-  return RATING_COLORS[trail.rating ?? ''] ?? UNRATED_COLOR;
+function ratingOf(trail: Trail): TrailRating | null {
+  return trail.rating && typeof trail.rating === 'object' ? trail.rating : null;
+}
+
+function kindOf(trail: Trail): TrailKind | null {
+  return trail.kind && typeof trail.kind === 'object' ? trail.kind : null;
 }
 
 function boundsFor(
@@ -76,8 +74,11 @@ function areaOf(trail: Trail): { name: string; region?: string } {
 
 function toMountainBikeTrail(trail: Trail): MountainBikeTrail {
   const area = areaOf(trail);
+  // Colour, icon and the rating key all come off the two vocabulary rows —
+  // see `appearance.ts` for which one wins where.
+  const appearance = appearanceFor(ratingOf(trail), kindOf(trail));
   return {
-    color: colorFor(trail),
+    color: appearance.color,
     defaultBounds: boundsFor(trail.bounds),
     displayName: trail.displayName ?? trail.trailName ?? '',
     distance: trail.distance ?? undefined,
@@ -85,13 +86,9 @@ function toMountainBikeTrail(trail: Trail): MountainBikeTrail {
     elevationLoss: trail.elevationLoss ?? undefined,
     elevationMax: trail.elevationMax ?? undefined,
     elevationMin: trail.elevationMin ?? undefined,
-    // An IconDefinition can't round-trip through the database, so it's rebuilt
-    // from `kind` — the same field that drives the colour.
-    icon: trail.kind === 'greenway' ? faRoute : faMountain,
+    icon: appearance.icon,
     osmIds: osmIdsFor(trail.osmIds),
-    // `rating` is a select with an explicit 'unrated' option; the app's type
-    // uses '' for the same thing.
-    rating: trail.rating === 'unrated' ? '' : (trail.rating ?? ''),
+    rating: appearance.rating,
     recArea: area.name,
     // Set only when the area carries one; the app falls back to its built-in
     // REGION_MAP otherwise.
