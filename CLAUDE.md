@@ -588,8 +588,69 @@ Things to know before touching it:
 - **Generated, lint-excluded**: `src/payload-types.ts`, `src/migrations/`,
   `src/app/(payload)/admin/importMap.js`.
 
+### Crowdsourced Trail Conditions
+
+Anyone can report what a trail was like — no account — from the selected-trail
+pane. The options come from a curated vocabulary. Full guide:
+[`docs/guides/trail-conditions.md`](docs/guides/trail-conditions.md).
+
+Two collections: `trail-condition-types` (the dropdown, nav group **Lists**, the
+same shape as `trail-ratings`) and `trail-conditions` (the reports, its own nav
+group **Conditions**). A report is a condition and an observed date, nothing
+else.
+
+- **This is the only public write path in the app, and it has exactly one door.**
+  `TrailConditions`'s access rules are **admin-only on purpose** — that is what
+  keeps Payload's own `/api/trail-conditions` shut. The public write goes
+  through `POST /api/map/conditions`, which validates first and then uses the
+  Local API (which bypasses access control by design). **Relaxing `create` on
+  the collection opens a second, unguarded door.**
+- **Anti-abuse is a honeypot plus a per-IP-hash rate limit**, both in
+  `src/payload/conditions/guard.ts` — pure, no Payload import, so it is testable
+  without a database. A tripped honeypot gets a **fake `200`**, never an error:
+  an error tells the bot which field is the trap. No captcha and no new service,
+  per ADR-0001 C3. `guard.ts` is where a captcha would go if one is ever needed.
+- **The IP is never stored** — only a salted, truncated one-way hash, in
+  `reporterHash`, so a spree can be found and removed together.
+  `CONDITION_REPORT_SALT` is optional and falls back to `PAYLOAD_SECRET`.
+- **Reports are live immediately; `hidden` is the moderation lever.** No drafts
+  on this collection — it is append-only data, and a versions table would double
+  the writes to express one boolean.
+- **Three switches close reporting, and any one is enough**: the
+  `condition-reporting` global (site-wide, mainly so a fork can ship the trail
+  data without a public form), and a `conditionReportsClosed` checkbox + note on
+  a trail and on a trail complex. Notes resolve most-specific-first via
+  `resolveLockMessage`. **Closing stops new reports; it never hides old ones** —
+  on a shut trail, what it was like when someone last rode it is the point.
+  Ask `lockFor(summary, slug)` rather than reading `locked`/`reporting`
+  separately, or the precedence gets re-derived and drifts.
+- **The hidden button is a courtesy; `submitConditionReport` is the gate.** It
+  re-checks all three switches and returns **403** with the same message. The
+  flag is named for the exception (`conditionReportsClosed`, default false) so
+  `ADD COLUMN ... DEFAULT false` needed no backfill and the lookup isn't
+  `equals: true` against a column of nulls.
+- **Staleness is deliberate.** A report stops driving the badge after
+  `CONDITION_FRESH_DAYS` (14) and stays in history. A stale condition is worse
+  than none: a green "Dry" pill from October is wrong in March in a way that
+  looks authoritative. `ConditionBadge` owns that rule for both surfaces.
+- **`ElevationProfile` no longer requires a chart to open.** Its guard is now
+  `hasProfile || hasConditions`, with the chart, y-axis, stats and GPX button
+  conditional — otherwise conditions would be invisible on exactly the trails
+  nobody has curated yet. The gate also tests that the vocabulary loaded, so the
+  pane never opens on an empty strip with no database.
+- **Conditions key on the trail's `slug`, never its name** — two complexes can
+  both have a "Larry". `curatedSlug()` in the pane returns `null` for an OSM way,
+  a route or a recorded ride; don't confuse it with `profileSlug()` beside it,
+  which deliberately invents a slug for an unrecognised name.
+- **`Trails` has a `beforeDelete` hook that clears a trail's reports.**
+  `trail_conditions.trail_id` is NOT NULL with an ON DELETE SET NULL FK — Payload
+  generates that pair, and together they make Postgres *refuse* to delete a trail
+  anyone has reported on. Reads also skip a report whose trail is null.
+
 ## Configuration & Secrets
 
 - Mapbox credentials belong in `.env.local`; see `.env.example` for required keys.
 - Never commit secrets or `.env.local` to version control.
 - `DATABASE_URL` and `PAYLOAD_SECRET` are only needed for the content backend.
+- `CONDITION_REPORT_SALT` is optional; it salts the condition-reporter hash and
+  falls back to `PAYLOAD_SECRET`.

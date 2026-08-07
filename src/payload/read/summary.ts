@@ -31,6 +31,8 @@ export interface TrailSummary {
   missingProfile: null | number;
   /** Whose last build reported a gap, a missing way, or a failed fetch. */
   withWarnings: null | number;
+  /** Condition reports filed in the last seven days, hidden ones included. */
+  reportsThisWeek: null | number;
   /** Most recently edited, for picking up where you left off. */
   recent: { id: number; name: string; updatedAt: string }[];
   /** True when the database could not be reached at all. */
@@ -43,6 +45,7 @@ const NONE: Omit<TrailSummary, 'city'> = {
   missingProfile: null,
   published: null,
   recent: [],
+  reportsThisWeek: null,
   unavailable: true,
   withWarnings: null,
 };
@@ -111,6 +114,18 @@ export async function getTrailSummary(): Promise<TrailSummary> {
       where: inCity,
     });
 
+    // Hidden reports are counted too, on purpose: this number is how an admin
+    // notices a spike worth looking at, and moderating one is not the same as
+    // it never having arrived.
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const conditionReports = await payload.count({
+      collection: 'trail-conditions',
+      where: {
+        and: [inCity, { createdAt: { greater_than: weekAgo.toISOString() } }],
+      },
+    });
+
     return {
       city,
       drafts,
@@ -122,6 +137,7 @@ export async function getTrailSummary(): Promise<TrailSummary> {
         name: trail.displayName ?? 'Untitled',
         updatedAt: trail.updatedAt ?? '',
       })),
+      reportsThisWeek: conditionReports.totalDocs,
       unavailable: false,
       withWarnings,
     };

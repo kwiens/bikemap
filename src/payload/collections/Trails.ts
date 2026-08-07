@@ -1,10 +1,15 @@
-import type { Access, CollectionConfig } from 'payload';
+import type {
+  Access,
+  CollectionBeforeDeleteHook,
+  CollectionConfig,
+} from 'payload';
 import { resolveTrailGeometry } from '@/payload/hooks/resolveTrailGeometry';
 import { activeCityId } from '@/config/map.config';
 import { DEFAULT_KIND_VALUE, UNRATED_VALUE } from '@/data/trail-vocabulary';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { MAX_WAYS_PER_REQUEST } from '@/payload/osm/overpass';
 import { slugify } from '@/utils/string';
+import { conditionLockFields } from './condition-lock-fields';
 import { defaultVocabularyId } from './vocabulary-fields';
 
 /**
@@ -46,6 +51,25 @@ const cityScoped: Access = ({ req }) => {
   return user.city ? { city: { equals: user.city } } : false;
 };
 
+/**
+ * Clears a trail's condition reports before the trail goes.
+ *
+ * `trail_conditions.trail_id` is NOT NULL with an ON DELETE SET NULL foreign key
+ * — Payload generates that pair for a required relationship, and together they
+ * make Postgres refuse the delete. Without this, deleting any trail someone had
+ * reported on would fail with a raw constraint violation.
+ */
+const deleteConditionReports: CollectionBeforeDeleteHook = async ({
+  id,
+  req,
+}) => {
+  await req.payload.delete({
+    collection: 'trail-conditions',
+    req,
+    where: { trail: { equals: id } },
+  });
+};
+
 export const Trails: CollectionConfig = {
   slug: 'trails',
   admin: {
@@ -69,6 +93,7 @@ export const Trails: CollectionConfig = {
   },
   hooks: {
     beforeChange: [resolveTrailGeometry],
+    beforeDelete: [deleteConditionReports],
   },
   fields: [
     /**
@@ -197,6 +222,19 @@ export const Trails: CollectionConfig = {
                   },
                 },
               ],
+            },
+            {
+              type: 'collapsible',
+              label: 'Condition reports',
+              admin: {
+                description:
+                  'Close this trail to new rider reports. The trail complex and Settings → Condition reporting can close it too; any one is enough.',
+                initCollapsed: true,
+              },
+              fields: conditionLockFields({
+                effect: 'for this trail',
+                example: 'Closed for logging until 1 May.',
+              }),
             },
             {
               type: 'collapsible',

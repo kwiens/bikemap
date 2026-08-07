@@ -77,6 +77,14 @@ export async function DashboardSummary() {
           tone={summary.withWarnings ? 'attention' : 'plain'}
           value={summary.withWarnings}
         />
+        {/* Plain, never 'attention': riders reporting conditions is the system
+            working. It is here so a sudden spike is visible, not as a chore. */}
+        <Stat
+          href="/admin/collections/trail-conditions"
+          label="Reports"
+          note="filed in the last 7 days"
+          value={summary.reportsThisWeek}
+        />
       </div>
 
       {summary.recent.length > 0 && (
