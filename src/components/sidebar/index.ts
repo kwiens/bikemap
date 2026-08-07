@@ -13,6 +13,8 @@ export { InformationSection } from './InformationSection';
 export { LocationList } from './LocationList';
 export { SidebarCard, type SidebarCardColorTheme } from './SidebarCard';
 export { pressableProps } from './a11y';
+export { ConditionBadge } from './ConditionBadge';
+export { TrailConditionsStrip } from './TrailConditionsStrip';
 
 // Types
 export type {
