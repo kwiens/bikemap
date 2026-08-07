@@ -26,6 +26,18 @@ export default buildConfig({
     meta: {
       titleSuffix: '— Open Bike Map',
     },
+    components: {
+      // Rendered above Payload's collection cards rather than replacing the
+      // dashboard, so the default way of reaching a collection still works —
+      // including if this ever fails to render.
+      beforeDashboard: [
+        '@/payload/components/DashboardSummary#DashboardSummary',
+      ],
+      // Above the collection groups: neither the dashboard nor the public map
+      // is a collection, and Payload offers no way back to the dashboard but
+      // the logo.
+      beforeNavLinks: ['@/payload/components/AdminNavLinks#AdminNavLinks'],
+    },
   },
   collections: [
     Trails,

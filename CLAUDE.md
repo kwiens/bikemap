@@ -498,6 +498,12 @@ Things to know before touching it:
   (The `vocabulary` in `loadVocabulary` / `defaultVocabularyId` /
   `trail-vocabulary.ts` is the data-model term and is unrelated to the nav
   label — don't rename those to match.)
+- **`getTrailSummary` never throws**, same rule as `getCityTrails` and
+  `getThemeCss` — it feeds the dashboard, which is the first page after signing
+  in, so an exception there locks everyone out over a decorative panel. An
+  unreachable database renders `—`, never `0`. Note one count is done in JS on
+  purpose: `osmReport` is a plain `json` column and `osmReport.warnings.0`
+  compiles to a jsonb path Postgres rejects.
 - **Theme the admin with CSS variables, never Payload's selectors.** Defaults
   live in `src/app/(payload)/custom.css`; the DB-backed overrides come from the
   Theme global. Class names like `.btn__content` are internals that move between
