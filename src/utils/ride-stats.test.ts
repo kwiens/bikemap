@@ -165,6 +165,57 @@ describe('computeElevation', () => {
   // and points must be spaced > ELEVATION_MIN_DISTANCE apart (~15m).
   // At 0.0003° spacing (~33m/point), this simulates realistic rides.
 
+  // A sustained climb must survive the spike filter.
+  //
+  // The filter replaces a reading that is more than ELEVATION_SPIKE_THRESHOLD
+  // from a running EMA. It used to advance that EMA from the *substituted*
+  // value, which on a rejection is the EMA itself — so the update reduced to
+  // `ema = 0.3*ema + 0.7*ema` and the EMA froze permanently. Every later
+  // reading was then too far from a value that could no longer move, and was
+  // also replaced.
+  //
+  // On a real trail that erased a mountain: one rejection 7% into O'Leary
+  // Mountain flatlined the remaining 92% at 2,239 ft, reporting 449 ft of
+  // climbing on a trail that gains about 3,200.
+  it('keeps tracking a sustained climb the EMA cannot keep up with', () => {
+    // The spike filter compares each reading against a running EMA and
+    // replaces anything further away than ELEVATION_SPIKE_THRESHOLD. On a
+    // sustained climb the EMA *lags* — by roughly step * (1-alpha)/alpha —
+    // and on a steep enough slope that lag alone exceeds the threshold, with
+    // no spike anywhere in the data.
+    //
+    // The filter then held its reference while rejecting, so it could never
+    // catch up: the ground kept climbing away from a value that had stopped
+    // moving, and every remaining reading was rejected too. On O'Leary
+    // Mountain that flatlined 92% of the trail at 2,239 ft and reported 449 ft
+    // of climbing on a trail that gains about 3,200 — with a largest
+    // sample-to-sample step of 17.8 m, well under the 25 m threshold.
+    //
+    // 10 m per ~33 m of track is about a 30% grade: steep, and exactly what
+    // the real trail does where this first went wrong.
+    const points = makeTrack(200, { startAlt: 1000, altStep: 10 });
+    const { gain, max, min } = computeElevation(points);
+
+    // The track climbs 199 * 10 = 1,990 m. Loose on purpose — smoothing trims
+    // the ends, and the failure this guards against reported almost none of it.
+    expect(gain).toBeGreaterThan(1700);
+    expect(max - min).toBeGreaterThan(1700);
+  });
+
+  it('still replaces an isolated spike', () => {
+    // The behaviour the filter exists for, which the fix must not give up.
+    const clean = makeTrack(200, { startAlt: 1000, altStep: 2 });
+    const spiked = clean.map((point, i) =>
+      i === 100 ? { ...point, altitude: (point.altitude ?? 0) + 200 } : point,
+    );
+
+    const before = computeElevation(clean);
+    const after = computeElevation(spiked);
+
+    // A 200 m spike must not show up as 200 m of extra height.
+    expect(Math.abs(after.max - before.max)).toBeLessThan(20);
+  });
+
   it('computes gain for a steady climb', () => {
     const points = makeTrack(200, { startAlt: 200, altStep: 2 });
     const { gain, loss } = computeElevation(points);

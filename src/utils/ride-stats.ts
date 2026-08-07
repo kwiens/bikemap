@@ -35,6 +35,12 @@ export const ELEVATION_DEAD_BAND = 3;
 // are replaced with the current EMA value before smoothing.
 // Must be high enough to allow sustained climbs (EMA lags on slopes).
 export const ELEVATION_SPIKE_THRESHOLD = 25;
+// How many consecutive readings may be dismissed as spikes before the series
+// is taken at face value. Losing satellite lock in a tunnel produces a short
+// burst — five points or so — while a hillside keeps going, so the run length
+// is what tells a real climb from bad data. Without a ceiling here, a filter
+// that holds its reference while rejecting will reject forever.
+export const ELEVATION_SPIKE_MAX_RUN = 5;
 // Minimum horizontal distance (meters) between deadband anchor updates.
 // Prevents counting altitude jitter while stopped or barely moving.
 export const ELEVATION_MIN_DISTANCE = 15;
@@ -153,13 +159,36 @@ function smoothAltitudes(points: { altitude: number | null }[]): number[] {
   const seedMedian = seedSlice[Math.floor(seedSlice.length / 2)];
   let spikeEma = seedMedian;
   const vals: number[] = [];
+  // How many readings in a row have been rejected. A burst of bad readings and
+  // a real climb look identical point by point — losing satellite lock in a
+  // tunnel ramps away from the truth exactly the way a hillside does. What
+  // separates them is how long it lasts, so the run length is what decides.
+  let rejectRun = 0;
   for (let i = 0; i < rawVals.length; i++) {
-    if (Math.abs(rawVals[i] - spikeEma) > ELEVATION_SPIKE_THRESHOLD) {
-      vals.push(spikeEma); // replace spike with current EMA
+    const deviates =
+      Math.abs(rawVals[i] - spikeEma) > ELEVATION_SPIKE_THRESHOLD;
+
+    if (deviates && rejectRun < ELEVATION_SPIKE_MAX_RUN) {
+      // Treat it as a spike: substitute, and **hold** the EMA where it is.
+      //
+      // Advancing it from the substituted value is what this used to do, and
+      // it is a latch: on a rejection the substitute *is* the EMA, so the
+      // update reduced to `ema = 0.3*ema + 0.7*ema` and the EMA froze
+      // permanently. Every later reading was then further than the threshold
+      // from a value that could no longer move, so it was rejected too. One
+      // rejection 7% into O'Leary Mountain flatlined the remaining 92% of the
+      // trail at 2,239 ft, reporting 449 ft of climbing on a trail that gains
+      // about 3,200.
+      vals.push(spikeEma);
+      rejectRun += 1;
     } else {
+      // Either a normal reading, or a deviation that has gone on too long to
+      // be noise — that is the ground, not a spike, so re-acquire.
       vals.push(rawVals[i]);
+      rejectRun = 0;
+      spikeEma =
+        SPIKE_EMA_ALPHA * rawVals[i] + (1 - SPIKE_EMA_ALPHA) * spikeEma;
     }
-    spikeEma = SPIKE_EMA_ALPHA * vals[i] + (1 - SPIKE_EMA_ALPHA) * spikeEma;
   }
 
   // Centered moving average
