@@ -451,6 +451,23 @@ row.
 
 ## How the admin is laid out
 
+**Two entries sit above the groups** (`AdminNavLinks`, via
+`admin.components.beforeNavLinks`), because neither is a collection:
+
+- **Dashboard** — Payload ships no nav link back to it; the logo is the only way,
+  and it doesn't read as navigation. Rendered as a `div` rather than a link when
+  you are already there, matching what Payload does for the current page.
+- **View map** — opens the public site, in a **new tab on purpose**: the admin is
+  form-heavy and a trail being edited holds unsaved geometry, so navigating away
+  in the same tab would quietly discard it.
+
+Both reuse Payload's own `nav__link` classes. That is against the usual rule of
+leaving their selectors alone, and deliberately so — the rule is about
+*overriding* their styles, whereas these have to be pixel-identical to a dozen
+native links inches away. If Payload renames the classes these render unstyled
+but still work; a hand-styled version that drifts is conspicuously wrong on every
+page. The markup mirrors `DefaultNavClient` in `@payloadcms/next`.
+
 **Navigation** groups by what you are doing, not by what the thing is:
 
 | Group | What's in it |
@@ -485,6 +502,22 @@ the document *and* the database, so naming these would rename every column and
 break the seeds, the read path, and the public map — to move boxes around on
 screen. `payload migrate:create` reports "No schema changes detected" for the
 layout as it stands, and that is the check to re-run if you touch it.
+
+The **dashboard** (`DashboardSummary`, wired through `admin.components.
+beforeDashboard`) shows what needs attention: published and draft counts, trails
+with no line, trails with no elevation chart, trails whose last build warned, and
+the five most recently edited. It is additive — Payload's collection cards still
+render below it, so the normal way into a collection survives this failing.
+
+Two things it has to keep doing. `getTrailSummary` **never throws**, like
+`getCityTrails` and `getThemeCss`: the dashboard is the first page after signing
+in, so an exception there is an admin nobody can get into, over a decorative
+panel. And an unreachable database shows `—`, never `0` — a zero is a claim.
+
+One query in it is deliberately done in JavaScript. `osmReport` is a plain
+`json` column, and asking Postgres whether its `warnings` array is non-empty
+means indexing into it: `osmReport.warnings.0` compiles to a jsonb path Postgres
+rejects outright, which took the whole panel down to `—`.
 
 ## Reference collections
 
