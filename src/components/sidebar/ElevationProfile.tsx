@@ -36,6 +36,21 @@ const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 const GRADE_YELLOW = 12;
 const GRADE_RED = 25;
 
+/**
+ * One profile fetch. Rejects on a non-200 — a trail with no stored profile is
+ * a 404, which the caller treats as "no chart" rather than an error.
+ */
+async function fetchProfile(
+  url: string,
+  signal: AbortSignal,
+): Promise<ElevationProfileData> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
 function profileSlug(trailName: string): string {
   const trail = getMountainBikeTrails().find(
     (item) => item.trailName === trailName,
@@ -425,11 +440,21 @@ export function ElevationProfile() {
 
     const controller = new AbortController();
     const slug = encodeURIComponent(profileSlug(trailName));
-    fetch(`/data/elevation/${slug}.json`, { signal: controller.signal })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
+
+    // One source: the profile measured when the trail was last saved, and
+    // recalculated whenever its ways change or its line is redrawn.
+    //
+    // The checked-in `public/data/elevation/*.json` files are deliberately
+    // *not* consulted. They cannot update themselves, so a trail whose ways had
+    // been adjusted kept drawing the old chart while the sidebar showed the new
+    // distance — two numbers disagreeing on one screen. They also only exist
+    // for the two bundled cities, and this repo is meant to be stood up by any
+    // trail org, which has a database and none of those files.
+    //
+    // The cost is that a trail with no row has no chart. That is Chattanooga
+    // today, whose geometry still lives in a Mapbox tileset; it gets its own
+    // CMS, and the files stay on disk until then.
+    fetchProfile(`/api/map/elevation/${slug}`, controller.signal)
       .then((data: ElevationProfileData) => {
         profileCache.set(trailName, data);
         setProfile(data);

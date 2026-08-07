@@ -8,6 +8,7 @@
  * rider does. This is the admin-side equivalent of scripts/audit_bend_trails.py.
  */
 import { useFormFields } from '@payloadcms/ui';
+import { Banner } from './admin-ui';
 
 interface Gap {
   distanceMeters: number;
@@ -20,6 +21,8 @@ interface BuildReport {
   gaps?: Gap[];
   missingIds?: number[];
   resolvedIds?: number[];
+  /** Which path produced the line — see resolveTrailGeometry. */
+  source?: 'edited' | 'osm' | null;
   warnings?: string[];
 }
 
@@ -56,24 +59,25 @@ export function OsmBuildReport({ path }: { path: string }) {
           margin: '0 0 0.5rem',
         }}
       >
-        Built {new Date(report.builtAt).toLocaleString()} from{' '}
-        {report.resolvedIds?.length ?? 0} OSM way
-        {report.resolvedIds?.length === 1 ? '' : 's'}
+        {report.source === 'edited' ? (
+          <>
+            Measured {new Date(report.builtAt).toLocaleString()} from a line
+            edited by hand — it no longer tracks OSM
+          </>
+        ) : (
+          <>
+            Built {new Date(report.builtAt).toLocaleString()} from{' '}
+            {report.resolvedIds?.length ?? 0} OSM way
+            {report.resolvedIds?.length === 1 ? '' : 's'}
+          </>
+        )}
         {healthy ? ' — no problems found.' : '.'}
       </p>
 
       {warnings.map((warning) => (
-        <p
-          key={warning}
-          style={{
-            background: 'var(--theme-warning-100, #fff6e5)',
-            borderLeft: '3px solid var(--theme-warning-500, #e6a700)',
-            margin: '0 0 0.5rem',
-            padding: '0.5rem 0.75rem',
-          }}
-        >
+        <Banner key={warning} tone="warning">
           {warning}
-        </p>
+        </Banner>
       ))}
 
       {gaps.length > 0 && (

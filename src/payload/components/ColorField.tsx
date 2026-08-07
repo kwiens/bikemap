@@ -12,8 +12,9 @@
  * and it is the field's source of truth: the swatch only writes well-formed
  * hex back into it.
  */
-import { useField, FieldLabel } from '@payloadcms/ui';
+import { useField } from '@payloadcms/ui';
 import type { TextFieldClientProps } from 'payload';
+import { FieldShell, inputStyle, useFieldId } from './admin-ui';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -27,10 +28,20 @@ export function ColorField({ field, path }: TextFieldClientProps) {
   const current = value ?? '';
   const label = typeof field?.label === 'string' ? field.label : path;
 
-  return (
-    <div className="field-type text">
-      <FieldLabel label={label} path={path} required={field?.required} />
+  // The label points at the hex box rather than the swatch: it is the field's
+  // source of truth, and it is the one you can type into.
+  const inputId = useFieldId(path);
 
+  return (
+    <FieldShell
+      description={
+        field?.admin?.description ? String(field.admin.description) : undefined
+      }
+      htmlFor={inputId}
+      label={label}
+      path={path}
+      required={field?.required}
+    >
       <div style={{ alignItems: 'center', display: 'flex', gap: '0.5rem' }}>
         <input
           aria-label={`${label} colour picker`}
@@ -49,28 +60,24 @@ export function ColorField({ field, path }: TextFieldClientProps) {
         />
         <input
           className="field-type__wrap"
+          id={inputId}
           onChange={(event) => setValue(event.target.value)}
           placeholder="#c3f44d"
           spellCheck={false}
           style={{
-            background: 'var(--theme-input-bg)',
-            border: `1px solid var(--theme-elevation-${showError ? '150' : '150'})`,
-            borderRadius: 'var(--style-radius-s)',
-            color: 'var(--theme-text)',
+            ...inputStyle(true),
+            // Was `elevation-${showError ? '150' : '150'}` — both branches the
+            // same, so an invalid colour never looked invalid.
+            ...(showError
+              ? { border: '1px solid var(--theme-error-500, #c00)' }
+              : {}),
             flex: 1,
-            fontFamily: 'var(--font-mono)',
-            padding: '0.5rem 0.75rem',
+            width: undefined,
           }}
           type="text"
           value={current}
         />
       </div>
-
-      {field?.admin?.description && (
-        <div className="field-description">
-          {String(field.admin.description)}
-        </div>
-      )}
-    </div>
+    </FieldShell>
   );
 }
