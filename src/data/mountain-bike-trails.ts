@@ -40,7 +40,9 @@ export interface MountainBikeTrail {
   osmIds?: number[];
 }
 
-export function slugForTrail(trail: MountainBikeTrail): string {
+export function slugForTrail(
+  trail: Pick<MountainBikeTrail, 'slug' | 'trailName'>,
+): string {
   return trail.slug ?? slugify(trail.trailName);
 }
 

@@ -5,6 +5,7 @@
  * Shared by the server and the client, so no Node-only imports.
  */
 import { CONDITION_FRESH_DAYS } from './condition-vocabulary';
+import { slugForTrail } from './mountain-bike-trails';
 
 /** One option on the report form, out of the curated vocabulary. */
 export interface ConditionOption {
@@ -18,6 +19,12 @@ export interface ConditionOption {
 /** One report, as the map shows it. */
 export interface ConditionReport {
   color: string;
+  /**
+   * This condition means the trail is shut. Set on the condition type, not the
+   * report, so a curator decides which grades count — the app never matches on
+   * the value 'closed'.
+   */
+  marksClosed: boolean;
   name: string;
   /** ISO 8601. When the trail was ridden, not when this was submitted. */
   observedAt: string;
@@ -106,6 +113,43 @@ export function isConditionFresh(
   now: Date = new Date(),
 ): boolean {
   return conditionAgeDays(observedAt, now) < CONDITION_FRESH_DAYS;
+}
+
+/**
+ * Whether a report still stands.
+ *
+ * Everything fades after a fortnight except a closure, which holds until
+ * somebody reports something else. A closure is a state, not an observation — a
+ * trail does not quietly reopen because nobody has ridden it lately, and
+ * expiring one would take a barrier off the map on a timer.
+ */
+export function isConditionCurrent(
+  report: ConditionReport,
+  now: Date = new Date(),
+): boolean {
+  return report.marksClosed || isConditionFresh(report.observedAt, now);
+}
+
+/** Whether this trail's newest report says it is shut. */
+export function isTrailClosed(
+  summary: Pick<ConditionSummary, 'latest'>,
+  slug: string,
+): boolean {
+  return summary.latest[slug]?.marksClosed === true;
+}
+
+/**
+ * The trails whose newest report says they are shut.
+ *
+ * Conditions are keyed by slug, but the map layers join on the trail name (or
+ * on OSM way ids) — so the two are reconciled here, once, rather than in the
+ * map code.
+ */
+export function closedTrails<T extends { slug?: string; trailName: string }>(
+  summary: Pick<ConditionSummary, 'latest'>,
+  trails: T[],
+): T[] {
+  return trails.filter((trail) => isTrailClosed(summary, slugForTrail(trail)));
 }
 
 /**

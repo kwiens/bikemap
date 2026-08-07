@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { CONDITION_FRESH_DAYS } from './condition-vocabulary';
+import type { ConditionReport } from './trail-conditions';
 import {
+  closedTrails,
   conditionAgeDays,
   conditionAgeLabel,
   DEFAULT_LOCK_MESSAGE,
+  isConditionCurrent,
   isConditionFresh,
+  isTrailClosed,
   lockFor,
   resolveLockMessage,
 } from './trail-conditions';
@@ -148,5 +152,67 @@ describe('lockFor', () => {
     const summary = { locked: {}, reporting: { enabled: false, message: '' } };
 
     expect(lockFor(summary, 'pondo')).toBe(DEFAULT_LOCK_MESSAGE);
+  });
+});
+
+describe('closures', () => {
+  function report(daysAgo: number, marksClosed: boolean): ConditionReport {
+    const observed = new Date(NOW);
+    observed.setDate(observed.getDate() - daysAgo);
+    return {
+      color: '#dc2626',
+      marksClosed,
+      name: marksClosed ? 'Closed' : 'Dry',
+      observedAt: observed.toISOString(),
+      source: 'public',
+      value: marksClosed ? 'closed' : 'dry',
+    };
+  }
+
+  it('a closure never goes stale', () => {
+    // The whole point: a trail does not quietly reopen because nobody has
+    // ridden it lately.
+    expect(isConditionCurrent(report(400, true), NOW)).toBe(true);
+    expect(isConditionCurrent(report(400, false), NOW)).toBe(false);
+  });
+
+  it('everything else still fades at the cutoff', () => {
+    expect(isConditionCurrent(report(1, false), NOW)).toBe(true);
+    expect(isConditionCurrent(report(CONDITION_FRESH_DAYS, false), NOW)).toBe(
+      false,
+    );
+  });
+
+  it('a trail is closed only while a closure is its newest report', () => {
+    expect(isTrailClosed({ latest: { pondo: report(3, true) } }, 'pondo')).toBe(
+      true,
+    );
+    // Reopened: the newest report is not a closure, so the trail is not closed.
+    expect(
+      isTrailClosed({ latest: { pondo: report(1, false) } }, 'pondo'),
+    ).toBe(false);
+    expect(isTrailClosed({ latest: {} }, 'pondo')).toBe(false);
+  });
+
+  it('picks out the closed trails, keyed by slug', () => {
+    const trails = [
+      { slug: 'pondo', trailName: 'Pondo' },
+      { slug: 'rattler', trailName: 'Rattler' },
+    ];
+    const summary = {
+      latest: { pondo: report(200, true), rattler: report(2, false) },
+    };
+
+    expect(closedTrails(summary, trails).map((t) => t.trailName)).toEqual([
+      'Pondo',
+    ]);
+  });
+
+  it('falls back to a derived slug when the trail carries none', () => {
+    // Checked-in trails have no `slug`; slugForTrail derives one, and the
+    // lookup has to use the same key the API does.
+    const summary = { latest: { 'bear-creek': report(1, true) } };
+
+    expect(closedTrails(summary, [{ trailName: 'Bear Creek' }]).length).toBe(1);
   });
 });

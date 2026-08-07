@@ -21,7 +21,7 @@ import { useTrailConditions } from '@/components/TrailConditionsProvider';
 import {
   type ConditionReport,
   conditionAgeLabel,
-  isConditionFresh,
+  isConditionCurrent,
 } from '@/data/trail-conditions';
 import { MAP_EVENTS } from '@/events';
 import { cn } from '@/lib/utils';
@@ -103,7 +103,8 @@ export function TrailConditionsStrip({
     return null;
   }
 
-  const stale = current && !isConditionFresh(current.observedAt);
+  // A closure never goes stale, so this is never true for one.
+  const stale = current && !isConditionCurrent(current);
   const lockedReason = reasonFor(slug);
 
   return (

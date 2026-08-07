@@ -87,6 +87,17 @@ export const TrailConditionTypes: CollectionConfig = {
       },
     },
     {
+      name: 'marksClosed',
+      type: 'checkbox',
+      defaultValue: false,
+      index: true,
+      label: 'Mark the trail as closed on the map',
+      admin: {
+        description:
+          'Draws the trail as a red dashed line, and the badge stops expiring — a closure holds until someone reports something else. Nothing to do with the “closed to new reports” switches on a trail.',
+      },
+    },
+    {
       name: 'description',
       type: 'textarea',
       admin: { description: 'What this means locally. Optional.' },

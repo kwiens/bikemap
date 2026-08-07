@@ -52,6 +52,7 @@ function report(daysAgo: number, name: string): ConditionReport {
   observed.setDate(observed.getDate() - daysAgo);
   return {
     color: '#b45309',
+    marksClosed: false,
     name,
     observedAt: observed.toISOString(),
     source: 'public',

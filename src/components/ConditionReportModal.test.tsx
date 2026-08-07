@@ -73,6 +73,7 @@ describe('ConditionReportModal', () => {
   it('posts the slug, condition and date, then records the report locally', async () => {
     const report = {
       color: '#b45309',
+      marksClosed: false,
       name: 'Muddy — stay off',
       observedAt: '2026-08-07T00:00:00.000Z',
       source: 'public',

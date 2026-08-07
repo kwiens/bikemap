@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import {
   type ConditionReport,
   conditionAgeLabel,
-  isConditionFresh,
+  isConditionCurrent,
 } from '@/data/trail-conditions';
 
 export function ConditionBadge({
@@ -26,7 +26,7 @@ export function ConditionBadge({
   showAge?: boolean;
   size?: 'md' | 'sm';
 }) {
-  if (!report || !isConditionFresh(report.observedAt)) {
+  if (!report || !isConditionCurrent(report)) {
     return null;
   }
 

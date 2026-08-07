@@ -14,16 +14,12 @@
  */
 export const CONDITION_FRESH_DAYS = 14;
 
-/**
- * How far back the summary query looks. Wider than the freshness cutoff so the
- * pane can still say "last reported 3 weeks ago".
- */
-export const CONDITION_SUMMARY_DAYS = 60;
-
 export interface ConditionSeed {
   /** The colour the badge pill is tinted with. */
   color: string;
   description?: string;
+  /** Draws the trail closed on the map, and stops the badge expiring. */
+  marksClosed?: boolean;
   name: string;
   /** Best-to-worst order. Drives the admin list and the report dropdown. */
   sortOrder: number;
@@ -80,6 +76,7 @@ export const DEFAULT_CONDITIONS: ConditionSeed[] = [
   {
     color: '#dc2626',
     description: 'Closed by the land manager, or blocked. Do not ride.',
+    marksClosed: true,
     name: 'Closed',
     sortOrder: 70,
     value: 'closed',

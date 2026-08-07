@@ -34,6 +34,37 @@ someone can log Saturday's ride on Sunday morning. It is bounded: no more than
 
 Both go through `ConditionBadge`, which is also where the staleness rule lives.
 
+## Closed trails show on the map
+
+A trail whose **newest report** carries a condition flagged "Mark the trail as
+closed on the map" is drawn as a **red dashed line over its normal one**.
+
+An overlay rather than a recolour: the green/blue/black rating colours are what
+the legend and the sidebar swatches mean, and turning a closed trail red would
+leave the two disagreeing. The dash is what carries the meaning, so it still
+reads without relying on colour at all.
+
+**Which conditions close a trail is data, not code.** `marksClosed` is a
+checkbox on the condition type — seeded on "Closed", and a curator can tick it on
+"Snow / ice" too. Nothing in the app matches on the value `'closed'`.
+
+**A closure does not expire.** Everything else fades after
+`CONDITION_FRESH_DAYS`; a closure holds until somebody reports the trail as
+something else. A closure is a state, not an observation — a trail does not
+quietly reopen because nobody has ridden it in a fortnight, and expiring one
+would take a barrier off the map on a timer. `isConditionCurrent` is where that
+rule lives; ask it rather than `isConditionFresh` on anything user-facing.
+
+That is also why `getConditionSummary` has **no date floor** on its query. A
+window would silently reopen a trail shut last season. The row limit is the
+bound instead: newest-first means the newest report per trail is in the result
+while total non-hidden reports stay under it. Past that, the answer is a
+current-condition column on the trail.
+
+**The "closed to reports" switches do not do this.** Those are moderation — an
+admin muting a trail that is attracting nonsense should not paint it closed for
+riders. Only a condition marks the map.
+
 ### Staleness is a feature
 
 A report stops driving the badge after `CONDITION_FRESH_DAYS` (14). It stays in
