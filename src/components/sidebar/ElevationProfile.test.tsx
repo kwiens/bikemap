@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   gradeToColor,
   computeGradeColors,
+  computeGrades,
   downsampleStops,
+  formatGrade,
+  MAX_GRADIENT_STOPS,
   findClosestProfileIndex,
   profilePointToXY,
 } from './ElevationProfile';
@@ -86,12 +89,12 @@ describe('downsampleStops', () => {
     expect(stops).toHaveLength(50);
   });
 
-  it('returns exactly 200 stops when count is > 200', () => {
-    const points = makePoints(500);
+  it('caps the stop count on a profile longer than the cap', () => {
+    const points = makePoints(MAX_GRADIENT_STOPS + 100);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
     const stops = downsampleStops(points, colors, maxDist);
-    expect(stops).toHaveLength(200);
+    expect(stops).toHaveLength(MAX_GRADIENT_STOPS);
   });
 
   it('first offset is 0 and last is approximately 1', () => {
@@ -177,5 +180,66 @@ describe('profilePointToXY', () => {
     };
     const { y } = profilePointToXY(points, 0, flatProfile, 800);
     expect(Number.isFinite(y)).toBe(true);
+  });
+});
+
+describe('computeGrades', () => {
+  // 10 ft up over 100 ft along = 10%.
+  const climb: [number, number, number, number][] = [
+    [0, 100, -85, 35],
+    [100, 110, -85, 35],
+    [200, 120, -85, 35],
+    [300, 130, -85, 35],
+    [400, 140, -85, 35],
+  ];
+
+  it('reads a steady grade correctly', () => {
+    const grades = computeGrades(climb);
+    // The interior points have a full window either side, so they land on 10.
+    expect(grades[2]).toBeCloseTo(10, 5);
+  });
+
+  it('signs a descent negative', () => {
+    const drop: [number, number, number, number][] = climb.map(
+      ([d, e, lng, lat]) => [d, 200 - e, lng, lat],
+    );
+    expect(computeGrades(drop)[2]).toBeCloseTo(-10, 5);
+  });
+
+  it('keeps a short pitch visible rather than averaging it away', () => {
+    // One steep step in otherwise flat ground. With the old ±2 window this
+    // was divided across five samples; the point of the smaller window is
+    // that the pitch still reads as steep.
+    const pitch: [number, number, number, number][] = [
+      [0, 100, -85, 35],
+      [100, 100, -85, 35],
+      [200, 130, -85, 35],
+      [300, 130, -85, 35],
+      [400, 130, -85, 35],
+    ];
+    expect(Math.max(...computeGrades(pitch))).toBeGreaterThan(9);
+  });
+
+  it('is one grade per point, and flat for a degenerate profile', () => {
+    expect(computeGrades(climb)).toHaveLength(climb.length);
+    expect(computeGrades([[0, 100, -85, 35]])).toEqual([0]);
+    expect(computeGrades([])).toEqual([]);
+  });
+});
+
+describe('formatGrade', () => {
+  it('signs the number, because up and down share a colour', () => {
+    expect(formatGrade(8.42)).toBe('+8.4%');
+    expect(formatGrade(-8.42)).toBe('−8.4%');
+  });
+
+  it('does not dress up a zero', () => {
+    expect(formatGrade(0)).toBe('0.0%');
+    expect(formatGrade(0.01)).toBe('0.0%');
+  });
+
+  it('degrades rather than printing NaN', () => {
+    expect(formatGrade(undefined)).toBe('—');
+    expect(formatGrade(Number.NaN)).toBe('—');
   });
 });

@@ -4,10 +4,13 @@ import { postgresAdapter } from '@payloadcms/db-postgres';
 import { buildConfig } from 'payload';
 import { Organizations } from './payload/collections/Organizations';
 import { TrailAreas } from './payload/collections/TrailAreas';
+import { TrailConditions } from './payload/collections/TrailConditions';
+import { TrailConditionTypes } from './payload/collections/TrailConditionTypes';
 import { TrailKinds } from './payload/collections/TrailKinds';
 import { TrailRatings } from './payload/collections/TrailRatings';
 import { Trails } from './payload/collections/Trails';
 import { Users } from './payload/collections/Users';
+import { ConditionReporting } from './payload/globals/ConditionReporting';
 import { Theme } from './payload/globals/Theme';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,13 +44,15 @@ export default buildConfig({
   },
   collections: [
     Trails,
+    TrailConditions,
     TrailAreas,
     TrailRatings,
     TrailKinds,
+    TrailConditionTypes,
     Organizations,
     Users,
   ],
-  globals: [Theme],
+  globals: [ConditionReporting, Theme],
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),

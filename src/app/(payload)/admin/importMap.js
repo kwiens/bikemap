@@ -1,3 +1,4 @@
+import { TrailConditionLog as TrailConditionLog_99c3b61efc8df4edfdf8681317d13e83 } from '@/payload/components/TrailConditionLog'
 import { TrailDisplayNameField as TrailDisplayNameField_e98aef2becee800628e4b2016d1a744a } from '@/payload/components/DerivedTextField'
 import { TrailSlugField as TrailSlugField_e98aef2becee800628e4b2016d1a744a } from '@/payload/components/DerivedTextField'
 import { TrailMapEditor as TrailMapEditor_3ac3e0a5a2d5f3d2cb9858c36a6e6bef } from '@/payload/components/TrailMapEditor'
@@ -10,6 +11,7 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "@/payload/components/TrailConditionLog#TrailConditionLog": TrailConditionLog_99c3b61efc8df4edfdf8681317d13e83,
   "@/payload/components/DerivedTextField#TrailDisplayNameField": TrailDisplayNameField_e98aef2becee800628e4b2016d1a744a,
   "@/payload/components/DerivedTextField#TrailSlugField": TrailSlugField_e98aef2becee800628e4b2016d1a744a,
   "@/payload/components/TrailMapEditor#TrailMapEditor": TrailMapEditor_3ac3e0a5a2d5f3d2cb9858c36a6e6bef,

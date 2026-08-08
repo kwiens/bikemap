@@ -27,8 +27,10 @@ Open Bike Map is a fork-and-edit, not a rewrite. Everything a community controls
 
 - **`src/config/site.config.ts`** — branding (name, description, colors, PWA identity).
 - **`src/config/map.config.ts`** — geography (Mapbox style, default view, GBFS feed, region).
-- **`src/data/*`** — routes, trails, shops, and points of interest as plain typed arrays. No database, no CMS.
+- **`src/data/*`** — routes, trails, shops, and points of interest as plain typed arrays. The map runs on these alone, with no database.
 - **`public/*`** — logos, icons, splash screens.
+
+Optionally, add Postgres and you also get **`/admin`** — a CMS where someone without a GitHub account can curate trails, and where riders' condition reports land.
 
 The full step-by-step is in **[docs/DEPLOYING.md](docs/DEPLOYING.md)**; the data-file contract is in **[docs/DATA.md](docs/DATA.md)**.
 

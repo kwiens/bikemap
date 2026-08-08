@@ -398,6 +398,94 @@ function glowId(layerId: string): string {
 function hitId(layerId: string): string {
   return `${layerId} Hit`;
 }
+function closedId(layerId: string): string {
+  return `${layerId} Closed`;
+}
+
+/**
+ * The red of a closure. One colour rather than the condition's own, because
+ * this layer means one thing — the dash is what carries it, so it still reads
+ * without relying on colour at all.
+ */
+const CLOSED_COLOR = '#dc2626';
+
+/** A filter that matches no feature, for when nothing is closed. */
+const MATCH_NOTHING: mapboxgl.FilterSpecification = [
+  'in',
+  ['to-string', ['get', 'nonexistent']],
+  ['literal', []],
+];
+
+/**
+ * Draws the closed trails as a red dashed line over their normal one.
+ *
+ * An overlay rather than a recolour so the trail keeps its rating colour — the
+ * green/blue/black scheme is what the legend and the sidebar swatches mean, and
+ * turning a trail red would leave the two disagreeing.
+ *
+ * Sits above the trail line but below its hit layer, so a closed trail is still
+ * selectable. Idempotent: safe to call on every conditions change.
+ */
+export function setClosedTrails(
+  map: mapboxgl.Map,
+  closed: MountainBikeTrail[],
+): void {
+  try {
+    for (const cfg of TRAIL_LAYERS) {
+      if (!map.getLayer(cfg.layerId)) continue;
+
+      const id = closedId(cfg.layerId);
+      const layer = map.getStyle().layers?.find((l) => l.id === cfg.layerId);
+      const source = (layer as { source?: string } | undefined)?.source;
+      if (!source) continue;
+
+      if (!map.getLayer(id)) {
+        const before = map.getLayer(hitId(cfg.layerId))
+          ? hitId(cfg.layerId)
+          : undefined;
+        map.addLayer(
+          {
+            id,
+            type: 'line',
+            source,
+            ...(cfg.sourceLayer ? { 'source-layer': cfg.sourceLayer } : {}),
+            filter: MATCH_NOTHING,
+            layout: { 'line-cap': 'butt', 'line-join': 'round' },
+            paint: {
+              'line-color': CLOSED_COLOR,
+              'line-dasharray': [1.5, 1.5],
+              'line-width': 3.5,
+            },
+          },
+          before,
+        );
+      }
+
+      map.setFilter(id, closedFilterFor(cfg, closed));
+    }
+  } catch (error) {
+    // A missing closure marker must not take the map down.
+    console.error('Failed to update closed trail layers:', error);
+  }
+}
+
+/** Matches the closed trails the way this layer identifies a trail. */
+function closedFilterFor(
+  cfg: TrailLayerConfig,
+  closed: MountainBikeTrail[],
+): mapboxgl.FilterSpecification {
+  if (closed.length === 0) {
+    return MATCH_NOTHING;
+  }
+  if (cfg.matchBy === 'osmId') {
+    const ids = closed.flatMap((trail) => trail.osmIds ?? []).map(String);
+    return ['in', ['to-string', ['get', 'OSM_ID']], ['literal', ids]];
+  }
+  // `toRawName` maps a display name back to the value in the tileset, which is
+  // what the layer's other expressions key off.
+  const names = closed.map((trail) => cfg.toRawName(trail.trailName));
+  return ['in', ['to-string', ['get', cfg.trailProp]], ['literal', names]];
+}
 
 export { TRAIL_LAYERS };
 
