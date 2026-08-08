@@ -73,7 +73,15 @@ function curatedSlug(trailName: string): string | null {
   );
   return trail ? slugForTrail(trail) : null;
 }
-const MAX_GRADIENT_STOPS = 200;
+/**
+ * Colour stops per chart.
+ *
+ * The other place grade detail is lost: a 2,000-point trail capped at 200 stops
+ * averages away roughly every short pitch. Raising it keeps them, at the cost
+ * of more nodes in one `<linearGradient>` — cheap, since the gradient is
+ * memoised and only rebuilds when the profile or width changes.
+ */
+export const MAX_GRADIENT_STOPS = 600;
 
 const CHART_SVG_CLASS =
   'w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none';
@@ -96,10 +104,39 @@ export function gradeToColor(grade: number): string {
   return `rgb(${r},${green},${b})`;
 }
 
-export function computeGradeColors(
+/**
+ * Samples either side of a point averaged into its grade.
+ *
+ * Some smoothing is needed: Terrain-RGB elevation is quantised, so a raw
+ * sample-to-sample grade over a short step is mostly noise and the chart comes
+ * out as confetti. But every sample folded in also flattens the short steep
+ * pitches that are the interesting part of a trail. 1 (a 3-sample average) is
+ * the compromise; 0 is raw, 2 was the old default.
+ */
+export const GRADE_SMOOTHING_WINDOW = 1;
+
+/**
+ * A grade for the hover readout — signed, one decimal.
+ *
+ * The sign is the point: 8% up and 8% down are the same colour on the chart
+ * (`gradeToColor` takes the absolute value) and very different to ride.
+ */
+export function formatGrade(grade: number | undefined): string {
+  if (grade === undefined || !Number.isFinite(grade)) {
+    return '—';
+  }
+  // Rounds to nothing either way, so don't dress it up with a sign.
+  if (Math.abs(grade) < 0.05) {
+    return '0.0%';
+  }
+  return `${grade > 0 ? '+' : '\u2212'}${Math.abs(grade).toFixed(1)}%`;
+}
+
+/** Percent grade at each point, smoothed. Positive is uphill. */
+export function computeGrades(
   points: [number, number, number, number][],
-): string[] {
-  if (points.length < 2) return points.map(() => gradeToColor(0));
+): number[] {
+  if (points.length < 2) return points.map(() => 0);
 
   const rawGrades: number[] = [0];
   for (let i = 1; i < points.length; i++) {
@@ -108,14 +145,15 @@ export function computeGradeColors(
     rawGrades.push(dx > 0 ? (dy / dx) * 100 : 0);
   }
 
+  if (GRADE_SMOOTHING_WINDOW <= 0) return rawGrades;
+
   const smoothed: number[] = [];
-  const WINDOW = 2;
   for (let i = 0; i < rawGrades.length; i++) {
     let sum = 0;
     let count = 0;
     for (
-      let j = Math.max(0, i - WINDOW);
-      j <= Math.min(rawGrades.length - 1, i + WINDOW);
+      let j = Math.max(0, i - GRADE_SMOOTHING_WINDOW);
+      j <= Math.min(rawGrades.length - 1, i + GRADE_SMOOTHING_WINDOW);
       j++
     ) {
       sum += rawGrades[j];
@@ -124,7 +162,14 @@ export function computeGradeColors(
     smoothed.push(sum / count);
   }
 
-  return smoothed.map((g) => gradeToColor(g));
+  return smoothed;
+}
+
+export function computeGradeColors(
+  points: [number, number, number, number][],
+): string[] {
+  if (points.length < 2) return points.map(() => gradeToColor(0));
+  return computeGrades(points).map((g) => gradeToColor(g));
 }
 
 // Force strictly increasing offsets. Consecutive profile points can share a
@@ -562,9 +607,13 @@ export function ElevationProfile() {
     );
   }, []);
 
-  const gradeColors = useMemo(
-    () => (profile ? computeGradeColors(profile.profile) : []),
+  const grades = useMemo(
+    () => (profile ? computeGrades(profile.profile) : []),
     [profile],
+  );
+  const gradeColors = useMemo(
+    () => grades.map((g) => gradeToColor(g)),
+    [grades],
   );
 
   const hasProfile =
@@ -764,9 +813,18 @@ export function ElevationProfile() {
 
       {points && (
         <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
-          {hoverIndex !== null
-            ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft`
-            : '\u00A0'}
+          {hoverIndex !== null ? (
+            <>
+              {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
+              {/* Coloured to match the chart under the cursor, so the number
+                  and the band it came from are visibly the same reading. */}
+              <span style={{ color: gradeColors[hoverIndex] }}>
+                {formatGrade(grades[hoverIndex])}
+              </span>
+            </>
+          ) : (
+            '\u00A0'
+          )}
         </div>
       )}
     </div>
