@@ -59,6 +59,7 @@ EARTH_RADIUS_M = 6371000.0
 # Ported verbatim from src/utils/ride-stats.ts. Keep in sync.
 ELEVATION_DEAD_BAND = 3
 ELEVATION_SPIKE_THRESHOLD = 25
+ELEVATION_SPIKE_MAX_RUN = 5
 ELEVATION_MIN_DISTANCE = 15
 ELEVATION_SMOOTH_HALF = 5  # 11-point centered window
 SPIKE_EMA_ALPHA = 0.3
@@ -291,12 +292,16 @@ def smooth_altitudes(points):
     seed_slice = sorted(raw_vals[:seed_count])
     spike_ema = seed_slice[len(seed_slice) // 2]
     vals = []
+    reject_run = 0
     for v in raw_vals:
-        if abs(v - spike_ema) > ELEVATION_SPIKE_THRESHOLD:
+        deviates = abs(v - spike_ema) > ELEVATION_SPIKE_THRESHOLD
+        if deviates and reject_run < ELEVATION_SPIKE_MAX_RUN:
             vals.append(spike_ema)
+            reject_run += 1
         else:
             vals.append(v)
-        spike_ema = SPIKE_EMA_ALPHA * vals[-1] + (1 - SPIKE_EMA_ALPHA) * spike_ema
+            reject_run = 0
+            spike_ema = SPIKE_EMA_ALPHA * v + (1 - SPIKE_EMA_ALPHA) * spike_ema
 
     for i in range(len(vals)):
         lo = max(0, i - ELEVATION_SMOOTH_HALF)
