@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   gradeToColor,
   computeGradeColors,
   downsampleStops,
   findClosestProfileIndex,
+  loadProfile,
   profilePointToXY,
 } from './ElevationProfile';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
@@ -177,5 +178,90 @@ describe('profilePointToXY', () => {
     };
     const { y } = profilePointToXY(points, 0, flatProfile, 800);
     expect(Number.isFinite(y)).toBe(true);
+  });
+});
+
+describe('loadProfile', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const stored: ElevationProfileData = {
+    trail: 'Stored',
+    distance: 10,
+    gain: 1,
+    loss: 1,
+    min: 0,
+    max: 1,
+    profile: [[0, 0, -85.3, 35]],
+  };
+  const onDisk: ElevationProfileData = { ...stored, trail: 'On disk' };
+
+  function stubFetch(
+    responses: Record<string, { ok: boolean; body?: ElevationProfileData }>,
+  ) {
+    const fetchMock = vi.fn(async (url: string) => {
+      const match = Object.entries(responses).find(([prefix]) =>
+        url.startsWith(prefix),
+      );
+      if (!match) throw new Error(`Unexpected fetch: ${url}`);
+      return {
+        ok: match[1].ok,
+        status: match[1].ok ? 200 : 404,
+        json: async () => match[1].body,
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('prefers the stored profile and scopes it to the city', async () => {
+    const fetchMock = stubFetch({
+      '/api/map/elevation/': { ok: true, body: stored },
+      '/data/elevation/': { ok: true, body: onDisk },
+    });
+
+    const result = await loadProfile(
+      'ridge-trail',
+      'bend',
+      new AbortController().signal,
+    );
+
+    expect(result).toEqual(stored);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/map/elevation/ridge-trail?city=bend',
+    );
+  });
+
+  it('falls back to the checked-in file when nothing is stored', async () => {
+    // Chattanooga's trails are seeded without geometry, so they have no stored
+    // profile and only the offline file can draw their chart.
+    stubFetch({
+      '/api/map/elevation/': { ok: false },
+      '/data/elevation/': { ok: true, body: onDisk },
+    });
+
+    const result = await loadProfile(
+      'ridge-trail',
+      'chattanooga',
+      new AbortController().signal,
+    );
+
+    expect(result).toEqual(onDisk);
+  });
+
+  it('does not fall back when the selection changed', async () => {
+    const abortError = new Error('The operation was aborted.');
+    abortError.name = 'AbortError';
+    const fetchMock = vi.fn(async () => {
+      throw abortError;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      loadProfile('ridge-trail', 'bend', new AbortController().signal),
+    ).rejects.toThrow(/aborted/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

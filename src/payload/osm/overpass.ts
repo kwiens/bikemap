@@ -66,8 +66,34 @@ export class OverpassError extends Error {
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 const MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 2000;
+/**
+ * Ceiling on an honoured Retry-After. An editor's save is blocked on this
+ * request, so a long delay-seconds value is capped rather than obeyed.
+ */
+const MAX_BACKOFF_MS = 30_000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Retry-After as milliseconds, or null when it can't be read as delay-seconds.
+ *
+ * Null covers three cases that all mean "we were told nothing usable": the
+ * header is absent (`headers.get` returns null, and `Number(null)` is 0 — a
+ * number, and finite, which is why the absent case has to be rejected before
+ * any numeric conversion), it is blank, or it is the HTTP-date form. A literal
+ * `Retry-After: 0` is a real instruction to retry immediately and is honoured
+ * as 0 rather than treated as missing.
+ */
+function retryAfterMs(header: string | null): number | null {
+  if (header === null) {
+    return null;
+  }
+  const seconds = Number(header.trim());
+  if (header.trim() === '' || !Number.isFinite(seconds) || seconds < 0) {
+    return null;
+  }
+  return Math.min(seconds * 1000, MAX_BACKOFF_MS);
+}
 
 async function requestWithRetry(
   endpoint: string,
@@ -99,13 +125,12 @@ async function requestWithRetry(
       break;
     }
 
-    // Exponential backoff. Overpass publishes a Retry-After only sometimes, so
-    // honour it when present and fall back to doubling.
-    const retryAfter = Number(response.headers.get('Retry-After'));
-    const waitMs = Number.isFinite(retryAfter)
-      ? retryAfter * 1000
-      : BASE_BACKOFF_MS * 2 ** (attempt - 1);
-    await sleep(waitMs);
+    // Exponential backoff. Overpass publishes a Retry-After only sometimes —
+    // the common 429 carries none — so honour it when it is there and fall back
+    // to doubling when it is not. Retrying without a wait is worse than not
+    // retrying at all against a shared endpoint that just said "slow down".
+    const retryAfter = retryAfterMs(response.headers.get('Retry-After'));
+    await sleep(retryAfter ?? BASE_BACKOFF_MS * 2 ** (attempt - 1));
   }
 
   throw new OverpassError(

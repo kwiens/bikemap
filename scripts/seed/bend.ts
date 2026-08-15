@@ -14,7 +14,8 @@
  * file is the same one the map used to read directly, so seeding from it means
  * the database starts out rendering exactly what the static file did.
  *
- * Re-running is safe: rows match on (trailName, city) and update.
+ * Re-running is safe: rows match on (trailName, city) and update, and a trail
+ * whose line was drawn in the admin keeps it — see `upsertTrail`.
  */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -78,6 +79,7 @@ run(async () => {
   let updated = 0;
   let withGeometry = 0;
   const missingGeometry: string[] = [];
+  const preserved: string[] = [];
 
   for (const trail of trails) {
     const geom = geometry.get(slugForTrail(trail)) ?? null;
@@ -112,10 +114,18 @@ run(async () => {
       created += 1;
     } else {
       updated += 1;
+      if (result === 'preserved') {
+        preserved.push(trail.trailName);
+      }
     }
   }
 
-  report(payload, 'bend', { created, updated, withGeometry }, dryRun);
+  report(
+    payload,
+    'bend',
+    { created, preserved, updated, withGeometry },
+    dryRun,
+  );
 
   if (missingGeometry.length > 0) {
     payload.logger.warn(

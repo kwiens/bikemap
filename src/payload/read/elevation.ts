@@ -20,22 +20,25 @@ import 'server-only';
  */
 import { getPayload } from 'payload';
 import config from '@payload-config';
-import { activeCityId } from '@/config/map.config';
+import type { CityId } from '@/data/cities/types';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
 
 /**
- * A stored profile for `slug`, or null.
+ * A stored profile for `slug` in `city`, or null.
  *
  * A straight lookup on the column, because `slug` is required and derived from
  * the trail name rather than optional — so the client can name a trail the same
  * way whether its chart comes from a static file or from here.
  *
- * Scoped to the deployment's city, which keeps the answer unambiguous without
- * making slugs globally unique: two cities may both have a "Ridge Trail", and
- * only one of them is being served.
+ * The city has to be passed in: `slug` is indexed but not unique, so two cities
+ * may both have a "Ridge Trail", and a caller that guesses wrong serves the
+ * other one's chart. It cannot be read from the module-scope `activeCityId`
+ * either — on the server that is always the env default, never the host the
+ * request arrived on.
  */
 export async function getTrailElevation(
   slug: string,
+  city: CityId,
 ): Promise<ElevationProfile | null> {
   if (!process.env.DATABASE_URL || !slug) {
     return null;
@@ -52,7 +55,7 @@ export async function getTrailElevation(
       where: {
         and: [
           { slug: { equals: slug } },
-          { city: { equals: activeCityId } },
+          { city: { equals: city } },
           { _status: { equals: 'published' } },
         ],
       },

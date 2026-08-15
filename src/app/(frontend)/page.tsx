@@ -3,7 +3,7 @@
  *
  * This is a server component: it reads the database through Payload's Local
  * API (a typed function call, no HTTP hop) and hands the result to the client
- * map as props. An editor's change is live on the next revalidation, with no
+ * map as props. An editor's change is live on the next request, with no
  * rebuild and no client-side fetch waterfall.
  *
  * If there is no database — or it's unreachable — `getCityTrails` returns an
@@ -11,17 +11,31 @@
  * The public map keeps working either way.
  */
 import type { ReactElement } from 'react';
-import { activeCityId } from '@/config/map.config';
+import { headers } from 'next/headers';
+import { resolveActiveCityId } from '@/config/map.config';
 import { getCityTrails } from '@/payload/read/trails';
 import HomeClient from './HomeClient';
 
-// Trail edits are rare and the payload is a few hundred rows, so serve a cached
-// render and refresh it in the background rather than hitting the database on
-// every request.
-export const revalidate = 60;
-
+// Rendered per request, because reading the hostname makes it so. One
+// deployment can serve several cities (NEXT_PUBLIC_CITY_HOST_MAP), and a
+// render cached across hosts would hand a visitor another city's trails. The
+// resolved city travels with them so the client can reject a mismatch.
 export default async function Home(): Promise<ReactElement> {
-  const { trails } = await getCityTrails(activeCityId);
+  const cityId = resolveActiveCityId(await getRequestHostname());
+  const { trails } = await getCityTrails(cityId);
 
-  return <HomeClient trails={trails} />;
+  return <HomeClient cityId={cityId} trails={trails} />;
+}
+
+async function getRequestHostname(): Promise<string | undefined> {
+  try {
+    const requestHeaders = await headers();
+    return (
+      requestHeaders.get('x-forwarded-host') ??
+      requestHeaders.get('host') ??
+      undefined
+    );
+  } catch {
+    return undefined;
+  }
 }

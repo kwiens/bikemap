@@ -349,7 +349,7 @@ The map at `/` is a **server component**. It reads Payload through the Local API
 as props:
 
 ```
-app/(frontend)/page.tsx   getCityTrails(activeCityId)   ← Local API, revalidate 60
+app/(frontend)/page.tsx   getCityTrails(cityId)         ← Local API, per request
         ↓ props
 HomeClient.tsx            setMountainBikeTrails(trails) ← during render
         ↓
@@ -411,10 +411,12 @@ for geometry is unfinished work.
 
 ### Cache
 
-`revalidate = 60` on both the page and the API, so an edit in `/admin` is live
-within a minute without a rebuild. Trail edits are rare and the payload is a few
-hundred rows, so this serves a cached render and refreshes in the background
-rather than hitting the database per request.
+The page renders per request: it resolves its city from the request host, so one
+deployment can serve several cities and a render cached across hosts would hand
+a visitor another city's trails. `/api/map/trails` sends
+`Cache-Control: max-age=60, stale-while-revalidate=3600`, so an edit in `/admin`
+is live within a minute without a rebuild. Trail edits are rare and the payload
+is a few hundred rows, so the query is cheap enough to run per request.
 
 ## Admin appearance
 
@@ -621,24 +623,27 @@ scoped by it. Removing `hidden` brings the picker back for a multi-city admin.
 
 ## Where the elevation chart comes from
 
-`/api/map/elevation/<slug>`, and nowhere else. It serves the `elevationProfile`
-measured when the trail was last saved, recalculated whenever its ways change or
-its line is redrawn.
+`/api/map/elevation/<slug>?city=<id>` first, and the checked-in
+`public/data/elevation/<slug>.json` when that has nothing. The API serves the
+`elevationProfile` measured when the trail was last saved, recalculated whenever
+its ways change or its line is redrawn.
 
 The profile was never missing — `measureParts` samples the terrain on every save
 to *produce* the distance and elevation totals, and used to discard the
 per-point series it computed on the way. It is stored now and read back by
 `src/payload/read/elevation.ts`, under the same never-throws rule as
-`getCityTrails`: no database means no chart, not a broken page. The lookup is
-scoped to `activeCityId`, which keeps it unambiguous without making slugs
-globally unique — two cities may both have a "Ridge Trail", and only one is
-being served.
+`getCityTrails`: no database means no chart from this path, not a broken page.
+The lookup is scoped to a city the caller passes, which keeps it unambiguous
+without making slugs globally unique — two cities may both have a "Ridge Trail",
+and only one is being served. The city comes from the request (`?city=`, or the
+request host), not from `activeCityId`, which on the server is always the
+env-default city.
 
-### Why not the checked-in files
+### Why the database wins, and why the files are still there
 
 `public/data/elevation/*.json`, generated offline by
-`scripts/add_trail_elevation.py`, are deliberately **not** consulted. Three
-reasons, in order of how much they cost:
+`scripts/add_trail_elevation.py`, are the fallback, never the first choice.
+Three reasons, in order of how much they cost:
 
 1. **They can't update themselves.** A trail whose ways were adjusted kept
    drawing the old chart while the sidebar showed the new distance — two numbers
@@ -649,10 +654,13 @@ reasons, in order of how much they cost:
    here.
 3. **They come from a different pipeline** — see below.
 
-The cost is real and accepted: **a trail with no database row has no chart.**
-That is Chattanooga today, whose geometry lives in a Mapbox tileset rather than
-the CMS, so it is `imported` and there is no line here to sample. It gets its
-own CMS; the files stay on disk until then.
+So a trail with no database row falls back to its checked-in file rather than
+losing its chart. That is Chattanooga today, whose geometry lives in a Mapbox
+tileset rather than the CMS, so it is `imported` and there is no line here to
+sample; it is also every deployment running with no database at all. Those
+trails keep the offline profile they have always had, and the day a trail gets a
+row, the measured profile takes over. Chattanooga gets its own CMS; the files
+stay on disk until then, and stay useful as the offline path afterwards.
 
 `pnpm backfill:elevation` measures every trail that has geometry but no profile.
 It samples terrain only — the geometry is already in the row — so it needs no
@@ -746,34 +754,17 @@ privilege change.
 
 ## Things that will trip you up
 
-<<<<<<< HEAD
-The full list lives in [CLAUDE.md](../../CLAUDE.md); this is the one that costs
-the most time to diagnose.
+The full list lives in [CLAUDE.md](../../CLAUDE.md); the first one below costs
+the most time to diagnose, because nothing about it looks like a failure.
 
-**The app has no root layout, on purpose.** Payload's `RootLayout` renders its
-own `<html>`/`<body>`, so the public app lives in `src/app/(frontend)/` with its
-own. A layout at `src/app/` nests a second `<html>` inside Payload's, and the
-symptom is not a crash — the admin renders and its inputs silently stop
-accepting clicks. `favicon.ico` and `manifest.ts` stay at `src/app/`, since Next
-resolves metadata files from the app root.
-
-## Not built yet
-
-- **Trimming ways** to a start/end point — see Accuracy.
-- **Trails not in OSM.** Every trail must be mapped upstream first; brand-new or
-  deliberately unmapped ones need an OSM edit or a local-geometry escape hatch.
-- **Migrating Chattanooga's 220 trails.** They have no `osmIds` and render from
-  a Mapbox tileset. Worth testing with `scripts/align_bend_geometry.py` against
-  Tennessee.
-=======
+- **The app has no root layout, on purpose.** Payload's `RootLayout` renders its
+  own `<html>`/`<body>`, so the public app lives in `src/app/(frontend)/` with
+  its own. A layout at `src/app/` nests a second `<html>` inside Payload's, and
+  the symptom is not a crash — the admin renders and its inputs silently stop
+  accepting clicks. `favicon.ico` and `manifest.ts` stay at `src/app/`, since
+  Next resolves metadata files from the app root.
 - **The project is ESM** (`"type": "module"`) — Payload 3's CLI requires it. New
   root config files must be ESM or `.cjs`.
-- **The app has no root layout.** Payload's `RootLayout` renders its own
-  `<html>`/`<body>`, so the public app had to move into `src/app/(frontend)/`
-  with its own layout. Leaving a layout at `src/app/` nests a second `<html>`
-  inside Payload's, and the symptom is not an obvious crash — the admin renders
-  but its inputs stop accepting clicks. `favicon.ico` and `manifest.ts` stay at
-  `src/app/`, since Next resolves metadata files from the app root.
 - **Don't add a route at `/api/<collection-name>`.** Payload mounts its REST API
   there, so `/api/trails` would shadow the trails collection's list endpoint.
 - **`graphql` is pinned to v16.** Payload peer-depends on `^16.8.1`; a fresh
@@ -797,9 +788,11 @@ resolves metadata files from the app root.
 - **Trimming ways** to a start/end point — see Accuracy above. The geometry
   editor is a manual workaround: drag the endpoint back to where the trail
   actually starts. That flips the trail to `edited`, so it's a trade, not a fix.
-- **Migrating the existing 406 trails.** Chattanooga's trails have no `osmIds`
-  at all — they render from a Mapbox Studio tileset. Whether they can move to
-  this model is an open question worth testing with
-  `scripts/align_bend_geometry.py` against Tennessee.
->>>>>>> d89a213 (feat: curate trails in the CMS — geometry editor, lists, elevation)
+- **Trails not in OSM.** Every trail must be mapped upstream first; brand-new or
+  deliberately unmapped ones need an OSM edit or a hand-drawn line, which takes
+  them out of the maintained-upstream model.
+- **Migrating Chattanooga's trails.** They have no `osmIds` at all — they render
+  from a Mapbox Studio tileset. Whether they can move to this model is an open
+  question worth testing with `scripts/align_bend_geometry.py` against
+  Tennessee.
 - **Serving the map from the database.** Still reads `src/data/`.

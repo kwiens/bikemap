@@ -9,6 +9,7 @@
  * what the client computes for the same line, and what the Python port writes.
  */
 import sharp from 'sharp';
+import { lengthMeters } from './assemble';
 import { decodeTerrainRgb } from '@/utils/osm-elevation';
 import { haversineDistance } from '@/utils/ride-stats';
 
@@ -58,8 +59,19 @@ interface DecodedTile {
 /**
  * Process-lifetime tile cache. Trails in one recreation area share tiles, so an
  * editor working through an area mostly hits this after the first save.
+ *
+ * Only *answers* belong in here. A cached null must mean "the DEM has nothing
+ * at this tile", never "the network was unwell once" — the cache outlives every
+ * save, so a transient failure left in it would report a trail as having no
+ * elevation until the server is restarted, with only measure.ts's warning to
+ * say so.
  */
 const tileCache = new Map<string, Promise<DecodedTile | null>>();
+
+/** Drops every cached tile. For processes that outlive the data, and tests. */
+export function clearTileCache(): void {
+  tileCache.clear();
+}
 
 async function loadTile(
   x: number,
@@ -72,29 +84,40 @@ async function loadTile(
     return cached;
   }
 
-  const promise = (async (): Promise<DecodedTile | null> => {
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/v4/mapbox.terrain-rgb/${TERRAIN_ZOOM}/${x}/${y}.pngraw?access_token=${token}`,
-      );
-      if (!response.ok) {
+  const request = (async (): Promise<DecodedTile | null> => {
+    const response = await fetch(
+      `https://api.mapbox.com/v4/mapbox.terrain-rgb/${TERRAIN_ZOOM}/${x}/${y}.pngraw?access_token=${token}`,
+    );
+    if (!response.ok) {
+      // 404 is the DEM saying there is nothing here — ocean, or outside
+      // coverage. That answer is stable, so it caches. Any other status is the
+      // service having a moment, and must not be mistaken for an answer.
+      if (response.status === 404) {
         return null;
       }
-      const { data, info } = await sharp(
-        Buffer.from(await response.arrayBuffer()),
-      )
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-      return { channels: info.channels, data };
-    } catch {
-      // Ocean tiles 404, and a transient failure shouldn't fail an editor's
-      // save — the affected samples are treated as missing instead.
-      return null;
+      throw new Error(`Terrain tile ${key} returned HTTP ${response.status}`);
     }
+    const { data, info } = await sharp(
+      Buffer.from(await response.arrayBuffer()),
+    )
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { channels: info.channels, data };
   })();
 
-  tileCache.set(key, promise);
-  return promise;
+  // The caller still gets null rather than a throw — a terrain blip shouldn't
+  // fail an editor's save, and the affected samples are treated as missing.
+  // Dropping the entry on the way past is what lets a later save retry; the
+  // identity check keeps a late failure from evicting a newer attempt's entry.
+  const settled: Promise<DecodedTile | null> = request.catch(() => {
+    if (tileCache.get(key) === settled) {
+      tileCache.delete(key);
+    }
+    return null;
+  });
+
+  tileCache.set(key, settled);
+  return settled;
 }
 
 /** Inserts intermediate points so no gap exceeds roughly the DEM resolution. */
@@ -123,7 +146,12 @@ export function densify(
 }
 
 /**
- * Samples elevation along the line, densified to the DEM's resolution.
+ * Samples elevation along one continuous line, densified to the DEM's
+ * resolution.
+ *
+ * The line must be continuous: densification walks straight between successive
+ * coordinates, so a line spanning a gap gets samples on ground the trail never
+ * touches. Disconnected trails go through {@link sampleTerrainParts}.
  *
  * Returns null when no terrain could be read at all — the caller should report
  * "elevation unavailable" rather than store a flat line implying zero climb.
@@ -131,6 +159,7 @@ export function densify(
 export async function sampleTerrain(
   line: [number, number][],
   token: string,
+  maxSamples: number = MAX_SAMPLES,
 ): Promise<TerrainPoint[] | null> {
   if (line.length < 2 || !token) {
     return null;
@@ -139,8 +168,8 @@ export async function sampleTerrain(
   // Coarsen rather than refuse when a trail is very long.
   const fine = densify(line, SAMPLE_STEP_M);
   const sampled =
-    fine.length > MAX_SAMPLES
-      ? densify(line, SAMPLE_STEP_M * Math.ceil(fine.length / MAX_SAMPLES))
+    fine.length > maxSamples
+      ? densify(line, SAMPLE_STEP_M * Math.ceil(fine.length / maxSamples))
       : fine;
 
   const needed = new Map<string, { x: number; y: number }>();
@@ -177,4 +206,49 @@ export async function sampleTerrain(
   });
 
   return read === 0 ? null : points;
+}
+
+/**
+ * Samples each part of a disconnected trail on its own.
+ *
+ * A trail in two pieces has terrain between them that the trail never crosses —
+ * a valley, or the far side of a ridge. Sampling the parts as one line walks
+ * that ground and books its descent and climb as the trail's own, so parts are
+ * kept apart here and only combined once each has been measured.
+ *
+ * {@link MAX_SAMPLES} is a budget for the whole trail, split between parts in
+ * proportion to their length so every part is sampled at the same resolution
+ * and a many-part trail costs no more than a single-part one of equal length.
+ *
+ * Returns one entry per part that yielded terrain (parts that read nothing are
+ * dropped), or null when nothing could be read at all.
+ */
+export async function sampleTerrainParts(
+  parts: [number, number][][],
+  token: string,
+): Promise<TerrainPoint[][] | null> {
+  const usable = parts.filter((part) => part.length >= 2);
+  if (usable.length === 0 || !token) {
+    return null;
+  }
+
+  const lengths = usable.map((part) => lengthMeters([part]));
+  const total = lengths.reduce((sum, meters) => sum + meters, 0);
+
+  const sampled: TerrainPoint[][] = [];
+  for (const [index, part] of usable.entries()) {
+    const share = total > 0 ? lengths[index] / total : 1 / usable.length;
+    // Floor of 2: a part shorter than its share of a sample still keeps its own
+    // vertices, since `densify` never drops a coordinate.
+    const points = await sampleTerrain(
+      part,
+      token,
+      Math.max(2, Math.floor(MAX_SAMPLES * share)),
+    );
+    if (points) {
+      sampled.push(points);
+    }
+  }
+
+  return sampled.length > 0 ? sampled : null;
 }

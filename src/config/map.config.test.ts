@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   cityConfigs,
   cityIdForHostname,
+  cityIds,
   getGBFSUrl,
+  isCityId,
   mapConfig,
   parseCityId,
   resolveActiveCityId,
@@ -133,6 +135,26 @@ describe('map.config', () => {
         'https://cluster-prod.veoride.com/api/shares/name/bnd/gbfs',
       );
       expect(config.gbfs.endpoints.freeBikeStatus).toBe('/free_bike_status');
+    });
+  });
+
+  describe('city vocabulary', () => {
+    it('lists exactly the configured cities', () => {
+      // Derived from cityConfigs so adding a city needs no second edit — the
+      // API routes and the backfill script validate against this list.
+      expect([...cityIds].sort()).toEqual(Object.keys(cityConfigs).sort());
+    });
+
+    it('accepts only configured city ids', () => {
+      for (const cityId of cityIds) {
+        expect(isCityId(cityId)).toBe(true);
+      }
+      expect(isCityId('chatanooga')).toBe(false);
+      expect(isCityId('')).toBe(false);
+      expect(isCityId(undefined)).toBe(false);
+      expect(isCityId(null)).toBe(false);
+      // Object.hasOwn, not `in`: "toString" is not a city.
+      expect(isCityId('toString')).toBe(false);
     });
   });
 

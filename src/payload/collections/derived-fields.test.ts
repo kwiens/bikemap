@@ -56,3 +56,96 @@ describe('derivedFrom', () => {
     ).toBeUndefined();
   });
 });
+
+// The same call shape means two different things depending on `operation`: on a
+// create there is nothing to protect, on an update the field may simply not be
+// part of the request. Deriving in the second case rewrites a curated slug —
+// which keys the elevation profile lookup and the share URL — on a save that
+// never mentioned it.
+describe('derivedFrom on an existing document', () => {
+  it('derives on create, and leaves the stored value alone on a partial update', () => {
+    const args = {
+      data: { trailName: 'Tiddlywinks (Upper)' },
+      value: undefined,
+    };
+
+    expect(slugged({ ...args, operation: 'create' })).toBe(
+      'tiddlywinks-(upper)',
+    );
+    expect(
+      slugged({
+        ...args,
+        operation: 'update',
+        previousValue: 'tiddlywinks-upper',
+      }),
+    ).toBe('tiddlywinks-upper');
+  });
+
+  it('leaves it alone when the stored value is handed back unchanged', () => {
+    // Payload fills an absent field in from the document before the hooks run,
+    // so "not in the request" can arrive looking exactly like "resent as is".
+    expect(
+      slugged({
+        data: { trailName: 'Tiddlywinks (Upper)' },
+        operation: 'update',
+        previousValue: 'tiddlywinks-upper',
+        value: 'tiddlywinks-upper',
+      }),
+    ).toBe('tiddlywinks-upper');
+    expect(
+      copy({
+        data: { trailName: 'TIDDLY WINKS UPR' },
+        operation: 'update',
+        previousValue: 'Tiddlywinks (Upper)',
+        value: 'Tiddlywinks (Upper)',
+      }),
+    ).toBe('Tiddlywinks (Upper)');
+  });
+
+  it('reads the stored value from originalDoc when given the field instead', () => {
+    expect(
+      slugged({
+        data: { trailName: 'Tiddlywinks (Upper)' },
+        field: { name: 'slug' },
+        operation: 'update',
+        originalDoc: { slug: 'tiddlywinks-upper' },
+        value: undefined,
+      }),
+    ).toBe('tiddlywinks-upper');
+  });
+
+  it('normalises a new value the curator did send', () => {
+    expect(
+      slugged({
+        data: { trailName: 'Tiddlywinks (Upper)' },
+        operation: 'update',
+        previousValue: 'tiddlywinks-upper',
+        value: 'Tiddlywinks Upper Reroute',
+      }),
+    ).toBe('tiddlywinks-upper-reroute');
+  });
+
+  it('re-derives a field that was blanked on purpose', () => {
+    // Clearing the field is how you ask for the default back — the same rule
+    // the admin's live version follows (see components/derived-value.ts).
+    expect(
+      slugged({
+        data: { trailName: 'Pointe Break' },
+        operation: 'update',
+        previousValue: 'tiddlywinks-upper',
+        value: '',
+      }),
+    ).toBe('pointe-break');
+  });
+
+  it('fills a blank on an update of a trail that never had one', () => {
+    expect(
+      slugged({
+        data: { trailName: 'Pointe Break' },
+        operation: 'update',
+        previousValue: '',
+        value: undefined,
+      }),
+    ).toBe('pointe-break');
+  });
+});

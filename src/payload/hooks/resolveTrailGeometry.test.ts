@@ -45,6 +45,19 @@ function multiLine(...parts: [number, number][][]) {
   return { coordinates: parts, type: 'MultiLineString' };
 }
 
+/** Answers the one Overpass call a rebuild makes, with the given elements. */
+function overpassReturns(elements: unknown[]) {
+  globalThis.fetch = (() => {
+    fetched += 1;
+    return Promise.resolve({
+      json: () => Promise.resolve({ elements }),
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve(''),
+    });
+  }) as unknown as typeof fetch;
+}
+
 beforeEach(() => {
   fetched = 0;
   // Any network call from a path that shouldn't make one is a test failure, not
@@ -111,8 +124,28 @@ describe('edited geometry', () => {
       originalDoc: { distance: 1.23, geom },
     });
 
-    expect(result.osmReport).toBeUndefined();
-    expect(result.distance).toBeUndefined();
+    // No fresh report means nothing was measured; the stored distance stands.
+    expect(result.osmReport).toBeNull();
+    expect(result.distance).toBe(1.23);
+    expect(result.geom).toEqual(geom);
+  });
+
+  it('does not take measurements from the client', async () => {
+    // The derived fields are read-only in the admin, but the REST and Local
+    // APIs still accept them on the wire, and this save recomputes nothing.
+    const geom = multiLine([A, B]);
+    const result = await run({
+      data: {
+        distance: 999,
+        elevationGain: 1,
+        geom,
+        geometrySource: 'edited',
+      },
+      originalDoc: { distance: 1.23, elevationGain: 300, geom },
+    });
+
+    expect(result.distance).toBe(1.23);
+    expect(result.elevationGain).toBe(300);
     expect(result.geom).toEqual(geom);
   });
 
@@ -193,13 +226,114 @@ describe('other sources', () => {
     expect(result.rebuildGeometry).toBe(false);
   });
 
-  it('clears the derived line when the last way is removed', async () => {
+  it('leaves the ways alone when a save does not mention them', async () => {
+    // A partial update — publishing a draft over the API, say — carries no
+    // osmIds key at all. Reading that as "the curator removed every way" would
+    // wipe the line off a trail that nobody touched.
+    const geom = multiLine([A, B]);
     const result = await run({
-      data: { geometrySource: 'osm', osmIds: [] },
-      originalDoc: { geom: multiLine([A, B]), osmIds: [1] },
+      data: { _status: 'published' },
+      originalDoc: {
+        distance: 4.2,
+        geom,
+        geometrySource: 'osm',
+        osmIds: [1, 2],
+      },
     });
 
-    expect(result.geom).toBeNull();
-    expect(result.bounds).toBeNull();
+    expect(fetched).toBe(0);
+    expect(result.geom).toEqual(geom);
+    expect(result.distance).toBe(4.2);
+  });
+
+  it('does not take the line or its numbers from the client', async () => {
+    // Nothing is rebuilt on this save, so a submitted geometry or distance has
+    // no authority over what is already stored.
+    const stored = multiLine([A, B]);
+    const result = await run({
+      data: {
+        distance: 999,
+        elevationGain: 1,
+        geom: multiLine([A, C]),
+        geometrySource: 'osm',
+        osmIds: [1, 2],
+      },
+      originalDoc: {
+        distance: 4.2,
+        elevationGain: 300,
+        geom: stored,
+        osmIds: [1, 2],
+      },
+    });
+
+    expect(fetched).toBe(0);
+    expect(result.geom).toEqual(stored);
+    expect(result.distance).toBe(4.2);
+    expect(result.elevationGain).toBe(300);
+  });
+
+  it('clears every derived value when the last way is removed', async () => {
+    // A trail with no ways has no line, and nothing may outlive that line — a
+    // leftover distance or chart would describe geometry that is gone.
+    const result = await run({
+      data: { geometrySource: 'osm', osmIds: [] },
+      originalDoc: {
+        bounds: [-121.4, 44.0, -121.39, 44.01],
+        distance: 4.2,
+        elevationGain: 300,
+        elevationLoss: 280,
+        elevationMax: 6000,
+        elevationMin: 5000,
+        elevationProfile: { name: 'Phil’s', points: [] },
+        geom: multiLine([A, B]),
+        osmIds: [1],
+        osmReport: { source: 'osm' },
+      },
+    });
+
+    for (const field of [
+      'bounds',
+      'distance',
+      'elevationGain',
+      'elevationLoss',
+      'elevationMax',
+      'elevationMin',
+      'elevationProfile',
+      'geom',
+      'osmReport',
+    ]) {
+      expect(result[field], field).toBeNull();
+    }
+  });
+
+  it('keeps the stored line when a rebuild resolves nothing', async () => {
+    // Every way deleted or renumbered upstream. Emptying the trail would take a
+    // published line off the map on the strength of an upstream edit, so the
+    // line and its numbers stay together and the report says they are stale.
+    overpassReturns([]);
+
+    const result = await run({
+      data: { geometrySource: 'osm', osmIds: [7], rebuildGeometry: true },
+      originalDoc: {
+        bounds: [-121.4, 44.0, -121.39, 44.01],
+        distance: 4.2,
+        elevationGain: 300,
+        geom: multiLine([A, B]),
+        osmIds: [7],
+      },
+    });
+
+    expect(fetched).toBe(1);
+    expect(result.geom).toEqual(multiLine([A, B]));
+    expect(result.distance).toBe(4.2);
+    expect(result.elevationGain).toBe(300);
+    expect(result.bounds).toEqual([-121.4, 44.0, -121.39, 44.01]);
+
+    const report = result.osmReport as {
+      missingIds: number[];
+      warnings: string[];
+    };
+    expect(report.missingIds).toEqual([7]);
+    expect(report.warnings.join(' ')).toMatch(/re-pick the trail/);
   });
 });

@@ -407,9 +407,10 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
 **How the public map gets its trails.** `src/app/(frontend)/page.tsx` is a
 server component: it calls `getCityTrails()` (Payload's Local API — a typed
 function call, no HTTP hop) and passes trails into `HomeClient` as props, which
-publishes them to `src/data/trail-source.ts` during render. `revalidate = 60`
-on both the page and `/api/map/trails`, so an admin edit is live within a minute
-without a rebuild.
+publishes them to `src/data/trail-source.ts` during render. The page resolves
+its city from the request hostname, so it reads `headers()` and renders per
+request; `/api/map/trails` sends `Cache-Control: max-age=60`, so an admin edit
+is live within a minute without a rebuild.
 
 Things to know before touching it:
 

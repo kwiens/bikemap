@@ -63,6 +63,46 @@ function nameOf(data: TrailData, originalDoc: TrailData | undefined): string {
   return typeof fromDoc === 'string' && fromDoc ? fromDoc : 'Trail';
 }
 
+/**
+ * The line and everything measured from it, emptied together.
+ *
+ * Geometry and its measurements move as one unit in both directions: a trail
+ * never carries a distance or a chart for a line it no longer has, and never a
+ * line whose numbers were cleared out from under it.
+ */
+const CLEARED_GEOMETRY = {
+  bounds: null,
+  distance: null,
+  elevationGain: null,
+  elevationLoss: null,
+  elevationMax: null,
+  elevationMin: null,
+  elevationProfile: null,
+  geom: null,
+  osmReport: null,
+};
+
+/**
+ * What the trail already had on record.
+ *
+ * These fields are computed here and never accepted from the client, so a save
+ * that doesn't recompute them restores the stored values rather than letting a
+ * submitted `distance` or `geom` through.
+ */
+function storedGeometry(originalDoc: TrailData | undefined) {
+  return {
+    bounds: originalDoc?.bounds ?? null,
+    distance: originalDoc?.distance ?? null,
+    elevationGain: originalDoc?.elevationGain ?? null,
+    elevationLoss: originalDoc?.elevationLoss ?? null,
+    elevationMax: originalDoc?.elevationMax ?? null,
+    elevationMin: originalDoc?.elevationMin ?? null,
+    elevationProfile: originalDoc?.elevationProfile ?? null,
+    geom: originalDoc?.geom ?? null,
+    osmReport: originalDoc?.osmReport ?? null,
+  };
+}
+
 export const resolveTrailGeometry: CollectionBeforeChangeHook = async (
   args,
 ) => {
@@ -121,19 +161,7 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
   if (parts.length === 0) {
     // Deleting every vertex clears the measurements too, rather than leaving a
     // distance attached to a trail that no longer has a line.
-    return {
-      ...data,
-      bounds: null,
-      distance: null,
-      elevationGain: null,
-      elevationLoss: null,
-      elevationMax: null,
-      elevationMin: null,
-      elevationProfile: null,
-      geom: null,
-      osmReport: null,
-      rebuildGeometry: false,
-    };
+    return { ...data, ...CLEARED_GEOMETRY, rebuildGeometry: false };
   }
 
   const previous = parseTrailGeometry(originalDoc?.geom).parts ?? [];
@@ -146,7 +174,15 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
     typeof originalDoc?.distance === 'number' &&
     data.rebuildGeometry !== true
   ) {
-    return { ...data, geom, rebuildGeometry: false };
+    // The stored measurements still describe this line — the submitted ones are
+    // client input and carry no authority, so they don't survive the save. The
+    // line itself is the editor's to author; it is kept in its parsed form.
+    return {
+      ...data,
+      ...storedGeometry(originalDoc),
+      geom,
+      rebuildGeometry: false,
+    };
   }
 
   try {
@@ -221,22 +257,21 @@ async function rebuildFromOsmWays({
   originalDoc,
   req,
 }: HookArgs) {
-  const osmIds = readOsmIds(data.osmIds);
+  // `in`, not `??`: a submitted empty list means the editor removed every way,
+  // while an absent key means this save never touched them — a partial update
+  // that only flips `_status` must not read as "clear the ways".
+  const osmIds = readOsmIds(
+    'osmIds' in data ? data.osmIds : originalDoc?.osmIds,
+  );
   const previousIds = readOsmIds(originalDoc?.osmIds);
 
   if (osmIds.length === 0) {
     // Clearing the ways clears what was derived from them, rather than leaving
-    // a stale line attached to a trail that no longer claims it.
-    if (previousIds.length > 0) {
-      return {
-        ...data,
-        bounds: null,
-        elevationProfile: null,
-        geom: null,
-        osmReport: null,
-      };
-    }
-    return data;
+    // a stale line attached to a trail that no longer claims it. A trail that
+    // never had ways has nothing to clear, but it has no line either, so it
+    // cannot carry measurements — an 'imported' trail, whose geometry is
+    // maintained elsewhere, has already returned before this point.
+    return { ...data, ...CLEARED_GEOMETRY, rebuildGeometry: false };
   }
 
   // Overpass is a shared community endpoint and terrain sampling is not free —
@@ -248,7 +283,9 @@ async function rebuildFromOsmWays({
     data.rebuildGeometry !== true;
 
   if (unchanged) {
-    return { ...data, rebuildGeometry: false };
+    // Nothing was rebuilt, so nothing derived may change: the line and its
+    // measurements come back off the stored document, not out of the request.
+    return { ...data, ...storedGeometry(originalDoc), rebuildGeometry: false };
   }
 
   const name = nameOf(data, originalDoc);
@@ -259,9 +296,31 @@ async function rebuildFromOsmWays({
     });
 
     if (!built.geometry) {
+      // Ways were asked for and none resolved, so this rebuild produced nothing
+      // to store. Emptying the trail would take a published line off the map on
+      // the strength of an upstream deletion, so the stored line and its
+      // measurements stay as they were and the report says why they are stale.
       req.payload.logger.warn(
         `Trail "${name}": no geometry resolved from ${osmIds.length} OSM way(s).`,
       );
+
+      return {
+        ...data,
+        ...storedGeometry(originalDoc),
+        osmIds,
+        osmReport: {
+          builtAt: new Date().toISOString(),
+          gaps: built.report.gaps,
+          missingIds: built.report.missingIds,
+          resolvedIds: built.report.resolvedIds,
+          source: 'osm',
+          warnings: [
+            ...built.report.warnings,
+            `None of the ${osmIds.length} referenced OSM way(s) resolved to a line, so the previous geometry was kept — re-pick the trail on the map.`,
+          ],
+        },
+        rebuildGeometry: false,
+      };
     }
 
     return {
@@ -269,14 +328,14 @@ async function rebuildFromOsmWays({
       bounds: built.bounds,
       // Measured values overwrite whatever was in the form: they're derived,
       // and letting a stale form value win would silently desync them.
-      distance: built.geometry ? built.distance : data.distance,
-      elevationGain: built.elevationGain ?? data.elevationGain,
-      elevationLoss: built.elevationLoss ?? data.elevationLoss,
-      elevationMax: built.elevationMax ?? data.elevationMax,
-      elevationMin: built.elevationMin ?? data.elevationMin,
+      distance: built.distance,
+      elevationGain: built.elevationGain,
+      elevationLoss: built.elevationLoss,
+      elevationMax: built.elevationMax,
+      elevationMin: built.elevationMin,
       // See the note in the edited path: the pane's chart comes from here for
       // any trail that isn't in the checked-in data.
-      elevationProfile: built.profile ?? data.elevationProfile,
+      elevationProfile: built.profile,
       geom: built.geometry,
       osmIds,
       osmReport: {
@@ -299,6 +358,7 @@ async function rebuildFromOsmWays({
 
     return {
       ...data,
+      ...storedGeometry(originalDoc),
       osmReport: {
         builtAt: originalDoc?.osmReport?.builtAt ?? null,
         gaps: originalDoc?.osmReport?.gaps ?? [],

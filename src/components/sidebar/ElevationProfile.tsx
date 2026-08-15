@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
+import type { CityId } from '@/data/cities/types';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
@@ -25,6 +26,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { getSetting } from '@/utils/settings';
+import { activeCityId } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
 
@@ -49,6 +51,40 @@ async function fetchProfile(
     throw new Error(`HTTP ${response.status}`);
   }
   return response.json();
+}
+
+/**
+ * A trail's profile: the database first, the checked-in file second.
+ *
+ * The stored profile wins whenever there is one. It is remeasured every time a
+ * trail is saved, so it is the copy that agrees with the distance and climb the
+ * sidebar shows; a static file cannot update itself and would keep drawing an
+ * old line beside new numbers.
+ *
+ * The files are still the only source for a trail whose geometry isn't in a row
+ * — Chattanooga's ~220 trails ride on a Mapbox tileset, and a deployment with
+ * no DATABASE_URL has no rows at all — so a miss falls through to
+ * `/data/elevation/<slug>.json` rather than leaving the pane blank.
+ *
+ * An abort is not a miss: it means the selection changed, and refetching the
+ * file for a trail nobody is looking at any more would be pointless.
+ */
+export async function loadProfile(
+  slug: string,
+  city: CityId,
+  signal: AbortSignal,
+): Promise<ElevationProfileData> {
+  try {
+    return await fetchProfile(
+      `/api/map/elevation/${slug}?city=${encodeURIComponent(city)}`,
+      signal,
+    );
+  } catch (error) {
+    if ((error as Error).name === 'AbortError') {
+      throw error;
+    }
+    return fetchProfile(`/data/elevation/${slug}.json`, signal);
+  }
 }
 
 function profileSlug(trailName: string): string {
@@ -441,20 +477,10 @@ export function ElevationProfile() {
     const controller = new AbortController();
     const slug = encodeURIComponent(profileSlug(trailName));
 
-    // One source: the profile measured when the trail was last saved, and
-    // recalculated whenever its ways change or its line is redrawn.
-    //
-    // The checked-in `public/data/elevation/*.json` files are deliberately
-    // *not* consulted. They cannot update themselves, so a trail whose ways had
-    // been adjusted kept drawing the old chart while the sidebar showed the new
-    // distance — two numbers disagreeing on one screen. They also only exist
-    // for the two bundled cities, and this repo is meant to be stood up by any
-    // trail org, which has a database and none of those files.
-    //
-    // The cost is that a trail with no row has no chart. That is Chattanooga
-    // today, whose geometry still lives in a Mapbox tileset; it gets its own
-    // CMS, and the files stay on disk until then.
-    fetchProfile(`/api/map/elevation/${slug}`, controller.signal)
+    // `activeCityId` is the browser's own resolution (this runs on the client,
+    // so it sees window.location) — the API needs it because slugs are unique
+    // per city, not globally.
+    loadProfile(slug, activeCityId, controller.signal)
       .then((data: ElevationProfileData) => {
         profileCache.set(trailName, data);
         setProfile(data);

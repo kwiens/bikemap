@@ -403,6 +403,17 @@ export const Trails: CollectionConfig = {
   ],
 };
 
+export interface DerivedFromArgs {
+  data?: Record<string, unknown>;
+  /** Which field the hook is mounted on, to read it out of `originalDoc`. */
+  field?: { name?: string };
+  operation?: 'create' | 'delete' | 'read' | 'update';
+  originalDoc?: Record<string, unknown>;
+  /** Payload's per-field copy of what the stored document holds. */
+  previousValue?: unknown;
+  value?: unknown;
+}
+
 /**
  * Fills a blank field in from another one, server-side.
  *
@@ -411,6 +422,16 @@ export const Trails: CollectionConfig = {
  * way a trail gets written — the REST API, the seed scripts, a migration — so
  * `required` can be relied on rather than being a trap for anything that isn't
  * the form.
+ *
+ * **Deriving is for new and blank values only. A value already in the document
+ * is never rewritten** — the same rule `shouldFollow` holds to in
+ * components/derived-value.ts, and for the same reason: display names are
+ * routinely different from the raw tileset `trailName`, and `slug` keys the
+ * elevation profile lookup and the share URL, so re-deriving one on an
+ * unrelated save moves a chart out from under a trail. So an update that simply
+ * doesn't mention the field — a partial API write that sets `trailName` and
+ * nothing else — leaves it alone. Blanking it *on purpose* still re-derives:
+ * clearing the field is how you ask for the default back.
  *
  * Field `beforeValidate` hooks run *before* `required` is checked, so filling
  * the value here satisfies it. (Note this is the field-level hook; collection
@@ -421,19 +442,49 @@ export function derivedFrom(
   source: 'trailName',
   transform: (value: string) => string = (value) => value,
 ) {
-  return ({
-    data,
-    value,
-  }: {
-    data?: Record<string, unknown>;
-    value?: unknown;
-  }) => {
+  return (args: DerivedFromArgs): unknown => {
+    const { data, operation, value } = args;
+    const stored = storedValue(args);
+
+    // Untouched on an update: absent from the request, or handed back exactly
+    // as stored (Payload fills an absent field in from the document before the
+    // hooks run, so both arrive here looking the same). Returned verbatim
+    // rather than transformed — a stored slug that predates the rule is still
+    // the key something is filed under.
+    if (
+      operation === 'update' &&
+      stored &&
+      (value === undefined || value === stored)
+    ) {
+      return stored;
+    }
+
     if (typeof value === 'string' && value.trim()) {
       return transform(value);
     }
+
     const from = data?.[source];
     return typeof from === 'string' && from ? transform(from) : value;
   };
+}
+
+/**
+ * What the stored document holds for this field, if anything.
+ *
+ * `previousValue` is Payload's per-field copy of it; `originalDoc` plus the
+ * field name is the same thing read the long way, for callers that pass the
+ * document rather than the field.
+ */
+function storedValue({
+  field,
+  originalDoc,
+  previousValue,
+}: DerivedFromArgs): string | undefined {
+  if (typeof previousValue === 'string') {
+    return previousValue || undefined;
+  }
+  const fromDoc = field?.name ? originalDoc?.[field.name] : undefined;
+  return typeof fromDoc === 'string' && fromDoc ? fromDoc : undefined;
 }
 
 /**

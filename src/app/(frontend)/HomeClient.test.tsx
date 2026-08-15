@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { faMountain } from '@fortawesome/free-solid-svg-icons';
+import { activeCityId } from '@/config/map.config';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 import { MAP_EVENTS } from '@/events';
 
@@ -78,7 +79,7 @@ describe('HomeClient — share link URL parameter handling', () => {
 
   it('dispatches TRAIL_SELECT on MAP_READY when ?trail= matches', () => {
     window.history.replaceState(null, '', '/?trail=mouse-creek');
-    render(<HomeClient trails={TRAILS} />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     // Before MAP_READY fires, no TRAIL_SELECT should have been dispatched
     const trailEvents = dispatchSpy.mock.calls.filter(
@@ -100,7 +101,7 @@ describe('HomeClient — share link URL parameter handling', () => {
 
   it('dispatches ROUTE_SELECT on MAP_READY when ?route= matches', () => {
     window.history.replaceState(null, '', '/?route=zoo-loop');
-    render(<HomeClient trails={TRAILS} />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     // Simulate map ready
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
@@ -116,7 +117,7 @@ describe('HomeClient — share link URL parameter handling', () => {
 
   it('does not dispatch anything when URL has no trail or route param', () => {
     window.history.replaceState(null, '', '/');
-    render(<HomeClient trails={TRAILS} />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
@@ -130,7 +131,7 @@ describe('HomeClient — share link URL parameter handling', () => {
 
   it('does not dispatch when trail slug does not match any trail', () => {
     window.history.replaceState(null, '', '/?trail=nonexistent-trail');
-    render(<HomeClient trails={TRAILS} />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
@@ -142,7 +143,7 @@ describe('HomeClient — share link URL parameter handling', () => {
 
   it('only fires once even if MAP_READY is dispatched multiple times', () => {
     window.history.replaceState(null, '', '/?trail=mouse-creek');
-    render(<HomeClient trails={TRAILS} />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
@@ -156,7 +157,7 @@ describe('HomeClient — share link URL parameter handling', () => {
   it('selects immediately via __mapReady flag without waiting for event', () => {
     (window as unknown as Record<string, boolean>).__mapReady = true;
     window.history.replaceState(null, '', '/?trail=mouse-creek');
-    render(<HomeClient trails={TRAILS} />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     // Should have dispatched immediately, without needing MAP_READY event
     const trailEvents = dispatchSpy.mock.calls.filter(
@@ -170,7 +171,7 @@ describe('HomeClient — share link URL parameter handling', () => {
 
   it('prefers trail param when both trail and route are present', () => {
     window.history.replaceState(null, '', '/?trail=mouse-creek&route=zoo-loop');
-    render(<HomeClient trails={TRAILS} />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 

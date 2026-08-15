@@ -156,6 +156,8 @@ export function kindIdFor(
 
 export interface SeedResult {
   created: number;
+  /** Trail names whose hand-edited geometry the run left in place. */
+  preserved: string[];
   updated: number;
   withGeometry: number;
 }
@@ -226,6 +228,13 @@ export interface UpsertArgs {
  * Writes one trail, matching on (trailName, city) so re-running updates rather
  * than duplicating.
  *
+ * A row already marked `geometrySource: 'edited'` keeps its line, its source,
+ * and everything measured from it — the seed only refreshes its metadata. That
+ * is the whole point of the flag: the checked-in geometry is what a curator
+ * edited *away* from, and the stored `elevationProfile` (which no seed writes)
+ * still charts the drawn line, so restoring the static one leaves the trail
+ * disagreeing with its own chart.
+ *
  * Always passes `context.skipOsmRebuild`. Without it the beforeChange hook
  * would fire one Overpass request per trail — several hundred against a shared
  * community endpoint, which gets the machine rate-limited long before the seed
@@ -234,13 +243,27 @@ export interface UpsertArgs {
 export async function upsertTrail(
   payload: Payload,
   { areaId, city, geom, geometrySource, trail, vocabulary }: UpsertArgs,
-): Promise<'created' | 'updated'> {
-  const data = {
+): Promise<'created' | 'preserved' | 'updated'> {
+  // What the seed exists to carry: what the trail is called and what it belongs
+  // to. Written on every run, however the row's geometry is maintained.
+  const metadata = {
     _status: 'published' as const,
     area: areaId,
-    bounds: trail.defaultBounds ?? null,
     city,
     displayName: trail.displayName,
+    kind: kindIdFor(trail, vocabulary),
+    rating: ratingIdFor(trail, vocabulary),
+    // `slugForTrail` is the same rule the admin and the client use: an explicit
+    // slug when the trail has one, its slugified name otherwise. It is required
+    // now, because it is the key the elevation profile is looked up by.
+    slug: slugForTrail(trail),
+    trailName: trail.trailName,
+  };
+
+  // The line, the ways it was built from, and every number derived from it.
+  // Withheld from a hand-edited row: these only make sense together.
+  const geometry = {
+    bounds: trail.defaultBounds ?? null,
     distance: trail.distance ?? null,
     elevationGain: trail.elevationGain ?? null,
     elevationLoss: trail.elevationLoss ?? null,
@@ -250,14 +273,7 @@ export async function upsertTrail(
     // GeoJSON shape has to be widened at this boundary.
     geom: geom as Trail['geom'],
     geometrySource,
-    kind: kindIdFor(trail, vocabulary),
     osmIds: (trail.osmIds ?? null) as Trail['osmIds'],
-    rating: ratingIdFor(trail, vocabulary),
-    // `slugForTrail` is the same rule the admin and the client use: an explicit
-    // slug when the trail has one, its slugified name otherwise. It is required
-    // now, because it is the key the elevation profile is looked up by.
-    slug: slugForTrail(trail),
-    trailName: trail.trailName,
   };
 
   const existing = await payload.find({
@@ -265,6 +281,9 @@ export async function upsertTrail(
     depth: 0,
     limit: 1,
     pagination: false,
+    // Only the field that decides whether the geometry above may be written —
+    // this runs once per trail, so it stays as cheap as the id-only lookup was.
+    select: { geometrySource: true },
     where: {
       and: [
         { trailName: { equals: trail.trailName } },
@@ -273,20 +292,22 @@ export async function upsertTrail(
     },
   });
 
-  if (existing.docs.length > 0) {
+  const current = existing.docs[0];
+  if (current) {
+    const handEdited = current.geometrySource === 'edited';
     await payload.update({
       collection: 'trails',
       context: { skipOsmRebuild: true },
-      data,
-      id: existing.docs[0].id,
+      data: handEdited ? metadata : { ...metadata, ...geometry },
+      id: current.id,
     });
-    return 'updated';
+    return handEdited ? 'preserved' : 'updated';
   }
 
   await payload.create({
     collection: 'trails',
     context: { skipOsmRebuild: true },
-    data,
+    data: { ...metadata, ...geometry },
   });
   return 'created';
 }
@@ -294,7 +315,7 @@ export async function upsertTrail(
 export function report(
   payload: Payload,
   city: CityId,
-  { created, updated, withGeometry }: SeedResult,
+  { created, preserved, updated, withGeometry }: SeedResult,
   dryRun: boolean,
 ): void {
   if (dryRun) {
@@ -304,6 +325,15 @@ export function report(
   payload.logger.info(
     `${city}: created ${created}, updated ${updated}. ${withGeometry} have geometry.`,
   );
+  if (preserved.length > 0) {
+    // Named rather than counted: an operator who did not expect a hand-edited
+    // trail here needs to know which one to go and look at.
+    payload.logger.info(
+      `${city}: kept the hand-edited geometry on ${preserved.length} trails (metadata still updated): ${preserved
+        .slice(0, 10)
+        .join(', ')}${preserved.length > 10 ? ', …' : ''}`,
+    );
+  }
 }
 
 /** Wraps a seed so failures exit non-zero instead of an unhandled rejection. */

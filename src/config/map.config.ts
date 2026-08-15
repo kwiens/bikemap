@@ -165,11 +165,20 @@ export const cityConfigs: Record<CityId, MapConfig> = {
 
 const DEFAULT_CITY_ID: CityId = 'chattanooga';
 
+/**
+ * Every supported city id, in registry order. Derived from `cityConfigs` so a
+ * new city is one edit: anything that validates or lists cities — API routes,
+ * scripts — reads this rather than repeating the literals.
+ */
+export const cityIds: CityId[] = Object.keys(cityConfigs) as CityId[];
+
+/** Narrows arbitrary input (a query param, a CLI flag) to a supported city. */
+export function isCityId(value: unknown): value is CityId {
+  return typeof value === 'string' && Object.hasOwn(cityConfigs, value);
+}
+
 export function parseCityId(value: string | undefined): CityId {
-  if (value === 'bend' || value === 'chattanooga') {
-    return value;
-  }
-  return DEFAULT_CITY_ID;
+  return isCityId(value) ? value : DEFAULT_CITY_ID;
 }
 
 export function cityIdForHostname(
@@ -200,10 +209,7 @@ export function resolveActiveCityId(hostname?: string): CityId {
 }
 
 function parseCityIdOrUndefined(value: string | undefined): CityId | undefined {
-  if (value === 'bend' || value === 'chattanooga') {
-    return value;
-  }
-  return undefined;
+  return isCityId(value) ? value : undefined;
 }
 
 function getBrowserHostname(): string | undefined {
@@ -217,6 +223,11 @@ function normalizeHostname(hostname: string): string {
   return hostname.toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
 }
 
+// Resolved once at module load, from the browser's hostname when there is one.
+// There is no window on the server, so on any server surface this is the env
+// default city and nothing else: code that must honour host routing has to
+// resolve from the request itself, via `resolveActiveCityId(hostname)` or
+// `mapConfigForHostname(hostname)`.
 export const activeCityId = resolveActiveCityId();
 
 // Export the active configuration. A fork can swap this for its own MapConfig,

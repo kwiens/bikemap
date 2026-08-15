@@ -228,6 +228,7 @@ interface TrailLayerConfig {
   sourceId?: string;
   tilesetUrl?: string;
   geojsonUrl?: string;
+  geojsonFallbackUrl?: string;
   matchBy?: 'name' | 'osmId';
   // Maps the raw feature-property value (e.g. tileset 'Trail' name) to the
   // line color. Falls back to UNRATED_COLOR for anything unlisted.
@@ -419,12 +420,31 @@ export function ensureMtnBikeSource(map: mapboxgl.Map): void {
       if (!cfg.sourceId || (!cfg.tilesetUrl && !cfg.geojsonUrl)) continue;
 
       if (!map.getSource(cfg.sourceId)) {
-        map.addSource(
-          cfg.sourceId,
-          cfg.geojsonUrl
-            ? { type: 'geojson', data: cfg.geojsonUrl }
-            : { type: 'vector', url: cfg.tilesetUrl as string },
-        );
+        const { geojsonFallbackUrl, geojsonUrl, sourceId } = cfg;
+        if (geojsonUrl && geojsonFallbackUrl) {
+          // Fetched here rather than handed to Mapbox, which has no answer to
+          // the URL failing. The source must exist before the layer below reads
+          // it, so it starts empty and is filled in when the fetch settles —
+          // deliberately not awaited, as the layers have to be added in this
+          // same synchronous style-load pass.
+          map.addSource(sourceId, {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+          });
+          void loadCuratedGeojson(
+            map,
+            sourceId,
+            geojsonUrl,
+            geojsonFallbackUrl,
+          );
+        } else {
+          map.addSource(
+            sourceId,
+            geojsonUrl
+              ? { type: 'geojson', data: geojsonUrl }
+              : { type: 'vector', url: cfg.tilesetUrl as string },
+          );
+        }
       }
       if (map.getLayer(cfg.layerId)) continue;
 
@@ -447,6 +467,60 @@ export function ensureMtnBikeSource(map: mapboxgl.Map): void {
     }
   } catch (error) {
     console.error('Failed to attach MTB trail source/layer:', error);
+  }
+}
+
+/**
+ * Fills a curated trail source from its API, falling back to the static file
+ * the database was seeded from.
+ *
+ * The API is database-backed: with no `DATABASE_URL` or a database that is down
+ * it answers 503, and one that has never been seeded answers with an empty
+ * FeatureCollection. Both draw zero lines while the sidebar still lists every
+ * trail from the checked-in data, so clicking one zooms to blank basemap. An
+ * empty answer is therefore treated as a miss here — for a city configured with
+ * a fallback, "no trails" is not a state the map is meant to be able to reach.
+ */
+export async function loadCuratedGeojson(
+  map: mapboxgl.Map,
+  sourceId: string,
+  url: string,
+  fallbackUrl: string,
+): Promise<void> {
+  const primary = await fetchFeatureCollection(url);
+  const data = primary?.features.length
+    ? primary
+    : ((await fetchFeatureCollection(fallbackUrl)) ?? primary);
+
+  if (!data) {
+    console.error(
+      `No curated trail GeoJSON from ${url} or its fallback ${fallbackUrl}.`,
+    );
+    return;
+  }
+
+  const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
+  // The style can be swapped out from under an in-flight fetch, which takes the
+  // source with it.
+  if (source?.setData) {
+    source.setData(data);
+  }
+}
+
+async function fetchFeatureCollection(
+  url: string,
+): Promise<GeoJSON.FeatureCollection | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`Trail GeoJSON at ${url} returned ${response.status}.`);
+      return null;
+    }
+    const data = (await response.json()) as GeoJSON.FeatureCollection;
+    return Array.isArray(data?.features) ? data : null;
+  } catch (error) {
+    console.error(`Failed to load trail GeoJSON from ${url}:`, error);
+    return null;
   }
 }
 

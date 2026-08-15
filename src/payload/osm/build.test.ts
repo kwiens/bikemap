@@ -10,6 +10,7 @@ const realFetch = globalThis.fetch;
 function stubOverpass(
   ways: { id: number; geometry: [number, number][] }[],
   status = 200,
+  headers = new Headers(),
 ) {
   // Assigned directly rather than via vi.spyOn: a spy on globalThis.fetch
   // survived restoreAllMocks here, so call history leaked between tests and
@@ -17,7 +18,7 @@ function stubOverpass(
   const stub = vi.fn(
     async () =>
       ({
-        headers: new Headers(),
+        headers,
         json: async () => ({
           elements: ways.map((way) => ({
             geometry: way.geometry.map(([lon, lat]) => ({ lat, lon })),
@@ -33,6 +34,26 @@ function stubOverpass(
   );
   globalThis.fetch = stub as unknown as typeof fetch;
   return stub;
+}
+
+/**
+ * Records the delays the retry loop asks for and runs each one out immediately.
+ *
+ * The delays are the point of the assertion, and a suite that actually slept
+ * them would take seconds per test — so the clock is stubbed rather than
+ * advanced, which also reads the requested delay straight off the call.
+ */
+function captureRetryDelays(): number[] {
+  const delays: number[] = [];
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+    callback: () => void,
+    ms?: number,
+  ) => {
+    delays.push(ms ?? 0);
+    callback();
+    return 0;
+  }) as unknown as typeof globalThis.setTimeout);
+  return delays;
 }
 
 const A: [number, number] = [-121.4, 44.0];
@@ -130,10 +151,74 @@ describe('buildTrailFromOsm', () => {
   });
 
   it('surfaces a persistent Overpass outage as an error, not silent data loss', async () => {
+    captureRetryDelays();
+    const stub = stubOverpass([], 429);
+
+    await expect(
+      buildTrailFromOsm([1], 'Test Trail', { withElevation: false }),
+    ).rejects.toThrow(/busy/i);
+
+    expect(stub).toHaveBeenCalledTimes(3);
+  });
+
+  it('backs off between retries when the 429 carries no Retry-After', async () => {
+    // The common Overpass 429 has no Retry-After at all, and retrying with no
+    // wait is worse than not retrying against a shared endpoint.
+    const delays = captureRetryDelays();
     stubOverpass([], 429);
 
     await expect(
       buildTrailFromOsm([1], 'Test Trail', { withElevation: false }),
     ).rejects.toThrow(/busy/i);
-  }, 20000);
+
+    expect(delays).toEqual([2000, 4000]);
+  });
+
+  it('honours a Retry-After the server does send', async () => {
+    const delays = captureRetryDelays();
+    stubOverpass([], 503, new Headers({ 'Retry-After': '5' }));
+
+    await expect(
+      buildTrailFromOsm([1], 'Test Trail', { withElevation: false }),
+    ).rejects.toThrow(/busy/i);
+
+    expect(delays).toEqual([5000, 5000]);
+  });
+
+  it('honours an explicit Retry-After of zero rather than reading it as absent', async () => {
+    const delays = captureRetryDelays();
+    stubOverpass([], 503, new Headers({ 'Retry-After': '0' }));
+
+    await expect(
+      buildTrailFromOsm([1], 'Test Trail', { withElevation: false }),
+    ).rejects.toThrow(/busy/i);
+
+    expect(delays).toEqual([0, 0]);
+  });
+
+  it('falls back to backoff when Retry-After is an HTTP-date', async () => {
+    const delays = captureRetryDelays();
+    stubOverpass(
+      [],
+      503,
+      new Headers({ 'Retry-After': 'Wed, 21 Oct 2015 07:28:00 GMT' }),
+    );
+
+    await expect(
+      buildTrailFromOsm([1], 'Test Trail', { withElevation: false }),
+    ).rejects.toThrow(/busy/i);
+
+    expect(delays).toEqual([2000, 4000]);
+  });
+
+  it('caps an unreasonably long Retry-After so a save is not held open', async () => {
+    const delays = captureRetryDelays();
+    stubOverpass([], 503, new Headers({ 'Retry-After': '3600' }));
+
+    await expect(
+      buildTrailFromOsm([1], 'Test Trail', { withElevation: false }),
+    ).rejects.toThrow(/busy/i);
+
+    expect(delays).toEqual([30_000, 30_000]);
+  });
 });

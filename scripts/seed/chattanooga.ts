@@ -21,7 +21,8 @@
  * rebuild hook leaves them alone. Once a trail has been matched to way ids, set
  * its source to 'osm' and it starts being maintained from OSM like Bend's.
  *
- * Re-running is safe: rows match on (trailName, city) and update.
+ * Re-running is safe: rows match on (trailName, city) and update, and a trail
+ * whose line was drawn in the admin keeps it — see `upsertTrail`.
  */
 import { chattanoogaData } from '../../src/data/cities/chattanooga';
 import {
@@ -53,6 +54,7 @@ run(async () => {
   const vocabulary = dryRun ? emptyVocabulary() : await loadVocabulary(payload);
   let created = 0;
   let updated = 0;
+  const preserved: string[] = [];
 
   for (const trail of trails) {
     if (dryRun) {
@@ -79,8 +81,16 @@ run(async () => {
       created += 1;
     } else {
       updated += 1;
+      if (result === 'preserved') {
+        preserved.push(trail.trailName);
+      }
     }
   }
 
-  report(payload, 'chattanooga', { created, updated, withGeometry: 0 }, dryRun);
+  report(
+    payload,
+    'chattanooga',
+    { created, preserved, updated, withGeometry: 0 },
+    dryRun,
+  );
 });

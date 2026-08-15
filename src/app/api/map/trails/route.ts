@@ -12,21 +12,18 @@
  * trails collection's list endpoint.
  */
 import { NextResponse } from 'next/server';
+import { cityIds, isCityId } from '@/config/map.config';
 import { getCityTrails } from '@/payload/read/trails';
-import type { CityId } from '@/data/cities/types';
 
-const CITY_IDS: CityId[] = ['bend', 'chattanooga'];
-
-// Matches the page's revalidate: geometry changes when an editor saves, not
-// per request.
+// Geometry changes when an editor saves, not per request.
 export const revalidate = 60;
 
 export async function GET(request: Request) {
-  const city = new URL(request.url).searchParams.get('city') as CityId | null;
+  const city = new URL(request.url).searchParams.get('city');
 
-  if (!city || !CITY_IDS.includes(city)) {
+  if (!isCityId(city)) {
     return NextResponse.json(
-      { error: `city must be one of: ${CITY_IDS.join(', ')}` },
+      { error: `city must be one of: ${cityIds.join(', ')}` },
       { status: 400 },
     );
   }

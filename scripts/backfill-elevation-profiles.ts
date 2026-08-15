@@ -1,11 +1,12 @@
 /**
  * Generates the stored elevation profile for every trail that has geometry.
  *
- * The elevation pane reads `/api/map/elevation/<slug>`, which serves what a
- * trail last measured on save. A trail seeded from the checked-in data has
+ * The elevation pane asks `/api/map/elevation/<slug>` first, which serves what
+ * a trail last measured on save. A trail seeded from the checked-in data has
  * never been through that path — the seed writes `context.skipOsmRebuild`, on
  * purpose, so a few hundred rows don't fire a few hundred Overpass requests —
- * so it has stats but no profile, and no chart.
+ * so it has stats but no profile, and falls back to whatever offline file is
+ * still on disk, which cannot follow later edits to its ways.
  *
  * This fills them in **without touching Overpass**: the geometry is already in
  * the database, so only the terrain needs sampling. That makes it safe to run
@@ -25,10 +26,14 @@
  */
 import { getPayload } from 'payload';
 import config from '../src/payload.config';
+import { cityIds, isCityId } from '../src/config/map.config';
 import type { CityId } from '../src/data/cities/types';
 import { parseTrailGeometry } from '../src/payload/osm/geometry';
 import { measureParts } from '../src/payload/osm/measure';
 import type { Trail } from '../src/payload-types';
+
+/** Run without --city. Bend is the city whose geometry lives in the database. */
+const DEFAULT_CITY: CityId = 'bend';
 
 interface Options {
   city: CityId;
@@ -38,12 +43,30 @@ interface Options {
 }
 
 function parseArgs(argv: string[]): Options {
-  const city = argv.find((arg) => arg.startsWith('--city='))?.split('=')[1];
   return {
-    city: city === 'chattanooga' ? 'chattanooga' : 'bend',
+    city: parseCityArg(
+      argv.find((arg) => arg.startsWith('--city='))?.split('=')[1],
+    ),
     dryRun: argv.includes('--dry-run'),
     force: argv.includes('--force'),
   };
+}
+
+/**
+ * A misspelled city has to stop the run rather than quietly redirect it: with
+ * --force this rewrites the stats and profile of every trail it matches, so
+ * landing on the wrong city is destructive.
+ */
+function parseCityArg(value: string | undefined): CityId {
+  if (value === undefined) {
+    return DEFAULT_CITY;
+  }
+  if (!isCityId(value)) {
+    throw new Error(
+      `Unknown --city=${value}. Valid city ids: ${cityIds.join(', ')}.`,
+    );
+  }
+  return value;
 }
 
 async function main() {
