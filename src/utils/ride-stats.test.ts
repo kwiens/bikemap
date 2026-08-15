@@ -165,41 +165,21 @@ describe('computeElevation', () => {
   // and points must be spaced > ELEVATION_MIN_DISTANCE apart (~15m).
   // At 0.0003° spacing (~33m/point), this simulates realistic rides.
 
-  // A sustained climb must survive the spike filter.
-  //
-  // The filter replaces a reading that is more than ELEVATION_SPIKE_THRESHOLD
-  // from a running EMA. It used to advance that EMA from the *substituted*
-  // value, which on a rejection is the EMA itself — so the update reduced to
-  // `ema = 0.3*ema + 0.7*ema` and the EMA froze permanently. Every later
-  // reading was then too far from a value that could no longer move, and was
-  // also replaced.
-  //
-  // On a real trail that erased a mountain: one rejection 7% into O'Leary
-  // Mountain flatlined the remaining 92% at 2,239 ft, reporting 449 ft of
-  // climbing on a trail that gains about 3,200.
-  it('keeps tracking a sustained climb the EMA cannot keep up with', () => {
-    // The spike filter compares each reading against a running EMA and
-    // replaces anything further away than ELEVATION_SPIKE_THRESHOLD. On a
-    // sustained climb the EMA *lags* — by roughly step * (1-alpha)/alpha —
-    // and on a steep enough slope that lag alone exceeds the threshold, with
-    // no spike anywhere in the data.
-    //
-    // The filter then held its reference while rejecting, so it could never
-    // catch up: the ground kept climbing away from a value that had stopped
-    // moving, and every remaining reading was rejected too. On O'Leary
-    // Mountain that flatlined 92% of the trail at 2,239 ft and reported 449 ft
-    // of climbing on a trail that gains about 3,200 — with a largest
-    // sample-to-sample step of 17.8 m, well under the 25 m threshold.
-    //
-    // 10 m per ~33 m of track is about a 30% grade: steep, and exactly what
-    // the real trail does where this first went wrong.
+  // Guards the O'Leary Mountain regression: an averaged spike-filter
+  // reference lags a sustained steep climb until every reading is rejected,
+  // flattening the mountain (449 ft reported on a ~3,200 ft trail).  The
+  // largest real sample-to-sample step there was 17.8 m — under the 25 m
+  // threshold — so this must track cleanly.  10 m per ~33 m point ≈ 30% grade.
+  it('keeps tracking a sustained steep climb', () => {
     const points = makeTrack(200, { startAlt: 1000, altStep: 10 });
-    const { gain, max, min } = computeElevation(points);
+    const { gain, loss, max, min } = computeElevation(points);
 
-    // The track climbs 199 * 10 = 1,990 m. Loose on purpose — smoothing trims
-    // the ends, and the failure this guards against reported almost none of it.
-    expect(gain).toBeGreaterThan(1700);
-    expect(max - min).toBeGreaterThan(1700);
+    // True gain is 199 * 10 = 1,990 m; smoothing trims only the ends.
+    // A monotone climb must not fabricate descent, and max must track
+    // the summit (not sag below it as a lagging-reference sawtooth does).
+    expect(gain).toBeGreaterThan(1900);
+    expect(loss).toBeLessThan(1);
+    expect(max - min).toBeGreaterThan(1900);
   });
 
   it('still replaces an isolated spike', () => {
@@ -214,6 +194,21 @@ describe('computeElevation', () => {
 
     // A 200 m spike must not show up as 200 m of extra height.
     expect(Math.abs(after.max - before.max)).toBeLessThan(20);
+  });
+
+  it('bounds the damage from a dropout longer than the cap', () => {
+    // 8 bogus ramping readings — longer than ELEVATION_SPIKE_MAX_RUN — so the
+    // tail of the burst is accepted at face value.  Some phantom gain/loss
+    // leaks through (the price of not flatlining real climbs), but it must
+    // stay bounded well under the 240 m excursion and fully symmetric.
+    const points = makeTrack(100, { startAlt: 200, altStep: 0 }).map((p, i) =>
+      i >= 40 && i < 48 ? { ...p, altitude: 200 + (i - 40) * 30 } : p,
+    );
+    const { gain, loss, max } = computeElevation(points);
+
+    expect(gain).toBeLessThan(120); // measured ~98 m
+    expect(loss).toBeLessThan(120);
+    expect(max).toBeLessThan(320); // raw excursion peaks at 440 m
   });
 
   it('computes gain for a steady climb', () => {
