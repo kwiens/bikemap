@@ -121,7 +121,18 @@ export function parseObservedAt(
     };
   }
 
-  return { ok: true, value: parsed };
+  // Store the day at noon UTC, not the 00:00Z a bare `YYYY-MM-DD` parses to:
+  // midnight UTC reads as the day before west of UTC, aging every fresh report a
+  // day early. The window checks above ran against the raw value.
+  const atNoonUtc = new Date(
+    Date.UTC(
+      parsed.getUTCFullYear(),
+      parsed.getUTCMonth(),
+      parsed.getUTCDate(),
+      12,
+    ),
+  );
+  return { ok: true, value: atNoonUtc };
 }
 
 /** Rejects anything that isn't a plausible slug before it becomes a query. */

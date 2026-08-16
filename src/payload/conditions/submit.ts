@@ -127,11 +127,18 @@ export async function submitConditionReport(
 
     if (closed) {
       return {
-        // Same precedence the summary uses for the button's label.
+        // Same precedence the summary uses for the button's label. Each level's
+        // note only counts when that level's own switch is on: Payload hides the
+        // note field when the box is unticked but keeps the stored text, so a
+        // leftover note from a past closure must not speak for an active one.
         message: resolveLockMessage(
           settings?.enabled === false ? settings?.disabledMessage : null,
-          trail.conditionReportsNote,
-          area?.conditionReportsNote,
+          trail.conditionReportsClosed === true
+            ? trail.conditionReportsNote
+            : null,
+          area?.conditionReportsClosed === true
+            ? area?.conditionReportsNote
+            : null,
         ),
         ok: false,
         reason: 'locked',

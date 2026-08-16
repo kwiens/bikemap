@@ -10,6 +10,7 @@ import {
   isConditionFresh,
   isTrailClosed,
   lockFor,
+  observedAtNoonUtc,
   resolveLockMessage,
 } from './trail-conditions';
 
@@ -104,6 +105,25 @@ describe('resolveLockMessage', () => {
     expect(resolveLockMessage('  Closed for logging.  ')).toBe(
       'Closed for logging.',
     );
+  });
+});
+
+describe('observedAtNoonUtc', () => {
+  it('pins a day-only value to noon UTC', () => {
+    // Midnight UTC (what `new Date("2026-08-07")` gives) reads as 2026-08-06 for
+    // any viewer west of UTC; noon stays on the intended day across the US.
+    expect(observedAtNoonUtc('2026-08-07')).toBe('2026-08-07T12:00:00.000Z');
+  });
+
+  it('keeps the calendar day west of UTC', () => {
+    const rendered = new Date(
+      observedAtNoonUtc('2026-08-07'),
+    ).toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'numeric',
+      timeZone: 'America/Los_Angeles',
+    });
+    expect(rendered).toBe('8/7');
   });
 });
 

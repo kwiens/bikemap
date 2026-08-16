@@ -1,5 +1,33 @@
+import { APIError, type CollectionBeforeDeleteHook } from 'payload';
 import type { CollectionConfig } from 'payload';
 import { slugValidator, valueField } from './vocabulary-fields';
+
+/**
+ * Blocks deleting a condition type that reports still point at.
+ *
+ * `trail_conditions.condition_id` is NOT NULL with an ON DELETE SET NULL foreign
+ * key, so the delete would otherwise fail with a raw Postgres constraint
+ * violation. Unlike a trail — whose reports are cleared on delete — a condition
+ * type's reports are its history and shouldn't be silently discarded: retire the
+ * option with the Active switch instead. This is the "blocked" the field's own
+ * help text promises.
+ */
+const blockDeleteWhenReferenced: CollectionBeforeDeleteHook = async ({
+  id,
+  req,
+}) => {
+  const inUse = await req.payload.count({
+    collection: 'trail-conditions',
+    req,
+    where: { condition: { equals: id } },
+  });
+  if (inUse.totalDocs > 0) {
+    throw new APIError(
+      'This condition has reports using it. Untick "Offer this on the report form" to retire it instead of deleting.',
+      400,
+    );
+  }
+};
 
 /**
  * The options behind the dropdown on the public report form.
@@ -28,6 +56,9 @@ export const TrailConditionTypes: CollectionConfig = {
     delete: ({ req }) => req.user?.role === 'admin',
     read: ({ req }) => Boolean(req.user),
     update: ({ req }) => req.user?.role === 'admin',
+  },
+  hooks: {
+    beforeDelete: [blockDeleteWhenReferenced],
   },
   fields: [
     {

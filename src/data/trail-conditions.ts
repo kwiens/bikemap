@@ -85,6 +85,19 @@ export function lockFor(
   return message || DEFAULT_LOCK_MESSAGE;
 }
 
+/**
+ * A day-only observation ("when it was ridden") pinned to noon UTC.
+ *
+ * A `YYYY-MM-DD` value stored at 00:00Z reads as the *previous* calendar day for
+ * any viewer west of UTC — so a report filed this afternoon ages to "yesterday"
+ * by evening and the freshness cutoff expires hours early. Noon keeps the instant
+ * on the intended calendar day across every US timezone.
+ */
+export function observedAtNoonUtc(dateOnly: string): string {
+  const [year, month, day] = dateOnly.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12)).toISOString();
+}
+
 const MS_PER_DAY = 86_400_000;
 
 /**

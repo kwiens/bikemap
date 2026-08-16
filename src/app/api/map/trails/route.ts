@@ -13,18 +13,16 @@
  */
 import { NextResponse } from 'next/server';
 import { getCityTrails } from '@/payload/read/trails';
-import type { CityId } from '@/data/cities/types';
-
-const CITY_IDS: CityId[] = ['bend', 'chattanooga'];
+import { CITY_IDS, parseCityId } from '@/data/cities';
 
 // Matches the page's revalidate: geometry changes when an editor saves, not
 // per request.
 export const revalidate = 60;
 
 export async function GET(request: Request) {
-  const city = new URL(request.url).searchParams.get('city') as CityId | null;
+  const city = parseCityId(new URL(request.url).searchParams.get('city'));
 
-  if (!city || !CITY_IDS.includes(city)) {
+  if (!city) {
     return NextResponse.json(
       { error: `city must be one of: ${CITY_IDS.join(', ')}` },
       { status: 400 },

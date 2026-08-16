@@ -8,10 +8,8 @@
  * invitation.
  */
 import { NextResponse } from 'next/server';
-import type { CityId } from '@/data/cities/types';
+import { CITY_IDS, parseCityId } from '@/data/cities';
 import { getTrailConditionHistory } from '@/payload/read/conditions';
-
-const CITY_IDS: CityId[] = ['bend', 'chattanooga'];
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +18,9 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
-  const city = new URL(request.url).searchParams.get('city') as CityId | null;
+  const city = parseCityId(new URL(request.url).searchParams.get('city'));
 
-  if (!city || !CITY_IDS.includes(city)) {
+  if (!city) {
     return NextResponse.json(
       { error: `city must be one of: ${CITY_IDS.join(', ')}` },
       { status: 400 },

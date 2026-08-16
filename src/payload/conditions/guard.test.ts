@@ -144,6 +144,16 @@ describe('parseObservedAt', () => {
   it('accepts a Date as well as a string', () => {
     expect(parseObservedAt(new Date(NOW), NOW).ok).toBe(true);
   });
+
+  it('normalizes a day-only value to noon UTC, not midnight', () => {
+    // A bare YYYY-MM-DD parses to 00:00Z, which reads as the day before west of
+    // UTC; noon keeps it on the intended calendar day everywhere in the US.
+    const result = parseObservedAt('2026-08-07', NOW);
+    expect(result.ok).toBe(true);
+    expect(result.ok === true && result.value.toISOString()).toBe(
+      '2026-08-07T12:00:00.000Z',
+    );
+  });
 });
 
 describe('parseIdentifier', () => {
