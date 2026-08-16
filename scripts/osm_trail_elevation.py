@@ -59,9 +59,9 @@ EARTH_RADIUS_M = 6371000.0
 # Ported verbatim from src/utils/ride-stats.ts. Keep in sync.
 ELEVATION_DEAD_BAND = 3
 ELEVATION_SPIKE_THRESHOLD = 25
+ELEVATION_SPIKE_MAX_RUN = 5
 ELEVATION_MIN_DISTANCE = 15
 ELEVATION_SMOOTH_HALF = 5  # 11-point centered window
-SPIKE_EMA_ALPHA = 0.3
 
 OVERPASS_URL_DEFAULT = 'https://overpass-api.de/api/interpreter'
 # Overpass rejects requests without a User-Agent (HTTP 406). Identify the tool.
@@ -287,16 +287,22 @@ def smooth_altitudes(points):
     if not raw_vals:
         return result
 
+    # Spike rejection: the reference is the last *accepted raw* reading, not
+    # an average — an averaged reference lags sustained climbs until every
+    # reading is rejected.  See smoothAltitudes in src/utils/ride-stats.ts.
     seed_count = min(5, len(raw_vals))
     seed_slice = sorted(raw_vals[:seed_count])
-    spike_ema = seed_slice[len(seed_slice) // 2]
+    ref = seed_slice[len(seed_slice) // 2]
     vals = []
+    reject_run = 0
     for v in raw_vals:
-        if abs(v - spike_ema) > ELEVATION_SPIKE_THRESHOLD:
-            vals.append(spike_ema)
+        if abs(v - ref) > ELEVATION_SPIKE_THRESHOLD and reject_run < ELEVATION_SPIKE_MAX_RUN:
+            vals.append(ref)
+            reject_run += 1
         else:
             vals.append(v)
-        spike_ema = SPIKE_EMA_ALPHA * vals[-1] + (1 - SPIKE_EMA_ALPHA) * spike_ema
+            reject_run = 0
+            ref = v
 
     for i in range(len(vals)):
         lo = max(0, i - ELEVATION_SMOOTH_HALF)

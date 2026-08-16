@@ -31,10 +31,18 @@ export const ELEVATION_EMA_ALPHA = 0.1;
 // Filters GPS altitude jitter that otherwise inflates totals ~3-4×.
 export const ELEVATION_DEAD_BAND = 3;
 // Max plausible single-point altitude jump (meters).  Readings that
-// differ from the running EMA by more than this are GPS spikes and
-// are replaced with the current EMA value before smoothing.
-// Must be high enough to allow sustained climbs (EMA lags on slopes).
+// differ from the last accepted reading by more than this are treated
+// as spikes and replaced before smoothing.  Must exceed the largest real
+// sample-to-sample step (~18 m observed on sustained ~30% grades).
 export const ELEVATION_SPIKE_THRESHOLD = 25;
+// How many consecutive readings may be rejected as spikes before the series
+// is taken at face value.  Run length is what separates bad data from real
+// ground: a dropout is a short burst — ~5 s of GPS at 1 Hz for live rides,
+// or 100 m of trail for the DEM consumers that resample geometry every
+// SAMPLE_STEP_M = 20 m — while a hillside keeps going.  Trade-off: a burst
+// longer than the cap is accepted at face value and leaks phantom gain/loss
+// bounded by the excursion size (see the "dropout longer than the cap" test).
+export const ELEVATION_SPIKE_MAX_RUN = 5;
 // Minimum horizontal distance (meters) between deadband anchor updates.
 // Prevents counting altitude jitter while stopped or barely moving.
 export const ELEVATION_MIN_DISTANCE = 15;
@@ -122,7 +130,8 @@ export function computeMovingTime(points: AnyRidePoint[]): number {
 
 /**
  * Smooth altitudes with spike rejection + centered moving average.
- * 1. Reject altitude spikes (>ELEVATION_SPIKE_THRESHOLD from running EMA)
+ * 1. Reject altitude spikes (>ELEVATION_SPIKE_THRESHOLD from the last
+ *    accepted reading, at most ELEVATION_SPIKE_MAX_RUN in a row)
  * 2. Apply centered moving average (window = 2 * SMOOTH_HALF + 1 points)
  */
 export const ELEVATION_SMOOTH_HALF = 5; // 11-point centered window
@@ -142,24 +151,33 @@ function smoothAltitudes(points: { altitude: number | null }[]): number[] {
   }
   if (rawVals.length === 0) return result;
 
-  // Spike rejection: replace readings that jump >threshold from running EMA.
-  // Uses a faster EMA (alpha=0.3) than the main smoothing so it tracks
-  // sustained climbs/descents without false-triggering on slopes.
-  // Seed the EMA from the median of the first few readings so a single
-  // bad startup value doesn't poison the entire series.
-  const SPIKE_EMA_ALPHA = 0.3;
+  // Spike rejection: replace readings that jump >threshold from the last
+  // accepted reading.  The reference must be a raw reading, not an average:
+  // any averaged reference lags a sustained climb, and once that lag exceeds
+  // the threshold every subsequent reading is rejected and the profile
+  // flatlines (an EMA reference erased most of O'Leary Mountain this way).
+  // A raw reference advances step-by-step with the ground, so no real slope
+  // can out-run it.  Seed from the median of the first few readings so a
+  // bad startup value doesn't poison the series.
   const SEED_COUNT = Math.min(5, rawVals.length);
   const seedSlice = rawVals.slice(0, SEED_COUNT).sort((a, b) => a - b);
-  const seedMedian = seedSlice[Math.floor(seedSlice.length / 2)];
-  let spikeEma = seedMedian;
+  let ref = seedSlice[Math.floor(seedSlice.length / 2)];
   const vals: number[] = [];
+  let rejectRun = 0;
   for (let i = 0; i < rawVals.length; i++) {
-    if (Math.abs(rawVals[i] - spikeEma) > ELEVATION_SPIKE_THRESHOLD) {
-      vals.push(spikeEma); // replace spike with current EMA
+    if (
+      Math.abs(rawVals[i] - ref) > ELEVATION_SPIKE_THRESHOLD &&
+      rejectRun < ELEVATION_SPIKE_MAX_RUN
+    ) {
+      vals.push(ref);
+      rejectRun += 1;
     } else {
+      // A normal reading, or a deviation that outlasted the cap — that is
+      // the ground, not a spike, so accept it and move the reference.
       vals.push(rawVals[i]);
+      rejectRun = 0;
+      ref = rawVals[i];
     }
-    spikeEma = SPIKE_EMA_ALPHA * vals[i] + (1 - SPIKE_EMA_ALPHA) * spikeEma;
   }
 
   // Centered moving average
