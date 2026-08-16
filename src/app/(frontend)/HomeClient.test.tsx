@@ -1,6 +1,9 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
+import { faMountain } from '@fortawesome/free-solid-svg-icons';
+import { activeCityId } from '@/config/map.config';
+import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 import { MAP_EVENTS } from '@/events';
 
 // Mock next/dynamic to render a simple placeholder instead of the real Map
@@ -21,24 +24,28 @@ vi.mock('@/components/WelcomeModal', () => ({
   WelcomeModal: () => <div data-testid="welcome-stub" />,
 }));
 
-// Mock geo data with known trails and routes
+// Trails now arrive as a prop from the server component, which reads them
+// from Payload. Passing them in here exercises the real prop -> trail-source
+// -> consumer path rather than mocking the store.
+const TRAILS: MountainBikeTrail[] = [
+  {
+    slug: 'mouse-creek',
+    trailName: 'Mouse Creek Greenway Phase 1',
+    displayName: 'Mouse Creek Greenway Phase 1',
+    recArea: 'Cleveland',
+    rating: '',
+    color: '#059669',
+    distance: 0.6,
+    elevationGain: 15,
+    elevationLoss: 14,
+    elevationMin: 790,
+    elevationMax: 804,
+    defaultBounds: [-84.876938, 35.175211, -84.87299, 35.182087],
+    icon: faMountain,
+  },
+];
+
 vi.mock('@/data/geo_data', () => ({
-  mountainBikeTrails: [
-    {
-      slug: 'mouse-creek',
-      trailName: 'Mouse Creek Greenway Phase 1',
-      displayName: 'Mouse Creek Greenway Phase 1',
-      recArea: 'Cleveland',
-      rating: '',
-      color: '#059669',
-      distance: 0.6,
-      elevationGain: 15,
-      elevationLoss: 14,
-      elevationMin: 790,
-      elevationMax: 804,
-      defaultBounds: [-84.876938, 35.175211, -84.87299, 35.182087],
-    },
-  ],
   bikeRoutes: [
     {
       id: 'zoo-loop-v2-full-public',
@@ -52,10 +59,10 @@ vi.mock('@/data/geo_data', () => ({
   ],
 }));
 
-// Import Home after mocks are set up
-import Home from './page';
+// Imported after the mocks are set up.
+import HomeClient from './HomeClient';
 
-describe('Home — share link URL parameter handling', () => {
+describe('HomeClient — share link URL parameter handling', () => {
   let dispatchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -72,7 +79,7 @@ describe('Home — share link URL parameter handling', () => {
 
   it('dispatches TRAIL_SELECT on MAP_READY when ?trail= matches', () => {
     window.history.replaceState(null, '', '/?trail=mouse-creek');
-    render(<Home />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     // Before MAP_READY fires, no TRAIL_SELECT should have been dispatched
     const trailEvents = dispatchSpy.mock.calls.filter(
@@ -94,7 +101,7 @@ describe('Home — share link URL parameter handling', () => {
 
   it('dispatches ROUTE_SELECT on MAP_READY when ?route= matches', () => {
     window.history.replaceState(null, '', '/?route=zoo-loop');
-    render(<Home />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     // Simulate map ready
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
@@ -110,7 +117,7 @@ describe('Home — share link URL parameter handling', () => {
 
   it('does not dispatch anything when URL has no trail or route param', () => {
     window.history.replaceState(null, '', '/');
-    render(<Home />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
@@ -124,7 +131,7 @@ describe('Home — share link URL parameter handling', () => {
 
   it('does not dispatch when trail slug does not match any trail', () => {
     window.history.replaceState(null, '', '/?trail=nonexistent-trail');
-    render(<Home />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 
@@ -136,7 +143,7 @@ describe('Home — share link URL parameter handling', () => {
 
   it('only fires once even if MAP_READY is dispatched multiple times', () => {
     window.history.replaceState(null, '', '/?trail=mouse-creek');
-    render(<Home />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
@@ -150,7 +157,7 @@ describe('Home — share link URL parameter handling', () => {
   it('selects immediately via __mapReady flag without waiting for event', () => {
     (window as unknown as Record<string, boolean>).__mapReady = true;
     window.history.replaceState(null, '', '/?trail=mouse-creek');
-    render(<Home />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     // Should have dispatched immediately, without needing MAP_READY event
     const trailEvents = dispatchSpy.mock.calls.filter(
@@ -164,7 +171,7 @@ describe('Home — share link URL parameter handling', () => {
 
   it('prefers trail param when both trail and route are present', () => {
     window.history.replaceState(null, '', '/?trail=mouse-creek&route=zoo-loop');
-    render(<Home />);
+    render(<HomeClient cityId={activeCityId} trails={TRAILS} />);
 
     window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
 

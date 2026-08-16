@@ -5,14 +5,24 @@ import {
   faChevronDown,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
-import { mountainBikeTrails, regionFor } from '@/data/geo_data';
+import { regionOf } from '@/data/trail-region';
+import { getMountainBikeTrails } from '@/data/trail-source';
 import type { MountainBikeTrailsProps } from './types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 
+/**
+ * Groups the current trail list region -> area -> trails, with a trail count
+ * per region.
+ *
+ * Called during render rather than at module scope: trails arrive from the
+ * database via `setMountainBikeTrails` while this component's module is being
+ * imported, so anything computed at import time captures the checked-in
+ * fallback data and never sees a database row.
+ */
 function groupTrailsByRegionAndArea() {
-  const grouped = new Map<string, Map<string, typeof mountainBikeTrails>>();
-  for (const trail of mountainBikeTrails) {
-    const region = regionFor(trail.recArea);
+  const grouped = new Map<string, Map<string, MountainBikeTrail[]>>();
+  for (const trail of getMountainBikeTrails()) {
+    const region = regionOf(trail);
     const { recArea } = trail;
     if (!grouped.has(region)) {
       grouped.set(region, new Map());
@@ -24,16 +34,15 @@ function groupTrailsByRegionAndArea() {
     }
     areas.get(recArea)?.push(trail);
   }
-  return grouped;
-}
 
-const regionGroups = groupTrailsByRegionAndArea();
+  const counts = new Map<string, number>();
+  for (const [region, areas] of grouped) {
+    let count = 0;
+    for (const trails of areas.values()) count += trails.length;
+    counts.set(region, count);
+  }
 
-const regionTrailCounts = new Map<string, number>();
-for (const [region, areas] of regionGroups) {
-  let count = 0;
-  for (const trails of areas.values()) count += trails.length;
-  regionTrailCounts.set(region, count);
+  return { counts, grouped };
 }
 
 function toggleSet(
@@ -51,6 +60,16 @@ function toggleSet(
   });
 }
 
+/**
+ * The swatch shape per rating — the green circle / blue square / black diamond
+ * convention riders already read.
+ *
+ * Ratings are curated in the admin now, so a trail can arrive carrying one this
+ * map has never heard of. `shapeFor` falls back rather than indexing straight
+ * in: a miss used to yield `undefined`, which left the swatch with no classes
+ * at all and collapsed it to nothing — the trail's colour simply vanished from
+ * the list. The custom rating still shows, in its own colour, as a circle.
+ */
 const TRAIL_SHAPE: Record<string, string> = {
   easy: 'shrink-0 w-3 h-3 rounded-full',
   intermediate: 'shrink-0 w-3 h-3 rounded-sm',
@@ -58,6 +77,10 @@ const TRAIL_SHAPE: Record<string, string> = {
   expert: 'shrink-0 w-2.5 h-2.5 rotate-45 rounded-[1px]',
   unrated: 'shrink-0 w-3 h-3 rounded-full',
 };
+
+function shapeFor(rating: string | undefined): string {
+  return TRAIL_SHAPE[rating || 'unrated'] ?? TRAIL_SHAPE.unrated;
+}
 
 function TrailRow({
   trail,
@@ -93,7 +116,7 @@ function TrailRow({
     >
       <div className="flex items-center gap-3">
         <div
-          className={TRAIL_SHAPE[trail.rating || 'unrated']}
+          className={shapeFor(trail.rating)}
           style={{ backgroundColor: trail.color }}
         />
         <span className="font-medium text-[13px]">{trail.displayName}</span>
@@ -121,12 +144,19 @@ export function MountainBikeTrails({
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // The trail list is fixed for the life of the page, so this runs once —
+  // but it has to run during render, not at import. See the note above.
+  const { counts: regionTrailCounts, grouped: regionGroups } = useMemo(
+    () => groupTrailsByRegionAndArea(),
+    [],
+  );
+
   // Filter trails by search query (matches trail name, area, or region)
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return null;
-    return mountainBikeTrails.filter((trail) => {
-      const region = regionFor(trail.recArea);
+    return getMountainBikeTrails().filter((trail) => {
+      const region = regionOf(trail);
       return (
         trail.trailName.toLowerCase().includes(q) ||
         trail.displayName.toLowerCase().includes(q) ||
@@ -139,9 +169,11 @@ export function MountainBikeTrails({
   // Auto-expand region and area when a trail is selected
   useEffect(() => {
     if (!selectedTrail) return;
-    const trail = mountainBikeTrails.find((t) => t.trailName === selectedTrail);
+    const trail = getMountainBikeTrails().find(
+      (t) => t.trailName === selectedTrail,
+    );
     if (!trail) return;
-    const region = regionFor(trail.recArea);
+    const region = regionOf(trail);
     setExpandedRegions((prev) => {
       if (prev.has(region)) return prev;
       return new Set(prev).add(region);

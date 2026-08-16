@@ -65,6 +65,18 @@ export interface MapConfig {
   };
 }
 
+// The upstream Open Bike Map style. Its `composite` source merges Mapbox's own
+// tilesets with private `swuller.*` ones, so **only a token on that account can
+// render it** — every other token gets a 404 for the whole composite, which
+// silently blanks the entire basemap while runtime-attached sources (GeoJSON
+// overlays, the OSM trails tileset) keep drawing. The symptom is a map showing
+// trails floating on nothing.
+//
+// A fork therefore needs its own style: set NEXT_PUBLIC_MAPBOX_STYLE_URL.
+const DEFAULT_STYLE_URL = 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt';
+
+const styleUrl = process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL || DEFAULT_STYLE_URL;
+
 // Chattanooga configuration
 const chattanoogaConfig: MapConfig = {
   cityId: 'chattanooga',
@@ -73,7 +85,7 @@ const chattanoogaConfig: MapConfig = {
     // Public (pk.*) Mapbox token — set NEXT_PUBLIC_MAPBOX_TOKEN in .env.local
     // and in your host's environment for production. See .env.example.
     accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '',
-    styleUrl: 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt',
+    styleUrl,
   },
 
   defaultView: {
@@ -111,7 +123,7 @@ const bendConfig: MapConfig = {
 
   mapbox: {
     accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '',
-    styleUrl: 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt',
+    styleUrl,
   },
 
   defaultView: {
@@ -153,11 +165,20 @@ export const cityConfigs: Record<CityId, MapConfig> = {
 
 const DEFAULT_CITY_ID: CityId = 'chattanooga';
 
+/**
+ * Every supported city id, in registry order. Derived from `cityConfigs` so a
+ * new city is one edit: anything that validates or lists cities — API routes,
+ * scripts — reads this rather than repeating the literals.
+ */
+export const cityIds: CityId[] = Object.keys(cityConfigs) as CityId[];
+
+/** Narrows arbitrary input (a query param, a CLI flag) to a supported city. */
+export function isCityId(value: unknown): value is CityId {
+  return typeof value === 'string' && Object.hasOwn(cityConfigs, value);
+}
+
 export function parseCityId(value: string | undefined): CityId {
-  if (value === 'bend' || value === 'chattanooga') {
-    return value;
-  }
-  return DEFAULT_CITY_ID;
+  return isCityId(value) ? value : DEFAULT_CITY_ID;
 }
 
 export function cityIdForHostname(
@@ -188,10 +209,7 @@ export function resolveActiveCityId(hostname?: string): CityId {
 }
 
 function parseCityIdOrUndefined(value: string | undefined): CityId | undefined {
-  if (value === 'bend' || value === 'chattanooga') {
-    return value;
-  }
-  return undefined;
+  return isCityId(value) ? value : undefined;
 }
 
 function getBrowserHostname(): string | undefined {
@@ -205,6 +223,11 @@ function normalizeHostname(hostname: string): string {
   return hostname.toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
 }
 
+// Resolved once at module load, from the browser's hostname when there is one.
+// There is no window on the server, so on any server surface this is the env
+// default city and nothing else: code that must honour host routing has to
+// resolve from the request itself, via `resolveActiveCityId(hostname)` or
+// `mapConfigForHostname(hostname)`.
 export const activeCityId = resolveActiveCityId();
 
 // Export the active configuration. A fork can swap this for its own MapConfig,
