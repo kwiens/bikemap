@@ -82,12 +82,14 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   ALTER TABLE "trail_condition_types" DISABLE ROW LEVEL SECURITY;
   DROP TABLE "trail_conditions" CASCADE;
   DROP TABLE "trail_condition_types" CASCADE;
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_trail_conditions_fk";
-  
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_trail_condition_types_fk";
-  
-  DROP INDEX "payload_locked_documents_rels_trail_conditions_id_idx";
-  DROP INDEX "payload_locked_documents_rels_trail_condition_types_id_idx";
+  -- IF EXISTS: the DROP TABLE ... CASCADE above already removes these dependent
+  -- constraints, so a plain DROP CONSTRAINT would error on the second run down.
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_trail_conditions_fk";
+
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_trail_condition_types_fk";
+
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_trail_conditions_id_idx";
+  DROP INDEX IF EXISTS "payload_locked_documents_rels_trail_condition_types_id_idx";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "trail_conditions_id";
   ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "trail_condition_types_id";
   DROP TYPE "public"."enum_trail_conditions_source";

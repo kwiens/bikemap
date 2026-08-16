@@ -167,10 +167,10 @@ export function TrailConditionsStrip({
             </div>
           )}
           {!loading &&
-            history?.map((report) => (
+            history?.map((report, index) => (
               <div
-                // Two reports can share a date, so the date alone isn't a key.
-                key={`${report.observedAt}-${report.value}-${report.source}`}
+                // biome-ignore lint/suspicious/noArrayIndexKey: reports carry no id and same-day/same-value ones are indistinguishable; this newest-first list is fully replaced each load and never reordered, so index is stable.
+                key={index}
                 className="flex items-center gap-2 py-0.5"
               >
                 <span

@@ -53,6 +53,9 @@ export function ConditionReportModal() {
       const detail = (event as CustomEvent).detail as OpenDetail;
       setTarget(detail);
       setError(null);
+      // Clear the previous trail's choice, or one click files it against this
+      // trail — the select is pre-filled, so the required check wouldn't stop it.
+      setCondition('');
       // Reset on every open, or a page left open past midnight offers
       // yesterday as today.
       setObservedAt(toDateInputValue(new Date()));

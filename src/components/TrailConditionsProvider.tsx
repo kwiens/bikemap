@@ -44,6 +44,31 @@ interface TrailConditionsValue {
   refresh: () => void;
 }
 
+/**
+ * Layers this page's just-filed reports back over a server response, but only
+ * where the server hasn't caught up yet.
+ *
+ * The overlay exists for the race where a refresh beats the GET's 30-second
+ * cache and comes back without the report the rider just filed. But it must not
+ * outrank a *newer* server report — e.g. a steward closing the trail after the
+ * rider rode it. Keep the local echo only while its observation is at least as
+ * recent as the server's; an equal or newer server report wins, since the server
+ * is the source of truth.
+ */
+function mergeLocal(
+  server: Record<string, ConditionReport>,
+  local: Record<string, ConditionReport>,
+): Record<string, ConditionReport> {
+  const merged = { ...server };
+  for (const [slug, report] of Object.entries(local)) {
+    const current = merged[slug];
+    if (!current || report.observedAt > current.observedAt) {
+      merged[slug] = report;
+    }
+  }
+  return merged;
+}
+
 /** Open, for the same reason `NO_SUMMARY` is: a failure is not a closure. */
 const NO_SUMMARY: ConditionSummary = {
   latest: {},
@@ -120,7 +145,7 @@ export function TrailConditionsProvider({
         if (data) {
           setSummary({
             ...data,
-            latest: { ...data.latest, ...localRef.current },
+            latest: mergeLocal(data.latest, localRef.current),
             // An older deployment answering without these must not read as
             // "everything is closed".
             locked: data.locked ?? {},

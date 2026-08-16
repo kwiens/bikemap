@@ -107,7 +107,12 @@ async function lockedTrails(
     depth: 0,
     limit: 2000,
     pagination: false,
-    select: { area: true, conditionReportsNote: true, slug: true },
+    select: {
+      area: true,
+      conditionReportsClosed: true,
+      conditionReportsNote: true,
+      slug: true,
+    },
     where: {
       and: [
         inCity,
@@ -132,8 +137,13 @@ async function lockedTrails(
     const areaId = typeof trail.area === 'number' ? trail.area : trail.area?.id;
     // No site-wide note here: this only runs when the site switch is on, and
     // `disabledMessage` may still hold text from the last time it was off.
+    // The trail's own note only counts when its switch is on — a trail pulled in
+    // purely by a closed complex must show the complex's note, not a stale one
+    // Payload kept from the last time the trail itself was closed.
     locked[trail.slug] = resolveLockMessage(
-      trail.conditionReportsNote,
+      trail.conditionReportsClosed === true
+        ? trail.conditionReportsNote
+        : undefined,
       areaId === undefined ? undefined : areaNotes.get(areaId),
     );
   }
@@ -174,7 +184,11 @@ export async function getConditionSummary(
         depth: 1,
         limit: 5000,
         pagination: false,
-        sort: '-observedAt',
+        // `-createdAt` breaks ties: `observedAt` is day-only, so two reports on
+        // the same trail the same day are equal on it, and without a tiebreaker
+        // the "latest" (a closure vs a same-day reopen) would fall to arbitrary
+        // row order. The one filed last wins.
+        sort: ['-observedAt', '-createdAt'],
         // No date floor. A closure holds until someone reports something else,
         // so the newest report per trail has to be found at any age — a window
         // would quietly reopen a trail shut last season. Freshness is applied
@@ -199,7 +213,14 @@ export async function getConditionSummary(
       const trail = trailOf(row);
       // A report whose trail is gone shouldn't be reachable — Trails deletes its
       // reports first — but a direct SQL delete would leave one.
-      if (!trail?.slug || latest[trail.slug]) {
+      //
+      // Guard `_status` too: the public read is anonymous, so a report on an
+      // unpublished trail must not surface its slug and condition here. Every
+      // other public query filters published in its `where`; this one joins the
+      // trail at depth 1, so the check is in JS. Matched on `draft` rather than
+      // `!== published` so a missing status fails open to a shown badge (a
+      // decoration) rather than hiding every trail's condition.
+      if (!trail?.slug || trail._status === 'draft' || latest[trail.slug]) {
         continue;
       }
       const report = toReport(row);
@@ -270,7 +291,9 @@ export async function getTrailConditionHistory(
       depth: 1,
       limit: HISTORY_LIMIT,
       pagination: false,
-      sort: '-observedAt',
+      // `-createdAt` breaks day-only `observedAt` ties, so same-day reports list
+      // in the order they were filed rather than an arbitrary one.
+      sort: ['-observedAt', '-createdAt'],
       where: {
         and: [
           { trail: { equals: trail.id } },

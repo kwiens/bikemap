@@ -12,7 +12,7 @@
  * a header, not `export const revalidate`, which applies to the whole segment.
  */
 import { NextResponse } from 'next/server';
-import type { CityId } from '@/data/cities/types';
+import { CITY_IDS, type CityId, parseCityId } from '@/data/cities';
 import {
   clientAddress,
   hashReporter,
@@ -25,13 +25,10 @@ import {
 import { submitConditionReport } from '@/payload/conditions/submit';
 import { getConditionSummary } from '@/payload/read/conditions';
 
-const CITY_IDS: CityId[] = ['bend', 'chattanooga'];
-
 export const dynamic = 'force-dynamic';
 
 function cityFrom(request: Request): CityId | null {
-  const city = new URL(request.url).searchParams.get('city') as CityId | null;
-  return city && CITY_IDS.includes(city) ? city : null;
+  return parseCityId(new URL(request.url).searchParams.get('city'));
 }
 
 export async function GET(request: Request) {

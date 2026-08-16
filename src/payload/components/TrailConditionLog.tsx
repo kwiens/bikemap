@@ -16,7 +16,8 @@
  * the map marks differently from a rider's guess.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { useDocumentInfo } from '@payloadcms/ui';
+import { useDocumentInfo, useFormFields } from '@payloadcms/ui';
+import { observedAtNoonUtc } from '@/data/trail-conditions';
 import { Banner, linkButtonStyle } from './admin-ui';
 
 interface ConditionType {
@@ -57,6 +58,12 @@ const CONTROL: React.CSSProperties = {
 
 export function TrailConditionLog() {
   const { id } = useDocumentInfo();
+  // The trail's own city, straight from the edit form. Without it the report
+  // takes the collection's default (the deployment's active city), so a report
+  // logged on another city's trail would never surface on that city's map.
+  const city = useFormFields(
+    ([fields]) => fields?.city?.value as string | undefined,
+  );
 
   const [types, setTypes] = useState<ConditionType[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
@@ -112,9 +119,12 @@ export function TrailConditionLog() {
     try {
       const response = await fetch('/api/trail-conditions', {
         body: JSON.stringify({
+          // Stamp the trail's own city, not the collection default.
+          ...(city ? { city } : {}),
           condition: Number(condition),
           hidden: false,
-          observedAt: new Date(observedAt).toISOString(),
+          // Noon UTC, so the day reads correctly for admins west of UTC.
+          observedAt: observedAtNoonUtc(observedAt),
           // Filed by a signed-in steward, not a rider.
           source: 'admin',
           trail: id,
@@ -259,7 +269,11 @@ export function TrailConditionLog() {
                     {type?.name ?? 'Unknown'}
                   </td>
                   <td style={{ color: 'var(--theme-elevation-600)' }}>
-                    {new Date(report.observedAt).toLocaleDateString()}
+                    {/* UTC: observedAt is a day, stored at noon UTC — rendering
+                        in local time would slide it a day west of UTC. */}
+                    {new Date(report.observedAt).toLocaleDateString(undefined, {
+                      timeZone: 'UTC',
+                    })}
                   </td>
                   <td style={{ color: 'var(--theme-elevation-600)' }}>
                     {report.source === 'admin' ? 'Official' : 'Rider'}
