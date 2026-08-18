@@ -7,10 +7,17 @@
 // are approximate — vector-tile geometry is simplified and tile-clipped.
 
 import { haversineDistance, pointsToElevationProfile } from './ride-stats';
+import {
+  TERRAIN_TILE_SIZE as TILE_SIZE,
+  decodeTerrainRgb,
+  lngLatToTilePixel,
+} from './terrain-rgb';
 import type { ElevationProfile } from '../data/mountain-bike-trails';
 
+// Kept as a re-export for existing importers (tests, scripts docs).
+export { decodeTerrainRgb } from './terrain-rgb';
+
 const TERRAIN_ZOOM = 14;
-const TILE_SIZE = 256;
 // Resample segments to roughly the DEM resolution so gain isn't undercounted
 // between sparse vector-tile vertices.
 const SAMPLE_STEP_M = 20;
@@ -20,11 +27,6 @@ export interface ElevationStats {
   loss: number;
   min: number;
   max: number;
-}
-
-/** Decode a Mapbox Terrain-RGB pixel to elevation in meters. */
-export function decodeTerrainRgb(r: number, g: number, b: number): number {
-  return -10000 + (r * 65536 + g * 256 + b) * 0.1;
 }
 
 /** Insert intermediate points so no gap exceeds ~SAMPLE_STEP_M. */
@@ -45,30 +47,6 @@ export function densifyLine(
     }
   }
   return out;
-}
-
-interface TilePixel {
-  x: number;
-  y: number;
-  px: number;
-  py: number;
-}
-
-function lngLatToTilePixel(lng: number, lat: number, z: number): TilePixel {
-  const scale = TILE_SIZE * 2 ** z;
-  const worldX = ((lng + 180) / 360) * scale;
-  const sinLat = Math.sin((lat * Math.PI) / 180);
-  const worldY =
-    (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
-  const x = Math.floor(worldX / TILE_SIZE);
-  const y = Math.floor(worldY / TILE_SIZE);
-  const clamp = (v: number) => Math.min(TILE_SIZE - 1, Math.max(0, v));
-  return {
-    x,
-    y,
-    px: clamp(Math.floor(worldX) - x * TILE_SIZE),
-    py: clamp(Math.floor(worldY) - y * TILE_SIZE),
-  };
 }
 
 // Decoded terrain tiles persist across popups (module-level cache).
@@ -250,9 +228,17 @@ const regionPromises = new Map<
 function loadManifest(): Promise<RegionManifestEntry[]> {
   if (!manifestPromise) {
     manifestPromise = fetch(`${PRECOMPUTED_BASE}/index.json`)
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) throw new Error(`manifest fetch failed: ${r.status}`);
+        return r.json();
+      })
       .then((j) => (j?.regions ?? []) as RegionManifestEntry[])
-      .catch(() => []);
+      .catch(() => {
+        // Only cache successes — a transient failure (offline blip, 500) must
+        // not disable precomputed lookups for the rest of the session.
+        manifestPromise = null;
+        return [];
+      });
   }
   return manifestPromise;
 }
@@ -264,7 +250,13 @@ function loadRegion(
   if (existing) return existing;
 
   const promise = fetch(`${PRECOMPUTED_BASE}/${entry.file}`)
-    .then((r) => (r.ok ? r.json() : null))
+    .then((r) => {
+      // A 404 is a durable answer (file genuinely absent) — cache the null.
+      // Anything else is treated as transient and retried on the next lookup.
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error(`region fetch failed: ${r.status}`);
+      return r.json();
+    })
     .then((j) => {
       const trails = j?.trails as Record<string, number[]> | undefined;
       if (!trails) return null;
@@ -276,7 +268,10 @@ function loadRegion(
       }
       return map;
     })
-    .catch(() => null);
+    .catch(() => {
+      regionPromises.delete(entry.region);
+      return null;
+    });
 
   regionPromises.set(entry.region, promise);
   return promise;

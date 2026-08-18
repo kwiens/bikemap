@@ -154,10 +154,7 @@ export const cityConfigs: Record<CityId, MapConfig> = {
 const DEFAULT_CITY_ID: CityId = 'chattanooga';
 
 export function parseCityId(value: string | undefined): CityId {
-  if (value === 'bend' || value === 'chattanooga') {
-    return value;
-  }
-  return DEFAULT_CITY_ID;
+  return parseCityIdOrUndefined(value) ?? DEFAULT_CITY_ID;
 }
 
 export function cityIdForHostname(
@@ -188,10 +185,9 @@ export function resolveActiveCityId(hostname?: string): CityId {
 }
 
 function parseCityIdOrUndefined(value: string | undefined): CityId | undefined {
-  if (value === 'bend' || value === 'chattanooga') {
-    return value;
-  }
-  return undefined;
+  return value !== undefined && Object.hasOwn(cityConfigs, value)
+    ? (value as CityId)
+    : undefined;
 }
 
 function getBrowserHostname(): string | undefined {
@@ -213,25 +209,4 @@ export const mapConfig = cityConfigs[activeCityId];
 
 export function mapConfigForHostname(hostname: string | undefined): MapConfig {
   return cityConfigs[resolveActiveCityId(hostname)];
-}
-
-// Helper to get full GBFS endpoint URLs
-export function getGBFSUrl(endpoint: string): string {
-  if (!mapConfig.gbfs) {
-    throw new Error(
-      `GBFS is not configured for ${mapConfig.region.displayName}`,
-    );
-  }
-
-  const path = mapConfig.gbfs.endpoints[
-    endpoint as keyof typeof mapConfig.gbfs.endpoints
-  ] as string | undefined;
-
-  if (!path) {
-    throw new Error(
-      `GBFS endpoint "${endpoint}" is not configured for ${mapConfig.region.displayName}`,
-    );
-  }
-
-  return `${mapConfig.gbfs.baseUrl}${path}`;
 }

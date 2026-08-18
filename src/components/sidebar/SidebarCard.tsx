@@ -4,8 +4,9 @@ import {
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
+import { pressableProps } from './a11y';
 
-type ColorTheme = 'blue' | 'green' | 'purple' | 'gray';
+export type SidebarCardColorTheme = 'blue' | 'green' | 'purple' | 'gray';
 
 const colorConfig = {
   blue: {
@@ -37,7 +38,7 @@ const colorConfig = {
 } as const;
 
 interface SidebarCardProps {
-  colorTheme: ColorTheme;
+  colorTheme: SidebarCardColorTheme;
   icon: IconDefinition;
   title: string;
   description: React.ReactNode;
@@ -63,15 +64,7 @@ export function SidebarCard({
         'px-2 pt-2 pb-1.5 rounded-md transition-all duration-200 border border-transparent shadow-sm cursor-pointer',
         colors.cardHover,
       )}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick?.();
-        }
-      }}
-      role="button"
-      tabIndex={0}
+      {...pressableProps(() => onClick?.())}
     >
       <div className="flex items-center gap-3">
         <div

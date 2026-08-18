@@ -1,9 +1,10 @@
-// GPX 1.1 generation from GeoJSON features and recorded rides
-// Spec: https://www.topografix.com/gpx/1/1/
+// GPX 1.1 generation from GeoJSON features, recorded rides, and elevation
+// profiles. Spec: https://www.topografix.com/gpx/1/1/
 
-import type { StoredRidePoint } from '../data/ride';
+import { splitRideSegments, type StoredRidePoint } from '../data/ride';
 import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
+import { FEET_PER_METER } from './format';
 
 export function escapeXml(str: string): string {
   return str
@@ -65,16 +66,21 @@ export interface RideGpxInput {
 }
 
 export function buildRideGpx(input: RideGpxInput): string {
-  const trkpts = input.points
-    .map((p) => {
-      const children: string[] = [];
-      if (p.altitude !== null) {
-        children.push(`        <ele>${p.altitude.toFixed(1)}</ele>`);
-      }
-      children.push(
-        `        <time>${new Date(p.timestamp).toISOString()}</time>`,
-      );
-      return `      <trkpt lat="${p.lat}" lon="${p.lng}">\n${children.join('\n')}\n      </trkpt>`;
+  const trksegs = splitRideSegments(input.points)
+    .map((segment) => {
+      const trkpts = segment
+        .map((p) => {
+          const children: string[] = [];
+          if (p.altitude !== null) {
+            children.push(`        <ele>${p.altitude.toFixed(1)}</ele>`);
+          }
+          children.push(
+            `        <time>${new Date(p.timestamp).toISOString()}</time>`,
+          );
+          return `      <trkpt lat="${p.lat}" lon="${p.lng}">\n${children.join('\n')}\n      </trkpt>`;
+        })
+        .join('\n');
+      return `    <trkseg>\n${trkpts}\n    </trkseg>`;
     })
     .join('\n');
 
@@ -89,6 +95,37 @@ export function buildRideGpx(input: RideGpxInput): string {
   </metadata>
   <trk>
     <name>${escapeXml(input.name)}</name>
+${trksegs}
+  </trk>
+</gpx>`;
+}
+
+/**
+ * Build a GPX track from elevation-profile points
+ * ([distanceFt, elevationFt, lng, lat] tuples — elevation converts to meters).
+ */
+export function buildProfileGpx(
+  name: string,
+  points: [number, number, number, number][],
+): string {
+  const trkpts = points
+    .map(
+      ([, elev, lng, lat]) =>
+        `      <trkpt lat="${lat}" lon="${lng}"><ele>${(elev / FEET_PER_METER).toFixed(1)}</ele></trkpt>`,
+    )
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
+     version="1.1"
+     creator="${escapeXml(siteConfig.name)}">
+  <metadata>
+    <name>${escapeXml(name)}</name>
+  </metadata>
+  <trk>
+    <name>${escapeXml(name)}</name>
     <trkseg>
 ${trkpts}
     </trkseg>

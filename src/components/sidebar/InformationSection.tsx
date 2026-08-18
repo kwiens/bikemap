@@ -6,6 +6,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { localResources } from '@/data/geo_data';
 import { SidebarCard } from './SidebarCard';
+import { pressableProps } from './a11y';
 
 function ExternalLink({
   href,
@@ -51,13 +52,7 @@ export function InformationSection() {
     <div className="mb-6">
       <div
         className="text-sm font-medium mb-2 text-gray-600 cursor-pointer flex items-center select-none hover:text-blue-600"
-        onClick={() => setIsExpanded(!isExpanded)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setIsExpanded(!isExpanded);
-          }
-        }}
+        {...pressableProps(() => setIsExpanded(!isExpanded))}
         role="button"
         tabIndex={0}
         aria-expanded={isExpanded}

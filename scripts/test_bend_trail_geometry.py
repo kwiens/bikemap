@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from align_bend_geometry import Way, match_trail
 from audit_bend_trails import (
+    ELEV_DIR,
     geometry_quality_issues,
     profile_teleport_issues,
     source_gap_issues,
@@ -74,6 +75,12 @@ class OrderSegmentsTest(unittest.TestCase):
 
 
 class ProfileAuditTest(unittest.TestCase):
+    def test_default_elevation_directory_is_city_scoped(self):
+        self.assertEqual(
+            os.path.normpath(ELEV_DIR).split(os.sep)[-2:],
+            ["elevation", "bend"],
+        )
+
     def test_existing_profile_fallback_is_explicitly_flagged(self):
         data = {
             "trail": "Missing Source",

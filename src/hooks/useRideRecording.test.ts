@@ -176,6 +176,33 @@ describe('useRideRecording', () => {
     expect(result.current.isPaused).toBe(false);
   });
 
+  it('persists a segment break on the first point after manual resume', async () => {
+    const { saveRide } = await import('@/utils/ride-storage');
+    const { result } = renderHook(() => useRideRecording());
+
+    act(() => {
+      result.current.startRecording();
+      simulatePosition(-85.3, 35);
+      simulatePosition(-85.299, 35.001);
+    });
+    act(() => {
+      result.current.pauseRecording();
+      simulatePosition(-100, 40);
+    });
+    act(() => {
+      result.current.resumeRecording();
+      simulatePosition(-121.3, 44);
+    });
+
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+
+    const ride = (saveRide as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+    expect(ride.points).toHaveLength(3);
+    expect(ride.points[2].segmentStart).toBe(true);
+  });
+
   it('stopRecording returns null for short rides (< 2 points)', async () => {
     const { result } = renderHook(() => useRideRecording());
 

@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ElevationProfile,
   gradeToColor,
   computeGradeColors,
   downsampleStops,
@@ -7,6 +9,17 @@ import {
   profilePointToXY,
 } from './ElevationProfile';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
+import { MAP_EVENTS } from '@/events';
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class ResizeObserver {
+      observe() {}
+      disconnect() {}
+    },
+  );
+});
 
 describe('gradeToColor', () => {
   it('returns green for grade 0', () => {
@@ -177,5 +190,59 @@ describe('profilePointToXY', () => {
     };
     const { y } = profilePointToXY(points, 0, flatProfile, 800);
     expect(Number.isFinite(y)).toBe(true);
+  });
+});
+
+describe('ElevationProfile selection source', () => {
+  it('loads a curated profile when an OSM trail with the same name was selected', async () => {
+    const osmProfile: ElevationProfileData = {
+      trail: 'Big Forest',
+      distance: 5280,
+      gain: 999,
+      loss: 10,
+      min: 100,
+      max: 200,
+      profile: [
+        [0, 100, -85.3, 35],
+        [100, 110, -85.301, 35.001],
+        [200, 120, -85.302, 35.002],
+        [300, 130, -85.303, 35.003],
+        [400, 140, -85.304, 35.004],
+      ],
+    };
+    const curatedProfile: ElevationProfileData = {
+      ...osmProfile,
+      gain: 123,
+    };
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => curatedProfile,
+    } as Response);
+
+    render(<ElevationProfile />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, {
+          detail: { profile: osmProfile },
+        }),
+      );
+    });
+    expect(screen.getByText('+999 ft climbing')).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
+          detail: { trailName: 'Big Forest' },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/data/elevation/chattanooga/big-forest.json',
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      expect(screen.getByText('+123 ft climbing')).toBeInTheDocument();
+    });
   });
 });

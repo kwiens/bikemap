@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
-import { headers } from 'next/headers';
 import { siteConfigForHostname } from '@/config/site.config';
+import { getRequestHostname } from '@/utils/request-hostname';
 
 // App Router serves this at /manifest.webmanifest and auto-injects the
 // <link rel="manifest"> tag. Driven by site.config.ts so a fork rebrands
@@ -38,17 +38,4 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
       },
     ],
   };
-}
-
-async function getRequestHostname(): Promise<string | undefined> {
-  try {
-    const requestHeaders = await headers();
-    return (
-      requestHeaders.get('x-forwarded-host') ??
-      requestHeaders.get('host') ??
-      undefined
-    );
-  } catch {
-    return undefined;
-  }
 }

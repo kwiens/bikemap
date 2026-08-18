@@ -1,5 +1,6 @@
 // Barrel re-export — all data modules accessible from '@/data/geo_data'
 import { activeCityData } from './cities';
+import { hiddenStyleLayerIdsFor } from './mapbox-style';
 
 export type { BikeRoute } from './bike-routes';
 export const bikeRoutes = activeCityData.bikeRoutes;
@@ -19,10 +20,14 @@ export type {
 export const mountainBikeTrails = activeCityData.mountainBikeTrails;
 export const mountainBikeConfig = activeCityData.mountainBike;
 export const trailMetadata = activeCityData.trailMetadata;
-export const hiddenStyleLayerIds = activeCityData.hiddenStyleLayerIds;
+// Style-owned layers the active city doesn't manage (see mapbox-style.ts).
+export const hiddenStyleLayerIds = hiddenStyleLayerIdsFor(activeCityData);
 export const regionFor = activeCityData.regionFor;
 export const bikeNetworkUrl = activeCityData.bikeNetworkUrl;
 export const bikeRoutesUrl = activeCityData.bikeRoutesUrl;
+// Per-city curated trail elevation JSONs ({slug}.json lives under this path).
+// City-scoped so same-named trails in different cities can't collide.
+export const elevationBasePath = `/data/elevation/${activeCityData.cityId}`;
 
 export type { MapFeature } from './map-features';
 export const mapFeatures = activeCityData.mapFeatures;

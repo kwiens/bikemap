@@ -57,24 +57,3 @@ body > div,
   visibility: visible !important;
   opacity: 1 !important;
 }
-
-/* Map overlay elements */
-.map-overlay {
-  position: absolute;
-  z-index: 10;
-  pointer-events: none; /* Allow clicks to pass through to map */
-}
-
-.map-overlay > * {
-  pointer-events: auto; /* Re-enable clicks for actual UI elements */
-}
-
-/* Error notification */
-.map-notification {
-  position: absolute;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 20;
-  max-width: 80%;
-}
