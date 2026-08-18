@@ -5,6 +5,7 @@ import {
   ELEVATION_EMA_ALPHA,
   ELEVATION_DEAD_BAND,
   ELEVATION_SPIKE_THRESHOLD,
+  ELEVATION_SPIKE_MAX_RUN,
   ELEVATION_MIN_DISTANCE,
 } from './ride-stats';
 import type { RidePoint } from '../data/ride';
@@ -113,13 +114,16 @@ describe('elevation accuracy vs Strava (real GPS data)', () => {
   });
 
   it('consecutive spikes (tunnel entry/exit) are suppressed', () => {
-    // Simulate GPS losing satellite lock in a tunnel: 5 consecutive spike readings
+    // Simulate GPS losing satellite lock in a tunnel: 5 consecutive spike
+    // readings — exactly ELEVATION_SPIKE_MAX_RUN, the longest burst the
+    // filter still suppresses in full.  (The old formula started the burst
+    // at the baseline altitude, so only 4 readings actually deviated.)
     const pts: RidePoint[] = Array.from({ length: 100 }, (_, i) => {
-      const inTunnel = i >= 40 && i < 45;
+      const inTunnel = i >= 40 && i < 40 + ELEVATION_SPIKE_MAX_RUN;
       return {
         lat: 35.05 + i * 0.0003,
         lng: -85.3 + i * 0.0003,
-        altitude: inTunnel ? 200 + (i - 40) * 30 : 200, // spikes to 320m
+        altitude: inTunnel ? 230 + (i - 40) * 30 : 200, // spikes to 350m
         accuracy: 5,
         speed: 5,
         timestamp: 1700000000000 + i * 1000,
@@ -235,6 +239,19 @@ describe('elevation accuracy vs Strava (real GPS data)', () => {
       expect(live).toBeLessThan(Math.max(postRide * 2, 10));
     }
   });
+
+  it('live gain keeps tracking a sustained steep climb', () => {
+    // The live filter used to latch: one rejection froze its EMA reference
+    // and every later reading was rejected, flatlining liveElevationGain
+    // for the rest of the ride while the saved stats reported the climb.
+    const pts: GpxPoint[] = Array.from({ length: 200 }, (_, i) => [
+      35.05 + i * 0.0003,
+      -85.3 + i * 0.0003,
+      1000 + i * 10,
+    ]);
+    // True gain 1,990 m; the EMA trims the tail (~1,900 measured).
+    expect(simulateLiveElevation(pts)).toBeGreaterThan(1800);
+  });
 });
 
 /**
@@ -243,6 +260,8 @@ describe('elevation accuracy vs Strava (real GPS data)', () => {
  */
 function simulateLiveElevation(pts: GpxPoint[]): number {
   let ema: number | null = null;
+  let lastAccepted: number | null = null;
+  let rejectRun = 0;
   let anchor: number | null = null;
   let distSinceAnchor = 0;
   let gain = 0;
@@ -260,10 +279,18 @@ function simulateLiveElevation(pts: GpxPoint[]): number {
       );
     }
 
-    // Spike rejection
+    // Spike rejection against the last accepted raw reading (Filter 2)
     let alt = rawAlt;
-    if (ema !== null && Math.abs(alt - ema) > ELEVATION_SPIKE_THRESHOLD) {
-      alt = ema;
+    if (
+      lastAccepted !== null &&
+      Math.abs(alt - lastAccepted) > ELEVATION_SPIKE_THRESHOLD &&
+      rejectRun < ELEVATION_SPIKE_MAX_RUN
+    ) {
+      alt = lastAccepted;
+      rejectRun += 1;
+    } else {
+      lastAccepted = alt;
+      rejectRun = 0;
     }
 
     if (ema === null) {
@@ -279,8 +306,10 @@ function simulateLiveElevation(pts: GpxPoint[]): number {
       if (delta > ELEVATION_DEAD_BAND) {
         gain += delta;
         anchor = ema;
+        distSinceAnchor = 0;
       } else if (delta < -ELEVATION_DEAD_BAND) {
         anchor = ema;
+        distSinceAnchor = 0;
       }
     }
   }

@@ -206,6 +206,52 @@ describe('computeElevation', () => {
   // and points must be spaced > ELEVATION_MIN_DISTANCE apart (~15m).
   // At 0.0003° spacing (~33m/point), this simulates realistic rides.
 
+  // Guards the O'Leary Mountain regression: an averaged spike-filter
+  // reference lags a sustained steep climb until every reading is rejected,
+  // flattening the mountain (449 ft reported on a ~3,200 ft trail).  The
+  // largest real sample-to-sample step there was 17.8 m — under the 25 m
+  // threshold — so this must track cleanly.  10 m per ~33 m point ≈ 30% grade.
+  it('keeps tracking a sustained steep climb', () => {
+    const points = makeTrack(200, { startAlt: 1000, altStep: 10 });
+    const { gain, loss, max, min } = computeElevation(points);
+
+    // True gain is 199 * 10 = 1,990 m; smoothing trims only the ends.
+    // A monotone climb must not fabricate descent, and max must track
+    // the summit (not sag below it as a lagging-reference sawtooth does).
+    expect(gain).toBeGreaterThan(1900);
+    expect(loss).toBeLessThan(1);
+    expect(max - min).toBeGreaterThan(1900);
+  });
+
+  it('still replaces an isolated spike', () => {
+    // The behaviour the filter exists for, which the fix must not give up.
+    const clean = makeTrack(200, { startAlt: 1000, altStep: 2 });
+    const spiked = clean.map((point, i) =>
+      i === 100 ? { ...point, altitude: (point.altitude ?? 0) + 200 } : point,
+    );
+
+    const before = computeElevation(clean);
+    const after = computeElevation(spiked);
+
+    // A 200 m spike must not show up as 200 m of extra height.
+    expect(Math.abs(after.max - before.max)).toBeLessThan(20);
+  });
+
+  it('bounds the damage from a dropout longer than the cap', () => {
+    // 8 bogus ramping readings — longer than ELEVATION_SPIKE_MAX_RUN — so the
+    // tail of the burst is accepted at face value.  Some phantom gain/loss
+    // leaks through (the price of not flatlining real climbs), but it must
+    // stay bounded well under the 240 m excursion and fully symmetric.
+    const points = makeTrack(100, { startAlt: 200, altStep: 0 }).map((p, i) =>
+      i >= 40 && i < 48 ? { ...p, altitude: 200 + (i - 40) * 30 } : p,
+    );
+    const { gain, loss, max } = computeElevation(points);
+
+    expect(gain).toBeLessThan(120); // measured ~98 m
+    expect(loss).toBeLessThan(120);
+    expect(max).toBeLessThan(320); // raw excursion peaks at 440 m
+  });
+
   it('computes gain for a steady climb', () => {
     const points = makeTrack(200, { startAlt: 200, altStep: 2 });
     const { gain, loss } = computeElevation(points);

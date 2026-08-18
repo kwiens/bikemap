@@ -33,6 +33,26 @@ jobs:
       - name: Run linter
         run: pnpm lint
 
+  python-tests:
+    name: Python Script Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run script tests
+        run: python -m unittest discover -s scripts -p 'test_*.py'
+
   build:
     name: Build Check
     runs-on: ubuntu-latest
