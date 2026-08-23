@@ -125,15 +125,41 @@ A free [Mapbox](https://account.mapbox.com/access-tokens/) public token is requi
 | `pnpm build` | Production build |
 | `pnpm start` | Run production build |
 | `pnpm test` / `pnpm test:run` | Vitest (watch / single run) |
+| `pnpm test:e2e` | Playwright end-to-end suite |
+| `pnpm test:e2e:headed` | Playwright with a visible browser |
 | `pnpm lint` / `pnpm lint:fix` | Lint + format (check / auto-fix) |
 
 The Python trail-elevation pipeline is optional and documented in [docs/DEPLOYING.md](docs/DEPLOYING.md).
 
 ## Testing
 
-Tests live next to source as `*.test.ts(x)` and run under Vitest with jsdom — covering GBFS integration, ride stats and storage, DEM correction, GPX building, compass smoothing, and sidebar components.
+Unit tests live next to source as `*.test.ts(x)` and run under Vitest with jsdom — covering GBFS integration, ride stats and storage, DEM correction, GPX building, compass smoothing, and sidebar components.
 
 Mapbox layer events cannot be triggered synthetically — for layer-click testing, dispatch the corresponding custom event from `src/events.ts` directly.
+
+The Playwright suite in `e2e/` covers the complete browser flows for selecting
+mountain bike trails, exploring elevation profiles, recording GPS tracks, and
+managing saved rides. It runs the real Mapbox GL engine against deterministic
+style and TileJSON responses, and supplies a controllable browser geolocation
+implementation so CI does not depend on Mapbox availability or physical GPS.
+
+Install Chromium once, then run the suite:
+
+```bash
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+Run a focused or visible-browser test with:
+
+```bash
+pnpm test:e2e e2e/trails.spec.ts
+pnpm test:e2e:headed e2e/ride-recording.spec.ts
+```
+
+Failures retain screenshots, video, traces, application errors, and an HTML
+report in `test-results/` and `playwright-report/`. Open the report with
+`pnpm exec playwright show-report`.
 
 ## Deploying for your community
 

@@ -86,6 +86,7 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
           <div className="flex items-center gap-1.5 flex-1">
             <input
               type="text"
+              aria-label="Ride name"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
               onKeyDown={(e) => {
@@ -95,14 +96,22 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
               autoFocus
               className="flex-1 text-sm font-semibold px-1.5 py-0.5 border border-gray-200 rounded outline-none min-w-0 focus:border-blue-500"
             />
-            <IconButton onClick={handleRename} icon={faCheck} />
+            <IconButton
+              onClick={handleRename}
+              icon={faCheck}
+              ariaLabel="Save ride name"
+            />
           </div>
         ) : (
           <div className="flex items-center gap-1.5 font-semibold text-sm flex-1 min-w-0">
             <span className="overflow-hidden text-ellipsis whitespace-nowrap">
               {currentName}
             </span>
-            <IconButton onClick={() => setEditing(true)} icon={faPencilAlt} />
+            <IconButton
+              onClick={() => setEditing(true)}
+              icon={faPencilAlt}
+              ariaLabel="Rename ride"
+            />
           </div>
         )}
       </div>
@@ -149,13 +158,16 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
 function IconButton({
   onClick,
   icon,
+  ariaLabel,
 }: {
   onClick: () => void;
   icon: typeof faCheck;
+  ariaLabel: string;
 }) {
   return (
     <button
       type="button"
+      aria-label={ariaLabel}
       onClick={onClick}
       className="bg-transparent border-none cursor-pointer text-gray-500 p-1 text-[13px] leading-none rounded hover:text-gray-700 hover:bg-gray-100"
     >

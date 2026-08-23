@@ -9,6 +9,8 @@
     "start": "next start",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "typecheck": "tsc --noEmit",
     "lint": "pnpm typecheck && eslint . --max-warnings 0 && biome lint --error-on-warnings && biome format",
     "lint:fix": "eslint . --fix --max-warnings 0 && biome lint --write --unsafe && biome format --write",
@@ -34,6 +36,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.9.1",
