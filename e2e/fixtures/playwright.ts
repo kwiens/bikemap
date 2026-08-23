@@ -32,7 +32,8 @@ export const test = base.extend<AutomaticFixtures>({
   ],
 
   applicationErrorMonitor: [
-    async ({ page, baseURL }, use, testInfo) => {
+    async ({ page, baseURL, deterministicBrowser }, use, testInfo) => {
+      void deterministicBrowser;
       const issues: string[] = [];
       const applicationOrigin = baseURL ? new URL(baseURL).origin : null;
 
@@ -133,7 +134,11 @@ async function installDeterministicBrowser(
   }
 
   await context.addInitScript(() => {
-    localStorage.setItem('bikechatt-welcome-dismissed', '1');
+    try {
+      localStorage.setItem('bikechatt-welcome-dismissed', '1');
+    } catch {
+      // Initial about:blank and restricted documents do not expose storage.
+    }
 
     let current: MockGeolocationPoint = {
       longitude: -85.306739,

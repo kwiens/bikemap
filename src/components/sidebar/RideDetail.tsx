@@ -10,6 +10,7 @@ import {
   faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 import type { RecordedRide } from '@/data/ride';
+import { MAP_EVENTS } from '@/events';
 import { cn } from '@/lib/utils';
 import { buildRideGpx } from '@/utils/gpx';
 import { deleteRide, renameRide } from '@/utils/ride-storage';
@@ -37,8 +38,16 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
   const handleRename = () => {
     const trimmed = nameInput.trim();
     if (trimmed && trimmed !== currentName) {
-      renameRide(ride.id, trimmed).catch(() => {});
       setCurrentName(trimmed);
+      renameRide(ride.id, trimmed)
+        .then(() => {
+          window.dispatchEvent(
+            new CustomEvent(MAP_EVENTS.RIDE_RENAME, {
+              detail: { rideId: ride.id, name: trimmed },
+            }),
+          );
+        })
+        .catch(() => {});
     }
     setEditing(false);
   };

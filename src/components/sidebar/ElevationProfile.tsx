@@ -288,6 +288,27 @@ export function ElevationProfile() {
         profileRef.current = null;
       }
     };
+    const handleRideRename = (e: Event) => {
+      const { rideId, name } = (e as CustomEvent).detail as {
+        rideId: string;
+        name: string;
+      };
+      if (
+        sourceRef.current !== 'ride' ||
+        rideIdRef.current !== rideId ||
+        !profileRef.current
+      ) {
+        return;
+      }
+
+      const previousName = profileRef.current.trail;
+      const renamedProfile = { ...profileRef.current, trail: name };
+      profileCache.delete(previousName);
+      profileCache.set(name, renamedProfile);
+      setTrailName(name);
+      setProfile(renamedProfile);
+      profileRef.current = renamedProfile;
+    };
     const handleRideDeselect = () => {
       if (sourceRef.current === 'ride') {
         sourceRef.current = null;
@@ -325,6 +346,7 @@ export function ElevationProfile() {
       handleRidesPanelToggle,
     );
     window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
+    window.addEventListener(MAP_EVENTS.RIDE_RENAME, handleRideRename);
     window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
     window.addEventListener(
       MAP_EVENTS.RIDE_RECORDING_START,
@@ -359,6 +381,7 @@ export function ElevationProfile() {
         handleRidesPanelToggle,
       );
       window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
+      window.removeEventListener(MAP_EVENTS.RIDE_RENAME, handleRideRename);
       window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
       window.removeEventListener(
         MAP_EVENTS.RIDE_RECORDING_START,

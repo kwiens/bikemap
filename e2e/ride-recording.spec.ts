@@ -5,6 +5,7 @@ import {
   test,
   type MockGeolocationPoint,
 } from './fixtures/playwright';
+import type { Download } from '@playwright/test';
 
 test.describe('Ride recording', () => {
   test('records, pauses, saves, and manages a ride', async ({ page }) => {
@@ -39,7 +40,7 @@ test.describe('Ride recording', () => {
     await sendPoint(page, timestamp, 5, -85.3052, 35.0608, 226);
     await sendPoint(page, timestamp, 6, -85.3048, 35.0611, 230);
 
-    await expect(distance).not.toHaveText('0.0 mi');
+    await expect(distance).toHaveText('0.1 mi');
     await expect(climbing).not.toHaveText('0 ft');
 
     await page.getByRole('button', { name: 'Finish' }).click();
@@ -59,12 +60,16 @@ test.describe('Ride recording', () => {
     await nameInput.fill('Morning Test Ride');
     await nameInput.press('Enter');
     await expect(rideDetail.getByText('Morning Test Ride')).toBeVisible();
-    await expect(recordedProfile).toBeVisible();
+    const renamedProfile = page.getByRole('img', {
+      name: 'Elevation profile for Morning Test Ride',
+    });
+    await expect(renamedProfile).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
     await rideDetail.getByRole('button', { name: 'Export GPX' }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe('morning-test-ride.gpx');
+    await expectDownloadToContain(download, '<name>Morning Test Ride</name>');
 
     const deleteButton = rideDetail.getByRole('button', { name: 'Delete' });
     await deleteButton.click();
@@ -74,7 +79,7 @@ test.describe('Ride recording', () => {
     await rideDetail.getByRole('button', { name: 'Confirm Delete' }).click();
 
     await expect(page.getByText('Track your rides')).toBeVisible();
-    await expect(recordedProfile).toHaveCount(0);
+    await expect(renamedProfile).toHaveCount(0);
   });
 });
 
@@ -107,4 +112,16 @@ async function sendPoint(
     timestamp: startedAt + seconds * 1000,
   };
   await setMockGeolocation(page, point);
+}
+
+async function expectDownloadToContain(
+  download: Download,
+  expected: string,
+): Promise<void> {
+  const stream = await download.createReadStream();
+  let content = '';
+  for await (const chunk of stream) {
+    content += chunk.toString();
+  }
+  expect(content).toContain(expected);
 }

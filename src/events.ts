@@ -18,6 +18,7 @@ export const MAP_EVENTS = {
   RIDE_RECORDING_STOP: 'ride-recording-stop',
   RIDE_RECORDING_UPDATE: 'ride-recording-update',
   RIDE_SELECT: 'ride-select',
+  RIDE_RENAME: 'ride-rename',
   RIDE_DESELECT: 'ride-deselect',
   RIDES_PANEL_TOGGLE: 'rides-panel-toggle',
   TOAST: 'toast',

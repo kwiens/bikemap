@@ -49,10 +49,12 @@ export function RideHistory({
 
     window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, refresh);
     window.addEventListener(MAP_EVENTS.RIDE_SELECT, refresh);
+    window.addEventListener(MAP_EVENTS.RIDE_RENAME, refresh);
     window.addEventListener(MAP_EVENTS.RIDE_DESELECT, refresh);
     return () => {
       window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, refresh);
       window.removeEventListener(MAP_EVENTS.RIDE_SELECT, refresh);
+      window.removeEventListener(MAP_EVENTS.RIDE_RENAME, refresh);
       window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, refresh);
     };
   }, [refreshSummaries]);
