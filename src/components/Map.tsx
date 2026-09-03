@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 import mapboxgl from 'mapbox-gl';
 import { MapLegendProvider } from '@/components/MapLegend';
 import { EmbedAttribution } from '@/components/EmbedAttribution';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { useEmbed } from '@/components/EmbedContext';
 
 import {
@@ -84,10 +86,18 @@ const PAUSE_GESTURE_MS = 10000;
 
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
-if (!mapConfig.mapbox.accessToken) {
+
+// NEXT_PUBLIC_* values are inlined at build time, so a deployment built before
+// the variable was set stays broken until it is rebuilt — no amount of fixing
+// the dashboard changes an existing build.
+const hasMapboxToken = Boolean(mapConfig.mapbox.accessToken);
+
+if (!hasMapboxToken) {
   console.warn(
     'NEXT_PUBLIC_MAPBOX_TOKEN is not set — the map will fail to load. ' +
-      'Copy .env.example to .env.local and add a Mapbox token.',
+      'Copy .env.example to .env.local and add a Mapbox token. ' +
+      'On a deployment, set it for this environment and then redeploy: the ' +
+      'token is baked in at build time, so an existing build keeps failing.',
   );
 }
 
@@ -926,6 +936,11 @@ const MapboxMap = memo(function MapboxMap() {
       return; // already initialized
     }
 
+    // Without a token every Mapbox call throws; MapUnavailable renders instead.
+    if (!hasMapboxToken) {
+      return;
+    }
+
     // Initialize map
     if (mapContainer.current) {
       const initializeMap = async () => {
@@ -1630,6 +1645,8 @@ const MapboxMap = memo(function MapboxMap() {
     <>
       <div ref={mapContainer} className="w-full h-full absolute inset-0" />
 
+      {!hasMapboxToken && <MapUnavailable />}
+
       <EmbedAttribution />
 
       {/* Route selection toast */}
@@ -1708,6 +1725,29 @@ const MapboxMap = memo(function MapboxMap() {
     </>
   );
 });
+
+// Shown in place of the map when no Mapbox token was compiled in. Without it a
+// misconfigured deploy is a silent blank rectangle — which on a partner's page
+// looks like our embed is simply broken, with the only clue in their console.
+function MapUnavailable() {
+  return (
+    <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-gray-100 p-6">
+      <div className="max-w-sm text-center">
+        <FontAwesomeIcon
+          icon={faTriangleExclamation}
+          className="w-8 h-8 text-gray-400"
+        />
+        <p className="mt-3 text-sm font-medium text-gray-800">
+          Map unavailable
+        </p>
+        <p className="mt-1 text-sm text-gray-600">
+          This site is missing its Mapbox access token, so the map could not be
+          loaded.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // Main Map component - manages layout and UI chrome
 export default function BikeMap() {
