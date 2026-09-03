@@ -1,0 +1,23 @@
+'use client';
+
+import { useState } from 'react';
+import BikeMap from '@/components/Map';
+import { EmbedProvider } from '@/components/EmbedContext';
+import { parseEmbedOptions } from '@/utils/embed';
+import { useUrlDeepLink } from '@/hooks/useUrlDeepLink';
+
+// Only ever rendered client-side (the /embed page imports it with
+// `next/dynamic({ ssr: false })`), so reading `window.location.search`
+// directly here is safe.
+export default function EmbedMap() {
+  const [options] = useState(() => parseEmbedOptions(window.location.search));
+
+  // Embed mode is Casual-only — there's no trails layer to deep-link into.
+  useUrlDeepLink({ trails: false });
+
+  return (
+    <EmbedProvider options={options}>
+      <BikeMap />
+    </EmbedProvider>
+  );
+}

@@ -296,6 +296,16 @@ clicked way, those stats drive the pane's **headline numbers** (via
 - Overlay elements must use `z-index: 1000` or higher and `position: absolute` to appear above the map. See the route toast in `Map.tsx` and elevation overlay in `ElevationProfile.tsx` for working examples.
 - The sidebar (MapLegend) manages its own stacking context separately and is not affected by this.
 
+### Embed Mode (`/embed`)
+
+The map can be framed on third-party sites via `<iframe src="https://bikechatt.com/embed?...">`. `/embed/demo` is a mock partner page with a live preview and a copy-paste snippet builder.
+
+- **Everything is URL-driven.** `parseEmbedOptions` / `buildEmbedSearch` in `src/utils/embed.ts` are the single encoder/decoder for the supported params (`sidebar`, `route`, `center`, `zoom`, `layers`). Never rely on cookies or `localStorage` in embed mode — browsers drop the settings cookie (no `SameSite=None`) and partition storage inside a third-party frame.
+- **`EmbedProvider` / `useEmbed()`** (`src/components/EmbedContext.tsx`) is how `Map.tsx` and `MapLegend.tsx` learn they are embedded. Outside `/embed` the context defaults to `isEmbed: false`, so the main app never branches on it. In embed mode: Casual (routes) tab only, no MTB pill, sidebar closed by default, no `RidesPanel` / `WelcomeModal` / `PwaInstallPrompt`, no cookie writes, and an `EmbedAttribution` "Open in …" link overlays the map.
+- **Framing headers** come from `embedHeaders()` in `src/utils/embed-headers.ts`, wired into `next.config.ts`. `/embed*` gets `frame-ancestors` from the `EMBED_ALLOWED_ORIGINS` env var (unset = any site); every other path gets `frame-ancestors 'self'`. The Mapbox token's URL restriction keeps working because the iframe document's origin is ours.
+- **Partner snippet requirements:** `allow="geolocation; fullscreen; gyroscope; accelerometer; magnetometer"` for locate-me/compass, and an explicit height (the snippet uses `aspect-ratio`). `public/register-sw.js` skips registration inside frames.
+- CORS is not involved: the iframe runs on our origin, so tile/GBFS/data fetches are unchanged. Parent↔iframe control, if ever needed, is a `postMessage` adapter over `MAP_EVENTS` with an origin check.
+
 ## Code Style
 
 - Do not include "Co-Authored-By: Claude" in commit messages

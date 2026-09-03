@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { MapLegendProvider } from '@/components/MapLegend';
 import { RidesPanel } from '@/components/RidesPanel';
+import { EmbedAttribution } from '@/components/EmbedAttribution';
+import { useEmbed } from '@/components/EmbedContext';
 import {
   bikeRoutes,
   mapFeatures,
@@ -80,6 +82,7 @@ if (!mapConfig.mapbox.accessToken) {
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
+  const { options: embedOptions } = useEmbed();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
@@ -853,8 +856,8 @@ const MapboxMap = memo(function MapboxMap() {
           const newMap = new mapboxgl.Map({
             container: mapContainer.current as HTMLElement,
             style: mapConfig.mapbox.styleUrl,
-            center: mapConfig.defaultView.center,
-            zoom: mapConfig.defaultView.zoom,
+            center: embedOptions.center ?? mapConfig.defaultView.center,
+            zoom: embedOptions.zoom ?? mapConfig.defaultView.zoom,
             pitch: mapConfig.defaultView.pitch,
             bearing: mapConfig.defaultView.bearing,
             antialias: true,
@@ -1231,6 +1234,9 @@ const MapboxMap = memo(function MapboxMap() {
         map.current = null;
       }
     };
+    // embedOptions is read only for its value at mount time (the initial
+    // center/zoom); this effect must still only run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run once on mount
 
   const setLocationWatch = (value: boolean) => {
@@ -1507,6 +1513,8 @@ const MapboxMap = memo(function MapboxMap() {
     <>
       <div ref={mapContainer} className="w-full h-full absolute inset-0" />
 
+      <EmbedAttribution />
+
       {/* Route selection toast */}
       {toastMessage && (
         <div
@@ -1586,11 +1594,13 @@ const MapboxMap = memo(function MapboxMap() {
 
 // Main Map component - manages layout and UI chrome
 export default function BikeMap() {
+  const { isEmbed } = useEmbed();
   return (
     <MapLegendProvider>
       <div className="w-screen h-full relative overflow-visible">
         <MapboxMap />
-        <RidesPanel />
+        {/* Ride recording needs geolocation + persistent storage — not for embeds */}
+        {!isEmbed && <RidesPanel />}
       </div>
     </MapLegendProvider>
   );
