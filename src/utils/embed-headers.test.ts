@@ -2,180 +2,168 @@ import { describe, it, expect } from 'vitest';
 import { buildFrameAncestors, embedHeaders } from './embed-headers';
 
 describe('buildFrameAncestors', () => {
-  it('returns frame-ancestors * when allowedOrigins is undefined', () => {
+  it('opens framing when the var is unset, empty, or whitespace', () => {
     expect(buildFrameAncestors(undefined)).toBe('frame-ancestors *');
-  });
-
-  it('returns frame-ancestors * when allowedOrigins is empty string', () => {
     expect(buildFrameAncestors('')).toBe('frame-ancestors *');
-  });
-
-  it('returns frame-ancestors * when allowedOrigins is whitespace only', () => {
     expect(buildFrameAncestors('   ')).toBe('frame-ancestors *');
   });
 
-  it('returns frame-ancestors * when allowedOrigins is literal *', () => {
+  it('opens framing on an explicit *', () => {
     expect(buildFrameAncestors('*')).toBe('frame-ancestors *');
   });
 
-  it('returns frame-ancestors self when single valid origin provided', () => {
+  it('allowlists a single origin alongside self', () => {
     expect(buildFrameAncestors('https://partner.example.com')).toBe(
       "frame-ancestors 'self' https://partner.example.com",
     );
   });
 
-  it('handles two origins with self', () => {
+  it('allowlists several origins, trimming and collapsing whitespace', () => {
     expect(
-      buildFrameAncestors('https://partner1.example https://partner2.example'),
-    ).toBe(
-      "frame-ancestors 'self' https://partner1.example https://partner2.example",
-    );
+      buildFrameAncestors('  https://a.example   https://b.example  '),
+    ).toBe("frame-ancestors 'self' https://a.example https://b.example");
   });
 
-  it('trims whitespace from origins', () => {
-    expect(buildFrameAncestors('  https://partner.example  ')).toBe(
-      "frame-ancestors 'self' https://partner.example",
-    );
-  });
-
-  it('handles multiple spaces between origins', () => {
-    expect(buildFrameAncestors('https://a.example   https://b.example')).toBe(
-      "frame-ancestors 'self' https://a.example https://b.example",
-    );
-  });
-
-  it('deduplicates origins', () => {
+  it('deduplicates repeated origins', () => {
     expect(
       buildFrameAncestors('https://partner.example https://partner.example'),
     ).toBe("frame-ancestors 'self' https://partner.example");
   });
 
-  it('filters out non-http(s) entries', () => {
+  it('accepts http, ports, and wildcard subdomains', () => {
+    expect(buildFrameAncestors('http://localhost:3000')).toBe(
+      "frame-ancestors 'self' http://localhost:3000",
+    );
+    expect(buildFrameAncestors('https://*.example.com')).toBe(
+      "frame-ancestors 'self' https://*.example.com",
+    );
+  });
+
+  it('drops entries that are not http(s)', () => {
     expect(
       buildFrameAncestors('https://valid.example ftp://invalid.example'),
     ).toBe("frame-ancestors 'self' https://valid.example");
   });
 
-  it('filters out entries with typos that do not start with http', () => {
+  // The important one: ';' separates CSP directives, and it survives a
+  // `new URL(...).origin` round-trip intact — so a stray separator in the env
+  // var must be rejected outright rather than spliced into the header.
+  it('rejects entries that would inject a second CSP directive', () => {
+    // The whole value is suspect, so it fails closed rather than salvaging
+    // the part before the separator.
     expect(
-      buildFrameAncestors('https://valid.example htp://typo.example'),
-    ).toBe("frame-ancestors 'self' https://valid.example");
-  });
+      buildFrameAncestors("https://partner.example;script-src 'none'"),
+    ).toBe("frame-ancestors 'self'");
 
-  it('filters out empty entries from extra spaces', () => {
-    expect(buildFrameAncestors('https://a.example  https://b.example')).toBe(
-      "frame-ancestors 'self' https://a.example https://b.example",
+    expect(buildFrameAncestors('https://evil.example;script-src')).toBe(
+      "frame-ancestors 'self'",
     );
-  });
-
-  it('accepts http:// origins', () => {
-    expect(buildFrameAncestors('http://localhost:3000')).toBe(
-      "frame-ancestors 'self' http://localhost:3000",
+    // A valid origin alongside a malformed one still survives.
+    expect(
+      buildFrameAncestors('https://ok.example https://evil.example;script-src'),
+    ).toBe("frame-ancestors 'self' https://ok.example");
+    expect(buildFrameAncestors('https://a.example,https://b.example')).toBe(
+      "frame-ancestors 'self'",
     );
-  });
-
-  it('falls back to self when all entries are invalid', () => {
-    expect(buildFrameAncestors('ftp://invalid invalid:// not-a-url')).toBe(
+    expect(buildFrameAncestors("https://a.example'")).toBe(
       "frame-ancestors 'self'",
     );
   });
 
-  it('falls back to self for non-empty input with only whitespace entries', () => {
-    expect(buildFrameAncestors('   \t   ')).toBe('frame-ancestors *');
-  });
-
-  it('handles mixed case protocols', () => {
-    // Scheme is case-insensitive in URLs, but our filter checks startsWith exactly
-    // This test documents that we only accept lowercase http/https
-    expect(buildFrameAncestors('HTTPS://example.com')).toBe(
+  it('rejects credentials, paths, and bare schemes', () => {
+    expect(buildFrameAncestors('https://user:pw@p.example')).toBe(
       "frame-ancestors 'self'",
     );
+    expect(buildFrameAncestors('https://p.example/path')).toBe(
+      "frame-ancestors 'self'",
+    );
+    expect(buildFrameAncestors('https://')).toBe("frame-ancestors 'self'");
   });
 
-  it('preserves order of origins (except for deduplication)', () => {
-    expect(
-      buildFrameAncestors(
-        'https://c.example https://a.example https://b.example',
-      ),
-    ).toBe(
-      "frame-ancestors 'self' https://c.example https://a.example https://b.example",
+  it('fails closed when every entry is invalid', () => {
+    expect(buildFrameAncestors('nonsense not-an-origin')).toBe(
+      "frame-ancestors 'self'",
     );
   });
 });
 
 describe('embedHeaders', () => {
-  it('returns three header configurations', () => {
-    const headers = embedHeaders('https://partner.example');
-    expect(headers).toHaveLength(3);
-  });
-
-  it('embeds route /embed/:path* with allowed origins directive', () => {
-    const headers = embedHeaders('https://partner.example');
-    const embedPath = headers.find((h) => h.source === '/embed/:path*');
-    expect(embedPath).toBeDefined();
-    expect(embedPath?.headers[0].key).toBe('Content-Security-Policy');
-    expect(embedPath?.headers[0].value).toBe(
-      "frame-ancestors 'self' https://partner.example",
-    );
-  });
-
-  it('embeds route /embed with allowed origins directive', () => {
-    const headers = embedHeaders('https://partner.example');
-    const embedRoot = headers.find((h) => h.source === '/embed');
-    expect(embedRoot).toBeDefined();
-    expect(embedRoot?.headers[0].key).toBe('Content-Security-Policy');
-    expect(embedRoot?.headers[0].value).toBe(
-      "frame-ancestors 'self' https://partner.example",
-    );
-  });
-
-  it('applies frame-ancestors self to other routes using negative lookahead', () => {
-    const headers = embedHeaders('https://partner.example');
-    const otherRoutes = headers.find((h) => h.source === '/((?!embed).*)');
-    expect(otherRoutes).toBeDefined();
-    expect(otherRoutes?.headers[0].key).toBe('Content-Security-Policy');
-    expect(otherRoutes?.headers[0].value).toBe("frame-ancestors 'self'");
-  });
-
-  it('uses frame-ancestors * for /embed when allowedOrigins is unset', () => {
+  it('emits two mutually exclusive rules', () => {
     const headers = embedHeaders(undefined);
-    const embedPath = headers.find((h) => h.source === '/embed/:path*');
-    expect(embedPath?.headers[0].value).toBe('frame-ancestors *');
+    expect(headers.map((h) => h.source)).toEqual(['/embed', '/((?!embed$).*)']);
+    for (const rule of headers) {
+      expect(rule.headers).toHaveLength(1);
+      expect(rule.headers[0].key).toBe('Content-Security-Policy');
+    }
   });
 
-  it('uses frame-ancestors * for /embed when allowedOrigins is empty', () => {
-    const headers = embedHeaders('');
-    const embedPath = headers.find((h) => h.source === '/embed/:path*');
-    expect(embedPath?.headers[0].value).toBe('frame-ancestors *');
-  });
+  it('applies the allowlist to /embed and self to everything else', () => {
+    const headers = embedHeaders('https://a.example https://b.example');
 
-  it('uses frame-ancestors * for /embed when allowedOrigins is literal *', () => {
-    const headers = embedHeaders('*');
-    const embedPath = headers.find((h) => h.source === '/embed/:path*');
-    expect(embedPath?.headers[0].value).toBe('frame-ancestors *');
-  });
-
-  it('always applies frame-ancestors self to non-embed routes', () => {
-    const headers1 = embedHeaders(undefined);
-    const headers2 = embedHeaders('https://partner.example');
-    const headers3 = embedHeaders('*');
-
-    const otherRoutes1 = headers1.find((h) => h.source === '/((?!embed).*)');
-    const otherRoutes2 = headers2.find((h) => h.source === '/((?!embed).*)');
-    const otherRoutes3 = headers3.find((h) => h.source === '/((?!embed).*)');
-
-    expect(otherRoutes1?.headers[0].value).toBe("frame-ancestors 'self'");
-    expect(otherRoutes2?.headers[0].value).toBe("frame-ancestors 'self'");
-    expect(otherRoutes3?.headers[0].value).toBe("frame-ancestors 'self'");
-  });
-
-  it('handles multiple allowed origins in embedHeaders', () => {
-    const headers = embedHeaders(
-      'https://a.example https://b.example https://c.example',
+    expect(headers[0].source).toBe('/embed');
+    expect(headers[0].headers[0].value).toBe(
+      "frame-ancestors 'self' https://a.example https://b.example",
     );
-    const embedPath = headers.find((h) => h.source === '/embed/:path*');
-    expect(embedPath?.headers[0].value).toBe(
-      "frame-ancestors 'self' https://a.example https://b.example https://c.example",
-    );
+
+    // The catch-all must never inherit the permissive directive.
+    expect(headers[1].headers[0].value).toBe("frame-ancestors 'self'");
+  });
+
+  it('leaves the rest of the site locked down when embedding is open', () => {
+    const headers = embedHeaders(undefined);
+    expect(headers[0].headers[0].value).toBe('frame-ancestors *');
+    expect(headers[1].headers[0].value).toBe("frame-ancestors 'self'");
+  });
+});
+
+// These patterns are the actual security control, so assert on the compiled
+// behaviour rather than the source strings. A prefix-anchored lookahead
+// (`/((?!embed).*)`) silently leaves /embedded-help with no CSP at all.
+describe('header source patterns (compiled with Next path matching)', () => {
+  const toRegExp = (source: string): RegExp => {
+    // Mirrors how Next compiles a headers() `source` into a matcher.
+    const {
+      pathToRegexp,
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+    } = require('next/dist/compiled/path-to-regexp');
+    return pathToRegexp(source);
+  };
+
+  const [embedRule, catchAllRule] = embedHeaders(undefined);
+
+  it('matches the embed route exactly', () => {
+    const re = toRegExp(embedRule.source);
+    expect(re.test('/embed')).toBe(true);
+    expect(re.test('/embed/demo')).toBe(false);
+    expect(re.test('/about')).toBe(false);
+  });
+
+  it('covers every other path, including embed-prefixed ones', () => {
+    const re = toRegExp(catchAllRule.source);
+    expect(re.test('/')).toBe(true);
+    expect(re.test('/about')).toBe(true);
+    expect(re.test('/embed/demo')).toBe(true);
+    expect(re.test('/embedded-help')).toBe(true);
+    expect(re.test('/embeds')).toBe(true);
+    // Only the embed route itself is excluded — it has its own rule.
+    expect(re.test('/embed')).toBe(false);
+  });
+
+  it('never lets both rules match the same path', () => {
+    const embedRe = toRegExp(embedRule.source);
+    const catchAllRe = toRegExp(catchAllRule.source);
+    for (const path of [
+      '/',
+      '/about',
+      '/embed',
+      '/embed/demo',
+      '/embedded-help',
+      '/export',
+    ]) {
+      const matches = [embedRe.test(path), catchAllRe.test(path)].filter(
+        Boolean,
+      );
+      expect(matches).toHaveLength(1);
+    }
   });
 });

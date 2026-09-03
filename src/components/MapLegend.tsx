@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MAP_EVENTS } from '@/events';
+import { onMapReady } from '@/utils/map-ready';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTimes,
@@ -324,15 +325,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    if ((window as unknown as Record<string, boolean>).__mapReady) {
-      dispatchLayers();
-      return;
-    }
-    window.addEventListener(MAP_EVENTS.MAP_READY, dispatchLayers, {
-      once: true,
-    });
-    return () =>
-      window.removeEventListener(MAP_EVENTS.MAP_READY, dispatchLayers);
+    return onMapReady(dispatchLayers);
     // Runs once on mount only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

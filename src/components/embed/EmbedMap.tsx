@@ -13,7 +13,9 @@ export default function EmbedMap() {
   const [options] = useState(() => parseEmbedOptions(window.location.search));
 
   // Embed mode is Casual-only — there's no trails layer to deep-link into.
-  useUrlDeepLink({ trails: false });
+  // The route slug comes from the options we already decoded, so `?route=` has
+  // a single decoder rather than two that can disagree about trimming.
+  useUrlDeepLink({ trails: false, route: options.route });
 
   return (
     <EmbedProvider options={options}>

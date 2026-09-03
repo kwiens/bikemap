@@ -23,7 +23,16 @@ export function EmbedAttribution() {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="absolute bottom-4 right-4 z-[1000] flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-[0_2px_4px_rgba(0,0,0,0.2)] hover:text-gray-900"
+      // Anchored top-right, below Mapbox's NavigationControl (which
+      // `map.css` pins to `top: calc(68px + safe-area)`, extending to
+      // roughly 176px for its 3-button zoom/compass stack). This clears
+      // both bottom corners entirely, which are already crowded in embed
+      // mode: Mapbox's own (unrepositioned) bottom-right attribution
+      // control, the location-tracker button (`bottom-[60px] right-4` in
+      // Map.tsx), and the elevation panel, which spans nearly the full
+      // width along the bottom (`bottom-4`/`bottom-[60px]` with `left-4`
+      // or `left-2 right-2`) whenever a route/trail is selected.
+      className="absolute top-[184px] right-3 z-[1000] flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-[0_2px_4px_rgba(0,0,0,0.2)] hover:text-gray-900"
     >
       Open in {siteConfig.name}
       <FontAwesomeIcon

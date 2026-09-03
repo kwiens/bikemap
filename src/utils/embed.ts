@@ -15,6 +15,19 @@ export const EMBED_LAYERS = [
 
 export type EmbedLayer = (typeof EMBED_LAYERS)[number];
 
+/**
+ * The marker/overlay layers that form a mutually-exclusive radio group in the
+ * map UI (turning one on hides the others — see `toggleLayer` in
+ * `MapLegend.tsx` and the `handleLayerToggle` branches in `Map.tsx`).
+ * `bikeNetwork` is an independent line overlay and can coexist with any one
+ * of these.
+ */
+export const MARKER_LAYERS = [
+  'attractions',
+  'bikeResources',
+  'bikeRentals',
+] as const satisfies readonly EmbedLayer[];
+
 export interface EmbedOptions {
   /** Whether the routes sidebar starts open. Defaults to closed — a 280px
    *  drawer eats most of a typical embed width. */
@@ -25,7 +38,10 @@ export interface EmbedOptions {
   center?: [number, number];
   /** Initial zoom; falls back to the city default. */
   zoom?: number;
-  /** Layers switched on at load. */
+  /** Layers switched on at load. At most one of `MARKER_LAYERS`
+   *  (attractions, bikeResources, bikeRentals) is kept — they're a
+   *  mutually-exclusive radio group in the map UI — while `bikeNetwork` is
+   *  independent and may accompany it. */
   layers: EmbedLayer[];
 }
 
@@ -44,7 +60,10 @@ export const DEFAULT_EMBED_OPTIONS: EmbedOptions = {
  *   route=<slug>
  *   center=<lng>,<lat>
  *   zoom=<number>
- *   layers=attractions,bikeResources,bikeRentals,bikeNetwork  (comma list)
+ *   layers=attractions,bikeResources,bikeRentals,bikeNetwork  (comma list;
+ *     at most one of attractions/bikeResources/bikeRentals is kept — the
+ *     first one that appears — since the map treats them as a radio group;
+ *     bikeNetwork is independent and may accompany it)
  */
 export function parseEmbedOptions(
   search: string | URLSearchParams,
@@ -97,28 +116,44 @@ export function isEmbedLayer(value: string): value is EmbedLayer {
 
 function parseCenter(raw: string | null): [number, number] | undefined {
   if (!raw) return undefined;
-  const parts = raw.split(',').map((p) => Number(p.trim()));
-  if (parts.length !== 2 || parts.some((n) => !Number.isFinite(n))) {
+  const trimmedParts = raw.split(',').map((p) => p.trim());
+  // Reject empty/whitespace-only components before coercing — Number('')
+  // and Number(' ') are 0, which would silently pass as a valid coordinate.
+  if (trimmedParts.length !== 2 || trimmedParts.some((p) => p === '')) {
     return undefined;
   }
+  const parts = trimmedParts.map(Number);
+  if (parts.some((n) => !Number.isFinite(n))) return undefined;
   const [lng, lat] = parts;
   if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return undefined;
   return [lng, lat];
 }
 
 function parseZoom(raw: string | null): number | undefined {
-  if (!raw) return undefined;
-  const zoom = Number(raw);
+  // URLSearchParams decodes `+` as a space, so `zoom=+` yields ' ' here —
+  // truthy, so it must be checked explicitly (and Number(' ') === 0 would
+  // otherwise silently pass as a valid zoom).
+  if (!raw || raw.trim() === '') return undefined;
+  const zoom = Number(raw.trim());
   if (!Number.isFinite(zoom) || zoom < 0 || zoom > 24) return undefined;
   return zoom;
 }
 
 function parseLayers(raw: string | null): EmbedLayer[] {
   if (!raw) return [];
+  const markerLayers = new Set<string>(MARKER_LAYERS);
   const seen = new Set<EmbedLayer>();
+  let markerLayerChosen = false;
   for (const part of raw.split(',')) {
     const name = part.trim();
-    if (isEmbedLayer(name)) seen.add(name);
+    if (!isEmbedLayer(name) || seen.has(name)) continue;
+    if (markerLayers.has(name)) {
+      // Marker layers are a mutually-exclusive radio group — keep only the
+      // first one that appears.
+      if (markerLayerChosen) continue;
+      markerLayerChosen = true;
+    }
+    seen.add(name);
   }
   return [...seen];
 }

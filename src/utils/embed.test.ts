@@ -42,15 +42,47 @@ describe('parseEmbedOptions', () => {
     expect(parseEmbedOptions('zoom=x').zoom).toBeUndefined();
   });
 
+  it('rejects empty or whitespace-only center components without treating them as 0', () => {
+    expect(parseEmbedOptions('center=,').center).toBeUndefined();
+    expect(parseEmbedOptions('center=1,').center).toBeUndefined();
+    expect(parseEmbedOptions('center= , ').center).toBeUndefined();
+    // A genuine 0,0 must still parse successfully.
+    expect(parseEmbedOptions('center=0,0').center).toEqual([0, 0]);
+  });
+
+  it('rejects a `+`-decoded (whitespace) zoom without treating it as 0', () => {
+    // URLSearchParams decodes `+` as a space.
+    expect(parseEmbedOptions('zoom=+').zoom).toBeUndefined();
+    expect(parseEmbedOptions('zoom=%20').zoom).toBeUndefined();
+    // A genuine 0 must still parse successfully.
+    expect(parseEmbedOptions('zoom=0').zoom).toBe(0);
+  });
+
   it('parses a comma list of known layers, dropping unknowns and dupes', () => {
     expect(
-      parseEmbedOptions('layers=attractions,bogus,bikeRentals,attractions')
+      parseEmbedOptions('layers=attractions,bogus,bikeNetwork,attractions')
         .layers,
-    ).toEqual(['attractions', 'bikeRentals']);
+    ).toEqual(['attractions', 'bikeNetwork']);
     expect(parseEmbedOptions('layers=').layers).toEqual([]);
     expect(parseEmbedOptions('layers= bikeNetwork ').layers).toEqual([
       'bikeNetwork',
     ]);
+  });
+
+  it('keeps at most one marker layer, preferring the first that appears', () => {
+    expect(
+      parseEmbedOptions('layers=attractions,bikeResources').layers,
+    ).toEqual(['attractions']);
+    expect(
+      parseEmbedOptions('layers=bikeResources,attractions').layers,
+    ).toEqual(['bikeResources']);
+    expect(parseEmbedOptions('layers=attractions,bikeNetwork').layers).toEqual([
+      'attractions',
+      'bikeNetwork',
+    ]);
+    expect(
+      parseEmbedOptions('layers=bikeNetwork,attractions,bikeRentals').layers,
+    ).toEqual(['bikeNetwork', 'attractions']);
   });
 });
 

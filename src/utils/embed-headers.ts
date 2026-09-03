@@ -1,45 +1,56 @@
+// Framing policy for the app.
+//
+// `/embed` is the only route third-party sites may frame; everything else —
+// including `/embed/demo`, which is an ordinary page — is locked to 'self' so
+// the app cannot be used for clickjacking.
+
 /**
- * Builds Content-Security-Policy frame-ancestors directive for embed mode.
+ * CSP host-source grammar, deliberately stricter than a URL parse.
  *
- * Parses space-separated origins, trims whitespace, drops empties and invalid entries,
- * deduplicates. Only accepts origins starting with http:// or https://.
- * Falls back to 'self' if the input is non-empty but produces no valid origins.
+ * `;` is the CSP directive separator and survives `new URL(...).origin`
+ * intact (`https://evil.com;script-src` round-trips unchanged), so validating
+ * by parsing would let a stray separator in the env var inject a second
+ * directive. Only scheme + host (optionally a `*.` wildcard label) + port.
+ */
+const ORIGIN_PATTERN =
+  /^https?:\/\/(\*\.)?[a-z0-9-]+(\.[a-z0-9-]+)*(:\d{1,5})?$/i;
+
+/**
+ * Builds the `frame-ancestors` directive from `EMBED_ALLOWED_ORIGINS`.
  *
- * @param allowedOrigins - Space-separated origins or undefined
- * @returns Full directive string (e.g., "frame-ancestors 'self' https://example.com")
+ * Accepts a space-separated origin list. Entries that are not valid CSP host
+ * sources are dropped; if the value is non-empty but yields no valid origin,
+ * falls back to `'self'` (fail closed) rather than emitting a broken header.
+ *
+ * An unset/empty value returns `frame-ancestors *`: embedding is open until an
+ * operator opts into an allowlist, which matches the app's behaviour before
+ * this header existed. Set the var to lock a deployment down.
+ *
+ * @param allowedOrigins - Space-separated origins, `*`, or undefined
+ * @returns Full directive string (e.g. "frame-ancestors 'self' https://example.com")
  */
 export function buildFrameAncestors(
   allowedOrigins: string | undefined,
 ): string {
-  if (!allowedOrigins || allowedOrigins.trim() === '') {
+  const trimmed = allowedOrigins?.trim();
+
+  if (!trimmed || trimmed === '*') {
     return 'frame-ancestors *';
   }
 
-  const trimmed = allowedOrigins.trim();
-
-  // Handle explicit '*'
-  if (trimmed === '*') {
-    return 'frame-ancestors *';
-  }
-
-  // Split on whitespace, filter for valid http(s) origins, deduplicate
   const origins = new Set(
     trimmed
       .split(/\s+/)
-      .map((o) => o.trim())
-      .filter(
-        (o) =>
-          o.length > 0 && (o.startsWith('http://') || o.startsWith('https://')),
-      ),
+      .map((origin) => origin.trim())
+      .filter((origin) => ORIGIN_PATTERN.test(origin)),
   );
 
-  // If we have valid origins, use 'self' + all of them
-  if (origins.size > 0) {
-    return `frame-ancestors 'self' ${Array.from(origins).join(' ')}`;
+  if (origins.size === 0) {
+    // Every entry was malformed — deny rather than ship an open policy.
+    return "frame-ancestors 'self'";
   }
 
-  // All entries were invalid or empty — fail closed
-  return "frame-ancestors 'self'";
+  return `frame-ancestors 'self' ${[...origins].join(' ')}`;
 }
 
 interface Header {
@@ -53,47 +64,32 @@ interface HeaderConfig {
 }
 
 /**
- * Returns Next.js headers config for embed mode.
+ * Next.js `headers()` config for framing policy. Emits two mutually exclusive
+ * rules — Next appends the headers of *every* matching rule, and browsers
+ * intersect multiple CSPs, so an overlap would silently apply the stricter
+ * policy and break embedding.
  *
- * Emits three rules:
- * - '/embed' and '/embed/:path*': framed only by allowed origins
- * - All other paths: framed only by 'self' (clickjacking protection)
+ * - `/embed` — framed by the allowlist (or anyone, when unset).
+ * - everything else — `frame-ancestors 'self'`. The negative lookahead is
+ *   anchored with `$` so it excludes exactly `/embed`: `/embed/demo` and a
+ *   future `/embedded-guide` both keep the protection.
  *
- * @param allowedOrigins - Space-separated origins from env var
- * @returns Array of header configs for Next.js
+ * @param allowedOrigins - Space-separated origins from `EMBED_ALLOWED_ORIGINS`
  */
 export function embedHeaders(
   allowedOrigins: string | undefined,
 ): HeaderConfig[] {
   const embedDirective = buildFrameAncestors(allowedOrigins);
-  const selfDirective = "frame-ancestors 'self'";
 
   return [
     {
-      source: '/embed/:path*',
-      headers: [
-        {
-          key: 'Content-Security-Policy',
-          value: embedDirective,
-        },
-      ],
-    },
-    {
       source: '/embed',
-      headers: [
-        {
-          key: 'Content-Security-Policy',
-          value: embedDirective,
-        },
-      ],
+      headers: [{ key: 'Content-Security-Policy', value: embedDirective }],
     },
     {
-      source: '/((?!embed).*)',
+      source: '/((?!embed$).*)',
       headers: [
-        {
-          key: 'Content-Security-Policy',
-          value: selfDirective,
-        },
+        { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
       ],
     },
   ];

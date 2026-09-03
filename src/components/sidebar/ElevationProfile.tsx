@@ -23,6 +23,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { getSetting } from '@/utils/settings';
+import { useEmbed } from '@/components/EmbedContext';
 import { siteConfig } from '@/config/site.config';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
 
@@ -183,14 +184,23 @@ export function findClosestProfileIndex(
 }
 
 export function ElevationProfile() {
+  // Embeds never carry the settings cookie (that's the whole premise of
+  // embed mode), so `getSetting('sidebarOpen')` always misses there and the
+  // `?? true` fallback would wrongly assume the sidebar is open. MapLegend
+  // seeds its own `isOpen` from `embedOptions.sidebarOpen` in that case (see
+  // MapLegend.tsx) and only ever dispatches SIDEBAR_TOGGLE on a user toggle,
+  // never for the initial value — so we have to seed from the same embed
+  // option here to agree with it initially. Outside embed mode this is
+  // byte-for-byte the previous behavior.
+  const { isEmbed, options: embedOptions } = useEmbed();
   const [trailName, setTrailName] = useState<string | null>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [locationIndex, setLocationIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
-  const [sidebarOpen, setSidebarOpen] = useState(
-    () => getSetting('sidebarOpen') ?? true,
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    isEmbed ? embedOptions.sidebarOpen : (getSetting('sidebarOpen') ?? true),
   );
   const [ridesPanelOpen, setRidesPanelOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);

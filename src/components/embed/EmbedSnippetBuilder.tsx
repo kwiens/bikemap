@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { bikeRoutes } from '@/data/geo_data';
 import { slugify } from '@/utils/string';
 import {
-  EMBED_LAYERS,
+  MARKER_LAYERS,
   buildEmbedSearch,
   type EmbedLayer,
   type EmbedOptions,
@@ -16,6 +16,11 @@ const IFRAME_ALLOW =
 const IFRAME_STYLE =
   'width:100%; aspect-ratio: 4/3; border:0; border-radius: 12px';
 
+/** How long to wait after the last edit before navigating the preview iframe.
+ *  Each navigation is a full Mapbox map boot (style + tile fetches), so this
+ *  keeps rapid typing (e.g. in the zoom field) from firing one per keystroke. */
+const PREVIEW_DEBOUNCE_MS = 500;
+
 export interface EmbedSnippetBuilderProps {
   /** Absolute origin used in the copy-paste snippet, e.g. https://bikechatt.com */
   baseUrl: string;
@@ -26,45 +31,75 @@ export function EmbedSnippetBuilder({
 }: EmbedSnippetBuilderProps): ReactElement {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [route, setRoute] = useState('');
-  const [layers, setLayers] = useState<EmbedLayer[]>([]);
+  const [markerLayer, setMarkerLayer] = useState<EmbedLayer | ''>('');
+  const [bikeNetworkOn, setBikeNetworkOn] = useState(false);
   const [zoomInput, setZoomInput] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const options: Partial<EmbedOptions> = useMemo(() => {
-    const zoom = zoomInput.trim() === '' ? undefined : Number(zoomInput);
-    return {
-      sidebarOpen,
-      route: route || undefined,
-      zoom: zoom !== undefined && Number.isFinite(zoom) ? zoom : undefined,
-      layers,
-    };
-  }, [sidebarOpen, route, zoomInput, layers]);
+  const zoomTrimmed = zoomInput.trim();
+  const zoomNumber = zoomTrimmed === '' ? undefined : Number(zoomTrimmed);
+  // A transient empty string or a lone "-" parses to undefined/NaN — neither
+  // is "finite", so it's treated as mid-edit rather than an invalid value.
+  const zoomIsFiniteNumber =
+    zoomNumber !== undefined && Number.isFinite(zoomNumber);
+  const zoomInRange = zoomIsFiniteNumber && zoomNumber >= 0 && zoomNumber <= 24;
+  const showZoomError = zoomIsFiniteNumber && !zoomInRange;
 
-  const search = useMemo(() => buildEmbedSearch(options), [options]);
+  const layers: EmbedLayer[] = [
+    ...(markerLayer ? [markerLayer] : []),
+    ...(bikeNetworkOn ? (['bikeNetwork'] as const) : []),
+  ];
+
+  const options: Partial<EmbedOptions> = {
+    sidebarOpen,
+    route: route || undefined,
+    zoom: zoomInRange ? zoomNumber : undefined,
+    layers,
+  };
+
+  const search = buildEmbedSearch(options);
   const iframeSrc = search ? `/embed?${search}` : '/embed';
-  const absoluteSrc = search
-    ? `${baseUrl}/embed?${search}`
-    : `${baseUrl}/embed`;
+  const absoluteSrc = `${baseUrl}${iframeSrc}`;
 
-  const snippet = useMemo(
-    () =>
-      [
-        `<iframe`,
-        `  src="${absoluteSrc}"`,
-        `  title="Bike map"`,
-        `  allow="${IFRAME_ALLOW}"`,
-        `  loading="lazy"`,
-        `  style="${IFRAME_STYLE}"`,
-        `></iframe>`,
-      ].join('\n'),
-    [absoluteSrc],
-  );
+  const snippet = [
+    `<iframe`,
+    `  src="${absoluteSrc}"`,
+    `  title="Bike map"`,
+    `  allow="${IFRAME_ALLOW}"`,
+    `  loading="lazy"`,
+    `  style="${IFRAME_STYLE}"`,
+    `></iframe>`,
+  ].join('\n');
 
-  function toggleLayer(layer: EmbedLayer) {
-    setLayers((prev) =>
-      prev.includes(layer) ? prev.filter((l) => l !== layer) : [...prev, layer],
-    );
-  }
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  // The element's `src` attribute is only ever set once, on first render —
+  // after that the preview navigates itself imperatively (see effect below)
+  // so that changing `src` in place doesn't re-mount the iframe (Issue 1).
+  const initialIframeSrcRef = useRef(iframeSrc);
+  const isFirstRenderRef = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRenderRef.current) {
+      // The initial src is already applied via the element's `src` attribute.
+      isFirstRenderRef.current = false;
+      return;
+    }
+    const timeout = setTimeout(() => {
+      const iframe = iframeRef.current;
+      if (!iframe) return;
+      try {
+        // `location.replace` (vs. assigning `src`) doesn't push a history
+        // entry on the parent page. Same-origin here, so this should always
+        // succeed, but fall back defensively if it doesn't.
+        const win = iframe.contentWindow;
+        if (!win) throw new Error('iframe has no contentWindow');
+        win.location.replace(iframeSrc);
+      } catch {
+        iframe.src = iframeSrc;
+      }
+    }, PREVIEW_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [iframeSrc]);
 
   async function handleCopy() {
     try {
@@ -128,30 +163,55 @@ export function EmbedSnippetBuilder({
                 className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
                 value={zoomInput}
                 onChange={(e) => setZoomInput(e.target.value)}
+                aria-invalid={showZoomError}
               />
+              {showZoomError && (
+                <span className="text-xs font-normal text-red-600">
+                  Zoom must be between 0 and 24
+                </span>
+              )}
             </label>
           </div>
 
           <fieldset className="mt-4">
             <legend className="text-sm font-medium text-gray-700">
-              Layers on at load
+              Markers
             </legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {EMBED_LAYERS.map((layer) => (
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  name="marker-layer"
+                  checked={markerLayer === ''}
+                  onChange={() => setMarkerLayer('')}
+                />
+                None
+              </label>
+              {MARKER_LAYERS.map((layer) => (
                 <label
                   key={layer}
                   className="flex items-center gap-2 text-sm text-gray-700"
                 >
                   <input
-                    type="checkbox"
-                    checked={layers.includes(layer)}
-                    onChange={() => toggleLayer(layer)}
+                    type="radio"
+                    name="marker-layer"
+                    checked={markerLayer === layer}
+                    onChange={() => setMarkerLayer(layer)}
                   />
                   {LAYER_LABELS[layer]}
                 </label>
               ))}
             </div>
           </fieldset>
+
+          <label className="mt-4 flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={bikeNetworkOn}
+              onChange={() => setBikeNetworkOn((prev) => !prev)}
+            />
+            {LAYER_LABELS.bikeNetwork}
+          </label>
 
           <div className="mt-6">
             <div className="mb-1 flex items-center justify-between">
@@ -182,8 +242,8 @@ export function EmbedSnippetBuilder({
             Live preview
           </span>
           <iframe
-            key={iframeSrc}
-            src={iframeSrc}
+            ref={iframeRef}
+            src={initialIframeSrcRef.current}
             title="Bike map"
             allow={IFRAME_ALLOW}
             loading="lazy"
@@ -241,7 +301,8 @@ const PARAM_REFERENCE: {
   { param: 'zoom', values: '0–24', defaultValue: 'city default' },
   {
     param: 'layers',
-    values: 'comma list: attractions, bikeResources, bikeRentals, bikeNetwork',
+    values:
+      'comma list: at most one of attractions, bikeResources, bikeRentals — plus bikeNetwork',
     defaultValue: 'none',
   },
 ];

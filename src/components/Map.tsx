@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import mapboxgl from 'mapbox-gl';
 import { MapLegendProvider } from '@/components/MapLegend';
-import { RidesPanel } from '@/components/RidesPanel';
 import { EmbedAttribution } from '@/components/EmbedAttribution';
 import { useEmbed } from '@/components/EmbedContext';
+
 import {
   bikeRoutes,
   mapFeatures,
@@ -64,7 +65,16 @@ import {
 import { loadRide } from '@/utils/ride-storage';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
+import { clearMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
+
+// Ride recording is unreachable in embed mode, and its subtree (history, GPX,
+// ride stats and storage) is a sizeable chunk to make a partner's page
+// download. Loading it lazily keeps it out of the /embed request entirely.
+const RidesPanel = dynamic(
+  () => import('@/components/RidesPanel').then((m) => m.RidesPanel),
+  { ssr: false },
+);
 
 // Recenter pause durations: how long to suppress auto-centering after
 // programmatic fly-to animations vs user gestures (drag, zoom, scroll).
@@ -82,7 +92,11 @@ if (!mapConfig.mapbox.accessToken) {
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
-  const { options: embedOptions } = useEmbed();
+  const { isEmbed, options: embedOptions } = useEmbed();
+  // Embed mode is fixed for the lifetime of the tree, but the init effect runs
+  // once on mount and must not list it as a dependency.
+  const isEmbedRef = useRef(isEmbed);
+  isEmbedRef.current = isEmbed;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
@@ -484,6 +498,24 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
+    // Showing a marker group dims the routes underneath it. Do this up front,
+    // before the bikeRentals branch below suspends on its GBFS fetch: running
+    // it afterwards would deselect a route the user (or a `?route=` deep link)
+    // selected while that request was in flight.
+    if (
+      layer === 'attractions' ||
+      layer === 'bikeResources' ||
+      layer === 'bikeRentals'
+    ) {
+      const opacity = visible
+        ? { selected: 0.1, unselected: 0.1 }
+        : { selected: 1, unselected: 1 };
+      updateRouteOpacity(map.current, bikeRoutes, null, opacity);
+      if (visible) {
+        window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
+      }
+    }
+
     if (layer === 'bikeRentals') {
       bikeRentalsVisibleRef.current = visible;
       setShowBikeRentals(visible);
@@ -563,28 +595,32 @@ const MapboxMap = memo(function MapboxMap() {
 
     if (layer === 'bikeNetwork') {
       bikeNetworkVisibleRef.current = visible;
+      // Capture into a local so the narrowing survives into the closure below
+      // (an imported binding isn't narrowable across a function boundary).
+      const networkUrl = bikeNetworkUrl;
+      if (!networkUrl) return;
+
       // Lazy-attach the (multi-MB) network GeoJSON on first enable rather than
-      // at startup, so users who never open it don't pay the download. If the
-      // style isn't loaded yet, the ref alone suffices — the style.load handler
-      // replays it. ensureBikeNetworkSource is idempotent.
-      if (bikeNetworkUrl && map.current.isStyleLoaded()) {
-        if (visible) ensureBikeNetworkSource(map.current, bikeNetworkUrl);
+      // at startup, so users who never open it don't pay the download.
+      // ensureBikeNetworkSource is idempotent.
+      const applyBikeNetwork = () => {
+        if (!map.current) return;
+        // The desired state may have flipped while we waited.
+        if (bikeNetworkVisibleRef.current !== visible) return;
+        if (visible) ensureBikeNetworkSource(map.current, networkUrl);
         setBikeNetworkVisible(map.current, visible);
+      };
+
+      // The style may still be loading — MAP_READY fires right after a burst of
+      // addSource/addLayer calls, which is exactly when an embed's `?layers=`
+      // preset arrives. The style.load replay ran before that, so without this
+      // retry the toggle would be silently dropped.
+      if (map.current.isStyleLoaded()) {
+        applyBikeNetwork();
+      } else {
+        map.current.once('idle', applyBikeNetwork);
       }
       return;
-    }
-
-    if (visible) {
-      updateRouteOpacity(map.current, bikeRoutes, null, {
-        selected: 0.1,
-        unselected: 0.1,
-      });
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-    } else {
-      updateRouteOpacity(map.current, bikeRoutes, null, {
-        selected: 1,
-        unselected: 1,
-      });
     }
   }, []);
 
@@ -1025,23 +1061,34 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
-          // Initialize all mountain bike trail layers. The MTB tileset
-          // isn't included in the Mapbox Studio style, so attach it first.
-          ensureMtnBikeSource(newMap);
-          initMtnBikeColors(newMap);
-          initMtnBikeLayers(newMap);
+          // Embed mode is Casual-only: the MTB tab is hidden, so attaching the
+          // trail tilesets would cost the partner's page two extra vector
+          // sources and their tile traffic on the critical path to MAP_READY,
+          // and would leave trail lines clickable with no UI to show the
+          // result. Skip the whole stack there.
+          const showTrails = !isEmbedRef.current;
+
+          if (showTrails) {
+            // Initialize all mountain bike trail layers. The MTB tileset
+            // isn't included in the Mapbox Studio style, so attach it first.
+            ensureMtnBikeSource(newMap);
+            initMtnBikeColors(newMap);
+            initMtnBikeLayers(newMap);
+          }
 
           // Suppress orphan trail layers baked into the Studio style (e.g. the
           // leftover TPL trails layer) so they don't render over our routes.
           hideStrayStyleLayers(newMap);
 
-          // Attach the nationwide OSM bike-trails layer (hidden until toggled).
-          // Its click handler is registered later, after the curated route/MTB
-          // hit handlers, so curated trails win clicks in overlapping areas.
-          // Replay any toggle the user flipped before the style finished loading.
-          ensureOsmTrailsSource(newMap);
-          if (osmTrailsVisibleRef.current) {
-            setOsmTrailsVisible(newMap, true);
+          if (showTrails) {
+            // Attach the nationwide OSM bike-trails layer (hidden until toggled).
+            // Its click handler is registered later, after the curated route/MTB
+            // hit handlers, so curated trails win clicks in overlapping areas.
+            // Replay any toggle the user flipped before the style finished loading.
+            ensureOsmTrailsSource(newMap);
+            if (osmTrailsVisibleRef.current) {
+              setOsmTrailsVisible(newMap, true);
+            }
           }
 
           // The classified bike-network overlay (Casual mode) is lazy-attached
@@ -1051,13 +1098,15 @@ const MapboxMap = memo(function MapboxMap() {
             ensureBikeNetworkSource(newMap, bikeNetworkUrl);
             setBikeNetworkVisible(newMap, true);
           }
-          initTrailBoundsFromDefaults(mountainBikeTrails);
+          if (showTrails) {
+            initTrailBoundsFromDefaults(mountainBikeTrails);
 
-          // Apply unselected defaults (opacity/width) through the shared
-          // helper so deselect and init stay in sync — see updateMtnBikeOpacity.
-          updateMtnBikeOpacity(newMap, null);
+            // Apply unselected defaults (opacity/width) through the shared
+            // helper so deselect and init stay in sync — see updateMtnBikeOpacity.
+            updateMtnBikeOpacity(newMap, null);
+          }
 
-          for (const cfg of TRAIL_LAYERS) {
+          for (const cfg of showTrails ? TRAIL_LAYERS : []) {
             if (!newMap.getLayer(cfg.layerId)) continue;
 
             // Click handler on hit-test layer for easier tapping
@@ -1099,7 +1148,9 @@ const MapboxMap = memo(function MapboxMap() {
           // then bails on the already-handled click. Clear any prior registration
           // first in case the style reloads and re-runs this block.
           osmSelectionCleanup.current?.();
-          osmSelectionCleanup.current = registerOsmTrailSelection(newMap);
+          if (showTrails) {
+            osmSelectionCleanup.current = registerOsmTrailSelection(newMap);
+          }
 
           // Click on empty map area deselects routes and trails.
           // Check originalEvent.target to ignore ghost clicks that land on
@@ -1186,10 +1237,9 @@ const MapboxMap = memo(function MapboxMap() {
           });
 
           // Signal that the map is fully initialized and ready for events.
-          // Set a flag first so late listeners (e.g. page.tsx useEffect that
-          // registers after this fires) can detect they missed the event.
-          (window as unknown as Record<string, boolean>).__mapReady = true;
-          window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
+          // Sets a flag first so late listeners (which registered after this
+          // fires) can detect they missed the event — see utils/map-ready.
+          setMapReady();
         } catch (error) {
           console.error('Error initializing map:', error);
         }
@@ -1233,6 +1283,12 @@ const MapboxMap = memo(function MapboxMap() {
         map.current.remove();
         map.current = null;
       }
+
+      // The flag describes this map instance. Leaving it set would make
+      // listeners on a remounted tree (Strict Mode, Fast Refresh) dispatch
+      // immediately against a map that no longer exists, skipping the
+      // MAP_READY listener that would have recovered them.
+      clearMapReady();
     };
     // embedOptions is read only for its value at mount time (the initial
     // center/zoom); this effect must still only run once on mount.
