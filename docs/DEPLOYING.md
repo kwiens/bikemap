@@ -77,7 +77,7 @@ contract of `BikeRoute`, `MountainBikeTrail`, `BikeResource`, `MapFeature`, and
   `src/data/mountain-bike-trails.ts`. The app attaches this tileset at runtime
   (`ensureMtnBikeSource`), so it does not need to be in the Studio style.
   Each `MountainBikeTrail.trailName` must match the tileset's `Trail` feature
-  property. See `CLAUDE.md` for DevTools snippets to discover layer/tileset
+  property. See `AGENTS.md` for DevTools snippets to discover layer/tileset
   names after a GIS re-upload.
   - **Keep the elevation script in sync:** `scripts/add_trail_elevation.py`
     has its own `MVT_TILESET` constant. If you use the pipeline in step 7,
