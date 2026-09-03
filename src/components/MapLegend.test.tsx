@@ -2,6 +2,9 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MapLegendProvider } from './MapLegend';
+import { EmbedProvider } from './EmbedContext';
+import { DEFAULT_EMBED_OPTIONS, type EmbedOptions } from '@/utils/embed';
+import { siteConfig } from '@/config/site.config';
 import { MAP_EVENTS } from '@/events';
 import { dispatch } from '@/test/fixtures';
 
@@ -62,6 +65,22 @@ vi.mock('./sidebar', () => ({
   BikeResourcesList: () => <div data-testid="bike-resources" />,
   BikeRentalList: () => <div data-testid="bike-rentals" />,
   InformationSection: () => <div data-testid="info" />,
+  BikeNetworkLayer: ({
+    isActive,
+    onToggle,
+  }: {
+    isActive: boolean;
+    onToggle: () => void;
+  }) => (
+    <button
+      type="button"
+      onClick={onToggle}
+      data-testid="bike-network"
+      data-active={isActive}
+    >
+      Bike Network
+    </button>
+  ),
 }));
 
 vi.mock('./styles', () => ({
@@ -302,5 +321,116 @@ describe('MapLegendProvider', () => {
     );
     expect(toggle).toBeDefined();
     expect((toggle?.detail as { visible: boolean }).visible).toBe(true);
+  });
+});
+
+describe('embed mode', () => {
+  const events: Array<{ type: string; detail: unknown }> = [];
+  let handler: (e: Event) => void;
+
+  function renderEmbed(options: Partial<EmbedOptions> = {}) {
+    const merged: EmbedOptions = { ...DEFAULT_EMBED_OPTIONS, ...options };
+    return render(
+      <EmbedProvider options={merged}>
+        <MapLegendProvider>
+          <div />
+        </MapLegendProvider>
+      </EmbedProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    mockRideStyle = null;
+    // Clear cookies so no setting leaks in (and so we can assert none appear)
+    document.cookie.split(';').forEach((c) => {
+      const name = c.split('=')[0].trim();
+      document.cookie = `${name}=; max-age=0; path=/`;
+    });
+    delete (window as unknown as { __mapReady?: boolean }).__mapReady;
+    events.length = 0;
+    handler = (e: Event) => {
+      events.push({ type: e.type, detail: (e as CustomEvent).detail });
+    };
+    for (const key of Object.values(MAP_EVENTS)) {
+      window.addEventListener(key, handler);
+    }
+  });
+
+  afterEach(() => {
+    for (const key of Object.values(MAP_EVENTS)) {
+      window.removeEventListener(key, handler);
+    }
+    delete (window as unknown as { __mapReady?: boolean }).__mapReady;
+  });
+
+  it('is Casual-only: no MTB pill, routes section renders, trails does not', () => {
+    const { container } = renderEmbed();
+
+    expect(screen.queryByText('MTB')).not.toBeInTheDocument();
+    expect(screen.queryByText('Casual')).not.toBeInTheDocument();
+    expect(screen.getByTestId('bike-routes')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mountain-bike-trails'),
+    ).not.toBeInTheDocument();
+    // No Information section in embed mode
+    expect(screen.queryByTestId('info')).not.toBeInTheDocument();
+    // Compact header label instead of the pill
+    expect(container.textContent).toContain(siteConfig.name);
+  });
+
+  it('sidebar starts closed (-translate-x-full) when sidebarOpen is false', () => {
+    const { container } = renderEmbed({ sidebarOpen: false });
+    expect(
+      container.querySelector('[class*="-translate-x-full"]'),
+    ).not.toBeNull();
+    expect(container.querySelector('[class*="translate-x-0"]')).toBeNull();
+  });
+
+  it('sidebar starts open (translate-x-0) when sidebarOpen is true', () => {
+    const { container } = renderEmbed({ sidebarOpen: true });
+    expect(container.querySelector('[class*="translate-x-0"]')).not.toBeNull();
+  });
+
+  it('does not write the settings cookie when the sidebar is toggled', () => {
+    const { container } = renderEmbed({ sidebarOpen: false });
+    const toggleBtn = container.querySelector(
+      '.toggle-btn',
+    ) as HTMLButtonElement;
+    expect(toggleBtn).toBeTruthy();
+
+    fireEvent.click(toggleBtn);
+    fireEvent.click(toggleBtn);
+
+    expect(document.cookie).not.toContain('-settings=');
+  });
+
+  it('dispatches LAYER_TOGGLE for preset layers on mount when the map is ready', () => {
+    (window as unknown as { __mapReady?: boolean }).__mapReady = true;
+
+    renderEmbed({ layers: ['attractions'] });
+
+    const toggleEvents = events.filter(
+      (e) => e.type === MAP_EVENTS.LAYER_TOGGLE,
+    );
+    expect(toggleEvents).toContainEqual({
+      type: MAP_EVENTS.LAYER_TOGGLE,
+      detail: { layer: 'attractions', visible: true },
+    });
+  });
+
+  it('waits for MAP_READY before dispatching preset layers when the map is not ready yet', () => {
+    renderEmbed({ layers: ['bikeResources'] });
+
+    expect(events.some((e) => e.type === MAP_EVENTS.LAYER_TOGGLE)).toBe(false);
+
+    dispatch(MAP_EVENTS.MAP_READY);
+
+    const toggleEvents = events.filter(
+      (e) => e.type === MAP_EVENTS.LAYER_TOGGLE,
+    );
+    expect(toggleEvents).toContainEqual({
+      type: MAP_EVENTS.LAYER_TOGGLE,
+      detail: { layer: 'bikeResources', visible: true },
+    });
   });
 });

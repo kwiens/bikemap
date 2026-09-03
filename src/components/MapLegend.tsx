@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MAP_EVENTS } from '@/events';
+import { onMapReady } from '@/utils/map-ready';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTimes,
@@ -27,6 +28,9 @@ import { getSetting, setSetting } from '@/utils/settings';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
 import { cn } from '@/lib/utils';
 import { mapConfig } from '@/config/map.config';
+import { siteConfig } from '@/config/site.config';
+import { useEmbed } from '@/components/EmbedContext';
+import type { EmbedLayer } from '@/utils/embed';
 import {
   bikeNetworkUrl,
   bikeResources,
@@ -44,12 +48,16 @@ const hasCuratedTrails = mountainBikeTrails.length > 0;
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
+  const { isEmbed, options: embedOptions } = useEmbed();
   // Track state in this parent component
-  const [isOpen, setIsOpen] = useState(() => getSetting('sidebarOpen') ?? true);
+  const [isOpen, setIsOpen] = useState(() =>
+    isEmbed ? embedOptions.sidebarOpen : (getSetting('sidebarOpen') ?? true),
+  );
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
     () => {
+      if (isEmbed) return 'routes';
       const saved = getSetting('activeTab');
       if (saved === 'routes' && hasRoutesSection) return saved;
       if (saved === 'trails') return saved;
@@ -57,11 +65,16 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       return hasRoutesSection ? 'routes' : 'trails';
     },
   );
+  // Embed mode is Casual-only — no MTB tab, so tab switching is a no-op.
   const switchTab = (tab: 'routes' | 'trails') => {
+    if (isEmbed) return;
     if (tab === 'routes' && !hasRoutesSection) return;
     setActiveSection(tab);
     setSetting('activeTab', tab);
   };
+  // What section actually renders — embed mode always shows Casual/routes
+  // regardless of activeSection (kept only so non-embed logic is untouched).
+  const visibleSection = isEmbed ? 'routes' : activeSection;
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
@@ -77,13 +90,14 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const toggle = useCallback(() => {
     const next = !isOpenRef.current;
     setIsOpen(next);
-    setSetting('sidebarOpen', next);
+    // Third-party frames drop this cookie anyway (no SameSite=None) — skip it.
+    if (!isEmbed) setSetting('sidebarOpen', next);
     window.dispatchEvent(
       new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
         detail: { isOpen: next },
       }),
     );
-  }, []);
+  }, [isEmbed]);
 
   // Handle clicks/taps outside the sidebar (mobile only)
   useEffect(() => {
@@ -146,6 +160,9 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
     return () =>
       window.removeEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
+    // switchTab is a plain (non-memoized) function redefined every render;
+    // this listener wiring must run exactly once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Function to handle route selection
@@ -286,6 +303,61 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     );
   }, [showBikeNetwork]);
 
+  // Embed layer presets: turn on whatever layers the host page requested via
+  // `?layers=...`, once, on mount. Sidebar `show*` state flips immediately;
+  // the map only picks up LAYER_TOGGLE once it's ready.
+  //
+  // The sidebar is interactive from first paint but a Mapbox boot can take
+  // seconds on a partner's page, so the deferred dispatch reads the CURRENT
+  // state rather than replaying the URL: otherwise a layer the visitor
+  // switched off while the map was still loading would switch itself back on,
+  // leaving the sidebar and the map disagreeing.
+  const presetLayersRef = useRef({
+    attractions: false,
+    bikeResources: false,
+    bikeRentals: false,
+    bikeNetwork: false,
+  });
+  presetLayersRef.current = {
+    attractions: showAttractions,
+    bikeResources: showBikeResources,
+    bikeRentals: showBikeRentals,
+    bikeNetwork: showBikeNetwork,
+  };
+
+  useEffect(() => {
+    if (!isEmbed || embedOptions.layers.length === 0) return;
+
+    const setterMap: Record<EmbedLayer, () => void> = {
+      attractions: () => setShowAttractions(true),
+      bikeResources: () => setShowBikeResources(true),
+      bikeRentals: () => setShowBikeRentals(true),
+      bikeNetwork: () => setShowBikeNetwork(true),
+    };
+    for (const layer of embedOptions.layers) {
+      setterMap[layer]();
+      // Seed the ref too: when the map is already ready, onMapReady dispatches
+      // synchronously below — before React has re-rendered with the state we
+      // just queued, so the ref would still read false.
+      presetLayersRef.current[layer] = true;
+    }
+
+    const dispatchLayers = () => {
+      for (const layer of embedOptions.layers) {
+        const visible = presetLayersRef.current[layer];
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+            detail: { layer, visible },
+          }),
+        );
+      }
+    };
+
+    return onMapReady(dispatchLayers);
+    // Runs once on mount only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Function to center map on a specific location
   const centerOnLocation = useCallback(
     (location: LocationProps) => {
@@ -392,41 +464,50 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        {/* Casual / MTB toggle in header */}
-        <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
-          <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
-            {hasRoutesSection && (
+        {isEmbed ? (
+          /* Embed mode is Casual-only — a compact label instead of the pill */
+          <div className="flex items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
+            <span className="text-sm font-medium text-gray-700">
+              {siteConfig.name}
+            </span>
+          </div>
+        ) : (
+          /* Casual / MTB toggle in header */
+          <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
+            <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
+              {hasRoutesSection && (
+                <button
+                  type="button"
+                  className={cn(
+                    'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
+                    activeSection === 'routes'
+                      ? 'bg-white text-gray-800 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700',
+                  )}
+                  onClick={() => switchTab('routes')}
+                >
+                  Casual
+                </button>
+              )}
               <button
                 type="button"
                 className={cn(
                   'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
-                  activeSection === 'routes'
+                  activeSection === 'trails'
                     ? 'bg-white text-gray-800 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700',
                 )}
-                onClick={() => switchTab('routes')}
+                onClick={() => switchTab('trails')}
               >
-                Casual
+                MTB
               </button>
-            )}
-            <button
-              type="button"
-              className={cn(
-                'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
-                activeSection === 'trails'
-                  ? 'bg-white text-gray-800 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
-              )}
-              onClick={() => switchTab('trails')}
-            >
-              MTB
-            </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="overflow-y-auto flex-1 min-h-0">
           <div className="px-4 pb-4 pt-2">
-            {activeSection === 'routes' && (
+            {visibleSection === 'routes' && (
               <>
                 <BikeRoutes
                   selectedRoute={selectedRoute}
@@ -466,7 +547,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
               </>
             )}
 
-            {activeSection === 'trails' && (
+            {visibleSection === 'trails' && (
               <>
                 <MapLayersSection>
                   <ToggleRow
@@ -487,7 +568,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
               </>
             )}
 
-            <InformationSection />
+            {!isEmbed && <InformationSection />}
           </div>
         </div>
       </div>
