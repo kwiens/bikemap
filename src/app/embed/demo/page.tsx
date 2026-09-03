@@ -3,6 +3,7 @@ import type { ReactElement } from 'react';
 import { siteConfigForHostname } from '@/config/site.config';
 import { getRequestHostname } from '@/utils/request-hostname';
 import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
+import { embedBuilderConfig } from '@/utils/embed-options';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -11,7 +12,9 @@ export const metadata: Metadata = {
 // A mock third-party site showing the embed working in context, plus a
 // snippet builder partners can use to grab their own copy-paste embed code.
 export default async function EmbedDemoPage(): Promise<ReactElement> {
-  const config = siteConfigForHostname(await getRequestHostname());
+  const hostname = await getRequestHostname();
+  const config = siteConfigForHostname(hostname);
+  const builderConfig = embedBuilderConfig(hostname);
 
   return (
     <div className="min-h-screen bg-white text-gray-800">
@@ -48,7 +51,7 @@ export default async function EmbedDemoPage(): Promise<ReactElement> {
           <p className="mt-1 mb-4 text-sm text-gray-600">
             Customize the options below, then copy the snippet into your page.
           </p>
-          <EmbedSnippetBuilder baseUrl={config.url} />
+          <EmbedSnippetBuilder baseUrl={config.url} config={builderConfig} />
         </div>
       </main>
     </div>

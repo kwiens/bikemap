@@ -305,8 +305,26 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
   // Embed layer presets: turn on whatever layers the host page requested via
   // `?layers=...`, once, on mount. Sidebar `show*` state flips immediately;
-  // the map only picks up LAYER_TOGGLE once it's ready (mirrors the
-  // trail/route auto-select pattern in src/app/page.tsx).
+  // the map only picks up LAYER_TOGGLE once it's ready.
+  //
+  // The sidebar is interactive from first paint but a Mapbox boot can take
+  // seconds on a partner's page, so the deferred dispatch reads the CURRENT
+  // state rather than replaying the URL: otherwise a layer the visitor
+  // switched off while the map was still loading would switch itself back on,
+  // leaving the sidebar and the map disagreeing.
+  const presetLayersRef = useRef({
+    attractions: false,
+    bikeResources: false,
+    bikeRentals: false,
+    bikeNetwork: false,
+  });
+  presetLayersRef.current = {
+    attractions: showAttractions,
+    bikeResources: showBikeResources,
+    bikeRentals: showBikeRentals,
+    bikeNetwork: showBikeNetwork,
+  };
+
   useEffect(() => {
     if (!isEmbed || embedOptions.layers.length === 0) return;
 
@@ -318,13 +336,18 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     };
     for (const layer of embedOptions.layers) {
       setterMap[layer]();
+      // Seed the ref too: when the map is already ready, onMapReady dispatches
+      // synchronously below — before React has re-rendered with the state we
+      // just queued, so the ref would still read false.
+      presetLayersRef.current[layer] = true;
     }
 
     const dispatchLayers = () => {
       for (const layer of embedOptions.layers) {
+        const visible = presetLayersRef.current[layer];
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-            detail: { layer, visible: true },
+            detail: { layer, visible },
           }),
         );
       }

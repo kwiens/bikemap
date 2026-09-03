@@ -90,7 +90,10 @@ describe('buildFrameAncestors', () => {
 describe('embedHeaders', () => {
   it('emits two mutually exclusive rules', () => {
     const headers = embedHeaders(undefined);
-    expect(headers.map((h) => h.source)).toEqual(['/embed', '/((?!embed$).*)']);
+    expect(headers.map((h) => h.source)).toEqual([
+      '/embed',
+      '/((?!embed(?:/)?$).*)',
+    ]);
     for (const rule of headers) {
       expect(rule.headers).toHaveLength(1);
       expect(rule.headers[0].key).toBe('Content-Security-Policy');
@@ -156,9 +159,16 @@ describe('header source patterns (compiled with Next path matching)', () => {
       '/',
       '/about',
       '/embed',
+      // A trailing slash is a common hand-edit in a partner's snippet. Next
+      // compiles `/embed` with an optional trailing slash, so this used to
+      // match both rules and the browser intersected them down to 'self',
+      // blanking the frame.
+      '/embed/',
       '/embed/demo',
       '/embedded-help',
+      '/embeds',
       '/export',
+      '/sw.js',
     ]) {
       const matches = [embedRe.test(path), catchAllRe.test(path)].filter(
         Boolean,

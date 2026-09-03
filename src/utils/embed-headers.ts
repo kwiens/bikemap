@@ -74,6 +74,11 @@ interface HeaderConfig {
  *   anchored with `$` so it excludes exactly `/embed`: `/embed/demo` and a
  *   future `/embedded-guide` both keep the protection.
  *
+ * The lookahead also has to allow for a trailing slash. Next compiles `/embed`
+ * with an optional trailing `/`, so without the `/?` here `/embed/` matched
+ * BOTH rules — and since browsers intersect multiple CSP headers, the strict
+ * one won and a partner using `src=".../embed/?route=..."` got a blank frame.
+ *
  * @param allowedOrigins - Space-separated origins from `EMBED_ALLOWED_ORIGINS`
  */
 export function embedHeaders(
@@ -87,7 +92,7 @@ export function embedHeaders(
       headers: [{ key: 'Content-Security-Policy', value: embedDirective }],
     },
     {
-      source: '/((?!embed$).*)',
+      source: '/((?!embed(?:/)?$).*)',
       headers: [
         { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
       ],

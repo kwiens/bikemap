@@ -42,6 +42,21 @@ describe('parseEmbedOptions', () => {
     expect(parseEmbedOptions('zoom=x').zoom).toBeUndefined();
   });
 
+  it('rejects non-decimal numeric literals that Number() would accept', () => {
+    // Number('0x2d') === 45 and Number('0x1e') === 30 — both finite and in
+    // range, so without an explicit format check this lands in the Adriatic.
+    expect(parseEmbedOptions('center=0x2d,0x1e').center).toBeUndefined();
+    expect(parseEmbedOptions('center=0b101,0o17').center).toBeUndefined();
+    expect(parseEmbedOptions('center=Infinity,0').center).toBeUndefined();
+    expect(parseEmbedOptions('zoom=0x10').zoom).toBeUndefined();
+    // Ordinary decimal forms must still parse.
+    expect(parseEmbedOptions('center=-85.309,35.046').center).toEqual([
+      -85.309, 35.046,
+    ]);
+    expect(parseEmbedOptions('center=+1.5,-2').center).toEqual([1.5, -2]);
+    expect(parseEmbedOptions('zoom=13.5').zoom).toBe(13.5);
+  });
+
   it('rejects empty or whitespace-only center components without treating them as 0', () => {
     expect(parseEmbedOptions('center=,').center).toBeUndefined();
     expect(parseEmbedOptions('center=1,').center).toBeUndefined();

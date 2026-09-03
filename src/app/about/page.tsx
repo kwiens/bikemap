@@ -5,6 +5,7 @@ import { mapConfigForHostname } from '@/config/map.config';
 import { getRequestHostname } from '@/utils/request-hostname';
 import { siteConfigForHostname } from '@/config/site.config';
 import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
+import { embedBuilderConfig } from '@/utils/embed-options';
 import {
   ArrowLeft,
   MessageCircle,
@@ -78,6 +79,7 @@ export default async function AboutPage() {
   const region = mapConfig.region.displayName;
   const showBikeChattAssets = siteConfig.cityId === 'chattanooga';
   const isBend = siteConfig.cityId === 'bend';
+  const builderConfig = embedBuilderConfig(hostname);
 
   return (
     <div className="min-h-screen bg-gray-50 fixed inset-0 overflow-y-auto z-[9999]">
@@ -231,7 +233,10 @@ export default async function AboutPage() {
             or API key needed. The preview is the real thing, so what you see is
             what your visitors get.
           </p>
-          <EmbedSnippetBuilder baseUrl={siteConfig.url} />
+          <EmbedSnippetBuilder
+            baseUrl={siteConfig.url}
+            config={builderConfig}
+          />
         </section>
 
         {/* Data & credits */}

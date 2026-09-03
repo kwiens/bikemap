@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactElement } from 'react';
-import { bikeRoutes } from '@/data/geo_data';
-import { slugify } from '@/utils/string';
+import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import {
-  MARKER_LAYERS,
   buildEmbedSearch,
   parseCenter,
+  parseZoom,
   type EmbedLayer,
   type EmbedOptions,
 } from '@/utils/embed';
+import type { EmbedBuilderConfig } from '@/utils/embed-options';
 import { cn } from '@/lib/utils';
 
 const IFRAME_ALLOW =
@@ -25,11 +24,19 @@ const PREVIEW_DEBOUNCE_MS = 500;
 export interface EmbedSnippetBuilderProps {
   /** Absolute origin used in the copy-paste snippet, e.g. https://bikechatt.com */
   baseUrl: string;
+  /** Routes and layers for the city being served — resolved on the server from
+   *  the request hostname, so this works on a multi-domain deployment. */
+  config: EmbedBuilderConfig;
 }
 
 export function EmbedSnippetBuilder({
   baseUrl,
+  config,
 }: EmbedSnippetBuilderProps): ReactElement {
+  const { routes, availableLayers } = config;
+  const fieldId = useId();
+  const markerLayers = availableLayers.filter((l) => l !== 'bikeNetwork');
+  const hasBikeNetwork = availableLayers.includes('bikeNetwork');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [route, setRoute] = useState('');
   const [markerLayer, setMarkerLayer] = useState<EmbedLayer | ''>('');
@@ -45,13 +52,9 @@ export function EmbedSnippetBuilder({
   const showCenterError = centerTrimmed !== '' && center === undefined;
 
   const zoomTrimmed = zoomInput.trim();
-  const zoomNumber = zoomTrimmed === '' ? undefined : Number(zoomTrimmed);
-  // A transient empty string or a lone "-" parses to undefined/NaN — neither
-  // is "finite", so it's treated as mid-edit rather than an invalid value.
-  const zoomIsFiniteNumber =
-    zoomNumber !== undefined && Number.isFinite(zoomNumber);
-  const zoomInRange = zoomIsFiniteNumber && zoomNumber >= 0 && zoomNumber <= 24;
-  const showZoomError = zoomIsFiniteNumber && !zoomInRange;
+  // Same parser the embed uses, so the form can't accept a zoom the map drops.
+  const zoom = zoomTrimmed === '' ? undefined : parseZoom(zoomTrimmed);
+  const showZoomError = zoomTrimmed !== '' && zoom === undefined;
 
   const layers: EmbedLayer[] = [
     ...(markerLayer ? [markerLayer] : []),
@@ -62,7 +65,7 @@ export function EmbedSnippetBuilder({
     sidebarOpen,
     route: route || undefined,
     center,
-    zoom: zoomInRange ? zoomNumber : undefined,
+    zoom,
     layers,
   };
 
@@ -81,40 +84,50 @@ export function EmbedSnippetBuilder({
   ].join('\n');
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  // The element's `src` attribute is only ever set once, on first render —
-  // after that the preview navigates itself imperatively (see effect below)
-  // so that changing `src` in place doesn't re-mount the iframe (Issue 1).
-  const initialIframeSrcRef = useRef(iframeSrc);
-  const isFirstRenderRef = useRef(true);
+  // The preview boots a real Mapbox map, which is a billed map load. The
+  // builder now sits on the public About page, so it stays off until asked
+  // for rather than costing every visitor one. (`loading="lazy"` did not help:
+  // Chromium's lazy-frame threshold is thousands of pixels, so the preview
+  // loaded on first paint anyway.)
+  const [previewOn, setPreviewOn] = useState(false);
+  // What the frame is actually showing, so a debounced edit that lands back on
+  // the current URL doesn't re-boot the map for nothing.
+  const loadedSrcRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (isFirstRenderRef.current) {
-      // The initial src is already applied via the element's `src` attribute.
-      isFirstRenderRef.current = false;
-      return;
-    }
+    if (!previewOn) return;
+    if (loadedSrcRef.current === iframeSrc) return;
+
     const timeout = setTimeout(() => {
-      const iframe = iframeRef.current;
-      if (!iframe) return;
-      try {
-        // `location.replace` (vs. assigning `src`) doesn't push a history
-        // entry on the parent page. Same-origin here, so this should always
-        // succeed, but fall back defensively if it doesn't.
-        const win = iframe.contentWindow;
-        if (!win) throw new Error('iframe has no contentWindow');
-        win.location.replace(iframeSrc);
-      } catch {
-        iframe.src = iframeSrc;
-      }
+      const win = iframeRef.current?.contentWindow;
+      if (!win) return;
+      loadedSrcRef.current = iframeSrc;
+      // `location.replace` (vs. assigning `src`) adds no history entry to the
+      // parent page. Same-origin, so it cannot throw.
+      win.location.replace(iframeSrc);
     }, PREVIEW_DEBOUNCE_MS);
     return () => clearTimeout(timeout);
-  }, [iframeSrc]);
+  }, [iframeSrc, previewOn]);
+
+  function showPreview() {
+    loadedSrcRef.current = iframeSrc;
+    setPreviewOn(true);
+  }
+
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    },
+    [],
+  );
 
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(snippet);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+      copyResetRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API unavailable (e.g. insecure context) — silently ignore,
       // the snippet is still selectable/copyable by hand.
@@ -149,17 +162,23 @@ export function EmbedSnippetBuilder({
                 onChange={(e) => setRoute(e.target.value)}
               >
                 <option value="">None</option>
-                {bikeRoutes.map((r) => (
-                  <option key={r.id} value={slugify(r.name)}>
+                {routes.map((r) => (
+                  <option key={r.id} value={r.slug}>
                     {r.name}
                   </option>
                 ))}
               </select>
             </label>
 
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-              Zoom
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={`${fieldId}-zoom`}
+                className="text-sm font-medium text-gray-700"
+              >
+                Zoom
+              </label>
               <input
+                id={`${fieldId}-zoom`}
                 type="number"
                 min={0}
                 max={24}
@@ -169,17 +188,32 @@ export function EmbedSnippetBuilder({
                 value={zoomInput}
                 onChange={(e) => setZoomInput(e.target.value)}
                 aria-invalid={showZoomError}
+                aria-describedby={
+                  showZoomError ? `${fieldId}-zoom-error` : undefined
+                }
               />
+              {/* Outside the <label>: text inside one joins the field's
+                  accessible NAME, so the error would rename the input rather
+                  than describe it. */}
               {showZoomError && (
-                <span className="text-xs font-normal text-red-600">
+                <span
+                  id={`${fieldId}-zoom-error`}
+                  className="text-xs text-red-600"
+                >
                   Zoom must be between 0 and 24
                 </span>
               )}
-            </label>
+            </div>
 
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-              Center
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={`${fieldId}-center`}
+                className="text-sm font-medium text-gray-700"
+              >
+                Center
+              </label>
               <input
+                id={`${fieldId}-center`}
                 type="text"
                 inputMode="decimal"
                 placeholder="Longitude, latitude"
@@ -187,13 +221,19 @@ export function EmbedSnippetBuilder({
                 value={centerInput}
                 onChange={(e) => setCenterInput(e.target.value)}
                 aria-invalid={showCenterError}
+                aria-describedby={
+                  showCenterError ? `${fieldId}-center-error` : undefined
+                }
               />
               {showCenterError && (
-                <span className="text-xs font-normal text-red-600">
+                <span
+                  id={`${fieldId}-center-error`}
+                  className="text-xs text-red-600"
+                >
                   Use longitude, latitude — e.g. -85.309, 35.046
                 </span>
               )}
-            </label>
+            </div>
           </div>
 
           <fieldset className="mt-4">
@@ -204,20 +244,20 @@ export function EmbedSnippetBuilder({
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="radio"
-                  name="marker-layer"
+                  name={`${fieldId}-marker-layer`}
                   checked={markerLayer === ''}
                   onChange={() => setMarkerLayer('')}
                 />
                 None
               </label>
-              {MARKER_LAYERS.map((layer) => (
+              {markerLayers.map((layer) => (
                 <label
                   key={layer}
                   className="flex items-center gap-2 text-sm text-gray-700"
                 >
                   <input
                     type="radio"
-                    name="marker-layer"
+                    name={`${fieldId}-marker-layer`}
                     checked={markerLayer === layer}
                     onChange={() => setMarkerLayer(layer)}
                   />
@@ -227,14 +267,16 @@ export function EmbedSnippetBuilder({
             </div>
           </fieldset>
 
-          <label className="mt-4 flex items-center gap-2 text-sm font-medium text-gray-700">
-            <input
-              type="checkbox"
-              checked={bikeNetworkOn}
-              onChange={() => setBikeNetworkOn((prev) => !prev)}
-            />
-            {LAYER_LABELS.bikeNetwork}
-          </label>
+          {hasBikeNetwork && (
+            <label className="mt-4 flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={bikeNetworkOn}
+                onChange={() => setBikeNetworkOn((prev) => !prev)}
+              />
+              {LAYER_LABELS.bikeNetwork}
+            </label>
+          )}
 
           <div className="mt-6">
             <div className="mb-1 flex items-center justify-between">
@@ -264,18 +306,41 @@ export function EmbedSnippetBuilder({
           <span className="mb-1 block text-sm font-medium text-gray-700">
             Live preview
           </span>
-          <iframe
-            ref={iframeRef}
-            src={initialIframeSrcRef.current}
-            title="Bike map"
-            allow={IFRAME_ALLOW}
-            loading="lazy"
-            className="aspect-[4/3] w-full rounded-xl border-0"
-          />
+          {previewOn ? (
+            <iframe
+              ref={iframeRef}
+              src={iframeSrc}
+              title="Bike map preview"
+              allow={IFRAME_ALLOW}
+              className="aspect-[4/3] w-full rounded-xl border-0"
+            />
+          ) : (
+            <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white text-center">
+              <p className="px-6 text-sm text-gray-600">
+                The preview loads the real map, exactly as your visitors will
+                see it.
+              </p>
+              <button
+                type="button"
+                onClick={showPreview}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Show live preview
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      <details className="mt-6 border-t border-gray-200 pt-4 text-sm text-gray-600">
+      <p className="mt-6 text-xs text-gray-600">
+        Paste it as-is: the <code className="font-mono">allow</code> attribute
+        is what lets &ldquo;locate me&rdquo; and the compass work inside a
+        frame, and the <code className="font-mono">aspect-ratio</code> style is
+        what gives the frame a height — without it the map collapses to a
+        sliver. Some CMS editors strip both.
+      </p>
+
+      <details className="mt-4 border-t border-gray-200 pt-4 text-sm text-gray-600">
         <summary className="cursor-pointer font-medium text-gray-700">
           Requirements &amp; troubleshooting
         </summary>
@@ -296,6 +361,12 @@ export function EmbedSnippetBuilder({
             web address, so browsers block it from framing any site — the{' '}
             <code className="font-mono">frame-ancestors</code> error you get is
             not a problem with your snippet.
+          </li>
+          <li>
+            If you hand-edit <code className="font-mono">layers</code>, keep at
+            most one of the marker layers — the map shows them one at a time, so
+            a second one is ignored. The bike-network overlay can accompany any
+            of them.
           </li>
           <li>
             Please don&rsquo;t cover the © Mapbox / © OpenStreetMap credit in

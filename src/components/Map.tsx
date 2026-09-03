@@ -124,6 +124,9 @@ const MapboxMap = memo(function MapboxMap() {
   const gpsHeading = useRef<{ heading: number; speed: number } | null>(null);
   const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
+  // Set when init throws or the style errors — a token can be present but
+  // revoked, which `hasMapboxToken` (a build-time constant) cannot detect.
+  const [mapFailed, setMapFailed] = useState(false);
 
   // Track markers for attractions and bike resources
   const attractionMarkers = useRef<MarkerManager>(new MarkerManager());
@@ -547,10 +550,25 @@ const MapboxMap = memo(function MapboxMap() {
   );
 
   // Handle layer toggle events
-  // Handle layer toggle events
   const handleLayerToggle = useCallback(
     async (event: CustomEvent) => {
       const { layer, visible } = event.detail;
+
+      // Record the desired state before the map-exists guard below. These refs
+      // are what style.load replays, so writing them after the bail-out made
+      // that recovery unreachable for the toggles it was meant to catch.
+      if (layer === 'osmTrails') osmTrailsVisibleRef.current = visible;
+      if (layer === 'bikeNetwork') bikeNetworkVisibleRef.current = visible;
+      if (
+        layer === 'attractions' ||
+        layer === 'bikeResources' ||
+        layer === 'bikeRentals'
+      ) {
+        markerLayersVisibleRef.current[
+          layer as keyof typeof markerLayersVisibleRef.current
+        ] = visible;
+        if (layer === 'bikeRentals') bikeRentalsVisibleRef.current = visible;
+      }
 
       if (!map.current) {
         return;
@@ -560,13 +578,11 @@ const MapboxMap = memo(function MapboxMap() {
       // group), so just flip their visibility. Remember the desired state so it
       // can be replayed if the style hadn't finished loading yet.
       if (layer === 'osmTrails') {
-        osmTrailsVisibleRef.current = visible;
         setOsmTrailsVisible(map.current, visible);
         return;
       }
 
       if (layer === 'bikeNetwork') {
-        bikeNetworkVisibleRef.current = visible;
         // Lazy-attach the (multi-MB) network GeoJSON on first enable rather than
         // at startup, so users who never open it don't pay the download. No
         // isStyleLoaded() gate: it reports false during any pending style
@@ -580,16 +596,6 @@ const MapboxMap = memo(function MapboxMap() {
         return;
       }
 
-      if (
-        layer === 'attractions' ||
-        layer === 'bikeResources' ||
-        layer === 'bikeRentals'
-      ) {
-        markerLayersVisibleRef.current[
-          layer as keyof typeof markerLayersVisibleRef.current
-        ] = visible;
-      }
-
       // Compute route dimming from "any marker layer visible" so the result is
       // independent of the order the sidebar dispatches its OFF/ON events.
       // This runs before the bikeRentals GBFS await below on purpose: doing it
@@ -601,8 +607,6 @@ const MapboxMap = memo(function MapboxMap() {
       }
 
       if (layer === 'bikeRentals') {
-        bikeRentalsVisibleRef.current = visible;
-
         if (visible) {
           bikeRentalMarkers.current.hide();
 
@@ -968,11 +972,21 @@ const MapboxMap = memo(function MapboxMap() {
           // Add basic controls
           newMap.addControl(new mapboxgl.NavigationControl());
 
-          // Wait for map to load
-          await new Promise<void>((resolve) => {
-            newMap.on('load', () => {
-              resolve();
-            });
+          // Registered before the load await, not after it: a token that is
+          // present but revoked makes the style request fail, 'load' never
+          // fires, and an error handler installed further down would never be
+          // reached — the map would hang silently with a clean console.
+          newMap.on('error', (event: { error?: Error }) => {
+            console.error('Map error:', event.error);
+          });
+
+          // Wait for the style to load, but give up if it errors so the
+          // fallback can render instead of waiting forever.
+          await new Promise<void>((resolve, reject) => {
+            newMap.on('load', () => resolve());
+            newMap.once('error', (event: { error?: Error }) =>
+              reject(event.error ?? new Error('Mapbox style failed to load')),
+            );
           });
 
           // Find the road-label layer — route lines will be inserted
@@ -1293,17 +1307,17 @@ const MapboxMap = memo(function MapboxMap() {
             }
           });
 
-          // Add error handler
-          newMap.on('error', (event: { error: Error }) => {
-            console.error('Map error:', event.error);
-          });
-
           // Signal that the map is fully initialized and ready for events.
           // Sets a flag first so late listeners (which registered after this
           // fires) can detect they missed the event — see utils/map-ready.
+          // A teardown may have run while this async init was mid-flight
+          // (Strict Mode's double-mount, Fast Refresh). Signalling ready then
+          // would fire onMapReady consumers at a map that no longer exists.
+          if (map.current !== newMap) return;
           setMapReady();
         } catch (error) {
           console.error('Error initializing map:', error);
+          setMapFailed(true);
         }
       };
 
@@ -1350,10 +1364,6 @@ const MapboxMap = memo(function MapboxMap() {
         );
         pendingLocationListener.current = null;
       }
-
-      // Unset the ready flag so a remount (e.g. React StrictMode) can't act on
-      // the removed map instance.
-      (window as unknown as Record<string, boolean>).__mapReady = false;
 
       if (map.current) {
         map.current.remove();
@@ -1645,7 +1655,7 @@ const MapboxMap = memo(function MapboxMap() {
     <>
       <div ref={mapContainer} className="w-full h-full absolute inset-0" />
 
-      {!hasMapboxToken && <MapUnavailable />}
+      {(!hasMapboxToken || mapFailed) && <MapUnavailable />}
 
       <EmbedAttribution />
 
@@ -1731,7 +1741,7 @@ const MapboxMap = memo(function MapboxMap() {
 // looks like our embed is simply broken, with the only clue in their console.
 function MapUnavailable() {
   return (
-    <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-gray-100 p-6">
+    <div className="absolute inset-0 z-[600] flex items-center justify-center bg-gray-100 p-6">
       <div className="max-w-sm text-center">
         <FontAwesomeIcon
           icon={faTriangleExclamation}

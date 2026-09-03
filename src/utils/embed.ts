@@ -118,28 +118,45 @@ export function isEmbedLayer(value: string): value is EmbedLayer {
  * Parse a `lng,lat` pair. Exported so the snippet builder validates exactly
  * what the embed will accept, rather than keeping a second copy of the rules.
  */
+/**
+ * A plain decimal number, optionally signed, with an optional fraction or
+ * exponent. `Number()` alone also accepts `0x2d`, `0b101`, `0o17` and
+ * `Infinity`, so `?center=0x2d,0x1e` would coerce to a perfectly in-range
+ * (45, 30) — a point in the Adriatic — and pass every range check.
+ */
+const DECIMAL_PATTERN = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
+
+function parseDecimal(raw: string): number | undefined {
+  if (!DECIMAL_PATTERN.test(raw)) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
+
 export function parseCenter(raw: string | null): [number, number] | undefined {
   if (!raw) return undefined;
   const trimmedParts = raw.split(',').map((p) => p.trim());
   // Reject empty/whitespace-only components before coercing — Number('')
   // and Number(' ') are 0, which would silently pass as a valid coordinate.
-  if (trimmedParts.length !== 2 || trimmedParts.some((p) => p === '')) {
-    return undefined;
-  }
-  const parts = trimmedParts.map(Number);
-  if (parts.some((n) => !Number.isFinite(n))) return undefined;
-  const [lng, lat] = parts;
+  if (trimmedParts.length !== 2) return undefined;
+  const parts = trimmedParts.map(parseDecimal);
+  if (parts.some((n) => n === undefined)) return undefined;
+  const [lng, lat] = parts as [number, number];
   if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return undefined;
   return [lng, lat];
 }
 
-function parseZoom(raw: string | null): number | undefined {
+/**
+ * Parse a zoom level. Exported alongside `parseCenter` so the snippet builder
+ * applies the same range the embed does, instead of a second copy that can
+ * drift out of step with it.
+ */
+export function parseZoom(raw: string | null): number | undefined {
   // URLSearchParams decodes `+` as a space, so `zoom=+` yields ' ' here —
   // truthy, so it must be checked explicitly (and Number(' ') === 0 would
   // otherwise silently pass as a valid zoom).
-  if (!raw || raw.trim() === '') return undefined;
-  const zoom = Number(raw.trim());
-  if (!Number.isFinite(zoom) || zoom < 0 || zoom > 24) return undefined;
+  if (!raw) return undefined;
+  const zoom = parseDecimal(raw.trim());
+  if (zoom === undefined || zoom < 0 || zoom > 24) return undefined;
   return zoom;
 }
 
