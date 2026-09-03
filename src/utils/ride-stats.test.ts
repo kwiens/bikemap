@@ -9,6 +9,7 @@ import {
   computeBounds,
   computeRideStats,
   rideToElevationProfile,
+  pointsToElevationProfile,
 } from './ride-stats';
 
 function makePoint(overrides?: Partial<RidePoint>): RidePoint {
@@ -109,6 +110,20 @@ describe('computeDistance', () => {
     // Both segments touching the inaccurate point are skipped
     expect(d).toBe(0);
   });
+
+  it('does not bridge an explicit segment break', () => {
+    const points = [
+      makePoint({ lat: 35, lng: -85.3 }),
+      makePoint({ lat: 35.001, lng: -85.3 }),
+      makePoint({ lat: 44, lng: -121.3, segmentStart: true }),
+      makePoint({ lat: 44.001, lng: -121.3 }),
+    ];
+
+    const expected =
+      haversineDistance(35, -85.3, 35.001, -85.3) +
+      haversineDistance(44, -121.3, 44.001, -121.3);
+    expect(computeDistance(points)).toBeCloseTo(expected);
+  });
 });
 
 // --- computeMovingTime ---
@@ -156,6 +171,32 @@ describe('computeMovingTime', () => {
     // Last interval (moving): 1000ms
     expect(moving).toBe(8000 - 1000); // total elapsed minus first timestamp offset
   });
+
+  it('does not count time across a segment break', () => {
+    const points = [
+      makePoint({ timestamp: 1000 }),
+      makePoint({ timestamp: 2000 }),
+      makePoint({ timestamp: 3_602_000, segmentStart: true }),
+      makePoint({ timestamp: 3_603_000 }),
+    ];
+    expect(computeMovingTime(points)).toBe(2000);
+  });
+
+  it('caps gaps and respects breaks for stored points without speed', () => {
+    const points = [
+      { lng: -85.3, lat: 35, altitude: 200, timestamp: 1000 },
+      { lng: -85.3, lat: 35.001, altitude: 200, timestamp: 2000 },
+      {
+        lng: -121.3,
+        lat: 44,
+        altitude: 500,
+        timestamp: 3_602_000,
+        segmentStart: true,
+      },
+      { lng: -121.3, lat: 44.001, altitude: 500, timestamp: 3_603_000 },
+    ];
+    expect(computeMovingTime(points)).toBe(2000);
+  });
 });
 
 // --- computeElevation ---
@@ -164,6 +205,52 @@ describe('computeElevation', () => {
   // Forward-backward EMA smoothing needs ~200+ points to converge,
   // and points must be spaced > ELEVATION_MIN_DISTANCE apart (~15m).
   // At 0.0003° spacing (~33m/point), this simulates realistic rides.
+
+  // Guards the O'Leary Mountain regression: an averaged spike-filter
+  // reference lags a sustained steep climb until every reading is rejected,
+  // flattening the mountain (449 ft reported on a ~3,200 ft trail).  The
+  // largest real sample-to-sample step there was 17.8 m — under the 25 m
+  // threshold — so this must track cleanly.  10 m per ~33 m point ≈ 30% grade.
+  it('keeps tracking a sustained steep climb', () => {
+    const points = makeTrack(200, { startAlt: 1000, altStep: 10 });
+    const { gain, loss, max, min } = computeElevation(points);
+
+    // True gain is 199 * 10 = 1,990 m; smoothing trims only the ends.
+    // A monotone climb must not fabricate descent, and max must track
+    // the summit (not sag below it as a lagging-reference sawtooth does).
+    expect(gain).toBeGreaterThan(1900);
+    expect(loss).toBeLessThan(1);
+    expect(max - min).toBeGreaterThan(1900);
+  });
+
+  it('still replaces an isolated spike', () => {
+    // The behaviour the filter exists for, which the fix must not give up.
+    const clean = makeTrack(200, { startAlt: 1000, altStep: 2 });
+    const spiked = clean.map((point, i) =>
+      i === 100 ? { ...point, altitude: (point.altitude ?? 0) + 200 } : point,
+    );
+
+    const before = computeElevation(clean);
+    const after = computeElevation(spiked);
+
+    // A 200 m spike must not show up as 200 m of extra height.
+    expect(Math.abs(after.max - before.max)).toBeLessThan(20);
+  });
+
+  it('bounds the damage from a dropout longer than the cap', () => {
+    // 8 bogus ramping readings — longer than ELEVATION_SPIKE_MAX_RUN — so the
+    // tail of the burst is accepted at face value.  Some phantom gain/loss
+    // leaks through (the price of not flatlining real climbs), but it must
+    // stay bounded well under the 240 m excursion and fully symmetric.
+    const points = makeTrack(100, { startAlt: 200, altStep: 0 }).map((p, i) =>
+      i >= 40 && i < 48 ? { ...p, altitude: 200 + (i - 40) * 30 } : p,
+    );
+    const { gain, loss, max } = computeElevation(points);
+
+    expect(gain).toBeLessThan(120); // measured ~98 m
+    expect(loss).toBeLessThan(120);
+    expect(max).toBeLessThan(320); // raw excursion peaks at 440 m
+  });
 
   it('computes gain for a steady climb', () => {
     const points = makeTrack(200, { startAlt: 200, altStep: 2 });
@@ -256,6 +343,21 @@ describe('computeElevation', () => {
     const { gain } = computeElevation(points);
     // Should still detect most of the climb despite gaps
     expect(gain).toBeGreaterThan(50);
+  });
+
+  it('smooths elevation independently across segment breaks', () => {
+    const first = makeTrack(20, { startAlt: 100, altStep: 0 });
+    const second = makeTrack(20, {
+      startLat: 44,
+      startLng: -121.3,
+      startAlt: 1000,
+      altStep: 0,
+    });
+    second[0].segmentStart = true;
+
+    const { min, max } = computeElevation([...first, ...second]);
+    expect(min).toBeCloseTo(100);
+    expect(max).toBeCloseTo(1000);
   });
 });
 
@@ -457,6 +559,20 @@ describe('rideToElevationProfile', () => {
     for (let i = 1; i < p.profile.length; i++) {
       expect(p.profile[i][0]).toBeGreaterThan(p.profile[i - 1][0]);
     }
+  });
+
+  it('does not advance profile distance across a segment break', () => {
+    const points = makeTrack(10, { startAlt: 200 });
+    points[5] = {
+      ...points[5],
+      lat: 44,
+      lng: -121.3,
+      segmentStart: true,
+    };
+    const profile = pointsToElevationProfile(points, 'Segmented Ride');
+
+    expect(profile).not.toBeNull();
+    expect(profile?.profile[5][0]).toBe(profile?.profile[4][0]);
   });
 
   it('converts elevation to feet', () => {

@@ -2,6 +2,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type { ReactNode } from 'react';
 import { ToggleSwitch } from './ToggleSwitch';
+import { pressableProps } from './a11y';
 
 // Shared "Map Layers" sidebar section used by both the Casual and MTB tabs.
 export function MapLayersSection({ children }: { children: ReactNode }) {
@@ -24,15 +25,7 @@ interface ToggleRowProps {
 export function ToggleRow({ icon, label, isActive, onToggle }: ToggleRowProps) {
   return (
     <div
-      onClick={onToggle}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onToggle();
-        }
-      }}
-      role="button"
-      tabIndex={0}
+      {...pressableProps(onToggle)}
       className="p-2 rounded cursor-pointer transition-all duration-200 flex items-center justify-between hover:bg-blue-600/5"
     >
       <div className="flex items-center gap-3">

@@ -1,5 +1,6 @@
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type { OsmTrailDetails } from './osm-trails';
+import { slugify } from '@/utils/string';
 
 // MTB trails tileset. The Mapbox Studio style no longer references this
 // tileset, so we add it ourselves at runtime (see ensureMtnBikeSource).
@@ -15,6 +16,7 @@ export const GODSEY_SOURCE_LAYER = 'LineStrings';
 
 // Mountain Bike Trails Interface and Data
 export interface MountainBikeTrail {
+  slug?: string; // Canonical source slug when it differs from the display name
   trailName: string; // Trail property value from Mapbox features
   displayName: string; // Human-friendly display name
   recArea: string; // Recreation area grouping
@@ -32,6 +34,10 @@ export interface MountainBikeTrail {
   // from the OSM trails tileset (matched by OSM_ID rather than a trail name) —
   // see CuratedTrailLayerConfig.matchBy. Unset for tileset-name layers.
   osmIds?: number[];
+}
+
+export function slugForTrail(trail: MountainBikeTrail): string {
+  return trail.slug ?? slugify(trail.trailName);
 }
 
 export interface ElevationProfile {

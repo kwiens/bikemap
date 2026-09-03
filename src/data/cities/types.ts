@@ -9,10 +9,11 @@ export type CityId = 'chattanooga' | 'bend';
 
 export interface CuratedTrailLayerConfig {
   layerId: string;
-  sourceLayer: string;
+  sourceLayer?: string;
   trailProp: string;
   sourceId?: string;
   tilesetUrl?: string;
+  geojsonUrl?: string;
   metadata?: Record<string, TrailMeta>;
   // How a curated trail entry maps to features in this layer:
   //  - 'name'  (default): match trailProp against the trail's name
@@ -26,7 +27,6 @@ export interface CuratedTrailLayerConfig {
 export interface MountainBikeCityConfig {
   layers: CuratedTrailLayerConfig[];
   hiddenTrails: string[];
-  strayStyleLayers: string[];
 }
 
 export interface CityData {
@@ -38,7 +38,6 @@ export interface CityData {
   mountainBikeTrails: MountainBikeTrail[];
   trailMetadata: Record<string, TrailMeta>;
   mountainBike: MountainBikeCityConfig;
-  hiddenStyleLayerIds: string[];
   regionFor: (recArea: string) => string;
   // Static GeoJSON URL for the classified bike-network overlay (Casual mode).
   // Undefined for cities without one (the toggle is hidden).

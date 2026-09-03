@@ -45,6 +45,7 @@ from PIL import Image
 
 # Reuse the app's token resolver and retry-configured HTTP session so token
 # logic lives in exactly one place.
+from _geo import haversine_m
 from add_trail_elevation import _get_mapbox_token, _session
 
 # --- Constants ---------------------------------------------------------------
@@ -54,14 +55,13 @@ from add_trail_elevation import _get_mapbox_token, _session
 TERRAIN_ZOOM = 14
 TILE_SIZE = 256
 SAMPLE_STEP_M = 20
-EARTH_RADIUS_M = 6371000.0
 
 # Ported verbatim from src/utils/ride-stats.ts. Keep in sync.
 ELEVATION_DEAD_BAND = 3
 ELEVATION_SPIKE_THRESHOLD = 25
+ELEVATION_SPIKE_MAX_RUN = 5
 ELEVATION_MIN_DISTANCE = 15
 ELEVATION_SMOOTH_HALF = 5  # 11-point centered window
-SPIKE_EMA_ALPHA = 0.3
 
 OVERPASS_URL_DEFAULT = 'https://overpass-api.de/api/interpreter'
 # Overpass rejects requests without a User-Agent (HTTP 406). Identify the tool.
@@ -76,7 +76,10 @@ CELL_DEG_DEFAULT = 0.5
 
 OUTPUT_DIR = 'public/data/osm-elevation'
 MANIFEST_PATH = os.path.join(OUTPUT_DIR, 'index.json')
-TILE_CACHE_DIR = 'scripts/.tile_cache/terrain14'
+TILE_CACHE_DIR = os.environ.get(
+    'OSM_TERRAIN_CACHE_DIR',
+    'scripts/.tile_cache/terrain14',
+)
 OVERPASS_CACHE_DIR = 'scripts/.osm_cache'
 
 # US state + DC bounding boxes as (minLng, minLat, maxLng, maxLat). Padded so a
@@ -139,16 +142,6 @@ US_STATE_BBOX = {
 
 
 # --- Geometry helpers --------------------------------------------------------
-
-def haversine_m(lng1, lat1, lng2, lat2):
-    """Great-circle distance in meters (matches ride-stats haversineDistance)."""
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlng / 2) ** 2)
-    return EARTH_RADIUS_M * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
 
 def line_length_m(line):
     """Total length of a [[lng, lat], ...] polyline in meters."""
@@ -284,16 +277,22 @@ def smooth_altitudes(points):
     if not raw_vals:
         return result
 
+    # Spike rejection: the reference is the last *accepted raw* reading, not
+    # an average — an averaged reference lags sustained climbs until every
+    # reading is rejected.  See smoothAltitudes in src/utils/ride-stats.ts.
     seed_count = min(5, len(raw_vals))
     seed_slice = sorted(raw_vals[:seed_count])
-    spike_ema = seed_slice[len(seed_slice) // 2]
+    ref = seed_slice[len(seed_slice) // 2]
     vals = []
+    reject_run = 0
     for v in raw_vals:
-        if abs(v - spike_ema) > ELEVATION_SPIKE_THRESHOLD:
-            vals.append(spike_ema)
+        if abs(v - ref) > ELEVATION_SPIKE_THRESHOLD and reject_run < ELEVATION_SPIKE_MAX_RUN:
+            vals.append(ref)
+            reject_run += 1
         else:
             vals.append(v)
-        spike_ema = SPIKE_EMA_ALPHA * vals[-1] + (1 - SPIKE_EMA_ALPHA) * spike_ema
+            reject_run = 0
+            ref = v
 
     for i in range(len(vals)):
         lo = max(0, i - ELEVATION_SMOOTH_HALF)

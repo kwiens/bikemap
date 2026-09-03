@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
-import { headers } from 'next/headers';
 import { siteConfigForHostname } from '@/config/site.config';
+import { getRequestHostname } from '@/utils/request-hostname';
 import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 
 export const metadata: Metadata = {
@@ -47,17 +47,4 @@ export default async function EmbedDemoPage(): Promise<ReactElement> {
       </main>
     </div>
   );
-}
-
-async function getRequestHostname(): Promise<string | undefined> {
-  try {
-    const requestHeaders = await headers();
-    return (
-      requestHeaders.get('x-forwarded-host') ??
-      requestHeaders.get('host') ??
-      undefined
-    );
-  } catch {
-    return undefined;
-  }
 }

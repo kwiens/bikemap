@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import os
 
-from _geo import slugify
+from _geo import M_TO_MI, esc, slugify
 from osm_trail_elevation import line_length_m
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -26,8 +26,6 @@ ROOT = os.path.dirname(HERE)
 NETWORK = os.path.join(ROOT, "public", "data", "bend", "bike-network.geojson")
 OUT_GEOJSON = os.path.join(ROOT, "public", "data", "bend", "routes.geojson")
 OUT_TS = os.path.join(ROOT, "src", "data", "cities", "bend", "bike-routes.data.ts")
-
-M_TO_MI = 1 / 1609.344
 
 # Curated greenway routes: OSM name -> (display name, color, description).
 # Names match the `name` tag on OSM ways (collected across all segments).
@@ -108,9 +106,6 @@ def main():
 
 
 def write_ts(entries):
-    def esc(s):
-        return s.replace("\\", "\\\\").replace("'", "\\'")
-
     lines = [
         "import { faRoute } from '@fortawesome/free-solid-svg-icons';",
         "import type { BikeRoute } from '@/data/bike-routes';",

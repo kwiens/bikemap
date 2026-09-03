@@ -1,8 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { mapConfigForHostname } from '@/config/map.config';
+import { getRequestHostname } from '@/utils/request-hostname';
 import { siteConfigForHostname } from '@/config/site.config';
 import {
   ArrowLeft,
@@ -357,17 +357,4 @@ function LogoCard({
       </div>
     </div>
   );
-}
-
-async function getRequestHostname(): Promise<string | undefined> {
-  try {
-    const requestHeaders = await headers();
-    return (
-      requestHeaders.get('x-forwarded-host') ??
-      requestHeaders.get('host') ??
-      undefined
-    );
-  } catch {
-    return undefined;
-  }
 }

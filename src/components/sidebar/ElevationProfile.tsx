@@ -7,10 +7,15 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
+import {
+  elevationBasePath,
+  mountainBikeTrails,
+  type ElevationProfile as ElevationProfileData,
+} from '@/data/geo_data';
+import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
 import { downloadFile } from '@/utils/format';
-import { escapeXml } from '@/utils/gpx';
+import { buildProfileGpx } from '@/utils/gpx';
 import { MAP_EVENTS } from '@/events';
 import { loadRide } from '@/utils/ride-storage';
 import { rideToElevationProfile } from '@/utils/ride-stats';
@@ -24,7 +29,6 @@ import {
 import { cn } from '@/lib/utils';
 import { getSetting } from '@/utils/settings';
 import { useEmbed } from '@/components/EmbedContext';
-import { siteConfig } from '@/config/site.config';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
 
 const CHART_HEIGHT = 100;
@@ -34,12 +38,19 @@ const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 
 const GRADE_YELLOW = 12;
 const GRADE_RED = 25;
+
+function profileSlug(trailName: string): string {
+  const trail = mountainBikeTrails.find((item) => item.trailName === trailName);
+  return trail ? slugForTrail(trail) : slugify(trailName);
+}
 const MAX_GRADIENT_STOPS = 200;
 
 const CHART_SVG_CLASS =
   'w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none';
 const ACTION_BTN_CLASS =
   'bg-transparent border-none cursor-pointer text-gray-400 text-2xl px-2 py-1 rounded hover:text-gray-600 hover:bg-gray-50';
+
+type ProfileSource = 'trail' | 'osm' | 'route' | 'ride' | null;
 
 export function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
@@ -133,23 +144,7 @@ export function downsampleStops(
 const profileCache = new Map<string, ElevationProfileData>();
 
 function downloadGpx(profile: ElevationProfileData): void {
-  const gpxPoints = profile.profile
-    .map(
-      ([, elev, lng, lat]) =>
-        `      <trkpt lat="${lat}" lon="${lng}"><ele>${(elev / 3.28084).toFixed(1)}</ele></trkpt>`,
-    )
-    .join('\n');
-
-  const gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="${escapeXml(siteConfig.name)}" xmlns="http://www.topografix.com/GPX/1/1">
-  <trk>
-    <name>${escapeXml(profile.trail)}</name>
-    <trkseg>
-${gpxPoints}
-    </trkseg>
-  </trk>
-</gpx>`;
-
+  const gpx = buildProfileGpx(profile.trail, profile.profile);
   downloadFile(gpx, `${slugify(profile.trail)}.gpx`, 'application/gpx+xml');
 }
 
@@ -194,6 +189,7 @@ export function ElevationProfile() {
   // byte-for-byte the previous behavior.
   const { isEmbed, options: embedOptions } = useEmbed();
   const [trailName, setTrailName] = useState<string | null>(null);
+  const [profileSource, setProfileSource] = useState<ProfileSource>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -205,7 +201,7 @@ export function ElevationProfile() {
   const [ridesPanelOpen, setRidesPanelOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   // Track whether current profile is from a route, trail, or ride selection
-  const sourceRef = useRef<'trail' | 'route' | 'ride' | null>(null);
+  const sourceRef = useRef<ProfileSource>(null);
   const rideIdRef = useRef<string | null>(null);
   // Keep profile in a ref so location handler always sees latest
   const profileRef = useRef<ElevationProfileData | null>(null);
@@ -216,12 +212,13 @@ export function ElevationProfile() {
     const handleTrailSelect = (e: Event) => {
       const { trailName: name } = (e as CustomEvent).detail;
       sourceRef.current = 'trail';
+      setProfileSource('trail');
       rideIdRef.current = null;
       setTrailName(name);
       window.history.replaceState(
         null,
         '',
-        `?trail=${encodeURIComponent(slugify(name))}`,
+        `?trail=${encodeURIComponent(profileSlug(name))}`,
       );
     };
     // OSM trails ship a ready-built profile (no curated JSON to load by name),
@@ -232,9 +229,12 @@ export function ElevationProfile() {
       const { profile: osmProfile } = (e as CustomEvent).detail as {
         profile: ElevationProfileData;
       };
-      sourceRef.current = 'trail';
+      sourceRef.current = 'osm';
+      setProfileSource('osm');
       rideIdRef.current = null;
-      profileCache.set(osmProfile.trail, osmProfile);
+      // Cache keys are namespaced by source: an OSM way sharing a curated
+      // trail's name must not shadow the curated /data/elevation JSON.
+      profileCache.set(`osm:${osmProfile.trail}`, osmProfile);
       setTrailName(osmProfile.trail);
       setProfile(osmProfile);
       profileRef.current = osmProfile;
@@ -249,6 +249,7 @@ export function ElevationProfile() {
       // only ever 'trail' or 'ride', so the old `=== 'route'` guard never hit.)
       if (sourceRef.current !== null) {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
@@ -256,8 +257,9 @@ export function ElevationProfile() {
       }
     };
     const handleTrailDeselect = () => {
-      if (sourceRef.current === 'trail') {
+      if (sourceRef.current === 'trail' || sourceRef.current === 'osm') {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         window.history.replaceState(null, '', window.location.pathname);
       }
@@ -265,6 +267,7 @@ export function ElevationProfile() {
     const handleRouteDeselect = () => {
       if (sourceRef.current === 'route') {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         window.history.replaceState(null, '', window.location.pathname);
       }
@@ -283,10 +286,11 @@ export function ElevationProfile() {
       if (!ride || latestRideId !== rideId) return; // stale check
       const elevProfile = rideToElevationProfile(ride);
       sourceRef.current = 'ride';
+      setProfileSource('ride');
       rideIdRef.current = rideId;
       if (elevProfile) {
         setTrailName(ride.name);
-        profileCache.set(ride.name, elevProfile);
+        profileCache.set(`ride:${ride.name}`, elevProfile);
         setProfile(elevProfile);
         profileRef.current = elevProfile;
         setHoverIndex(null);
@@ -301,6 +305,7 @@ export function ElevationProfile() {
     const handleRideDeselect = () => {
       if (sourceRef.current === 'ride') {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
@@ -311,6 +316,7 @@ export function ElevationProfile() {
       // Hide elevation profile during recording — not enough data for a
       // meaningful chart and the panel just gets in the way.
       sourceRef.current = null;
+      setProfileSource(null);
       setTrailName(null);
       setProfile(null);
       profileRef.current = null;
@@ -318,6 +324,7 @@ export function ElevationProfile() {
     const handleRecordingStop = () => {
       if (sourceRef.current === 'ride') {
         sourceRef.current = null;
+        setProfileSource(null);
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
@@ -407,9 +414,10 @@ export function ElevationProfile() {
     }
 
     // Ride profiles are set directly by the RIDE_SELECT handler — skip fetch
-    if (sourceRef.current === 'ride') return;
+    if (profileSource === 'ride') return;
 
-    const cached = profileCache.get(trailName);
+    const cacheKey = `${profileSource ?? 'trail'}:${trailName}`;
+    const cached = profileCache.get(cacheKey);
     if (cached) {
       setProfile(cached);
       profileRef.current = cached;
@@ -418,6 +426,10 @@ export function ElevationProfile() {
       return;
     }
 
+    // OSM profiles are seeded into the cache by their select handler and have
+    // no curated JSON to fetch — a miss here just means nothing to show.
+    if (profileSource === 'osm') return;
+
     setLoading(true);
     setProfile(null);
     profileRef.current = null;
@@ -425,14 +437,14 @@ export function ElevationProfile() {
     setLocationIndex(null);
 
     const controller = new AbortController();
-    const slug = encodeURIComponent(slugify(trailName));
-    fetch(`/data/elevation/${slug}.json`, { signal: controller.signal })
+    const slug = encodeURIComponent(profileSlug(trailName));
+    fetch(`${elevationBasePath}/${slug}.json`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then((data: ElevationProfileData) => {
-        profileCache.set(trailName, data);
+        profileCache.set(`trail:${trailName}`, data);
         setProfile(data);
         profileRef.current = data;
         setLoading(false);
@@ -442,7 +454,7 @@ export function ElevationProfile() {
       });
 
     return () => controller.abort();
-  }, [trailName]);
+  }, [trailName, profileSource]);
 
   // Measure chart width via ResizeObserver
   useEffect(() => {
@@ -523,7 +535,11 @@ export function ElevationProfile() {
   }
 
   const points = profile.profile;
-  const maxDist = points[points.length - 1][0];
+  // Headline mileage: profile.distance, which carries the authoritative total
+  // (precomputed OSM stats, curated JSON, accuracy-filtered ride stats) and can
+  // differ from the tile-simplified chart geometry's sum (the chart subcomponents
+  // derive their own x-axis normalizer from the points).
+  const headlineDistFt = profile.distance;
 
   // Mountain icon toggle button (visible when collapsed)
   if (collapsed) {
@@ -556,7 +572,7 @@ export function ElevationProfile() {
       )}
     >
       <div className="flex items-center gap-3 mb-1">
-        {sourceRef.current === 'ride' && rideIdRef.current ? (
+        {profileSource === 'ride' && rideIdRef.current ? (
           <button
             type="button"
             onClick={() => {
@@ -576,7 +592,7 @@ export function ElevationProfile() {
           </span>
         )}
         <div className="flex gap-3 text-[11px] text-gray-500 ml-auto shrink-0">
-          <span>{(maxDist / 5280).toFixed(1)} mi</span>
+          <span>{(headlineDistFt / 5280).toFixed(1)} mi</span>
           <span>+{Math.round(profile.gain).toLocaleString()} ft climbing</span>
         </div>
         <div className="flex gap-1 ml-2 shrink-0">

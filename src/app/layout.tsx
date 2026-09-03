@@ -4,8 +4,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import './globals.css';
 import './map.css';
 import Script from 'next/script';
-import { headers } from 'next/headers';
-import { siteConfig, siteConfigForHostname } from '@/config/site.config';
+import { siteConfigForHostname } from '@/config/site.config';
+import { getRequestHostname } from '@/utils/request-hostname';
 
 // Self-hosted to keep production builds reproducible and offline-capable
 // (next/font/google would fetch from Google Fonts at build time).
@@ -45,13 +45,16 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  // Pinch-to-zoom is intentionally left enabled for accessibility.
-  viewportFit: 'cover',
-  themeColor: siteConfig.themeColor,
-};
+export async function generateViewport(): Promise<Viewport> {
+  const hostname = await getRequestHostname();
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    // Pinch-to-zoom is intentionally left enabled for accessibility.
+    viewportFit: 'cover',
+    themeColor: siteConfigForHostname(hostname).themeColor,
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -157,17 +160,4 @@ export default async function RootLayout({
       </body>
     </html>
   );
-}
-
-async function getRequestHostname(): Promise<string | undefined> {
-  try {
-    const requestHeaders = await headers();
-    return (
-      requestHeaders.get('x-forwarded-host') ??
-      requestHeaders.get('host') ??
-      undefined
-    );
-  } catch {
-    return undefined;
-  }
 }

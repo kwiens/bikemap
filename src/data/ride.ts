@@ -6,6 +6,7 @@ export interface RidePoint {
   accuracy: number; // meters, from coords.accuracy
   speed: number | null; // m/s, from coords.speed
   timestamp: number; // Unix ms
+  segmentStart?: boolean; // true when this point follows a pause/recovery gap
 }
 
 // Slim point — persisted to storage (accuracy/speed dropped after stats computed)
@@ -14,6 +15,7 @@ export interface StoredRidePoint {
   lat: number;
   altitude: number | null;
   timestamp: number;
+  segmentStart?: boolean;
 }
 
 export interface RideStats {
@@ -43,6 +45,21 @@ export interface RideSummary {
   name: string;
   startTime: number;
   stats: RideStats;
+}
+
+export function splitRideSegments<T extends { segmentStart?: boolean }>(
+  points: T[],
+): T[][] {
+  const segments: T[][] = [];
+
+  for (const point of points) {
+    if (segments.length === 0 || point.segmentStart) {
+      segments.push([]);
+    }
+    segments[segments.length - 1].push(point);
+  }
+
+  return segments;
 }
 
 export function generateRideName(startTime: number): string {

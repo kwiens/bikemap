@@ -45,7 +45,6 @@ const hasRoutesSection =
   bikeResources.length > 0 ||
   Boolean(mapConfig.gbfs);
 const hasCuratedTrails = mountainBikeTrails.length > 0;
-const hasTrailsSection = true;
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
@@ -61,8 +60,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       if (isEmbed) return 'routes';
       const saved = getSetting('activeTab');
       if (saved === 'routes' && hasRoutesSection) return saved;
-      if (saved === 'trails' && hasTrailsSection) return saved;
-      if (getRideStyle() === 'mountain' && hasTrailsSection) return 'trails';
+      if (saved === 'trails') return saved;
+      if (getRideStyle() === 'mountain') return 'trails';
       return hasRoutesSection ? 'routes' : 'trails';
     },
   );
@@ -70,7 +69,6 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const switchTab = (tab: 'routes' | 'trails') => {
     if (isEmbed) return;
     if (tab === 'routes' && !hasRoutesSection) return;
-    if (tab === 'trails' && !hasTrailsSection) return;
     setActiveSection(tab);
     setSetting('activeTab', tab);
   };
@@ -242,17 +240,24 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
       const turningOn = !stateMap[layer];
 
-      // Update state and dispatch events for all layers
-      for (const key of Object.keys(stateMap) as Array<keyof typeof stateMap>) {
+      // Update state and dispatch events for all layers. OFF events go out
+      // before the ON so listeners never see two layers active at once.
+      const keys = Object.keys(stateMap) as Array<keyof typeof stateMap>;
+      const changed = keys.filter(
+        (key) => stateMap[key] !== (key === layer ? turningOn : false),
+      );
+      const ordered = [
+        ...changed.filter((key) => key !== layer),
+        ...changed.filter((key) => key === layer),
+      ];
+      for (const key of ordered) {
         const newValue = key === layer ? turningOn : false;
-        if (stateMap[key] !== newValue) {
-          setterMap[key](newValue);
-          window.dispatchEvent(
-            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-              detail: { layer: key, visible: newValue },
-            }),
-          );
-        }
+        setterMap[key](newValue);
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+            detail: { layer: key, visible: newValue },
+          }),
+        );
       }
     },
     [showAttractions, showBikeResources, showBikeRentals],
@@ -382,12 +387,21 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Close when rides panel opens
+  // Close when rides panel opens. Dispatch SIDEBAR_TOGGLE too — the elevation
+  // pane and map-resize hook track sidebar state solely via that event, so a
+  // silent close would leave them laid out for an open sidebar. (Unlike
+  // toggle(), this doesn't persist the closed state: the panel closing the
+  // sidebar isn't a user preference.)
   useEffect(() => {
     const handler = (e: Event) => {
       const { isOpen: panelOpen } = (e as CustomEvent).detail;
       if (panelOpen && isOpenRef.current) {
         setIsOpen(false);
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
+            detail: { isOpen: false },
+          }),
+        );
       }
     };
     window.addEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
@@ -452,20 +466,18 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   Casual
                 </button>
               )}
-              {hasTrailsSection && (
-                <button
-                  type="button"
-                  className={cn(
-                    'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
-                    activeSection === 'trails'
-                      ? 'bg-white text-gray-800 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700',
-                  )}
-                  onClick={() => switchTab('trails')}
-                >
-                  MTB
-                </button>
-              )}
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
+                  activeSection === 'trails'
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700',
+                )}
+                onClick={() => switchTab('trails')}
+              >
+                MTB
+              </button>
             </div>
           </div>
         )}

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   cityConfigs,
   cityIdForHostname,
-  getGBFSUrl,
   mapConfig,
   parseCityId,
   resolveActiveCityId,
@@ -48,30 +47,6 @@ describe('map.config', () => {
     });
   });
 
-  describe('getGBFSUrl', () => {
-    it('should return full URL for stationInformation', () => {
-      expect(mapConfig.gbfs?.type).toBe('station');
-      if (mapConfig.gbfs?.type !== 'station') return;
-
-      const url = getGBFSUrl('stationInformation');
-      expect(url).toBe(
-        `${mapConfig.gbfs.baseUrl}${mapConfig.gbfs.endpoints.stationInformation}`,
-      );
-      expect(url).toContain('station_information');
-    });
-
-    it('should return full URL for stationStatus', () => {
-      expect(mapConfig.gbfs?.type).toBe('station');
-      if (mapConfig.gbfs?.type !== 'station') return;
-
-      const url = getGBFSUrl('stationStatus');
-      expect(url).toBe(
-        `${mapConfig.gbfs.baseUrl}${mapConfig.gbfs.endpoints.stationStatus}`,
-      );
-      expect(url).toContain('station_status');
-    });
-  });
-
   describe('cityConfigs', () => {
     it('stores Chattanooga as a station-based GBFS city', () => {
       const config = cityConfigs.chattanooga;
@@ -110,6 +85,8 @@ describe('map.config', () => {
       expect(parseCityId('chattanooga')).toBe('chattanooga');
       expect(parseCityId(undefined)).toBe('chattanooga');
       expect(parseCityId('not-a-city')).toBe('chattanooga');
+      expect(parseCityId('toString')).toBe('chattanooga');
+      expect(parseCityId('__proto__')).toBe('chattanooga');
     });
 
     it('maps production hostnames to city ids', () => {

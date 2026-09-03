@@ -7,6 +7,7 @@ import {
   trailMetadata,
 } from '@/data/geo_data';
 import { RATING_COLORS, UNRATED_COLOR } from '@/data/trail-metadata';
+import { STYLE_STRAY_LAYER_IDS } from '@/data/mapbox-style';
 import {
   OSM_TRAILS_SOURCE_ID,
   OSM_TRAILS_LAYER_ID,
@@ -32,6 +33,78 @@ import {
   BIKE_NETWORK_SOURCE_ID,
 } from '@/data/bike-network';
 import { MAP_EVENTS } from '@/events';
+
+// --- Shared layer plumbing ----------------------------------------------------
+
+// Rounded line-cap/join layout fragment shared by every line layer we add.
+const ROUND_LINE = {
+  'line-cap': 'round' as const,
+  'line-join': 'round' as const,
+};
+
+// Curated MTB trail layers additionally tighten the round-join limit.
+const ROUND_LINE_LIMIT = {
+  ...ROUND_LINE,
+  'line-round-limit': 0.1,
+};
+
+// Add a source only if the map doesn't already have it.
+function ensureSource(
+  map: mapboxgl.Map,
+  id: string,
+  spec: mapboxgl.SourceSpecification,
+): void {
+  if (!map.getSource(id)) {
+    map.addSource(id, spec);
+  }
+}
+
+// Add a layer only if the map doesn't already have it.
+function addLayerOnce(
+  map: mapboxgl.Map,
+  spec: mapboxgl.LayerSpecification,
+  beforeId?: string,
+): void {
+  if (!map.getLayer(spec.id)) {
+    map.addLayer(spec, beforeId);
+  }
+}
+
+// Flip visibility on each of the given layers that exists on the map.
+function setLayersVisibility(
+  map: mapboxgl.Map,
+  ids: string[],
+  visible: boolean,
+): void {
+  const value = visible ? 'visible' : 'none';
+  for (const id of ids) {
+    if (map.getLayer(id)) {
+      map.setLayoutProperty(id, 'visibility', value);
+    }
+  }
+}
+
+// Show a pointer cursor while hovering over a layer's features.
+export function registerPointerCursor(
+  map: mapboxgl.Map,
+  layerId: string,
+): void {
+  map.on('mouseenter', layerId, () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', layerId, () => {
+    map.getCanvas().style.cursor = '';
+  });
+}
+
+// Flatten a feature's line geometry: a LineString yields one line, a
+// MultiLineString yields each of its lines, anything else yields none.
+function linesOfFeature(feature: GeoJSON.Feature): GeoJSON.Position[][] {
+  const geom = feature.geometry;
+  if (geom.type === 'LineString') return [geom.coordinates];
+  if (geom.type === 'MultiLineString') return geom.coordinates;
+  return [];
+}
 
 // Route utilities
 export function updateRouteOpacity(
@@ -105,16 +178,10 @@ export function calculateRouteBounds(
   const bounds = new mapboxgl.LngLatBounds();
 
   features.forEach((feature: GeoJSON.Feature) => {
-    if (feature.geometry.type === 'LineString') {
-      feature.geometry.coordinates.forEach((coord: GeoJSON.Position) => {
+    for (const line of linesOfFeature(feature)) {
+      for (const coord of line) {
         bounds.extend(coord as [number, number]);
-      });
-    } else if (feature.geometry.type === 'MultiLineString') {
-      feature.geometry.coordinates.forEach((line: GeoJSON.Position[]) => {
-        line.forEach((coord: GeoJSON.Position) => {
-          bounds.extend(coord as [number, number]);
-        });
-      });
+      }
     }
   });
 
@@ -142,7 +209,7 @@ export function calculateTrailBounds(
     if (!source) continue;
 
     const features = map.querySourceFeatures(source, {
-      sourceLayer: cfg.sourceLayer,
+      ...(cfg.sourceLayer ? { sourceLayer: cfg.sourceLayer } : {}),
       filter: trailMatchExpr(cfg, trailName),
     });
 
@@ -150,20 +217,16 @@ export function calculateTrailBounds(
 
     const bounds = new mapboxgl.LngLatBounds();
     for (const feature of features) {
-      if (feature.geometry.type === 'LineString') {
-        for (const coord of feature.geometry.coordinates) {
+      for (const line of linesOfFeature(feature)) {
+        for (const coord of line) {
           bounds.extend(coord as [number, number]);
-        }
-      } else if (feature.geometry.type === 'MultiLineString') {
-        for (const line of feature.geometry.coordinates) {
-          for (const coord of line) {
-            bounds.extend(coord as [number, number]);
-          }
         }
       }
     }
 
-    if (bounds.getNorth() !== undefined && bounds.getSouth() !== undefined) {
+    // Only return bounds if we have valid coordinates (calling getNorth() on
+    // an empty LngLatBounds throws).
+    if (!bounds.isEmpty()) {
       return bounds;
     }
   }
@@ -180,22 +243,27 @@ export function toLngLatBounds(
   return new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
 }
 
-export function initTrailBoundsFromDefaults(trails: MountainBikeTrail[]): void {
-  for (const trail of trails) {
-    if (!trail.bounds && trail.defaultBounds) {
-      const [swLng, swLat, neLng, neLat] = trail.defaultBounds;
-      trail.bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+// Anything carrying runtime bounds plus a static [swLng, swLat, neLng, neLat]
+// fallback (both BikeRoute and MountainBikeTrail qualify).
+interface BoundedItem {
+  bounds?: mapboxgl.LngLatBounds;
+  defaultBounds?: [number, number, number, number];
+}
+
+function initBoundsFromDefaults(items: BoundedItem[]): void {
+  for (const item of items) {
+    if (!item.bounds && item.defaultBounds) {
+      item.bounds = toLngLatBounds(item.defaultBounds);
     }
   }
 }
 
+export function initTrailBoundsFromDefaults(trails: MountainBikeTrail[]): void {
+  initBoundsFromDefaults(trails);
+}
+
 export function initRouteBoundsFromDefaults(routes: BikeRoute[]): void {
-  for (const route of routes) {
-    if (!route.bounds && route.defaultBounds) {
-      const [swLng, swLat, neLng, neLat] = route.defaultBounds;
-      route.bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
-    }
-  }
+  initBoundsFromDefaults(routes);
 }
 
 export function getAreaBounds(
@@ -207,13 +275,9 @@ export function getAreaBounds(
   for (const trail of trails) {
     if (trail.recArea !== areaName && regionFor(trail.recArea) !== areaName)
       continue;
-    if (trail.bounds) {
-      bounds.extend(trail.bounds);
-      hasCoords = true;
-    } else if (trail.defaultBounds) {
-      const [swLng, swLat, neLng, neLat] = trail.defaultBounds;
-      bounds.extend([swLng, swLat]);
-      bounds.extend([neLng, neLat]);
+    const trailBounds = trail.bounds ?? toLngLatBounds(trail.defaultBounds);
+    if (trailBounds) {
+      bounds.extend(trailBounds);
       hasCoords = true;
     }
   }
@@ -224,10 +288,11 @@ export function getAreaBounds(
 // containing mountain bike trails with its own property names
 interface TrailLayerConfig {
   layerId: string;
-  sourceLayer: string;
+  sourceLayer?: string;
   trailProp: string; // feature property containing the trail name
   sourceId?: string;
   tilesetUrl?: string;
+  geojsonUrl?: string;
   matchBy?: 'name' | 'osmId';
   // Maps the raw feature-property value (e.g. tileset 'Trail' name) to the
   // line color. Falls back to UNRATED_COLOR for anything unlisted.
@@ -386,31 +451,26 @@ function sourceIdForLayer(
   return layer?.source ?? cfg.sourceId ?? null;
 }
 
-// Attach any city-managed curated trail tilesets that are not already baked
-// into the Mapbox Studio style. Idempotent: skips existing sources/layers.
+// Attach any city-managed curated trail vector/GeoJSON sources that are not
+// already baked into the Mapbox Studio style. Idempotent: skips existing ones.
 export function ensureMtnBikeSource(map: mapboxgl.Map): void {
   try {
     for (const cfg of TRAIL_LAYERS) {
-      if (!cfg.sourceId || !cfg.tilesetUrl) continue;
+      if (!cfg.sourceId || (!cfg.tilesetUrl && !cfg.geojsonUrl)) continue;
 
-      if (!map.getSource(cfg.sourceId)) {
-        map.addSource(cfg.sourceId, {
-          type: 'vector',
-          url: cfg.tilesetUrl,
-        });
-      }
-      if (map.getLayer(cfg.layerId)) continue;
-
-      map.addLayer({
+      ensureSource(
+        map,
+        cfg.sourceId,
+        cfg.geojsonUrl
+          ? { type: 'geojson', data: cfg.geojsonUrl }
+          : { type: 'vector', url: cfg.tilesetUrl as string },
+      );
+      addLayerOnce(map, {
         id: cfg.layerId,
         type: 'line',
         source: cfg.sourceId,
-        'source-layer': cfg.sourceLayer,
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round',
-          'line-round-limit': 0.1,
-        },
+        ...(cfg.sourceLayer ? { 'source-layer': cfg.sourceLayer } : {}),
+        layout: ROUND_LINE_LIMIT,
         paint: {
           'line-color': UNRATED_COLOR,
           'line-width': 3,
@@ -491,26 +551,21 @@ const OSM_TRAIL_COLOR_EXPRESSION = buildOsmTrailColorExpression();
 // stays on top and curated clicks win over OSM clicks.
 export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
   try {
-    if (!map.getSource(OSM_TRAILS_SOURCE_ID)) {
-      map.addSource(OSM_TRAILS_SOURCE_ID, {
-        type: 'vector',
-        url: OSM_TRAILS_TILEJSON_URL,
-      });
-    }
+    ensureSource(map, OSM_TRAILS_SOURCE_ID, {
+      type: 'vector',
+      url: OSM_TRAILS_TILEJSON_URL,
+    });
 
     const firstCuratedLayer = TRAIL_LAYERS.find((cfg) =>
       map.getLayer(cfg.layerId),
     );
     const beforeId = firstCuratedLayer?.layerId;
 
-    // When a curated layer renders from this same source by OSM_ID (e.g. Bend),
-    // exclude those way ids here so curated trails aren't stroked twice and so
-    // curated clicks win over the nationwide hit layer.
-    const curatedIds = mountainBikeConfig.layers.some(
-      (l) => l.matchBy === 'osmId',
-    )
-      ? mountainBikeTrails.flatMap((t) => t.osmIds ?? []).map(String)
-      : [];
+    // Exclude source ways represented by curated trails so they aren't stroked
+    // twice and curated clicks win over the nationwide hit layer.
+    const curatedIds = mountainBikeTrails
+      .flatMap((t) => t.osmIds ?? [])
+      .map(String);
     const baseFilter: mapboxgl.FilterSpecification =
       curatedIds.length > 0
         ? [
@@ -529,11 +584,7 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
       'source-layer': OSM_TRAILS_SOURCE_LAYER,
       minzoom: OSM_TRAILS_MIN_ZOOM,
       filter: baseFilter,
-      layout: {
-        'line-cap': 'round' as const,
-        'line-join': 'round' as const,
-        visibility: 'none' as const,
-      },
+      layout: { ...ROUND_LINE, visibility: 'none' as const },
     };
 
     const lineLayers = [
@@ -607,17 +658,16 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
 }
 
 export function setOsmTrailsVisible(map: mapboxgl.Map, visible: boolean): void {
-  const value = visible ? 'visible' : 'none';
-  for (const id of [
-    OSM_TRAILS_CASING_LAYER_ID,
-    OSM_TRAILS_LAYER_ID,
-    OSM_TRAILS_HIT_LAYER_ID,
-    OSM_POI_LAYER_ID,
-  ]) {
-    if (map.getLayer(id)) {
-      map.setLayoutProperty(id, 'visibility', value);
-    }
-  }
+  setLayersVisibility(
+    map,
+    [
+      OSM_TRAILS_CASING_LAYER_ID,
+      OSM_TRAILS_LAYER_ID,
+      OSM_TRAILS_HIT_LAYER_ID,
+      OSM_POI_LAYER_ID,
+    ],
+    visible,
+  );
 }
 
 // Anchor runtime overlays just beneath the first label so place/road names stay
@@ -626,11 +676,6 @@ export function setOsmTrailsVisible(map: mapboxgl.Map, visible: boolean): void {
 function firstSymbolLayerId(map: mapboxgl.Map): string | undefined {
   return map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
 }
-
-const ROUND_LINE = {
-  'line-cap': 'round' as const,
-  'line-join': 'round' as const,
-};
 
 // --- Classified bike network (Casual overlay) --------------------------------
 
@@ -666,13 +711,11 @@ const BIKE_NETWORK_LAYERS: {
 // above. Hidden until toggled. Idempotent.
 export function ensureBikeNetworkSource(map: mapboxgl.Map, url: string): void {
   try {
-    if (!map.getSource(BIKE_NETWORK_SOURCE_ID)) {
-      map.addSource(BIKE_NETWORK_SOURCE_ID, { type: 'geojson', data: url });
-    }
+    ensureSource(map, BIKE_NETWORK_SOURCE_ID, { type: 'geojson', data: url });
     const beforeId = firstSymbolLayerId(map);
     for (const l of BIKE_NETWORK_LAYERS) {
-      if (map.getLayer(l.id)) continue;
-      map.addLayer(
+      addLayerOnce(
+        map,
         {
           id: l.id,
           type: 'line',
@@ -697,12 +740,11 @@ export function setBikeNetworkVisible(
   map: mapboxgl.Map,
   visible: boolean,
 ): void {
-  const value = visible ? 'visible' : 'none';
-  for (const l of BIKE_NETWORK_LAYERS) {
-    if (map.getLayer(l.id)) {
-      map.setLayoutProperty(l.id, 'visibility', value);
-    }
-  }
+  setLayersVisibility(
+    map,
+    BIKE_NETWORK_LAYERS.map((l) => l.id),
+    visible,
+  );
 }
 
 // --- Inline (GeoJSON-backed) bike routes -------------------------------------
@@ -721,9 +763,7 @@ export function ensureInlineRoutes(
   routes: BikeRoute[],
 ): void {
   try {
-    if (!map.getSource(INLINE_ROUTES_SOURCE_ID)) {
-      map.addSource(INLINE_ROUTES_SOURCE_ID, { type: 'geojson', data: url });
-    }
+    ensureSource(map, INLINE_ROUTES_SOURCE_ID, { type: 'geojson', data: url });
     const beforeId = firstSymbolLayerId(map);
     for (const route of routes) {
       const filter: mapboxgl.FilterSpecification = [
@@ -747,8 +787,8 @@ export function ensureInlineRoutes(
         { id: `${route.id}-hit`, color: '#000000', width: 24, opacity: 0 },
       ];
       for (const s of sublayers) {
-        if (map.getLayer(s.id)) continue;
-        map.addLayer(
+        addLayerOnce(
+          map,
           {
             id: s.id,
             type: 'line',
@@ -803,14 +843,14 @@ export function highlightOsmTrail(
     id: OSM_HL_CASING_ID,
     type: 'line',
     source: OSM_HL_SOURCE_ID,
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    layout: ROUND_LINE,
     paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
   });
   map.addLayer({
     id: OSM_HL_LINE_ID,
     type: 'line',
     source: OSM_HL_SOURCE_ID,
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    layout: ROUND_LINE,
     paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 1 },
   });
 }
@@ -834,13 +874,8 @@ function collectOsmWayLines(
 
   const lines: [number, number][][] = [];
   for (const feature of features) {
-    const geom = feature.geometry;
-    if (geom.type === 'LineString') {
-      lines.push(geom.coordinates as [number, number][]);
-    } else if (geom.type === 'MultiLineString') {
-      for (const line of geom.coordinates) {
-        lines.push(line as [number, number][]);
-      }
+    for (const line of linesOfFeature(feature)) {
+      lines.push(line as [number, number][]);
     }
   }
   return lines;
@@ -945,12 +980,7 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): () => void {
       .catch(() => {});
   });
 
-  map.on('mouseenter', OSM_TRAILS_HIT_LAYER_ID, () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
-  map.on('mouseleave', OSM_TRAILS_HIT_LAYER_ID, () => {
-    map.getCanvas().style.cursor = '';
-  });
+  registerPointerCursor(map, OSM_TRAILS_HIT_LAYER_ID);
 
   // map.remove() tears down the map.on(...) handlers above, but these window
   // listeners outlive it. Return a cleanup so a remount doesn't leak or
@@ -978,7 +1008,7 @@ export function hideStyleLayers(map: mapboxgl.Map, layerIds: string[]): void {
 // Hide orphan trail layers baked into the Studio style that the app doesn't
 // manage. Idempotent and guarded — skips any that aren't present.
 export function hideStrayStyleLayers(map: mapboxgl.Map): void {
-  hideStyleLayers(map, mountainBikeConfig.strayStyleLayers);
+  hideStyleLayers(map, STYLE_STRAY_LAYER_IDS);
 }
 
 export function initMtnBikeColors(map: mapboxgl.Map): void {
@@ -1006,76 +1036,72 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
 
     const source = (layer as { source?: string }).source ?? 'composite';
     const cId = casingId(cfg.layerId);
-    const gId = glowId(cfg.layerId);
-    const hId = hitId(cfg.layerId);
 
-    if (!map.getLayer(cId)) {
-      map.addLayer(
-        {
-          id: cId,
-          type: 'line',
-          source,
-          'source-layer': cfg.sourceLayer,
-          layout: {
-            'line-cap': 'round',
-            'line-join': 'round',
-            'line-round-limit': 0.1,
-          },
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': 5,
-            'line-opacity': 0.5,
-          },
+    // Insertion order matters: casing slides under the base layer, glow under
+    // the casing, and the transparent hit target is appended on top.
+    const sublayers: {
+      id: string;
+      paint: mapboxgl.LineLayerSpecification['paint'];
+      beforeId?: string;
+    }[] = [
+      {
+        id: cId,
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 5,
+          'line-opacity': 0.5,
         },
-        cfg.layerId,
-      );
-    }
-
-    if (!map.getLayer(gId)) {
-      map.addLayer(
-        {
-          id: gId,
-          type: 'line',
-          source,
-          'source-layer': cfg.sourceLayer,
-          layout: {
-            'line-cap': 'round',
-            'line-join': 'round',
-            'line-round-limit': 0.1,
-          },
-          paint: {
-            'line-color': '#ffffff',
-            'line-width': 0,
-            'line-opacity': 0,
-            'line-blur': 10,
-          },
+        beforeId: cfg.layerId,
+      },
+      {
+        id: glowId(cfg.layerId),
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 0,
+          'line-opacity': 0,
+          'line-blur': 10,
         },
-        cId,
-      );
-    }
-
-    if (!map.getLayer(hId)) {
-      map.addLayer({
-        id: hId,
-        type: 'line',
-        source,
-        'source-layer': cfg.sourceLayer,
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round',
-          'line-round-limit': 0.1,
-        },
+        beforeId: cId,
+      },
+      {
+        id: hitId(cfg.layerId),
         paint: {
           'line-color': 'rgba(0,0,0,0)',
           'line-width': 10,
           'line-opacity': 0,
         },
-      });
+      },
+    ];
+    for (const s of sublayers) {
+      addLayerOnce(
+        map,
+        {
+          id: s.id,
+          type: 'line',
+          source,
+          ...(cfg.sourceLayer ? { 'source-layer': cfg.sourceLayer } : {}),
+          layout: ROUND_LINE_LIMIT,
+          paint: s.paint,
+        },
+        s.beforeId,
+      );
     }
 
-    map.setLayoutProperty(cfg.layerId, 'line-cap', 'round');
-    map.setLayoutProperty(cfg.layerId, 'line-join', 'round');
-    map.setLayoutProperty(cfg.layerId, 'line-round-limit', 0.1);
+    map.setLayoutProperty(
+      cfg.layerId,
+      'line-cap',
+      ROUND_LINE_LIMIT['line-cap'],
+    );
+    map.setLayoutProperty(
+      cfg.layerId,
+      'line-join',
+      ROUND_LINE_LIMIT['line-join'],
+    );
+    map.setLayoutProperty(
+      cfg.layerId,
+      'line-round-limit',
+      ROUND_LINE_LIMIT['line-round-limit'],
+    );
 
     // For OSM-tileset-backed layers (nationwide source), restrict rendering to
     // the union of curated way ids — otherwise the layer would draw every trail
@@ -1102,7 +1128,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
       ];
     }
     if (filter) {
-      for (const id of [cfg.layerId, cId, gId, hId]) {
+      for (const id of [cfg.layerId, ...sublayers.map((s) => s.id)]) {
         if (map.getLayer(id)) {
           map.setFilter(id, filter);
         }
@@ -1214,7 +1240,7 @@ const RIDE_LINE_COLOR = '#ff6b35';
 
 export function addRideLayer(
   map: mapboxgl.Map,
-  coordinates: [number, number][],
+  segments: [number, number][][],
 ): void {
   removeRideLayer(map);
 
@@ -1223,7 +1249,10 @@ export function addRideLayer(
     data: {
       type: 'Feature',
       properties: {},
-      geometry: { type: 'LineString', coordinates },
+      geometry: {
+        type: 'MultiLineString',
+        coordinates: segments.filter((segment) => segment.length >= 2),
+      },
     },
   });
 
@@ -1231,7 +1260,7 @@ export function addRideLayer(
     id: RIDE_LINE_ID,
     type: 'line',
     source: RIDE_SOURCE_ID,
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    layout: ROUND_LINE,
     paint: {
       'line-color': RIDE_LINE_COLOR,
       'line-width': 4,
@@ -1242,7 +1271,7 @@ export function addRideLayer(
 
 export function updateRideLayer(
   map: mapboxgl.Map,
-  coordinates: [number, number][],
+  segments: [number, number][][],
 ): void {
   const source = map.getSource(RIDE_SOURCE_ID) as
     | mapboxgl.GeoJSONSource
@@ -1251,10 +1280,13 @@ export function updateRideLayer(
     source.setData({
       type: 'Feature',
       properties: {},
-      geometry: { type: 'LineString', coordinates },
+      geometry: {
+        type: 'MultiLineString',
+        coordinates: segments.filter((segment) => segment.length >= 2),
+      },
     });
   } else {
-    addRideLayer(map, coordinates);
+    addRideLayer(map, segments);
   }
 }
 
