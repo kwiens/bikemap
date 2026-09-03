@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { mapConfigForHostname } from '@/config/map.config';
 import { getRequestHostname } from '@/utils/request-hostname';
 import { siteConfigForHostname } from '@/config/site.config';
+import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import {
   ArrowLeft,
   MessageCircle,
@@ -219,6 +220,19 @@ export default async function AboutPage() {
             </div>
           </section>
         )}
+
+        {/* Embed */}
+        <section className="mb-14">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
+            Put this map on your site
+          </h2>
+          <p className="text-sm text-gray-500 leading-relaxed mb-5">
+            Set it up below, then paste the snippet into your page — no account
+            or API key needed. The preview is the real thing, so what you see is
+            what your visitors get.
+          </p>
+          <EmbedSnippetBuilder baseUrl={siteConfig.url} />
+        </section>
 
         {/* Data & credits */}
         <section className="mb-14">

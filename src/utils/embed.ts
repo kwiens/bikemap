@@ -114,7 +114,11 @@ export function isEmbedLayer(value: string): value is EmbedLayer {
   return (EMBED_LAYERS as readonly string[]).includes(value);
 }
 
-function parseCenter(raw: string | null): [number, number] | undefined {
+/**
+ * Parse a `lng,lat` pair. Exported so the snippet builder validates exactly
+ * what the embed will accept, rather than keeping a second copy of the rules.
+ */
+export function parseCenter(raw: string | null): [number, number] | undefined {
   if (!raw) return undefined;
   const trimmedParts = raw.split(',').map((p) => p.trim());
   // Reject empty/whitespace-only components before coercing — Number('')

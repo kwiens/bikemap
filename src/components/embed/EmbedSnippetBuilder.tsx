@@ -6,6 +6,7 @@ import { slugify } from '@/utils/string';
 import {
   MARKER_LAYERS,
   buildEmbedSearch,
+  parseCenter,
   type EmbedLayer,
   type EmbedOptions,
 } from '@/utils/embed';
@@ -34,7 +35,14 @@ export function EmbedSnippetBuilder({
   const [markerLayer, setMarkerLayer] = useState<EmbedLayer | ''>('');
   const [bikeNetworkOn, setBikeNetworkOn] = useState(false);
   const [zoomInput, setZoomInput] = useState('');
+  const [centerInput, setCenterInput] = useState('');
   const [copied, setCopied] = useState(false);
+
+  const centerTrimmed = centerInput.trim();
+  // Validated with the embed's own parser, so the form can't accept a value
+  // the map would silently drop.
+  const center = centerTrimmed === '' ? undefined : parseCenter(centerTrimmed);
+  const showCenterError = centerTrimmed !== '' && center === undefined;
 
   const zoomTrimmed = zoomInput.trim();
   const zoomNumber = zoomTrimmed === '' ? undefined : Number(zoomTrimmed);
@@ -53,6 +61,7 @@ export function EmbedSnippetBuilder({
   const options: Partial<EmbedOptions> = {
     sidebarOpen,
     route: route || undefined,
+    center,
     zoom: zoomInRange ? zoomNumber : undefined,
     layers,
   };
@@ -114,14 +123,10 @@ export function EmbedSnippetBuilder({
 
   return (
     <section className="rounded-xl border border-gray-200 bg-gray-50 p-6">
-      <h2 className="text-lg font-semibold text-gray-900">
-        Embed this map on your site
-      </h2>
-      <p className="mt-1 text-sm text-gray-600">
-        Customize the options below, then copy the snippet into your page.
-      </p>
-
-      <div className="mt-6 grid gap-8 lg:grid-cols-2">
+      {/* Stacked rather than two columns: the About page caps content at
+          max-w-2xl, and a viewport-based `lg:` split would squeeze the preview
+          to a couple of hundred pixels there. */}
+      <div className="flex flex-col gap-6">
         <div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
@@ -168,6 +173,24 @@ export function EmbedSnippetBuilder({
               {showZoomError && (
                 <span className="text-xs font-normal text-red-600">
                   Zoom must be between 0 and 24
+                </span>
+              )}
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+              Center
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="Longitude, latitude"
+                className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
+                value={centerInput}
+                onChange={(e) => setCenterInput(e.target.value)}
+                aria-invalid={showCenterError}
+              />
+              {showCenterError && (
+                <span className="text-xs font-normal text-red-600">
+                  Use longitude, latitude — e.g. -85.309, 35.046
                 </span>
               )}
             </label>
@@ -252,33 +275,35 @@ export function EmbedSnippetBuilder({
         </div>
       </div>
 
-      <div className="mt-8 overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-300 text-gray-500">
-              <th className="py-1 pr-4 font-medium">Param</th>
-              <th className="py-1 pr-4 font-medium">Values</th>
-              <th className="py-1 font-medium">Default</th>
-            </tr>
-          </thead>
-          <tbody className="text-gray-700">
-            {PARAM_REFERENCE.map((row) => (
-              <tr key={row.param} className="border-b border-gray-100">
-                <td className="py-1 pr-4 font-mono text-xs">{row.param}</td>
-                <td className="py-1 pr-4">{row.values}</td>
-                <td className="py-1">{row.defaultValue}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <p className="mt-4 text-xs text-gray-500">
-        <code className="font-mono">allow=&quot;geolocation&quot;</code> is
-        required for the locate-me button to work inside a frame, and the iframe
-        needs an explicit height — the{' '}
-        <code className="font-mono">aspect-ratio</code> style above provides it.
-      </p>
+      <details className="mt-6 border-t border-gray-200 pt-4 text-sm text-gray-600">
+        <summary className="cursor-pointer font-medium text-gray-700">
+          Requirements &amp; troubleshooting
+        </summary>
+        <ul className="mt-3 flex flex-col gap-2 pl-4 list-disc marker:text-gray-400">
+          <li>
+            Keep the <code className="font-mono">allow</code> attribute — it is
+            what lets the &ldquo;locate me&rdquo; button and compass work inside
+            a frame. Your page also has to be served over HTTPS for those.
+          </li>
+          <li>
+            Keep a height on the iframe. Without one it collapses to about
+            150px; the <code className="font-mono">aspect-ratio</code> above
+            handles any width.
+          </li>
+          <li>
+            Test on a page served over http(s), not by opening an HTML file
+            directly. A <code className="font-mono">file://</code> page has no
+            web address, so browsers block it from framing any site — the{' '}
+            <code className="font-mono">frame-ancestors</code> error you get is
+            not a problem with your snippet.
+          </li>
+          <li>
+            Please don&rsquo;t cover the © Mapbox / © OpenStreetMap credit in
+            the corner of the map — Mapbox&rsquo;s terms require it stay
+            visible.
+          </li>
+        </ul>
+      </details>
     </section>
   );
 }
@@ -289,20 +314,3 @@ const LAYER_LABELS: Record<EmbedLayer, string> = {
   bikeRentals: 'Bike rentals',
   bikeNetwork: 'Bike network',
 };
-
-const PARAM_REFERENCE: {
-  param: string;
-  values: string;
-  defaultValue: string;
-}[] = [
-  { param: 'sidebar', values: 'open | closed', defaultValue: 'closed' },
-  { param: 'route', values: '<slug> (e.g. riverwalk-loop)', defaultValue: '—' },
-  { param: 'center', values: '<lng>,<lat>', defaultValue: 'city default' },
-  { param: 'zoom', values: '0–24', defaultValue: 'city default' },
-  {
-    param: 'layers',
-    values:
-      'comma list: at most one of attractions, bikeResources, bikeRentals — plus bikeNetwork',
-    defaultValue: 'none',
-  },
-];

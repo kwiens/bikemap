@@ -136,6 +136,45 @@ describe('EmbedSnippetBuilder', () => {
     expect(getSnippetText()).not.toContain('zoom=');
   });
 
+  it('includes a valid center in the snippet', () => {
+    render(<EmbedSnippetBuilder baseUrl={baseUrl} />);
+
+    fireEvent.change(screen.getByLabelText('Center'), {
+      target: { value: '-85.309, 35.046' },
+    });
+
+    expect(getSnippetText()).toContain('center=-85.309%2C35.046');
+    expect(
+      screen.queryByText(/Use longitude, latitude/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('excludes an out-of-range center and explains the format', () => {
+    render(<EmbedSnippetBuilder baseUrl={baseUrl} />);
+
+    // Latitude 200 is out of range — the embed's parser would drop it, so the
+    // form must not put it in the snippet either.
+    fireEvent.change(screen.getByLabelText('Center'), {
+      target: { value: '-85.309, 200' },
+    });
+
+    expect(getSnippetText()).not.toContain('center=');
+    expect(screen.getByText(/Use longitude, latitude/)).toBeInTheDocument();
+  });
+
+  it('treats a cleared center field as unset rather than invalid', () => {
+    render(<EmbedSnippetBuilder baseUrl={baseUrl} />);
+
+    const centerInput = screen.getByLabelText('Center');
+    fireEvent.change(centerInput, { target: { value: '-85.309, 35.046' } });
+    fireEvent.change(centerInput, { target: { value: '' } });
+
+    expect(getSnippetText()).not.toContain('center=');
+    expect(
+      screen.queryByText(/Use longitude, latitude/),
+    ).not.toBeInTheDocument();
+  });
+
   it('debounces the preview iframe navigation instead of remounting on every change', () => {
     vi.useFakeTimers();
     try {

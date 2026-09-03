@@ -42,6 +42,12 @@ export default async function EmbedDemoPage(): Promise<ReactElement> {
         </article>
 
         <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Embed this map on your site
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-gray-600">
+            Customize the options below, then copy the snippet into your page.
+          </p>
           <EmbedSnippetBuilder baseUrl={config.url} />
         </div>
       </main>
