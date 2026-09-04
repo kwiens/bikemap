@@ -1,5 +1,5 @@
-// Register service worker only in production and if browser supports it
-if ('serviceWorker' in navigator && window.location.hostname !== 'localhost') {
+// Register service worker only in production, if browser supports it, and if not inside a frame
+if ('serviceWorker' in navigator && window.location.hostname !== 'localhost' && window.self === window.top) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/sw.js').then(
       function(registration) {

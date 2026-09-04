@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RecordedRide, RidePoint, StoredRidePoint } from '../data/ride';
-import { generateRideName } from '../data/ride';
+import { generateRideName, splitRideSegments } from '../data/ride';
 
 type NotifyCallback = (message: string) => void;
 
@@ -80,6 +80,8 @@ export function useRideRecording(
   const pauseStartRef = useRef(0);
   const lowSpeedCountRef = useRef(0); // consecutive low-speed GPS readings
   const preserveProgressRef = useRef(false); // keep in-progress data if GPS fails during continue
+  const stoppingRef = useRef(false); // synchronous re-entry guard for stopRecording
+  const segmentBreakRef = useRef(false); // next GPS point follows a manual pause — don't bridge it
 
   const saveIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(
     undefined,
@@ -154,6 +156,7 @@ export function useRideRecording(
     setElapsedTime(0);
     setLiveDistance(0);
     setLiveElevationGain(0);
+    segmentBreakRef.current = false;
   }, []);
 
   // Shared: start GPS watch, elapsed timer, and periodic save
@@ -190,6 +193,10 @@ export function useRideRecording(
           lowSpeedCountRef.current = 0;
         }
 
+        const prev = pointsRef.current[pointsRef.current.length - 1];
+        const startsNewSegment = Boolean(prev && segmentBreakRef.current);
+        segmentBreakRef.current = false;
+
         const point: RidePoint = {
           lng: position.coords.longitude,
           lat: position.coords.latitude,
@@ -197,8 +204,8 @@ export function useRideRecording(
           accuracy: position.coords.accuracy,
           speed: position.coords.speed,
           timestamp: position.timestamp,
+          ...(startsNewSegment && { segmentStart: true }),
         };
-        const prev = pointsRef.current[pointsRef.current.length - 1];
         pointsRef.current.push(point);
 
         // GPS is confirmed working — safe to clear progress on future cleanup
@@ -206,13 +213,19 @@ export function useRideRecording(
 
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-            detail: { point: [point.lng, point.lat] as [number, number] },
+            detail: {
+              point: [point.lng, point.lat] as [number, number],
+              segmentStart: startsNewSegment,
+            },
           }),
         );
 
         // Compute horizontal distance once and reuse for both
-        // distance tracking and elevation min-distance filter
-        if (prev) {
+        // distance tracking and elevation min-distance filter. The first
+        // segment after a manual pause is skipped entirely: points were
+        // dropped while paused, so this segment may teleport across whatever
+        // ground was covered in the meantime.
+        if (prev && !startsNewSegment) {
           const segDist = haversineDistance(
             prev.lat,
             prev.lng,
@@ -232,6 +245,12 @@ export function useRideRecording(
         // Filter 1: skip readings with poor altitude accuracy
         const altAccuracy = position.coords.altitudeAccuracy;
         const altValue = point.altitude;
+
+        if (startsNewSegment) {
+          emaAltRef.current = null;
+          altAnchorRef.current = null;
+          distSinceAnchorRef.current = 0;
+        }
 
         if (
           altValue !== null &&
@@ -347,6 +366,7 @@ export function useRideRecording(
     pausedTimeRef.current = 0;
     pauseStartRef.current = 0;
     lowSpeedCountRef.current = 0;
+    segmentBreakRef.current = false;
 
     setElapsedTime(0);
     setLiveDistance(0);
@@ -373,6 +393,9 @@ export function useRideRecording(
     pausedTimeRef.current += Date.now() - pauseStartRef.current;
     pausedRef.current = false;
     lowSpeedCountRef.current = 0;
+    // The user may have moved while paused (points were dropped) — don't let
+    // the first post-resume segment bridge the gap into distance/elevation.
+    segmentBreakRef.current = true;
     setIsPaused(false);
   }, [isRecording]);
 
@@ -391,8 +414,14 @@ export function useRideRecording(
       lng: number;
       altitude: number | null;
       timestamp: number;
+      segmentStart?: boolean;
     }[],
-    demDeduped?: { lat: number; lng: number; altitude: number | null }[],
+    demDeduped?: {
+      lat: number;
+      lng: number;
+      altitude: number | null;
+      segmentStart?: boolean;
+    }[],
   ): RecordedRide {
     const stats = computeRideStats(points);
 
@@ -417,11 +446,12 @@ export function useRideRecording(
     // and elevation profiles use terrain elevation, not noisy GPS.
     const source = demCorrected ?? points;
     const storedPoints: StoredRidePoint[] = source.map(
-      ({ lng, lat, altitude, timestamp }) => ({
+      ({ lng, lat, altitude, timestamp, segmentStart }) => ({
         lng,
         lat,
         altitude,
         timestamp,
+        ...(segmentStart && { segmentStart: true }),
       }),
     );
     return {
@@ -436,34 +466,55 @@ export function useRideRecording(
   }
 
   const stopRecording = useCallback(async (): Promise<RecordedRide | null> => {
-    if (!isRecording) return null;
-    if (pointsRef.current.length < 2) {
+    // isRecording is React state and doesn't flip until cleanup(), which runs
+    // after two awaits — a second Finish tap in that window would save a
+    // duplicate ride. The ref guards synchronously.
+    if (!isRecording || stoppingRef.current) return null;
+    stoppingRef.current = true;
+
+    try {
+      if (pointsRef.current.length < 2) {
+        cleanup();
+        window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
+        return null;
+      }
+
+      const points = [...pointsRef.current];
+      const { corrected, deduplicated } = await tryDemCorrection(points);
+      const ride = buildRide(
+        points,
+        startTimeRef.current,
+        Date.now(),
+        corrected,
+        deduplicated,
+      );
+
+      try {
+        await saveRide(ride);
+      } catch (error) {
+        // Save failed (quota, private browsing, ...) — still tear down the
+        // watch/timers/UI, but keep the in-progress record so the recovery
+        // banner offers a retry. cleanup() dispatches RIDE_RECORDING_STOP on
+        // this path.
+        console.error('Failed to save ride:', error);
+        preserveProgressRef.current = true;
+        cleanup();
+        onNotify?.('Could not save your ride — it can be recovered below.');
+        return null;
+      }
       cleanup();
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
-      return null;
+
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP, {
+          detail: { rideId: ride.id },
+        }),
+      );
+
+      return ride;
+    } finally {
+      stoppingRef.current = false;
     }
-
-    const points = [...pointsRef.current];
-    const { corrected, deduplicated } = await tryDemCorrection(points);
-    const ride = buildRide(
-      points,
-      startTimeRef.current,
-      Date.now(),
-      corrected,
-      deduplicated,
-    );
-
-    await saveRide(ride);
-    cleanup();
-
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP, {
-        detail: { rideId: ride.id },
-      }),
-    );
-
-    return ride;
-  }, [isRecording, cleanup]);
+  }, [isRecording, cleanup, onNotify]);
 
   useEffect(() => {
     loadInProgress().then((data) => {
@@ -517,6 +568,7 @@ export function useRideRecording(
     pausedRef.current = false;
     manualPauseRef.current = false;
     lowSpeedCountRef.current = 0;
+    segmentBreakRef.current = true;
 
     // Recompute distance from saved points
     const dist = computeDistance(data.points);
@@ -548,12 +600,12 @@ export function useRideRecording(
     preserveProgressRef.current = true;
 
     // Draw existing track on map in a single batch
-    const coords = data.points.map(
-      (pt) => [pt.lng, pt.lat] as [number, number],
+    const segments = splitRideSegments(data.points).map((segment) =>
+      segment.map((pt) => [pt.lng, pt.lat] as [number, number]),
     );
     window.dispatchEvent(
       new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-        detail: { points: coords },
+        detail: { segments },
       }),
     );
 

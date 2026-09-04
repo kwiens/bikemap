@@ -237,24 +237,3 @@ export const mapConfig = cityConfigs[activeCityId];
 export function mapConfigForHostname(hostname: string | undefined): MapConfig {
   return cityConfigs[resolveActiveCityId(hostname)];
 }
-
-// Helper to get full GBFS endpoint URLs
-export function getGBFSUrl(endpoint: string): string {
-  if (!mapConfig.gbfs) {
-    throw new Error(
-      `GBFS is not configured for ${mapConfig.region.displayName}`,
-    );
-  }
-
-  const path = mapConfig.gbfs.endpoints[
-    endpoint as keyof typeof mapConfig.gbfs.endpoints
-  ] as string | undefined;
-
-  if (!path) {
-    throw new Error(
-      `GBFS endpoint "${endpoint}" is not configured for ${mapConfig.region.displayName}`,
-    );
-  }
-
-  return `${mapConfig.gbfs.baseUrl}${path}`;
-}

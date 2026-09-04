@@ -3,7 +3,7 @@
  *
  * Trails are authored in Payload and read on the server (see
  * `src/payload/read/trails.ts`), then handed to the client by
- * `TrailDataProvider`, which calls `setMountainBikeTrails` before anything
+ * `HomeClient`, which calls `setMountainBikeTrails` before anything
  * renders.
  *
  * Until that happens — and permanently for anyone running without a database —

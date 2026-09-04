@@ -11,7 +11,7 @@
  * The public map keeps working either way.
  */
 import type { ReactElement } from 'react';
-import { headers } from 'next/headers';
+import { getRequestHostname } from '@/utils/request-hostname';
 import { resolveActiveCityId } from '@/config/map.config';
 import { getCityTrails } from '@/payload/read/trails';
 import HomeClient from './HomeClient';
@@ -25,17 +25,4 @@ export default async function Home(): Promise<ReactElement> {
   const { trails } = await getCityTrails(cityId);
 
   return <HomeClient cityId={cityId} trails={trails} />;
-}
-
-async function getRequestHostname(): Promise<string | undefined> {
-  try {
-    const requestHeaders = await headers();
-    return (
-      requestHeaders.get('x-forwarded-host') ??
-      requestHeaders.get('host') ??
-      undefined
-    );
-  } catch {
-    return undefined;
-  }
 }

@@ -33,7 +33,6 @@ export interface CuratedTrailLayerConfig {
 export interface MountainBikeCityConfig {
   layers: CuratedTrailLayerConfig[];
   hiddenTrails: string[];
-  strayStyleLayers: string[];
 }
 
 export interface CityData {
@@ -45,7 +44,6 @@ export interface CityData {
   mountainBikeTrails: MountainBikeTrail[];
   trailMetadata: Record<string, TrailMeta>;
   mountainBike: MountainBikeCityConfig;
-  hiddenStyleLayerIds: string[];
   regionFor: (recArea: string) => string;
   // Static GeoJSON URL for the classified bike-network overlay (Casual mode).
   // Undefined for cities without one (the toggle is hidden).

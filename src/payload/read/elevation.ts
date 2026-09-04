@@ -3,7 +3,7 @@ import 'server-only';
 /**
  * Reads a trail's elevation profile out of Payload, by slug.
  *
- * The pane's chart has always come from `public/data/elevation/<slug>.json`,
+ * The pane's chart has always come from `public/data/elevation/<city>/<slug>.json`,
  * generated offline by `scripts/add_trail_elevation.py`. That works for the
  * checked-in trails and not at all for one created in the admin: there is no
  * script run between saving a trail and looking at it, so the fetch 404s and

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGpx, type GpxRoute } from './gpx';
+import { buildGpx, buildRideGpx, type GpxRoute } from './gpx';
 
 function lineStringFeature(
   coords: [number, number][],
@@ -149,5 +149,28 @@ describe('buildGpx', () => {
     expect(gpx).toContain('&lt;Loop&gt;');
     expect(gpx).toContain('&quot;Test&quot;');
     expect(gpx).toContain('&apos;s a test');
+  });
+});
+
+describe('buildRideGpx', () => {
+  it('writes segment breaks as separate GPX track segments', () => {
+    const gpx = buildRideGpx({
+      name: 'Paused Ride',
+      points: [
+        { lng: -85.3, lat: 35, altitude: 200, timestamp: 1000 },
+        { lng: -85.3, lat: 35.001, altitude: 201, timestamp: 2000 },
+        {
+          lng: -121.3,
+          lat: 44,
+          altitude: 500,
+          timestamp: 3000,
+          segmentStart: true,
+        },
+        { lng: -121.3, lat: 44.001, altitude: 501, timestamp: 4000 },
+      ],
+    });
+
+    expect(gpx.match(/<trkseg>/g)).toHaveLength(2);
+    expect(gpx.match(/<\/trkseg>/g)).toHaveLength(2);
   });
 });

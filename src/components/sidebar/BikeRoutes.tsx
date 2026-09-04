@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { bikeRoutes } from '@/data/geo_data';
+import { pressableProps } from './a11y';
 import type { BikeRoutesProps } from './types';
 
 export function BikeRoutes({ selectedRoute, onRouteSelect }: BikeRoutesProps) {
@@ -13,15 +14,7 @@ export function BikeRoutes({ selectedRoute, onRouteSelect }: BikeRoutesProps) {
       {bikeRoutes.map((route) => (
         <div
           key={route.id}
-          onClick={() => onRouteSelect(route.id)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onRouteSelect(route.id);
-            }
-          }}
-          role="button"
-          tabIndex={0}
+          {...pressableProps(() => onRouteSelect(route.id))}
           data-selected={selectedRoute === route.id || undefined}
           className={cn(
             'p-2 rounded cursor-pointer transition-all duration-200 border border-transparent',

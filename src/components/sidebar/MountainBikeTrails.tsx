@@ -7,6 +7,7 @@ import {
 import { cn } from '@/lib/utils';
 import { regionOf } from '@/data/trail-region';
 import { getMountainBikeTrails } from '@/data/trail-source';
+import { pressableProps } from './a11y';
 import type { MountainBikeTrailsProps } from './types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 
@@ -93,15 +94,7 @@ function TrailRow({
 }) {
   return (
     <div
-      onClick={() => onTrailSelect(trail.trailName)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onTrailSelect(trail.trailName);
-        }
-      }}
-      role="button"
-      tabIndex={0}
+      {...pressableProps(() => onTrailSelect(trail.trailName))}
       data-selected={selectedTrail === trail.trailName || undefined}
       data-faded={
         (selectedTrail && selectedTrail !== trail.trailName) || undefined
@@ -239,17 +232,10 @@ export function MountainBikeTrails({
               <React.Fragment key={region}>
                 <div
                   className="text-xs font-bold text-gray-700 cursor-pointer rounded pt-2.5 pb-1 px-1 flex items-center whitespace-nowrap hover:bg-blue-600/5 hover:text-blue-600"
-                  onClick={() => {
+                  {...pressableProps(() => {
                     toggleSet(setExpandedRegions, region);
                     onAreaSelect(region);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      toggleSet(setExpandedRegions, region);
-                      onAreaSelect(region);
-                    }
-                  }}
+                  })}
                   role="button"
                   tabIndex={0}
                   aria-expanded={isRegionExpanded}
@@ -275,13 +261,7 @@ export function MountainBikeTrails({
                         {!singleArea && (
                           <div
                             className="text-[11px] font-semibold uppercase text-gray-500 tracking-wide cursor-pointer rounded py-2 pb-1 px-1 pl-4 flex items-baseline hover:bg-blue-600/5 hover:text-blue-600"
-                            onClick={() => handleAreaClick(area)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                handleAreaClick(area);
-                              }
-                            }}
+                            {...pressableProps(() => handleAreaClick(area))}
                             role="button"
                             tabIndex={0}
                             aria-expanded={isAreaExpanded}

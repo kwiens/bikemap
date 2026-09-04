@@ -23,7 +23,9 @@ Usage:
   4. Run: python scripts/add_trail_bounds.py
 """
 
-import json, math, re, sys
+import json, re, sys
+
+from _geo import M_TO_MI, haversine_m
 
 # Paste trail coordinate data here (from browser console)
 # Format: { "Trail Name": [[[lng, lat], [lng, lat], ...], ...], ... }
@@ -31,13 +33,7 @@ trail_coords_json = '''{}'''
 
 def haversine_miles(lon1, lat1, lon2, lat2):
     """Calculate distance between two points in miles using haversine formula."""
-    R = 3958.8  # Earth radius in miles
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlon / 2) ** 2)
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return haversine_m(lon1, lat1, lon2, lat2) * M_TO_MI
 
 def line_distance_miles(coords):
     """Sum haversine distance along a list of [lng, lat] coordinate pairs."""

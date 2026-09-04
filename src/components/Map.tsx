@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import mapboxgl from 'mapbox-gl';
 import { MapLegendProvider } from '@/components/MapLegend';
-import { RidesPanel } from '@/components/RidesPanel';
+import { EmbedAttribution } from '@/components/EmbedAttribution';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { useEmbed } from '@/components/EmbedContext';
+
 import {
   bikeRoutes,
   mapFeatures,
@@ -60,9 +65,19 @@ import {
   toLngLatBounds,
 } from '@/utils/map';
 import { loadRide } from '@/utils/ride-storage';
+import { splitRideSegments } from '@/data/ride';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
+import { clearMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
+
+// Ride recording is unreachable in embed mode, and its subtree (history, GPX,
+// ride stats and storage) is a sizeable chunk to make a partner's page
+// download. Loading it lazily keeps it out of the /embed request entirely.
+const RidesPanel = dynamic(
+  () => import('@/components/RidesPanel').then((m) => m.RidesPanel),
+  { ssr: false },
+);
 
 // Recenter pause durations: how long to suppress auto-centering after
 // programmatic fly-to animations vs user gestures (drag, zoom, scroll).
@@ -71,15 +86,28 @@ const PAUSE_GESTURE_MS = 10000;
 
 // Initialize Mapbox access token from config
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
-if (!mapConfig.mapbox.accessToken) {
+
+// NEXT_PUBLIC_* values are inlined at build time, so a deployment built before
+// the variable was set stays broken until it is rebuilt — no amount of fixing
+// the dashboard changes an existing build.
+const hasMapboxToken = Boolean(mapConfig.mapbox.accessToken);
+
+if (!hasMapboxToken) {
   console.warn(
     'NEXT_PUBLIC_MAPBOX_TOKEN is not set — the map will fail to load. ' +
-      'Copy .env.example to .env.local and add a Mapbox token.',
+      'Copy .env.example to .env.local and add a Mapbox token. ' +
+      'On a deployment, set it for this environment and then redeploy: the ' +
+      'token is baked in at build time, so an existing build keeps failing.',
   );
 }
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
+  const { isEmbed, options: embedOptions } = useEmbed();
+  // Embed mode is fixed for the lifetime of the tree, but the init effect runs
+  // once on mount and must not list it as a dependency.
+  const isEmbedRef = useRef(isEmbed);
+  isEmbedRef.current = isEmbed;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
@@ -96,6 +124,9 @@ const MapboxMap = memo(function MapboxMap() {
   const gpsHeading = useRef<{ heading: number; speed: number } | null>(null);
   const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
+  // Set when init throws or the style errors — a token can be present but
+  // revoked, which `hasMapboxToken` (a build-time constant) cannot detect.
+  const [mapFailed, setMapFailed] = useState(false);
 
   // Track markers for attractions and bike resources
   const attractionMarkers = useRef<MarkerManager>(new MarkerManager());
@@ -104,9 +135,14 @@ const MapboxMap = memo(function MapboxMap() {
   // Tracks the latest desired visibility of the rentals layer so a slow GBFS
   // fetch can't re-show markers after the user has toggled the layer back off.
   const bikeRentalsVisibleRef = useRef(false);
-  const [showAttractions, setShowAttractions] = useState(false);
-  const [showBikeResources, setShowBikeResources] = useState(false);
-  const [showBikeRentals, setShowBikeRentals] = useState(false);
+  // Tracks all marker-layer visibility so route dimming can be computed from
+  // "any marker layer visible" — independent of the order the sidebar
+  // dispatches its radio-toggle OFF/ON events.
+  const markerLayersVisibleRef = useRef({
+    attractions: false,
+    bikeResources: false,
+    bikeRentals: false,
+  });
   // Desired OSM-trails visibility, tracked in a ref so a toggle flipped before
   // the style finishes loading can be replayed once the layers are attached.
   const osmTrailsVisibleRef = useRef(false);
@@ -140,8 +176,10 @@ const MapboxMap = memo(function MapboxMap() {
     const ride = await loadRide(rideId);
     if (!ride) return;
 
-    const coords: [number, number][] = ride.points.map((p) => [p.lng, p.lat]);
-    addRideLayer(map.current, coords);
+    const segments = splitRideSegments(ride.points).map((segment) =>
+      segment.map((p) => [p.lng, p.lat] as [number, number]),
+    );
+    addRideLayer(map.current, segments);
 
     // Dim other routes/trails
     updateRouteOpacity(map.current, bikeRoutes, null, {
@@ -172,7 +210,7 @@ const MapboxMap = memo(function MapboxMap() {
   useEffect(() => {
     const selectHandler = (e: Event) => handleRideSelect(e as CustomEvent);
     const deselectHandler = () => handleRideDeselect();
-    const liveCoords: [number, number][] = [];
+    const liveSegments: [number, number][][] = [[]];
     let updateSkip = 0;
     const DETECT_INTERVAL_MS = 3000;
     const DETECT_CONFIRM_COUNT = 3; // ~9s before first auto-select
@@ -182,19 +220,27 @@ const MapboxMap = memo(function MapboxMap() {
       if (!map.current) return;
       const detail = (e as CustomEvent).detail;
 
-      // Batch restore (continueRide) — push all points and render once
-      if (detail.points) {
-        liveCoords.push(...(detail.points as [number, number][]));
-        updateRideLayer(map.current, liveCoords);
+      // Batch restore (continueRide) — replace all segments and render once
+      if (detail.segments) {
+        liveSegments.length = 0;
+        liveSegments.push(...(detail.segments as [number, number][][]));
+        updateRideLayer(map.current, liveSegments);
         return;
       }
 
-      const { point } = detail;
-      liveCoords.push(point);
+      const { point, segmentStart } = detail;
+      if (segmentStart && liveSegments[liveSegments.length - 1].length > 0) {
+        liveSegments.push([]);
+      }
+      liveSegments[liveSegments.length - 1].push(point);
       // Throttle Mapbox setData to every 3rd point
       updateSkip++;
-      if (liveCoords.length >= 2 && updateSkip >= 3) {
-        updateRideLayer(map.current, liveCoords);
+      const pointCount = liveSegments.reduce(
+        (count, segment) => count + segment.length,
+        0,
+      );
+      if (pointCount >= 2 && updateSkip >= 3) {
+        updateRideLayer(map.current, liveSegments);
         updateSkip = 0;
       }
 
@@ -233,10 +279,15 @@ const MapboxMap = memo(function MapboxMap() {
     };
     const stopHandler = () => {
       // Flush any unrendered points so the full route is briefly visible
-      if (map.current && liveCoords.length >= 2) {
-        updateRideLayer(map.current, liveCoords);
+      const pointCount = liveSegments.reduce(
+        (count, segment) => count + segment.length,
+        0,
+      );
+      if (map.current && pointCount >= 2) {
+        updateRideLayer(map.current, liveSegments);
       }
-      liveCoords.length = 0;
+      liveSegments.length = 0;
+      liveSegments.push([]);
       if (map.current) removeRideLayer(map.current);
     };
 
@@ -328,7 +379,13 @@ const MapboxMap = memo(function MapboxMap() {
           }),
         );
       },
-      () => {
+      (error) => {
+        // Timeouts (code 3) are routine indoors/under tree cover — keep the
+        // marker and wait for the next fix. Only tear down when the position is
+        // genuinely unavailable or permission was revoked.
+        if (error.code === error.TIMEOUT) {
+          return;
+        }
         if (locationMarker.current) {
           locationMarker.current.remove();
           locationMarker.current = null;
@@ -437,9 +494,28 @@ const MapboxMap = memo(function MapboxMap() {
     [showToast],
   );
 
+  // Routes' resting opacity: dimmed while any marker layer is shown so the
+  // markers stand out, full otherwise. Matches the layer-toggle behavior.
+  const restingRouteOpacity = useCallback(
+    () =>
+      Object.values(markerLayersVisibleRef.current).some(Boolean)
+        ? { selected: 0.1, unselected: 0.1 }
+        : { selected: 1, unselected: 1 },
+    [],
+  );
+
+  // Reset route opacities when routes are deselected (empty-map click,
+  // sidebar trail selection, OSM trail selection, ...).
+  const handleRouteDeselect = useCallback(() => {
+    if (!map.current) return;
+    updateRouteOpacity(map.current, bikeRoutes, null, restingRouteOpacity());
+  }, [restingRouteOpacity]);
+
   const handleTrailDeselect = useCallback(() => {
     if (!map.current) return;
     updateMtnBikeOpacity(map.current, null);
+    // Trail selection dims the bike routes — restore them on deselect.
+    updateRouteOpacity(map.current, bikeRoutes, null, restingRouteOpacity());
 
     // Re-enable auto-detect if recording is active
     if (isRecordingRef.current) {
@@ -448,7 +524,7 @@ const MapboxMap = memo(function MapboxMap() {
       detectCandidateRef.current = null;
       detectConfirmCountRef.current = 0;
     }
-  }, []);
+  }, [restingRouteOpacity]);
 
   // Handle area (rec area heading) selection — zoom to area bounds
   const handleAreaSelect = useCallback(
@@ -476,255 +552,266 @@ const MapboxMap = memo(function MapboxMap() {
   );
 
   // Handle layer toggle events
-  const handleLayerToggle = useCallback(async (event: CustomEvent) => {
-    const { layer, visible } = event.detail;
-
-    if (!map.current) {
-      return;
-    }
-
-    if (layer === 'bikeRentals') {
-      bikeRentalsVisibleRef.current = visible;
-      setShowBikeRentals(visible);
-
-      if (visible) {
-        bikeRentalMarkers.current.hide();
-
-        try {
-          const rentalLocations = await fetchBikeRentalLocations();
-
-          // The user may have toggled the layer back off (or the map may have
-          // unmounted) while the GBFS fetch was in flight — don't re-show.
-          if (!bikeRentalsVisibleRef.current || !map.current) {
-            return;
-          }
-
-          const markers = rentalLocations.map((location) =>
-            createBikeRentalMarker(location),
-          );
-
-          bikeRentalMarkers.current.setMarkers(markers);
-          bikeRentalMarkers.current.show(map.current);
-        } catch (error) {
-          console.error('Error fetching bike rental data:', error);
-        }
-      } else {
-        bikeRentalMarkers.current.hide();
-      }
-    }
-
-    if (layer === 'attractions') {
-      setShowAttractions(visible);
-
-      if (visible) {
-        bikeResourceMarkers.current.hide();
-
-        if (attractionMarkers.current.length === 0) {
-          const markers = mapFeatures.map((feature) =>
-            createAttractionMarker(feature),
-          );
-          attractionMarkers.current.setMarkers(markers);
-        }
-
-        attractionMarkers.current.show(map.current);
-      } else {
-        attractionMarkers.current.hide();
-      }
-    }
-
-    if (layer === 'bikeResources') {
-      setShowBikeResources(visible);
-
-      if (visible) {
-        attractionMarkers.current.hide();
-
-        if (bikeResourceMarkers.current.length === 0) {
-          const markers = bikeResources.map((resource) =>
-            createBikeResourceMarker(resource),
-          );
-          bikeResourceMarkers.current.setMarkers(markers);
-        }
-
-        bikeResourceMarkers.current.show(map.current);
-      } else {
-        bikeResourceMarkers.current.hide();
-      }
-    }
-
-    // Nationwide OSM bike trails are an independent vector layer (not a marker
-    // group), so just flip their visibility. Remember the desired state so it
-    // can be replayed if the style hadn't finished loading yet.
-    if (layer === 'osmTrails') {
-      osmTrailsVisibleRef.current = visible;
-      setOsmTrailsVisible(map.current, visible);
-      return;
-    }
-
-    if (layer === 'bikeNetwork') {
-      bikeNetworkVisibleRef.current = visible;
-      // Lazy-attach the (multi-MB) network GeoJSON on first enable rather than
-      // at startup, so users who never open it don't pay the download. If the
-      // style isn't loaded yet, the ref alone suffices — the style.load handler
-      // replays it. ensureBikeNetworkSource is idempotent.
-      if (bikeNetworkUrl && map.current.isStyleLoaded()) {
-        if (visible) ensureBikeNetworkSource(map.current, bikeNetworkUrl);
-        setBikeNetworkVisible(map.current, visible);
-      }
-      return;
-    }
-
-    if (visible) {
-      updateRouteOpacity(map.current, bikeRoutes, null, {
-        selected: 0.1,
-        unselected: 0.1,
-      });
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-    } else {
-      updateRouteOpacity(map.current, bikeRoutes, null, {
-        selected: 1,
-        unselected: 1,
-      });
-    }
-  }, []);
-
-  // Handler for centering on a specific location
-  const handleCenterLocation = useCallback(
+  const handleLayerToggle = useCallback(
     async (event: CustomEvent) => {
+      const { layer, visible } = event.detail;
+
+      // Record the desired state before the map-exists guard below. These refs
+      // are what style.load replays, so writing them after the bail-out made
+      // that recovery unreachable for the toggles it was meant to catch.
+      if (layer === 'osmTrails') osmTrailsVisibleRef.current = visible;
+      if (layer === 'bikeNetwork') bikeNetworkVisibleRef.current = visible;
+      if (
+        layer === 'attractions' ||
+        layer === 'bikeResources' ||
+        layer === 'bikeRentals'
+      ) {
+        markerLayersVisibleRef.current[
+          layer as keyof typeof markerLayersVisibleRef.current
+        ] = visible;
+        if (layer === 'bikeRentals') bikeRentalsVisibleRef.current = visible;
+      }
+
       if (!map.current) {
         return;
       }
 
-      const { location } = event.detail;
+      // Nationwide OSM bike trails are an independent vector layer (not a marker
+      // group), so just flip their visibility. Remember the desired state so it
+      // can be replayed if the style hadn't finished loading yet.
+      if (layer === 'osmTrails') {
+        setOsmTrailsVisible(map.current, visible);
+        return;
+      }
 
-      // A bounds payload (e.g. the dockless fleet summary) fits the whole extent
-      // rather than flying to a single point. maxZoom keeps a tight/one-vehicle
-      // fleet from zooming all the way in.
-      if (location.bounds) {
-        const corners = (
-          location.bounds as [[number, number], [number, number]]
-        ).flat();
-        // A non-finite corner (malformed feed coord) would make fitBounds throw.
-        if (corners.every((n) => Number.isFinite(n))) {
-          pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-          map.current.fitBounds(location.bounds, {
-            padding: 60,
-            maxZoom: 16,
-            duration: 1000,
-            essential: true,
-          });
+      if (layer === 'bikeNetwork') {
+        // Lazy-attach the (multi-MB) network GeoJSON on first enable rather than
+        // at startup, so users who never open it don't pay the download. No
+        // isStyleLoaded() gate: it reports false during any pending style
+        // mutation (which would silently swallow the toggle), and the ensure/set
+        // helpers are idempotent and internally guarded. The init handler also
+        // replays the ref for pre-style-load toggles.
+        if (bikeNetworkUrl) {
+          if (visible) ensureBikeNetworkSource(map.current, bikeNetworkUrl);
+          setBikeNetworkVisible(map.current, visible);
         }
         return;
       }
 
-      let coordinates: [number, number] | null = null;
-
-      // If we have latitude and longitude, use them directly
-      if (location.latitude && location.longitude) {
-        coordinates = [location.longitude, location.latitude];
-      }
-      // If we have an address, geocode it
-      else if (location.address && mapboxgl.accessToken) {
-        coordinates = await geocodeAddress(
-          location.address,
-          mapboxgl.accessToken,
-        );
+      // Compute route dimming from "any marker layer visible" so the result is
+      // independent of the order the sidebar dispatches its OFF/ON events.
+      // This runs before the bikeRentals GBFS await below on purpose: doing it
+      // afterwards would deselect a route the user (or an embed's `?route=`
+      // deep link) selected while that request was still in flight.
+      updateRouteOpacity(map.current, bikeRoutes, null, restingRouteOpacity());
+      if (visible) {
+        window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
       }
 
-      if (coordinates) {
-        pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-        map.current.flyTo({
-          center: coordinates,
-          zoom: 17,
-          essential: true,
-          duration: 1000,
-        });
+      if (layer === 'bikeRentals') {
+        if (visible) {
+          bikeRentalMarkers.current.hide();
 
-        // Create a temporary highlight marker using React component
-        const marker = createHighlightMarker(coordinates[0], coordinates[1]);
+          try {
+            const rentalLocations = await fetchBikeRentalLocations();
 
-        // Only add to map if it exists
-        if (map.current) {
-          marker.addTo(map.current);
-        }
+            // The user may have toggled the layer back off (or the map may have
+            // unmounted) while the GBFS fetch was in flight — don't re-show.
+            if (!bikeRentalsVisibleRef.current || !map.current) {
+              return;
+            }
 
-        // Remove the highlight marker after animation
-        setTimeout(() => {
-          marker.remove();
-        }, 3000);
+            const markers = rentalLocations.map((location) =>
+              createBikeRentalMarker(location),
+            );
 
-        // Check if this location is an attraction - show the markers if they're not already shown
-        const isAttraction = findLocationInArray(mapFeatures, coordinates);
-
-        if (isAttraction && !showAttractions) {
-          // Toggle attractions layer on
-          window.dispatchEvent(
-            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-              detail: { layer: 'attractions', visible: true },
-            }),
-          );
-        }
-
-        // Check if this location is a bike resource - show the markers if they're not already shown
-        const isBikeResource = findLocationInArray(bikeResources, coordinates);
-
-        if (isBikeResource && !showBikeResources) {
-          // Toggle bike resources layer on
-          window.dispatchEvent(
-            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-              detail: { layer: 'bikeResources', visible: true },
-            }),
-          );
-        }
-
-        // Check if this location is a bike rental - show the markers if they're not already shown
-        const isBikeRental = bikeRentalMarkers.current.findByCoordinates(
-          coordinates[0],
-          coordinates[1],
-        );
-
-        if (isBikeRental && !showBikeRentals) {
-          // Toggle bike rentals layer on
-          window.dispatchEvent(
-            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-              detail: { layer: 'bikeRentals', visible: true },
-            }),
-          );
-        }
-
-        // Check if this is an attraction, bike resource, or bike rental and show the popup
-        if (showAttractions) {
-          const attractionMarker = attractionMarkers.current.findByCoordinates(
-            coordinates[0],
-            coordinates[1],
-          );
-          if (attractionMarker) {
-            attractionMarkers.current.openPopupFor(attractionMarker);
+            bikeRentalMarkers.current.setMarkers(markers);
+            bikeRentalMarkers.current.show(map.current);
+          } catch (error) {
+            console.error('Error fetching bike rental data:', error);
           }
+        } else {
+          bikeRentalMarkers.current.hide();
         }
+      }
 
-        if (showBikeResources) {
-          const bikeMarker = bikeResourceMarkers.current.findByCoordinates(
-            coordinates[0],
-            coordinates[1],
-          );
-          if (bikeMarker) {
-            bikeResourceMarkers.current.openPopupFor(bikeMarker);
+      if (layer === 'attractions') {
+        if (visible) {
+          bikeResourceMarkers.current.hide();
+
+          if (attractionMarkers.current.length === 0) {
+            const markers = mapFeatures.map((feature) =>
+              createAttractionMarker(feature),
+            );
+            attractionMarkers.current.setMarkers(markers);
           }
+
+          attractionMarkers.current.show(map.current);
+        } else {
+          attractionMarkers.current.hide();
         }
+      }
 
-        if (showBikeRentals) {
-          const rentalMarker = bikeRentalMarkers.current.findByCoordinates(
-            coordinates[0],
-            coordinates[1],
-          );
-          if (rentalMarker) {
-            bikeRentalMarkers.current.openPopupFor(rentalMarker);
+      if (layer === 'bikeResources') {
+        if (visible) {
+          attractionMarkers.current.hide();
+
+          if (bikeResourceMarkers.current.length === 0) {
+            const markers = bikeResources.map((resource) =>
+              createBikeResourceMarker(resource),
+            );
+            bikeResourceMarkers.current.setMarkers(markers);
           }
+
+          bikeResourceMarkers.current.show(map.current);
+        } else {
+          bikeResourceMarkers.current.hide();
         }
       }
     },
-    [showAttractions, showBikeResources, showBikeRentals],
+    [restingRouteOpacity],
   );
+
+  // Handler for centering on a specific location
+  const handleCenterLocation = useCallback(async (event: CustomEvent) => {
+    if (!map.current) {
+      return;
+    }
+
+    const { location } = event.detail;
+
+    // A bounds payload (e.g. the dockless fleet summary) fits the whole extent
+    // rather than flying to a single point. maxZoom keeps a tight/one-vehicle
+    // fleet from zooming all the way in.
+    if (location.bounds) {
+      const corners = (
+        location.bounds as [[number, number], [number, number]]
+      ).flat();
+      // A non-finite corner (malformed feed coord) would make fitBounds throw.
+      if (corners.every((n) => Number.isFinite(n))) {
+        pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
+        map.current.fitBounds(location.bounds, {
+          padding: 60,
+          maxZoom: 16,
+          duration: 1000,
+          essential: true,
+        });
+      }
+      return;
+    }
+
+    let coordinates: [number, number] | null = null;
+
+    // If we have latitude and longitude, use them directly
+    if (location.latitude && location.longitude) {
+      coordinates = [location.longitude, location.latitude];
+    }
+    // If we have an address, geocode it
+    else if (location.address && mapboxgl.accessToken) {
+      coordinates = await geocodeAddress(
+        location.address,
+        mapboxgl.accessToken,
+      );
+    }
+
+    if (coordinates) {
+      pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
+      map.current.flyTo({
+        center: coordinates,
+        zoom: 17,
+        essential: true,
+        duration: 1000,
+      });
+
+      // Create a temporary highlight marker using React component
+      const marker = createHighlightMarker(coordinates[0], coordinates[1]);
+
+      // Only add to map if it exists
+      if (map.current) {
+        marker.addTo(map.current);
+      }
+
+      // Remove the highlight marker after animation
+      setTimeout(() => {
+        marker.remove();
+      }, 3000);
+
+      // Read marker-layer visibility from the ref, not state: the LAYER_TOGGLE
+      // dispatches below run their handler synchronously, so the ref reflects
+      // the just-enabled layer while this closure's state is still stale.
+      const markersVisible = markerLayersVisibleRef.current;
+
+      // Check if this location is an attraction - show the markers if they're not already shown
+      const isAttraction = findLocationInArray(mapFeatures, coordinates);
+
+      if (isAttraction && !markersVisible.attractions) {
+        // Toggle attractions layer on
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+            detail: { layer: 'attractions', visible: true },
+          }),
+        );
+      }
+
+      // Check if this location is a bike resource - show the markers if they're not already shown
+      const isBikeResource = findLocationInArray(bikeResources, coordinates);
+
+      if (isBikeResource && !markersVisible.bikeResources) {
+        // Toggle bike resources layer on
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+            detail: { layer: 'bikeResources', visible: true },
+          }),
+        );
+      }
+
+      // Check if this location is a bike rental - show the markers if they're not already shown
+      const isBikeRental = bikeRentalMarkers.current.findByCoordinates(
+        coordinates[0],
+        coordinates[1],
+      );
+
+      if (isBikeRental && !markersVisible.bikeRentals) {
+        // Toggle bike rentals layer on
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+            detail: { layer: 'bikeRentals', visible: true },
+          }),
+        );
+      }
+
+      // Check if this is an attraction, bike resource, or bike rental and show the popup
+      if (markerLayersVisibleRef.current.attractions) {
+        const attractionMarker = attractionMarkers.current.findByCoordinates(
+          coordinates[0],
+          coordinates[1],
+        );
+        if (attractionMarker) {
+          attractionMarkers.current.openPopupFor(attractionMarker);
+        }
+      }
+
+      if (markerLayersVisibleRef.current.bikeResources) {
+        const bikeMarker = bikeResourceMarkers.current.findByCoordinates(
+          coordinates[0],
+          coordinates[1],
+        );
+        if (bikeMarker) {
+          bikeResourceMarkers.current.openPopupFor(bikeMarker);
+        }
+      }
+
+      if (markerLayersVisibleRef.current.bikeRentals) {
+        const rentalMarker = bikeRentalMarkers.current.findByCoordinates(
+          coordinates[0],
+          coordinates[1],
+        );
+        if (rentalMarker) {
+          bikeRentalMarkers.current.openPopupFor(rentalMarker);
+        }
+      }
+    }
+  }, []);
 
   // Set up event listeners for map layers and location centering
   useEffect(() => {
@@ -758,6 +845,19 @@ const MapboxMap = memo(function MapboxMap() {
       window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, routeSelectHandler);
     };
   }, [handleRouteSelect]);
+
+  // Reset route opacities whenever a route is deselected (empty-map click,
+  // sidebar deselect, rides panel, ...). Without this the map kept the last
+  // selection's dim/highlight forever.
+  useEffect(() => {
+    window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
+    return () => {
+      window.removeEventListener(
+        MAP_EVENTS.ROUTE_DESELECT,
+        handleRouteDeselect,
+      );
+    };
+  }, [handleRouteDeselect]);
 
   // Set up trail-select and trail-deselect event listeners
   useEffect(() => {
@@ -842,6 +942,11 @@ const MapboxMap = memo(function MapboxMap() {
       return; // already initialized
     }
 
+    // Without a token every Mapbox call throws; MapUnavailable renders instead.
+    if (!hasMapboxToken) {
+      return;
+    }
+
     // Initialize map
     if (mapContainer.current) {
       const initializeMap = async () => {
@@ -855,8 +960,8 @@ const MapboxMap = memo(function MapboxMap() {
           const newMap = new mapboxgl.Map({
             container: mapContainer.current as HTMLElement,
             style: mapConfig.mapbox.styleUrl,
-            center: mapConfig.defaultView.center,
-            zoom: mapConfig.defaultView.zoom,
+            center: embedOptions.center ?? mapConfig.defaultView.center,
+            zoom: embedOptions.zoom ?? mapConfig.defaultView.zoom,
             pitch: mapConfig.defaultView.pitch,
             bearing: mapConfig.defaultView.bearing,
             antialias: true,
@@ -869,11 +974,21 @@ const MapboxMap = memo(function MapboxMap() {
           // Add basic controls
           newMap.addControl(new mapboxgl.NavigationControl());
 
-          // Wait for map to load
-          await new Promise<void>((resolve) => {
-            newMap.on('load', () => {
-              resolve();
-            });
+          // Registered before the load await, not after it: a token that is
+          // present but revoked makes the style request fail, 'load' never
+          // fires, and an error handler installed further down would never be
+          // reached — the map would hang silently with a clean console.
+          newMap.on('error', (event: { error?: Error }) => {
+            console.error('Map error:', event.error);
+          });
+
+          // Wait for the style to load, but give up if it errors so the
+          // fallback can render instead of waiting forever.
+          await new Promise<void>((resolve, reject) => {
+            newMap.on('load', () => resolve());
+            newMap.once('error', (event: { error?: Error }) =>
+              reject(event.error ?? new Error('Mapbox style failed to load')),
+            );
           });
 
           // Find the road-label layer — route lines will be inserted
@@ -1024,23 +1139,34 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
-          // Initialize all mountain bike trail layers. The MTB tileset
-          // isn't included in the Mapbox Studio style, so attach it first.
-          ensureMtnBikeSource(newMap);
-          initMtnBikeColors(newMap);
-          initMtnBikeLayers(newMap);
+          // Embed mode is Casual-only: the MTB tab is hidden, so attaching the
+          // trail tilesets would cost the partner's page two extra vector
+          // sources and their tile traffic on the critical path to MAP_READY,
+          // and would leave trail lines clickable with no UI to show the
+          // result. Skip the whole stack there.
+          const showTrails = !isEmbedRef.current;
+
+          if (showTrails) {
+            // Initialize all mountain bike trail layers. The MTB tileset
+            // isn't included in the Mapbox Studio style, so attach it first.
+            ensureMtnBikeSource(newMap);
+            initMtnBikeColors(newMap);
+            initMtnBikeLayers(newMap);
+          }
 
           // Suppress orphan trail layers baked into the Studio style (e.g. the
           // leftover TPL trails layer) so they don't render over our routes.
           hideStrayStyleLayers(newMap);
 
-          // Attach the nationwide OSM bike-trails layer (hidden until toggled).
-          // Its click handler is registered later, after the curated route/MTB
-          // hit handlers, so curated trails win clicks in overlapping areas.
-          // Replay any toggle the user flipped before the style finished loading.
-          ensureOsmTrailsSource(newMap);
-          if (osmTrailsVisibleRef.current) {
-            setOsmTrailsVisible(newMap, true);
+          if (showTrails) {
+            // Attach the nationwide OSM bike-trails layer (hidden until toggled).
+            // Its click handler is registered later, after the curated route/MTB
+            // hit handlers, so curated trails win clicks in overlapping areas.
+            // Replay any toggle the user flipped before the style finished loading.
+            ensureOsmTrailsSource(newMap);
+            if (osmTrailsVisibleRef.current) {
+              setOsmTrailsVisible(newMap, true);
+            }
           }
 
           // The classified bike-network overlay (Casual mode) is lazy-attached
@@ -1050,13 +1176,15 @@ const MapboxMap = memo(function MapboxMap() {
             ensureBikeNetworkSource(newMap, bikeNetworkUrl);
             setBikeNetworkVisible(newMap, true);
           }
-          initTrailBoundsFromDefaults(getMountainBikeTrails());
+          if (showTrails) {
+            initTrailBoundsFromDefaults(getMountainBikeTrails());
 
-          // Apply unselected defaults (opacity/width) through the shared
-          // helper so deselect and init stay in sync — see updateMtnBikeOpacity.
-          updateMtnBikeOpacity(newMap, null);
+            // Apply unselected defaults (opacity/width) through the shared
+            // helper so deselect and init stay in sync — see updateMtnBikeOpacity.
+            updateMtnBikeOpacity(newMap, null);
+          }
 
-          for (const cfg of TRAIL_LAYERS) {
+          for (const cfg of showTrails ? TRAIL_LAYERS : []) {
             if (!newMap.getLayer(cfg.layerId)) continue;
 
             // Click handler on hit-test layer for easier tapping
@@ -1098,7 +1226,9 @@ const MapboxMap = memo(function MapboxMap() {
           // then bails on the already-handled click. Clear any prior registration
           // first in case the style reloads and re-runs this block.
           osmSelectionCleanup.current?.();
-          osmSelectionCleanup.current = registerOsmTrailSelection(newMap);
+          if (showTrails) {
+            osmSelectionCleanup.current = registerOsmTrailSelection(newMap);
+          }
 
           // Click on empty map area deselects routes and trails.
           // Check originalEvent.target to ignore ghost clicks that land on
@@ -1179,18 +1309,17 @@ const MapboxMap = memo(function MapboxMap() {
             }
           });
 
-          // Add error handler
-          newMap.on('error', (event: { error: Error }) => {
-            console.error('Map error:', event.error);
-          });
-
           // Signal that the map is fully initialized and ready for events.
-          // Set a flag first so late listeners (e.g. page.tsx useEffect that
-          // registers after this fires) can detect they missed the event.
-          (window as unknown as Record<string, boolean>).__mapReady = true;
-          window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
+          // Sets a flag first so late listeners (which registered after this
+          // fires) can detect they missed the event — see utils/map-ready.
+          // A teardown may have run while this async init was mid-flight
+          // (Strict Mode's double-mount, Fast Refresh). Signalling ready then
+          // would fire onMapReady consumers at a map that no longer exists.
+          if (map.current !== newMap) return;
+          setMapReady();
         } catch (error) {
           console.error('Error initializing map:', error);
+          setMapFailed(true);
         }
       };
 
@@ -1228,11 +1357,30 @@ const MapboxMap = memo(function MapboxMap() {
         osmSelectionCleanup.current = null;
       }
 
+      // A first-fix listener may still be pending if tracking was enabled but
+      // GPS never fired — remove it so it can't fly a torn-down map.
+      if (pendingLocationListener.current) {
+        window.removeEventListener(
+          MAP_EVENTS.LOCATION_UPDATE,
+          pendingLocationListener.current,
+        );
+        pendingLocationListener.current = null;
+      }
+
       if (map.current) {
         map.current.remove();
         map.current = null;
       }
+
+      // The flag describes this map instance. Leaving it set would make
+      // listeners on a remounted tree (Strict Mode, Fast Refresh) dispatch
+      // immediately against a map that no longer exists, skipping the
+      // MAP_READY listener that would have recovered them.
+      clearMapReady();
     };
+    // embedOptions is read only for its value at mount time (the initial
+    // center/zoom); this effect must still only run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run once on mount
 
   const setLocationWatch = (value: boolean) => {
@@ -1509,6 +1657,10 @@ const MapboxMap = memo(function MapboxMap() {
     <>
       <div ref={mapContainer} className="w-full h-full absolute inset-0" />
 
+      {(!hasMapboxToken || mapFailed) && <MapUnavailable />}
+
+      <EmbedAttribution />
+
       {/* Route selection toast */}
       {toastMessage && (
         <div
@@ -1586,13 +1738,38 @@ const MapboxMap = memo(function MapboxMap() {
   );
 });
 
+// Shown in place of the map when no Mapbox token was compiled in. Without it a
+// misconfigured deploy is a silent blank rectangle — which on a partner's page
+// looks like our embed is simply broken, with the only clue in their console.
+function MapUnavailable() {
+  return (
+    <div className="absolute inset-0 z-[600] flex items-center justify-center bg-gray-100 p-6">
+      <div className="max-w-sm text-center">
+        <FontAwesomeIcon
+          icon={faTriangleExclamation}
+          className="w-8 h-8 text-gray-400"
+        />
+        <p className="mt-3 text-sm font-medium text-gray-800">
+          Map unavailable
+        </p>
+        <p className="mt-1 text-sm text-gray-600">
+          This site is missing its Mapbox access token, so the map could not be
+          loaded.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // Main Map component - manages layout and UI chrome
 export default function BikeMap() {
+  const { isEmbed } = useEmbed();
   return (
     <MapLegendProvider>
       <div className="w-screen h-full relative overflow-visible">
         <MapboxMap />
-        <RidesPanel />
+        {/* Ride recording needs geolocation + persistent storage — not for embeds */}
+        {!isEmbed && <RidesPanel />}
       </div>
     </MapLegendProvider>
   );

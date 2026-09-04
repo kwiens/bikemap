@@ -1,9 +1,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { mapConfigForHostname } from '@/config/map.config';
+import { getRequestHostname } from '@/utils/request-hostname';
 import { siteConfigForHostname } from '@/config/site.config';
+import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
+import { embedBuilderConfig } from '@/utils/embed-options';
 import {
   ArrowLeft,
   MessageCircle,
@@ -77,6 +79,7 @@ export default async function AboutPage() {
   const region = mapConfig.region.displayName;
   const showBikeChattAssets = siteConfig.cityId === 'chattanooga';
   const isBend = siteConfig.cityId === 'bend';
+  const builderConfig = embedBuilderConfig(hostname);
 
   return (
     <div className="min-h-screen bg-gray-50 fixed inset-0 overflow-y-auto z-[9999]">
@@ -220,6 +223,22 @@ export default async function AboutPage() {
           </section>
         )}
 
+        {/* Embed */}
+        <section className="mb-14">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
+            Put this map on your site
+          </h2>
+          <p className="text-sm text-gray-500 leading-relaxed mb-5">
+            Set it up below, then paste the snippet into your page — no account
+            or API key needed. The preview is the real thing, so what you see is
+            what your visitors get.
+          </p>
+          <EmbedSnippetBuilder
+            baseUrl={siteConfig.url}
+            config={builderConfig}
+          />
+        </section>
+
         {/* Data & credits */}
         <section className="mb-14">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
@@ -357,17 +376,4 @@ function LogoCard({
       </div>
     </div>
   );
-}
-
-async function getRequestHostname(): Promise<string | undefined> {
-  try {
-    const requestHeaders = await headers();
-    return (
-      requestHeaders.get('x-forwarded-host') ??
-      requestHeaders.get('host') ??
-      undefined
-    );
-  } catch {
-    return undefined;
-  }
 }

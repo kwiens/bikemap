@@ -3,7 +3,7 @@
  *
  *   /api/map/elevation/pointe-break?city=bend
  *
- * Shaped exactly like the static files in public/data/elevation/<slug>.json, so
+ * Shaped exactly like the static files in public/data/elevation/<city>/<slug>.json, so
  * the client can treat the two as one format in two places rather than two
  * formats.
  *
