@@ -32,11 +32,18 @@ console says so explicitly.
 2. Create a **public access token** at
    <https://account.mapbox.com/access-tokens/> (starts with `pk.`). Scope it to
    your domains.
-3. Put the token in `.env.local`:
+3. Put the token **and your style URL** in `.env.local`:
    ```
    NEXT_PUBLIC_MAPBOX_TOKEN=pk.your_token_here
+   NEXT_PUBLIC_MAPBOX_STYLE_URL=mapbox://styles/<you>/<your-style-id>
    ```
-   Set the same variable in your host's environment for production.
+   Set both in your host's environment for production.
+
+> **You must set your own style.** The default belongs to the upstream Mapbox
+> account, and its `composite` source mixes Mapbox's tilesets with private
+> `swuller.*` ones. With any other token that composite 404s and Mapbox drops
+> the **whole basemap** with no visible error — you get trails and overlays
+> floating on a blank background. If your map looks like that, this is why.
 
 ## 3. Branding — `src/config/site.config.ts`
 
@@ -56,7 +63,7 @@ Brand colors also live in `tailwind.config.ts` as `app-primary` / `app-secondary
 
 | Field | What to set |
 |---|---|
-| `mapbox.styleUrl` | Your Mapbox style URL from step 2 |
+| `mapbox.styleUrl` | Comes from `NEXT_PUBLIC_MAPBOX_STYLE_URL` (step 2) — no code change needed |
 | `defaultView` | `center` `[lng, lat]`, `zoom`, `pitch`, `bearing` — where the map opens |
 | `gbfs.baseUrl` | Your city's [GBFS](https://gbfs.org/) feed, or remove the bike-share layer if there's none |
 | `region.name` / `region.displayName` | Your region's slug and display name |

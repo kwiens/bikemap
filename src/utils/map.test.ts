@@ -11,6 +11,7 @@ import {
   hideStrayStyleLayers,
   detectTrailAtPoint,
   toLngLatBounds,
+  loadCuratedGeojson,
   TRAIL_LAYERS,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
@@ -703,6 +704,113 @@ describe('TRAIL_LAYERS', () => {
     const cfg = TRAIL_LAYERS.find((l) => l.layerId === 'Godsey Ridge Trails');
     expect(cfg?.trailProp).toBe('Name');
     expect(cfg?.toRawName('Godsey Ridge Green')).toBe('Green as built');
+  });
+});
+
+// A city whose curated layer reads from the database-backed API also carries
+// the static file the database was seeded from. Without the fallback, a 503 or
+// an unseeded database draws no lines while the sidebar still lists every
+// trail — so clicking one zooms to blank basemap.
+describe('loadCuratedGeojson', () => {
+  const API = '/api/map/trails?city=bend';
+  const STATIC = '/data/bend/trails.geojson';
+
+  const trails = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { Trail: "Phil's Trail" },
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [-121.4, 44.0],
+            [-121.5, 44.1],
+          ],
+        },
+      },
+    ],
+  };
+  const empty = { type: 'FeatureCollection', features: [] };
+
+  function mockMap() {
+    const setData = vi.fn();
+    const map = {
+      getSource: vi.fn().mockReturnValue({ setData }),
+    } as unknown as mapboxgl.Map;
+    return { map, setData };
+  }
+
+  /** A number stands for a failing status, an Error for a network failure. */
+  function mockFetch(byUrl: Record<string, unknown>) {
+    global.fetch = vi.fn(async (url: string) => {
+      const answer = byUrl[url];
+      if (answer instanceof Error) {
+        throw answer;
+      }
+      if (typeof answer === 'number') {
+        return { ok: false, status: answer };
+      }
+      return { ok: true, json: async () => answer };
+    }) as unknown as typeof fetch;
+  }
+
+  it('draws the API response and never fetches the fallback', async () => {
+    const { map, setData } = mockMap();
+    mockFetch({ [API]: trails, [STATIC]: empty });
+
+    await loadCuratedGeojson(map, 'bend-mtb-trails-source', API, STATIC);
+
+    expect(setData).toHaveBeenCalledWith(trails);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the static file when the API fails', async () => {
+    const { map, setData } = mockMap();
+    mockFetch({ [API]: 503, [STATIC]: trails });
+
+    await loadCuratedGeojson(map, 'bend-mtb-trails-source', API, STATIC);
+
+    expect(setData).toHaveBeenCalledWith(trails);
+  });
+
+  it('falls back when the API answers with no features', async () => {
+    // An unseeded database is a 200 with an empty FeatureCollection.
+    const { map, setData } = mockMap();
+    mockFetch({ [API]: empty, [STATIC]: trails });
+
+    await loadCuratedGeojson(map, 'bend-mtb-trails-source', API, STATIC);
+
+    expect(setData).toHaveBeenCalledWith(trails);
+  });
+
+  it('keeps the empty API answer when the fallback is unreachable too', async () => {
+    const { map, setData } = mockMap();
+    mockFetch({ [API]: empty, [STATIC]: new Error('offline') });
+
+    await loadCuratedGeojson(map, 'bend-mtb-trails-source', API, STATIC);
+
+    expect(setData).toHaveBeenCalledWith(empty);
+  });
+
+  it('leaves the source alone when neither URL answers', async () => {
+    const { map, setData } = mockMap();
+    mockFetch({ [API]: 503, [STATIC]: 404 });
+
+    await loadCuratedGeojson(map, 'bend-mtb-trails-source', API, STATIC);
+
+    expect(setData).not.toHaveBeenCalled();
+  });
+
+  it('tolerates the source having gone away mid-fetch', async () => {
+    const map = {
+      getSource: vi.fn().mockReturnValue(undefined),
+    } as unknown as mapboxgl.Map;
+    mockFetch({ [API]: trails });
+
+    await expect(
+      loadCuratedGeojson(map, 'bend-mtb-trails-source', API, STATIC),
+    ).resolves.toBeUndefined();
   });
 });
 
