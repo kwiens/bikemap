@@ -11,6 +11,8 @@ end-to-end checklist. A condensed version is at the [bottom](#checklist).
   vector tilesets, terrain)
 - **Python 3.10+** — only if you have mountain bike trails to process
 - A host for the build — **Vercel** works with zero config
+- A **Postgres** database — only if you want the admin (step 10). The public map
+  runs without one.
 
 ## 1. Fork and run locally
 
@@ -130,7 +132,77 @@ Replace with your own:
 - **iOS splash screens** — `public/splash/*`
 - **README screenshots** — `screenshot-splash.png`, `screenshot-route.png`
 
-## 10. Deploy
+## 10. Content backend — database and admin (optional)
+
+Skip this and the map still works: it renders from the checked-in data in
+`src/data/`. Add it and you get `/admin`, where someone without a GitHub account
+can edit trails, and where riders' condition reports land.
+
+Any Postgres works — Neon, Supabase, RDS, your own. No extensions needed.
+
+### Environment variables
+
+Set these wherever you host, **and for every environment you want the admin in**
+— a variable scoped to Development only does nothing for a deployed site, which
+is the easiest mistake to make here.
+
+| Variable | |
+|---|---|
+| `DATABASE_URL` | Postgres connection string |
+| `PAYLOAD_SECRET` | Signs admin sessions. Generate your own: `openssl rand -base64 32` |
+| `DATABASE_SSL` | Set to `disable` for a local database with no TLS |
+
+### Run the migrations
+
+**Migrations do not run on deploy.** The build is `next build` and nothing more,
+and `push` is off — the schema only ever changes through committed migrations
+that you apply yourself. A fresh database has no tables until you do this:
+
+```bash
+DATABASE_URL='<your deployed database>' pnpm db:migrate
+DATABASE_URL='<your deployed database>' pnpm db:seed:bend   # optional starter data
+```
+
+You run this **once when you set the database up, and again after any deploy
+that adds a migration** — otherwise the new code meets an old schema. Check
+before deploying:
+
+```bash
+DATABASE_URL='<your deployed database>' pnpm payload migrate:status
+```
+
+On Vercel, `vercel env pull` gets you the connection string without copying it
+by hand.
+
+> **Neon and other pooled providers:** run migrations against the **unpooled**
+> connection (`DATABASE_URL_UNPOOLED`), not the pooler. PgBouncer in transaction
+> mode does not reliably handle the DDL a migration runs. The app itself should
+> keep using the pooled URL.
+
+Automating this into the build command is possible but not recommended: it makes
+every deploy a schema change against live data, which is exactly what committed
+migrations exist to avoid.
+
+### First sign-in
+
+Visit `/admin`. With no users yet it offers a create-first-user form; after that
+the route is closed to anyone signed out.
+
+### Elevation charts
+
+Trails seeded from the checked-in data have distance and climb figures but no
+chart — the seed skips the measuring hook on purpose, so a few hundred rows
+don't fire a few hundred Overpass requests. Fill them in once:
+
+```bash
+DATABASE_URL='<your deployed database>' pnpm backfill:elevation
+```
+
+It samples terrain only, never Overpass, so it is safe to run over everything
+and safe to re-run. Expect the summary numbers to shift slightly — it remeasures
+them with the same maths the chart uses, so the two can't disagree.
+
+## 11. Deploy
 
 ```bash
 pnpm build      # verify the production build locally
@@ -138,7 +210,14 @@ pnpm build      # verify the production build locally
 
 On **Vercel**: import the repo, and add `NEXT_PUBLIC_MAPBOX_TOKEN` under
 Settings → Environment Variables for **Production, Preview, and Development**.
-Any Node host works — `pnpm build` then `pnpm start`.
+Add `DATABASE_URL` and `PAYLOAD_SECRET` too if you did step 10 — and remember
+that `NEXT_PUBLIC_*` values are baked in at build time, so changing one needs a
+redeploy, not just a save. Any Node host works — `pnpm build` then `pnpm start`.
+
+Every push to any branch gets its own preview deployment. If a deploy includes a
+new migration, apply it before or immediately after the deploy — the app
+tolerates an unreachable database (the map falls back to the checked-in data),
+but not a schema that is behind the code.
 
 ## Checklist
 
@@ -151,3 +230,6 @@ Any Node host works — `pnpm build` then `pnpm start`.
 - [ ] `public/terrain/` DEM tiles regenerated or removed (ride-recording elevation)
 - [ ] `public/` brand assets replaced
 - [ ] `pnpm build` passes; host env var set
+- [ ] *(if using the admin)* `DATABASE_URL` and `PAYLOAD_SECRET` set on the host
+- [ ] *(if using the admin)* `pnpm db:migrate` run against the deployed database
+- [ ] *(if using the admin)* first user created at `/admin`

@@ -47,6 +47,7 @@ import {
   highlightMtnBikeArea,
   initMtnBikeColors,
   initMtnBikeLayers,
+  setClosedTrails,
   ensureMtnBikeSource,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
@@ -67,6 +68,8 @@ import {
 import { loadRide } from '@/utils/ride-storage';
 import { splitRideSegments } from '@/data/ride';
 import { mapConfig } from '@/config/map.config';
+import { useTrailConditions } from '@/components/TrailConditionsProvider';
+import { closedTrails } from '@/data/trail-conditions';
 import { MAP_EVENTS } from '@/events';
 import { clearMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
@@ -110,6 +113,12 @@ const MapboxMap = memo(function MapboxMap() {
   isEmbedRef.current = isEmbed;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  // Set once, at the end of init, so the closures effect below knows there are
+  // layers to draw onto. Not a ref: this one has to trigger a render. Named
+  // apart from `setMapReady` (the window-flag handshake in @/utils/map-ready),
+  // which it would otherwise shadow inside this component.
+  const [layersReady, setLayersReady] = useState(false);
+  const { latest: latestConditions } = useTrailConditions();
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const locationAccuracy = useRef<number>(0);
   const watchId = useRef<number | null>(null);
@@ -1317,6 +1326,7 @@ const MapboxMap = memo(function MapboxMap() {
           // would fire onMapReady consumers at a map that no longer exists.
           if (map.current !== newMap) return;
           setMapReady();
+          setLayersReady(true);
         } catch (error) {
           console.error('Error initializing map:', error);
           setMapFailed(true);
@@ -1652,6 +1662,19 @@ const MapboxMap = memo(function MapboxMap() {
     // GPS/compass hook extraction.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Draw a red dashed line over any trail whose newest report says it is shut.
+  // Keyed on the conditions, not just the map, so a closure filed while the
+  // page is open appears without a reload.
+  useEffect(() => {
+    if (!layersReady || !map.current) {
+      return;
+    }
+    setClosedTrails(
+      map.current,
+      closedTrails({ latest: latestConditions }, getMountainBikeTrails()),
+    );
+  }, [layersReady, latestConditions]);
 
   return (
     <>

@@ -68,9 +68,11 @@ export interface Config {
   blocks: {};
   collections: {
     trails: Trail;
+    'trail-conditions': TrailCondition;
     'trail-areas': TrailArea;
     'trail-ratings': TrailRating;
     'trail-kinds': TrailKind;
+    'trail-condition-types': TrailConditionType;
     organizations: Organization;
     users: User;
     'payload-kv': PayloadKv;
@@ -81,9 +83,11 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     trails: TrailsSelect<false> | TrailsSelect<true>;
+    'trail-conditions': TrailConditionsSelect<false> | TrailConditionsSelect<true>;
     'trail-areas': TrailAreasSelect<false> | TrailAreasSelect<true>;
     'trail-ratings': TrailRatingsSelect<false> | TrailRatingsSelect<true>;
     'trail-kinds': TrailKindsSelect<false> | TrailKindsSelect<true>;
+    'trail-condition-types': TrailConditionTypesSelect<false> | TrailConditionTypesSelect<true>;
     organizations: OrganizationsSelect<false> | OrganizationsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -96,9 +100,11 @@ export interface Config {
   };
   fallbackLocale: null;
   globals: {
+    'condition-reporting': ConditionReporting;
     theme: Theme;
   };
   globalsSelect: {
+    'condition-reporting': ConditionReportingSelect<false> | ConditionReportingSelect<true>;
     theme: ThemeSelect<false> | ThemeSelect<true>;
   };
   locale: null;
@@ -156,6 +162,14 @@ export interface Trail {
    * Drives the line colour and sidebar icon, both of which come from the kind and rating rows rather than being stored per trail. Manage the list under Lists → Trail kinds.
    */
   kind: number | TrailKind;
+  /**
+   * Stops new condition reports for this trail. Existing reports stay visible.
+   */
+  conditionReportsClosed?: boolean | null;
+  /**
+   * Optional, e.g. “Closed for logging until 1 May.” Shown in place of the Report button.
+   */
+  conditionReportsNote?: string | null;
   /**
    * The name riders see in the sidebar and the elevation pane.
    */
@@ -259,6 +273,14 @@ export interface TrailArea {
    * Optional.
    */
   description?: string | null;
+  /**
+   * Stops new condition reports for every trail in this complex. Existing reports stay visible.
+   */
+  conditionReportsClosed?: boolean | null;
+  /**
+   * Optional, e.g. “Whole complex shut for the wet season.” Shown in place of the Report button.
+   */
+  conditionReportsNote?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -353,6 +375,75 @@ export interface TrailKind {
   createdAt: string;
 }
 /**
+ * What riders have reported. These are live on the map as soon as they arrive — tick “Hidden” to take one down.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-conditions".
+ */
+export interface TrailCondition {
+  id: number;
+  trail: number | Trail;
+  condition: number | TrailConditionType;
+  /**
+   * When it was ridden, not when this was typed.
+   */
+  observedAt: string;
+  /**
+   * Official means the steward said so, not a rider.
+   */
+  source: 'public' | 'admin';
+  /**
+   * Takes this off the public map. The row stays, so repeat abuse is still visible here.
+   */
+  hidden?: boolean | null;
+  city: 'chattanooga' | 'bend';
+  /**
+   * A one-way hash of the submitter’s IP, so repeat abuse can be found together. The address itself is never stored.
+   */
+  reporterHash?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * What riders can report a trail as being. Anything added here becomes selectable on the report form.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-condition-types".
+ */
+export interface TrailConditionType {
+  id: number;
+  /**
+   * As riders see it, e.g. "Muddy — stay off".
+   */
+  name: string;
+  /**
+   * The stable key the map matches on, e.g. "muddy". Lowercase and dashes.
+   */
+  value: string;
+  /**
+   * The badge colour.
+   */
+  color: string;
+  /**
+   * Low to high, best first. Orders the dropdown.
+   */
+  sortOrder: number;
+  /**
+   * Untick to retire an option. Deleting one that past reports use is blocked.
+   */
+  active?: boolean | null;
+  /**
+   * Draws the trail as a red dashed line, and the badge stops expiring — a closure holds until someone reports something else. Nothing to do with the “closed to new reports” switches on a trail.
+   */
+  marksClosed?: boolean | null;
+  /**
+   * What this means locally. Optional.
+   */
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Who can sign in and edit.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -417,6 +508,10 @@ export interface PayloadLockedDocument {
         value: number | Trail;
       } | null)
     | ({
+        relationTo: 'trail-conditions';
+        value: number | TrailCondition;
+      } | null)
+    | ({
         relationTo: 'trail-areas';
         value: number | TrailArea;
       } | null)
@@ -427,6 +522,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'trail-kinds';
         value: number | TrailKind;
+      } | null)
+    | ({
+        relationTo: 'trail-condition-types';
+        value: number | TrailConditionType;
       } | null)
     | ({
         relationTo: 'organizations';
@@ -489,6 +588,8 @@ export interface TrailsSelect<T extends boolean = true> {
   organization?: T;
   rating?: T;
   kind?: T;
+  conditionReportsClosed?: T;
+  conditionReportsNote?: T;
   displayName?: T;
   slug?: T;
   geom?: T;
@@ -509,6 +610,21 @@ export interface TrailsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-conditions_select".
+ */
+export interface TrailConditionsSelect<T extends boolean = true> {
+  trail?: T;
+  condition?: T;
+  observedAt?: T;
+  source?: T;
+  hidden?: T;
+  city?: T;
+  reporterHash?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "trail-areas_select".
  */
 export interface TrailAreasSelect<T extends boolean = true> {
@@ -516,6 +632,8 @@ export interface TrailAreasSelect<T extends boolean = true> {
   city?: T;
   region?: T;
   description?: T;
+  conditionReportsClosed?: T;
+  conditionReportsNote?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -541,6 +659,21 @@ export interface TrailKindsSelect<T extends boolean = true> {
   value?: T;
   icon?: T;
   color?: T;
+  description?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-condition-types_select".
+ */
+export interface TrailConditionTypesSelect<T extends boolean = true> {
+  name?: T;
+  value?: T;
+  color?: T;
+  sortOrder?: T;
+  active?: T;
+  marksClosed?: T;
   description?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -624,6 +757,25 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   createdAt?: T;
 }
 /**
+ * Whether riders can report trail conditions. Turning this off leaves existing reports visible.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "condition-reporting".
+ */
+export interface ConditionReporting {
+  id: number;
+  /**
+   * Untick to close the report form across the whole map.
+   */
+  enabled?: boolean | null;
+  /**
+   * Optional, e.g. “Conditions are reported on our forum instead.”
+   */
+  disabledMessage?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * How the admin looks. Changes apply on the next page load. Clear a field to fall back to the default.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -651,6 +803,17 @@ export interface Theme {
   customCss?: string | null;
   updatedAt?: string | null;
   createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "condition-reporting_select".
+ */
+export interface ConditionReportingSelect<T extends boolean = true> {
+  enabled?: T;
+  disabledMessage?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
