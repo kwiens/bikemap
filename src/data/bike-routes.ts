@@ -13,6 +13,7 @@ export interface BikeRoute {
   opacity: number; // Line opacity (0-1)
   distance: number; // Route distance in miles
   reverseDirection?: boolean; // Flip arrow direction on this route
+  reverseArrowBounds?: [number, number, number, number][]; // Flip arrow geometry within [swLng, swLat, neLng, neLat]
   hideArrows?: boolean; // Don't show directional arrows on this route
   defaultBounds?: [number, number, number, number]; // [swLng, swLat, neLng, neLat] fallback
   bounds?: mapboxgl.LngLatBounds; // Runtime-calculated bounds
@@ -29,6 +30,13 @@ export const bikeRoutes: BikeRoute[] = [
     opacity: 1.0,
     distance: 7.7,
     reverseDirection: true,
+    // The source geometry reverses direction around the 5th/Lookout half of
+    // the downtown rectangle. Flip those two legs before applying the
+    // route-wide reverseDirection so the complete loop runs clockwise.
+    reverseArrowBounds: [
+      [-85.3076, 35.0509, -85.3063, 35.0511], // East 5th Street
+      [-85.30655, 35.04965, -85.30625, 35.0511], // Lookout Street
+    ],
     defaultBounds: [-85.326925, 35.028003, -85.301479, 35.061734],
   },
   {

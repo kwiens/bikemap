@@ -76,7 +76,10 @@ export function syncRouteArrowLayer(
   });
   const arrowData: GeoJSON.FeatureCollection<GeoJSON.LineString> = {
     type: 'FeatureCollection',
-    features: removeOverlappingSegments(features),
+    features: applyArrowDirectionOverrides(
+      removeOverlappingSegments(features),
+      route.reverseArrowBounds,
+    ),
   };
   const arrowSourceId = `${route.id}-arrows-source`;
   const arrowLayerId = `${route.id}-arrows`;
@@ -287,6 +290,77 @@ export function removeOverlappingSegments(
   }
 
   return result;
+}
+
+export function applyArrowDirectionOverrides(
+  features: GeoJSON.Feature<GeoJSON.LineString>[],
+  reverseBounds: [number, number, number, number][] = [],
+): GeoJSON.Feature<GeoJSON.LineString>[] {
+  if (reverseBounds.length === 0) return features;
+
+  return features.flatMap((feature) => {
+    const coordinates = feature.geometry.coordinates;
+    if (coordinates.length < 2) return [];
+
+    const result: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+    let shouldReverse = edgeMatchesBounds(
+      coordinates[0],
+      coordinates[1],
+      reverseBounds,
+    );
+    let currentRun = [coordinates[0], coordinates[1]];
+
+    for (let i = 1; i < coordinates.length - 1; i++) {
+      const edgeShouldReverse = edgeMatchesBounds(
+        coordinates[i],
+        coordinates[i + 1],
+        reverseBounds,
+      );
+
+      if (edgeShouldReverse === shouldReverse) {
+        currentRun.push(coordinates[i + 1]);
+        continue;
+      }
+
+      pushDirectedLineString(result, currentRun, shouldReverse);
+      currentRun = [coordinates[i], coordinates[i + 1]];
+      shouldReverse = edgeShouldReverse;
+    }
+
+    pushDirectedLineString(result, currentRun, shouldReverse);
+    return result;
+  });
+}
+
+function edgeMatchesBounds(
+  start: GeoJSON.Position,
+  end: GeoJSON.Position,
+  bounds: [number, number, number, number][],
+): boolean {
+  const midpointLng = (start[0] + end[0]) / 2;
+  const midpointLat = (start[1] + end[1]) / 2;
+  return bounds.some(
+    ([swLng, swLat, neLng, neLat]) =>
+      midpointLng >= swLng &&
+      midpointLng <= neLng &&
+      midpointLat >= swLat &&
+      midpointLat <= neLat,
+  );
+}
+
+function pushDirectedLineString(
+  result: GeoJSON.Feature<GeoJSON.LineString>[],
+  coordinates: GeoJSON.Position[],
+  reverse: boolean,
+): void {
+  result.push({
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'LineString',
+      coordinates: reverse ? [...coordinates].reverse() : coordinates,
+    },
+  });
 }
 
 function pathOwnerId(

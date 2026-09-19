@@ -7,6 +7,7 @@ import {
   createArrowSdfImage,
   syncRouteArrowLayer,
   removeOverlappingSegments,
+  applyArrowDirectionOverrides,
   flyToBounds,
   updateMtnBikeOpacity,
   highlightMtnBikeArea,
@@ -261,6 +262,61 @@ describe('Mapbox Geo Integration', () => {
 
     it('should return empty array for empty input', () => {
       expect(removeOverlappingSegments([])).toHaveLength(0);
+    });
+  });
+
+  describe('applyArrowDirectionOverrides', () => {
+    it('should reverse only consecutive edges inside configured bounds', () => {
+      const features: GeoJSON.Feature<GeoJSON.LineString>[] = [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.3075, 35.051],
+              [-85.3064, 35.051],
+              [-85.3064, 35.0497],
+              [-85.3058, 35.0497],
+            ],
+          },
+        },
+      ];
+
+      const result = applyArrowDirectionOverrides(features, [
+        [-85.3076, 35.0509, -85.3063, 35.0511],
+        [-85.3065, 35.0496, -85.3063, 35.0511],
+      ]);
+
+      expect(result.map((feature) => feature.geometry.coordinates)).toEqual([
+        [
+          [-85.3064, 35.0497],
+          [-85.3064, 35.051],
+          [-85.3075, 35.051],
+        ],
+        [
+          [-85.3064, 35.0497],
+          [-85.3058, 35.0497],
+        ],
+      ]);
+    });
+
+    it('should leave geometry unchanged without overrides', () => {
+      const features: GeoJSON.Feature<GeoJSON.LineString>[] = [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.3, 35],
+              [-85.31, 35.01],
+            ],
+          },
+        },
+      ];
+
+      expect(applyArrowDirectionOverrides(features)).toBe(features);
     });
   });
 
