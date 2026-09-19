@@ -5,6 +5,7 @@ import {
   calculateRouteBounds,
   findLocationInArray,
   createArrowSdfImage,
+  syncRouteArrowLayer,
   removeOverlappingSegments,
   flyToBounds,
   updateMtnBikeOpacity,
@@ -135,8 +136,7 @@ describe('Mapbox Geo Integration', () => {
       expect(result[0].geometry.coordinates).toHaveLength(3);
     });
 
-    it('should remove portions where two segments overlap', () => {
-      // Two segments that share a middle section
+    it('should remove shared edges while preserving unique runs', () => {
       const features: GeoJSON.Feature[] = [
         {
           type: 'Feature',
@@ -145,7 +145,59 @@ describe('Mapbox Geo Integration', () => {
             type: 'LineString',
             coordinates: [
               [-85.3, 35.0],
-              [-85.31, 35.01], // overlapping
+              [-85.31, 35.01],
+              [-85.32, 35.02],
+              [-85.33, 35.03],
+            ],
+          },
+        },
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.34, 35.04],
+              [-85.32, 35.02],
+              [-85.31, 35.01],
+              [-85.35, 35.05],
+            ],
+          },
+        },
+      ];
+
+      const result = removeOverlappingSegments(features);
+
+      expect(result.map((feature) => feature.geometry.coordinates)).toEqual([
+        [
+          [-85.3, 35.0],
+          [-85.31, 35.01],
+        ],
+        [
+          [-85.32, 35.02],
+          [-85.33, 35.03],
+        ],
+        [
+          [-85.34, 35.04],
+          [-85.32, 35.02],
+        ],
+        [
+          [-85.31, 35.01],
+          [-85.35, 35.05],
+        ],
+      ]);
+    });
+
+    it('should keep paths that only cross at one coordinate', () => {
+      const features: GeoJSON.Feature[] = [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.3, 35.0],
+              [-85.31, 35.01],
               [-85.32, 35.02],
             ],
           },
@@ -157,7 +209,7 @@ describe('Mapbox Geo Integration', () => {
             type: 'LineString',
             coordinates: [
               [-85.34, 35.04],
-              [-85.31, 35.01], // overlapping
+              [-85.31, 35.01],
               [-85.35, 35.05],
             ],
           },
@@ -165,20 +217,168 @@ describe('Mapbox Geo Integration', () => {
       ];
 
       const result = removeOverlappingSegments(features);
-      // Overlapping coordinates should be removed, leaving only non-overlapping runs
-      for (const feature of result) {
-        for (const coord of feature.geometry.coordinates) {
-          // No coordinate should be near the overlapping point
-          const nearOverlap =
-            Math.abs(coord[0] - -85.31) < 0.001 &&
-            Math.abs(coord[1] - 35.01) < 0.001;
-          expect(nearOverlap).toBe(false);
-        }
-      }
+
+      expect(result).toHaveLength(2);
+      expect(result.map((feature) => feature.geometry.coordinates)).toEqual(
+        features.map(
+          (feature) => (feature.geometry as GeoJSON.LineString).coordinates,
+        ),
+      );
+    });
+
+    it('should not treat tile fragments of the same feature as overlap', () => {
+      const features: GeoJSON.Feature[] = [
+        {
+          type: 'Feature',
+          id: 42,
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.3, 35.0],
+              [-85.31, 35.01],
+              [-85.32, 35.02],
+            ],
+          },
+        },
+        {
+          type: 'Feature',
+          id: 42,
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.31, 35.01],
+              [-85.32, 35.02],
+              [-85.33, 35.03],
+            ],
+          },
+        },
+      ];
+
+      expect(removeOverlappingSegments(features)).toHaveLength(2);
     });
 
     it('should return empty array for empty input', () => {
       expect(removeOverlappingSegments([])).toHaveLength(0);
+    });
+  });
+
+  describe('syncRouteArrowLayer', () => {
+    const route: BikeRoute = {
+      id: 'route1',
+      name: 'Route 1',
+      color: '#FF0000',
+      description: 'Test route',
+      icon: {} as IconDefinition,
+      defaultWidth: 8,
+      opacity: 1,
+      distance: 5,
+    };
+
+    it('should build a filtered GeoJSON source for vector route arrows', () => {
+      const filter: mapboxgl.FilterSpecification = [
+        '==',
+        ['get', 'route'],
+        'route1',
+      ];
+      const features: GeoJSON.Feature[] = [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-85.3, 35.0],
+              [-85.31, 35.01],
+            ],
+          },
+        },
+      ];
+      const mockMap = {
+        querySourceFeatures: vi.fn().mockReturnValue(features),
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(undefined),
+        addLayer: vi.fn(),
+      } as unknown as mapboxgl.Map;
+      const layer = {
+        id: route.id,
+        type: 'line',
+        source: 'composite',
+        'source-layer': 'routes',
+        filter,
+      } as mapboxgl.AnyLayer;
+
+      syncRouteArrowLayer(mockMap, route, layer, 'road-label');
+
+      expect(mockMap.querySourceFeatures).toHaveBeenCalledWith('composite', {
+        sourceLayer: 'routes',
+        filter,
+      });
+      expect(mockMap.addSource).toHaveBeenCalledWith('route1-arrows-source', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features,
+        },
+      });
+      expect(mockMap.addLayer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'route1-arrows',
+          source: 'route1-arrows-source',
+        }),
+        'road-label',
+      );
+    });
+
+    it('should refresh an existing arrow source for GeoJSON routes', () => {
+      const setData = vi.fn();
+      const filter: mapboxgl.FilterSpecification = [
+        '==',
+        ['get', 'id'],
+        route.id,
+      ];
+      const mockMap = {
+        querySourceFeatures: vi.fn().mockReturnValue([]),
+        getSource: vi.fn().mockReturnValue({ setData }),
+        addSource: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(true),
+        addLayer: vi.fn(),
+      } as unknown as mapboxgl.Map;
+      const layer = {
+        id: route.id,
+        type: 'line',
+        source: 'inline-routes-source',
+        filter,
+      } as mapboxgl.AnyLayer;
+
+      syncRouteArrowLayer(mockMap, route, layer);
+
+      expect(mockMap.querySourceFeatures).toHaveBeenCalledWith(
+        'inline-routes-source',
+        { filter },
+      );
+      expect(setData).toHaveBeenCalledWith({
+        type: 'FeatureCollection',
+        features: [],
+      });
+      expect(mockMap.addSource).not.toHaveBeenCalled();
+      expect(mockMap.addLayer).not.toHaveBeenCalled();
+    });
+
+    it('should skip routes configured to hide arrows', () => {
+      const mockMap = {
+        querySourceFeatures: vi.fn(),
+      } as unknown as mapboxgl.Map;
+
+      syncRouteArrowLayer(mockMap, { ...route, hideArrows: true }, {
+        id: route.id,
+        type: 'line',
+        source: 'composite',
+      } as mapboxgl.AnyLayer);
+
+      expect(mockMap.querySourceFeatures).not.toHaveBeenCalled();
     });
   });
 

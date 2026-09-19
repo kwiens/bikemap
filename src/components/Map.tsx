@@ -35,6 +35,8 @@ import {
   calculateRouteBounds,
   findLocationInArray,
   createArrowSdfImage,
+  ROUTE_DIRECTION_ARROW_IMAGE_ID,
+  syncRouteArrowLayer,
   calculateTrailBounds,
   initTrailBoundsFromDefaults,
   initRouteBoundsFromDefaults,
@@ -880,8 +882,12 @@ const MapboxMap = memo(function MapboxMap() {
           const style = newMap.getStyle();
 
           // Register SDF arrow image for route direction indicators
-          const arrowImage = createArrowSdfImage(20);
-          newMap.addImage('route-direction-arrow', arrowImage, { sdf: true });
+          if (!newMap.hasImage(ROUTE_DIRECTION_ARROW_IMAGE_ID)) {
+            const arrowImage = createArrowSdfImage(20);
+            newMap.addImage(ROUTE_DIRECTION_ARROW_IMAGE_ID, arrowImage, {
+              sdf: true,
+            });
+          }
 
           let firstLabelId: string | undefined;
           if (style?.layers) {
@@ -902,9 +908,14 @@ const MapboxMap = memo(function MapboxMap() {
             ensureInlineRoutes(newMap, bikeRoutesUrl, bikeRoutes);
           }
 
+          // Re-read the style after attaching inline GeoJSON routes so those
+          // layers receive the same styling and arrow treatment as Studio
+          // vector layers.
+          const routeLayers = newMap.getStyle().layers;
+
           // Set initial line width for specific layers
-          if (style?.layers) {
-            style.layers.forEach((layer) => {
+          if (routeLayers) {
+            routeLayers.forEach((layer) => {
               if (layer.type === 'line') {
                 const route = bikeRoutes.find((r) => r.id === layer.id);
                 if (route) {
@@ -958,45 +969,44 @@ const MapboxMap = memo(function MapboxMap() {
                   if (bounds) {
                     route.bounds = bounds;
                   }
-
-                  // Add directional arrow symbol layer
-                  const sourceId = layer.source as string;
-                  const sourceLayer = (layer as Record<string, unknown>)[
-                    'source-layer'
-                  ] as string;
-                  if (sourceId && sourceLayer && !route.hideArrows) {
-                    newMap.addLayer({
-                      id: `${route.id}-arrows`,
-                      type: 'symbol',
-                      source: sourceId,
-                      'source-layer': sourceLayer,
-                      layout: {
-                        'symbol-placement': 'line',
-                        'symbol-spacing': 160,
-                        'icon-image': 'route-direction-arrow',
-                        'icon-size': 1.2,
-                        'icon-rotate': route.reverseDirection ? 180 : 0,
-                        'icon-rotation-alignment': 'map',
-                        'icon-allow-overlap': true,
-                        'icon-ignore-placement': true,
-                      },
-                      paint: {
-                        'icon-color': route.color,
-                        'icon-opacity': 0.2,
-                      },
-                    });
-                  }
                 }
               }
             });
           }
+
+          const syncRouteArrows = () => {
+            const currentLayers = newMap.getStyle().layers;
+            for (const route of bikeRoutes) {
+              const layer = currentLayers?.find(
+                (candidate) => candidate.id === route.id,
+              );
+              if (layer?.type === 'line') {
+                syncRouteArrowLayer(newMap, route, layer, firstLabelId);
+              }
+            }
+          };
+
+          // Source queries only include loaded tiles. Refresh after the map
+          // settles following a pan/zoom so arrows cover the new viewport.
+          syncRouteArrows();
+          let routeArrowSyncScheduled = false;
+          const scheduleRouteArrowSync = () => {
+            if (routeArrowSyncScheduled) return;
+            routeArrowSyncScheduled = true;
+            newMap.once('idle', () => {
+              routeArrowSyncScheduled = false;
+              syncRouteArrows();
+            });
+          };
+          scheduleRouteArrowSync();
+          newMap.on('moveend', scheduleRouteArrowSync);
 
           // Add invisible hit-test layers and click handlers for routes.
           // The hit layer is wider than the visible route to make tapping
           // easier on phones — same pattern used for mountain bike trails.
           bikeRoutes.forEach((route) => {
             const hitId = `${route.id}-hit`;
-            const routeLayer = style?.layers?.find((l) => l.id === route.id) as
+            const routeLayer = routeLayers?.find((l) => l.id === route.id) as
               | { source?: string; 'source-layer'?: string; filter?: unknown }
               | undefined;
 
