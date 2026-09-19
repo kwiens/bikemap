@@ -77,6 +77,10 @@ import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
 import { clearMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
+import {
+  fetchRouteCollection,
+  routeIdsInCollection,
+} from '@/utils/route-source';
 
 // Ride recording is unreachable in embed mode, and its subtree (history, GPX,
 // ride stats and storage) is a sizeable chunk to make a partner's page
@@ -978,12 +982,20 @@ const MapboxMap = memo(function MapboxMap() {
           // Expose map for console debugging (e.g. querying tileset features)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__map = null;
-          const mapStyle = await loadBikeRouteOptimizedStyle(
-            mapConfig.mapbox.styleUrl,
-            mapConfig.mapbox.accessToken,
-            Boolean(bikeRoutesUrl),
-            styleRequestController.signal,
-          );
+          const [mapStyle, routeCollection] = await Promise.all([
+            loadBikeRouteOptimizedStyle(
+              mapConfig.mapbox.styleUrl,
+              mapConfig.mapbox.accessToken,
+              Boolean(bikeRoutesUrl && !inlineBikeRouteIds),
+              styleRequestController.signal,
+            ),
+            bikeRoutesUrl
+              ? fetchRouteCollection(
+                  bikeRoutesUrl,
+                  styleRequestController.signal,
+                )
+              : Promise.resolve(null),
+          ]);
           const container = mapContainer.current;
           if (cancelled || !container) return;
 
@@ -1047,71 +1059,78 @@ const MapboxMap = memo(function MapboxMap() {
 
           hideStyleLayers(newMap, hiddenStyleLayerIds);
 
-          // Attach curated routes whose geometry ships as GeoJSON (not Studio
-          // layers) before route styling and click handling below.
-          if (bikeRoutesUrl) {
-            const inlineRoutes = bikeRoutes.filter(
-              (route) => inlineBikeRouteIds?.includes(route.id) ?? true,
-            );
-            ensureInlineRoutes(newMap, bikeRoutesUrl, inlineRoutes);
+          // Only replace Studio-backed fallbacks after the route API has
+          // returned usable geometry. A missing database leaves Studio intact.
+          const availableRouteIds = routeIdsInCollection(routeCollection);
+          const configuredInlineIds = new Set(
+            inlineBikeRouteIds ?? bikeRoutes.map((route) => route.id),
+          );
+          const inlineRoutes = bikeRoutes.filter(
+            (route) =>
+              configuredInlineIds.has(route.id) &&
+              availableRouteIds.has(route.id),
+          );
+          const inlineRouteIds = new Set(inlineRoutes.map((route) => route.id));
+          if (routeCollection && inlineRoutes.length > 0) {
+            ensureInlineRoutes(newMap, routeCollection, inlineRoutes);
           }
 
           const combinedRouteLayer = newMap.getLayer(BIKE_ROUTE_LAYER_ID);
 
           // Cities can still rely on route layers baked into the Studio style
           // while they migrate to the shared GeoJSON source. Preserve that
-          // path, but avoid creating extra per-route layers for migrated cities.
-          if (!combinedRouteLayer) {
-            for (const route of bikeRoutes) {
-              const layer = newMap.getLayer(route.id);
-              if (layer?.type !== 'line' || !('source' in layer)) {
-                continue;
-              }
+          // path. A city can migrate one route at a time, so style every route
+          // not supplied by the shared GeoJSON layer.
+          for (const route of bikeRoutes) {
+            if (inlineRouteIds.has(route.id)) {
+              continue;
+            }
+            const layer = newMap.getLayer(route.id);
+            if (layer?.type !== 'line' || !('source' in layer)) {
+              continue;
+            }
 
-              newMap.setPaintProperty(
-                layer.id,
-                'line-width',
-                route.defaultWidth,
-              );
-              newMap.setPaintProperty(layer.id, 'line-color', route.color);
-              newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
-              newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
-              newMap.setLayoutProperty(layer.id, 'line-join', 'round');
-              newMap.setLayoutProperty(layer.id, 'visibility', 'visible');
+            newMap.setPaintProperty(layer.id, 'line-width', route.defaultWidth);
+            newMap.setPaintProperty(layer.id, 'line-color', route.color);
+            newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
+            newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
+            newMap.setLayoutProperty(layer.id, 'line-join', 'round');
+            newMap.setLayoutProperty(layer.id, 'visibility', 'visible');
 
-              if (firstLabelId) newMap.moveLayer(layer.id, firstLabelId);
+            if (firstLabelId) newMap.moveLayer(layer.id, firstLabelId);
 
-              const casingId = `${layer.id}-casing`;
-              if (!newMap.getLayer(casingId)) {
-                newMap.addLayer(
-                  {
-                    id: casingId,
-                    type: 'line',
-                    source: layer.source,
-                    ...('source-layer' in layer && layer['source-layer']
-                      ? { 'source-layer': layer['source-layer'] }
-                      : {}),
-                    layout: { 'line-cap': 'round', 'line-join': 'round' },
-                    paint: {
-                      'line-color': '#ffffff',
-                      'line-width': route.defaultWidth + 2,
-                      'line-opacity': 0.3,
-                    },
-                    ...('filter' in layer && layer.filter
-                      ? { filter: layer.filter }
-                      : {}),
+            const casingId = `${layer.id}-casing`;
+            if (!newMap.getLayer(casingId)) {
+              newMap.addLayer(
+                {
+                  id: casingId,
+                  type: 'line',
+                  source: layer.source,
+                  ...('source-layer' in layer && layer['source-layer']
+                    ? { 'source-layer': layer['source-layer'] }
+                    : {}),
+                  layout: { 'line-cap': 'round', 'line-join': 'round' },
+                  paint: {
+                    'line-color': '#ffffff',
+                    'line-width': route.defaultWidth + 2,
+                    'line-opacity': 0.3,
                   },
-                  layer.id,
-                );
-              }
+                  ...('filter' in layer && layer.filter
+                    ? { filter: layer.filter }
+                    : {}),
+                },
+                layer.id,
+              );
             }
           }
 
-          const routeLayerIds = combinedRouteLayer
-            ? [BIKE_ROUTE_LAYER_ID]
-            : bikeRoutes
-                .map((route) => route.id)
-                .filter((layerId) => newMap.getLayer(layerId));
+          const routeLayerIds = [
+            ...(combinedRouteLayer ? [BIKE_ROUTE_LAYER_ID] : []),
+            ...bikeRoutes
+              .filter((route) => !inlineRouteIds.has(route.id))
+              .map((route) => route.id)
+              .filter((layerId) => newMap.getLayer(layerId)),
+          ];
 
           const syncRouteArrows = () => {
             const currentLayers = newMap.getStyle().layers;
@@ -1119,9 +1138,9 @@ const MapboxMap = memo(function MapboxMap() {
               (candidate) => candidate.id === BIKE_ROUTE_LAYER_ID,
             );
             for (const route of bikeRoutes) {
-              const layer =
-                sharedLayer ??
-                currentLayers?.find((candidate) => candidate.id === route.id);
+              const layer = inlineRouteIds.has(route.id)
+                ? sharedLayer
+                : currentLayers?.find((candidate) => candidate.id === route.id);
               if (layer?.type === 'line') {
                 syncRouteArrowLayer(newMap, route, layer, firstLabelId);
               }
@@ -1216,9 +1235,10 @@ const MapboxMap = memo(function MapboxMap() {
               routeLayerIds,
             )[0];
             if (routeFeature) {
-              const routeId = combinedRouteLayer
-                ? routeFeature.properties?.id
-                : routeFeature.layer?.id;
+              const routeId =
+                routeFeature.layer?.id === BIKE_ROUTE_LAYER_ID
+                  ? routeFeature.properties?.id
+                  : routeFeature.layer?.id;
               if (bikeRoutes.some((route) => route.id === routeId)) {
                 e.preventDefault();
                 window.dispatchEvent(

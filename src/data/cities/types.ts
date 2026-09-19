@@ -48,11 +48,10 @@ export interface CityData {
   // Static GeoJSON URL for the classified bike-network overlay (Casual mode).
   // Undefined for cities without one (the toggle is hidden).
   bikeNetworkUrl?: string;
-  // Static GeoJSON URL for curated routes attached at runtime and keyed by
-  // route id. When the style already has a layer with the same id, the static
-  // route replaces it so repository-owned geometry stays authoritative.
+  // GeoJSON URL for curated routes attached at runtime and keyed by route id.
+  // It may be a static file or a database-backed map API.
   bikeRoutesUrl?: string;
-  // Optional subset present in bikeRoutesUrl. Omit when the file contains
-  // every configured route for the city.
+  // Optional subset expected from bikeRoutesUrl. Omit when the source contains
+  // every configured route. A partial source keeps Studio layers as fallbacks.
   inlineBikeRouteIds?: string[];
 }

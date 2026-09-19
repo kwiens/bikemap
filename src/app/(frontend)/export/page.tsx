@@ -1,6 +1,5 @@
 'use client';
 
-import type * as GeoJSON from 'geojson';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import mapboxgl from 'mapbox-gl';

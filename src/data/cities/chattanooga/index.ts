@@ -54,6 +54,8 @@ export const chattanoogaData: CityData = {
     ],
     hiddenTrails: HIDDEN_TRAILS,
   },
-  bikeRoutesUrl: '/data/chattanooga/routes.geojson',
+  // Riverwalk is imported into Payload from the verified GIS archive. If the
+  // database is unavailable or unseeded, the client retains its Studio layer.
+  bikeRoutesUrl: '/api/map/routes?city=chattanooga',
   inlineBikeRouteIds: ['riverwalk-loop-v3-public'],
 };

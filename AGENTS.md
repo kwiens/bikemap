@@ -143,7 +143,7 @@ The app uses custom DOM events (`window.dispatchEvent`) for component communicat
 
 ### Map Styling
 
-Routes are styled via Mapbox Studio (referenced by layer IDs like `riverwalk-loop-v3-public`). Route bounds are calculated from layer features at runtime to enable zoom-to-fit.
+Route display metadata is keyed by stable layer IDs such as `riverwalk-loop-v3-public`. Geometry may come from Mapbox Studio or the configured city GeoJSON/API; Chattanooga's imported Riverwalk row comes from Payload and retains Studio as its unavailable/unseeded fallback.
 
 ### Mountain Bike Trails
 
@@ -442,6 +442,10 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
 - `src/payload/osm/build.ts` — orchestrates the OSM path
 - `src/payload/components/TrailMapEditor.tsx` — the one admin map (pick/move/draw)
 - `src/payload/read/trails.ts` — reads trails back out for the public map
+- `src/payload/collections/Routes.ts` + `src/payload/read/routes.ts` — imported
+  curated route geometry and the public map read path; use
+  `pnpm db:import:chattanooga-routes` rather than committing generated route
+  GeoJSON
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
 - `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind

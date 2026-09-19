@@ -78,7 +78,10 @@ contract of `BikeRoute`, `MountainBikeTrail`, `BikeResource`, `MapFeature`, and
 ## 6. Routes and curated trails
 
 - **Routes** — draw/upload each route as a line layer in your style, then set
-  each `BikeRoute.id` in `bike-routes.ts` to that layer's ID.
+  each `BikeRoute.id` in `bike-routes.ts` to that layer's ID. A verified route
+  may instead be imported into Payload and served from
+  `/api/map/routes?city=<city>`; keep the Studio layer when it should act as the
+  database-outage fallback.
 - **Trails** — prepare a WGS84 GeoJSON file with one `MultiLineString` feature
   per curated trail, seed it into Payload, and configure the city layer with
   `/api/map/trails?city=<city>` plus the static file as

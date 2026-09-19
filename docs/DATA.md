@@ -1,8 +1,9 @@
 # Data files
 
-All content shown on the map lives in `src/data/` as plain, typed TypeScript
-arrays — no database, no CMS, no admin panel. To change what a deployment
-shows, edit an array and ship a PR.
+Display metadata and checked-in fallbacks live in `src/data/` as typed
+TypeScript arrays. Published trail and route geometry can come from Payload,
+while static files and Mapbox Studio layers keep the public map useful when the
+database is unavailable or unseeded.
 
 Each file exports a typed array; the `interface` at the top of the file is the
 contract. `icon` fields are Font Awesome `IconDefinition` values imported from
@@ -27,7 +28,8 @@ The MTB trail array lives in its own `mountain-bike-trails.data.ts` so the
 
 Route display metadata lives in TypeScript. Geometry comes from the active
 city's `bikeRoutesUrl` GeoJSON when configured, otherwise from a Mapbox Studio
-line layer.
+line layer. Chattanooga's Riverwalk URL is database-backed; the Studio line
+remains visible when Payload is unavailable or has not been imported yet.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -82,7 +84,8 @@ pointless, they get overwritten. See [DEPLOYING.md](DEPLOYING.md) for setup.
 
 | Script | Writes |
 |---|---|
-| `prepare_chattanooga_routes.py` | `public/data/chattanooga/routes.geojson` from verified archived route shapefiles |
+| `import-chattanooga-routes.ts` | Normalizes the verified Riverwalk shapefile and upserts it into Payload without writing generated GIS data to Git |
+| `prepare_chattanooga_routes.py` | Streams normalized route GeoJSON to the importer, or writes an explicitly requested temporary output |
 | `fix_route_directions.py` | Detects and repairs inconsistent multipart loop direction |
 | `add_trail_elevation.py` | `MountainBikeTrail` elevation stats (`elevationGain/Loss/Min/Max`, `distance`) + per-trail `public/data/elevation/chattanooga/{slug}.json` |
 | `add_trail_bounds.py` | `MountainBikeTrail.defaultBounds` and `distance` |

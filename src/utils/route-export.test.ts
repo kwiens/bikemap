@@ -91,4 +91,45 @@ describe('loadRouteFeatures', () => {
     ).resolves.toEqual([]);
     expect(map.querySourceFeatures).not.toHaveBeenCalled();
   });
+
+  it('falls back to the Studio route when the database is unavailable', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 503 }),
+    );
+    const studioFeature = {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [0, 0],
+          [1, 1],
+        ],
+      },
+    } as GeoJSON.Feature;
+    const map = {
+      getStyle: vi.fn().mockReturnValue({
+        layers: [
+          {
+            id: 'inline-route',
+            type: 'line',
+            source: 'composite',
+            'source-layer': 'studio-routes',
+          },
+        ],
+      }),
+      querySourceFeatures: vi.fn().mockReturnValue([studioFeature]),
+    } as unknown as mapboxgl.Map;
+
+    await expect(
+      loadRouteFeatures(map, routes, {
+        bikeRoutesUrl: '/api/map/routes?city=chattanooga',
+        inlineBikeRouteIds: ['inline-route'],
+      }),
+    ).resolves.toContainEqual({
+      routeId: 'inline-route',
+      features: [studioFeature],
+    });
+  });
 });

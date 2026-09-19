@@ -1,5 +1,6 @@
 import type mapboxgl from 'mapbox-gl';
 import type { BikeRoute } from '@/data/geo_data';
+import { fetchRouteCollection } from './route-source';
 
 export interface RouteFeatures {
   routeId: string;
@@ -26,28 +27,24 @@ export async function loadRouteFeatures(
   const inlineFeatures = new Map<string, GeoJSON.Feature>();
 
   if (bikeRoutesUrl) {
-    try {
-      const response = await fetch(bikeRoutesUrl);
-      if (!response.ok) {
-        throw new Error(`Route GeoJSON request failed (${response.status})`);
-      }
-      const collection = (await response.json()) as GeoJSON.FeatureCollection;
+    const collection = await fetchRouteCollection(bikeRoutesUrl);
+    if (collection) {
       for (const feature of collection.features) {
         const id = feature.properties?.id;
         if (typeof id === 'string') {
           inlineFeatures.set(id, feature);
         }
       }
-    } catch (error) {
-      console.error('Failed to load route GeoJSON for export:', error);
     }
   }
 
   const styleLayers = map.getStyle().layers;
   return routes.flatMap((route) => {
-    if (inlineIds.has(route.id)) {
-      const feature = inlineFeatures.get(route.id);
-      return feature ? [{ routeId: route.id, features: [feature] }] : [];
+    const inlineFeature = inlineIds.has(route.id)
+      ? inlineFeatures.get(route.id)
+      : undefined;
+    if (inlineFeature) {
+      return [{ routeId: route.id, features: [inlineFeature] }];
     }
 
     const layer = styleLayers.find((item) => item.id === route.id);

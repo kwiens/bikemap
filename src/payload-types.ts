@@ -67,6 +67,7 @@ export interface Config {
   };
   blocks: {};
   collections: {
+    routes: Route;
     trails: Trail;
     'trail-areas': TrailArea;
     'trail-ratings': TrailRating;
@@ -80,6 +81,7 @@ export interface Config {
   };
   collectionsJoins: {};
   collectionsSelect: {
+    routes: RoutesSelect<false> | RoutesSelect<true>;
     trails: TrailsSelect<false> | TrailsSelect<true>;
     'trail-areas': TrailAreasSelect<false> | TrailAreasSelect<true>;
     'trail-ratings': TrailRatingsSelect<false> | TrailRatingsSelect<true>;
@@ -128,6 +130,37 @@ export interface UserAuthOperations {
     email: string;
     password: string;
   };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "routes".
+ */
+export interface Route {
+  id: number;
+  name: string;
+  city: 'chattanooga' | 'bend';
+  /**
+   * Stable public identifier used by map selection and exports.
+   */
+  routeId: string;
+  /**
+   * Normalized WGS84 route geometry. Import tooling owns this value.
+   */
+  geom:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  sourcePath: string;
+  sourceSha256: string;
+  sourceFeatureCount: number;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -423,6 +456,10 @@ export interface PayloadLockedDocument {
   id: number;
   document?:
     | ({
+        relationTo: 'routes';
+        value: number | Route;
+      } | null)
+    | ({
         relationTo: 'trails';
         value: number | Trail;
       } | null)
@@ -487,6 +524,22 @@ export interface PayloadMigration {
   batch?: number | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "routes_select".
+ */
+export interface RoutesSelect<T extends boolean = true> {
+  name?: T;
+  city?: T;
+  routeId?: T;
+  geom?: T;
+  sourcePath?: T;
+  sourceSha256?: T;
+  sourceFeatureCount?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

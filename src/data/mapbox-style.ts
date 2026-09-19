@@ -33,7 +33,12 @@ export const STYLE_STRAY_LAYER_IDS = ['Chatt_TPL_Trails-public'];
  * bakes in except the city's own routes.
  */
 export function hiddenStyleLayerIdsFor(city: CityData): string[] {
-  if (city.bikeRoutesUrl) return STYLE_OWNED_ROUTE_LAYER_IDS;
+  // A complete runtime source replaces every Studio route. A partial source
+  // keeps its configured Studio layers as fallbacks until usable API geometry
+  // has loaded; `ensureInlineRoutes` removes only the routes it can replace.
+  if (city.bikeRoutesUrl && !city.inlineBikeRouteIds) {
+    return STYLE_OWNED_ROUTE_LAYER_IDS;
+  }
   const ownRouteIds = new Set(city.bikeRoutes.map((route) => route.id));
   return STYLE_OWNED_ROUTE_LAYER_IDS.filter((id) => !ownRouteIds.has(id));
 }

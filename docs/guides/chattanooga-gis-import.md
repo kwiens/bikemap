@@ -2,8 +2,10 @@
 
 The regional mountain-bike geometry archived from
 [PR #67](https://github.com/kwiens/bikemap/pull/67) is permitted for use in this
-project. The raw shapefile stays outside the application repository; the
-normalized WGS84 GeoJSON used for database seeding is committed.
+project. The raw trail shapefile stays outside the application repository; its
+normalized WGS84 trail GeoJSON remains the checked-in public fallback. Curated
+route geometry takes a stricter path: normalize it directly into Payload and
+do not commit the generated coordinates.
 
 ## Canonical input
 
@@ -71,29 +73,42 @@ archive. It is the only route migrated here because its archived geometry was
 verified against the current Studio tileset; several other Studio routes have
 newer geometry than the archive.
 
-| Route source (`GIS/Uncompressed files/…`) | `.shp` SHA-256 |
+| Route source (`GIS/Uncompressed files/RiverWalk_Loop_v3.1/…`) | SHA-256 |
 |---|---|
-| `RiverWalk_Loop_v3.1/OSM_RiverWalk_Loop_V3_1.shp` | `ef797a83b5a630747faa0f32ca16956b989fa5877d929313b1847657e1a98460` |
+| `OSM_RiverWalk_Loop_V3_1.cpg` | `3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824` |
+| `OSM_RiverWalk_Loop_V3_1.dbf` | `3bcc134651d0bf0159f2e63fcc6ebddf0332a13e9f2abf4c0c2ccb6d757cd1b7` |
+| `OSM_RiverWalk_Loop_V3_1.prj` | `f2e7fb14d55bdd8d6a3bc2c272a48729d8f9d0ad72936e20eae6a9a81c2fccd0` |
+| `OSM_RiverWalk_Loop_V3_1.shp` | `ef797a83b5a630747faa0f32ca16956b989fa5877d929313b1847657e1a98460` |
+| `OSM_RiverWalk_Loop_V3_1.shx` | `60349a0c0cacd4817330aa390de2d0d794c9aa31bc026f68fd41bbf1b8d07b33` |
 
 ```bash
-python scripts/prepare_chattanooga_routes.py \
+pnpm db:import:chattanooga-routes \
   "/path/to/GIS/Uncompressed files"
 ```
 
-This writes `public/data/chattanooga/routes.geojson`. The configured feature
-replaces its copy baked into the shared Mapbox Studio style and keeps the
-existing `BikeRoute.id`, so route selection and styling continue to use the
-same public identifier.
+The importer invokes `prepare_chattanooga_routes.py`, verifies every component
+of the archived shapefile, normalizes it in memory, and upserts the result into
+Payload's `routes` collection. No generated route coordinates are written
+under `public/` or committed to Git. The database row keeps the existing
+`BikeRoute.id`, so route selection and styling continue to use the same public
+identifier.
+
+The public map reads `/api/map/routes?city=chattanooga`. It replaces the
+Riverwalk Studio layer only after that endpoint returns usable geometry; an
+unavailable or unseeded database leaves the Studio layer in place.
 
 Multipart route direction is normalized by `scripts/fix_route_directions.py`.
 When two parts form alternate paths between the same junctions, the paths must
 run in opposite directions. The utility solves those relationships together
 and reverses the least total distance, avoiding route-specific coordinate
-exceptions. Run its check mode after editing route geometry:
+exceptions. To inspect or independently check the normalized output, write it
+to a temporary file explicitly:
 
 ```bash
+python scripts/prepare_chattanooga_routes.py \
+  "/path/to/GIS/Uncompressed files" --output /tmp/chattanooga-routes.geojson
 python scripts/fix_route_directions.py \
-  public/data/chattanooga/routes.geojson --check
+  /tmp/chattanooga-routes.geojson --check
 ```
 
 The current source normalization reverses the four-point 5th/Lookout branch of
@@ -101,14 +116,14 @@ Riverwalk Loop while leaving its 556-point main path unchanged.
 
 ## Other PR #67 datasets
 
-PR #100 currently has a database collection for curated mountain-bike trails,
-not for every GIS layer in the archive. Do not coerce unrelated data into the
-`trails` table:
+The app has dedicated database collections for curated mountain-bike trails
+and routes, not for every GIS layer in the archive. Do not coerce unrelated
+data into either collection:
 
 | Source group | Intended treatment |
 |---|---|
 | TPL full and filtered trail inventories | Preserve as reference/network data; mixed-use and hiking records need a separate network-segment model. |
-| Riverwalk Loop route file | Normalized into repository-owned static GeoJSON; route metadata remains in `BikeRoute` until a `routes` collection is added. |
+| Riverwalk Loop route file | Normalize and import into Payload's `routes` collection; display metadata remains in `BikeRoute`. |
 | Zoo, Riverwalk Greenway, Cherokee, Moccasin Bend, and South Chickamauga route files | Keep their newer Studio geometry until each current source is archived and verified. |
 | Bike Chattanooga station snapshot | Do not seed as current availability; the app already reads live GBFS. Keep only as a dated reference snapshot. |
 | Traffic garden points | Candidate geometry for a future map-features collection. |

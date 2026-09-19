@@ -14,9 +14,9 @@ describe('Chattanooga curated trail source', () => {
     );
   });
 
-  it('renders curated routes from repository-owned GeoJSON', () => {
+  it('replaces Riverwalk with Payload geometry when it is available', () => {
     expect(chattanoogaData.bikeRoutesUrl).toBe(
-      '/data/chattanooga/routes.geojson',
+      '/api/map/routes?city=chattanooga',
     );
     expect(chattanoogaData.inlineBikeRouteIds).toEqual([
       'riverwalk-loop-v3-public',
