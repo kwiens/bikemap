@@ -185,7 +185,13 @@ describe('buildProfileGpx', () => {
         [100, 900, -84.3, 34],
         [200, 910, -84.3, 34.001],
       ],
-      [2],
+      [
+        {
+          feet: 1000,
+          from: [-85.3, 35.001],
+          to: [-84.3, 34],
+        },
+      ],
     );
 
     expect(gpx.match(/<trkseg>/g)).toHaveLength(2);

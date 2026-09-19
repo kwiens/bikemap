@@ -146,13 +146,57 @@ Replace with your own:
 pnpm build      # verify the production build locally
 ```
 
-On **Vercel**: import the repo, and add `NEXT_PUBLIC_MAPBOX_TOKEN` under
-Settings → Environment Variables for **Production, Preview, and Development**.
-Any Node host works — `pnpm build` then `pnpm start`.
+On **Vercel**, one project can serve every city and one Neon database can hold
+all of their content. Rows are scoped by the required `city` field; splitting a
+city out later is a data move and environment-variable change, not a different
+application schema.
+
+```bash
+# Link the repository to its Vercel project.
+vercel link
+
+# Provision one shared Neon resource in the same region as the app. Payload
+# owns admin authentication, so Neon Auth is not needed.
+vercel integration add neon \
+  --name bikemap-global \
+  --plan free_v3 \
+  --metadata region=iad1 \
+  --metadata auth=false
+
+# Pull the pooled runtime URL and direct migration URL locally.
+vercel env pull .env.local --yes
+```
+
+Set `PAYLOAD_SECRET`, `NEXT_PUBLIC_MAPBOX_TOKEN`,
+`NEXT_PUBLIC_MAPBOX_STYLE_URL`, `NEXT_PUBLIC_CITY_ID`, and
+`NEXT_PUBLIC_CITY_HOST_MAP` for **Production, Preview, and Development**. The
+Neon integration supplies `DATABASE_URL` (pooled application traffic) and
+`DATABASE_URL_UNPOOLED` (schema migrations).
+
+`vercel.ts` runs committed Payload migrations before each Vercel build when a
+database is connected. Neon gives preview deployments isolated database
+branches, so a PR migration does not mutate the production branch. A
+database-free fork skips migrations and still builds the checked-in fallback
+map.
+
+Seed every city into the same fresh database after the initial migration. Both
+commands are idempotent and match existing rows on `(trailName, city)`:
+
+```bash
+pnpm db:migrate
+pnpm db:seed:chattanooga
+pnpm db:seed:bend
+```
+
+Any Node host also works: set the same variables, run `pnpm run ci`, then
+`pnpm start`.
 
 ## Checklist
 
 - [ ] `.env.local` has `NEXT_PUBLIC_MAPBOX_TOKEN`
+- [ ] Vercel has one shared Neon resource with pooled and unpooled URLs
+- [ ] `PAYLOAD_SECRET` is set in every deployed environment
+- [ ] Payload migrations and both city seeds have completed
 - [ ] `src/config/site.config.ts` — name, description, URL, colors, storage prefix
 - [ ] `src/config/map.config.ts` — style URL, default view, GBFS, region
 - [ ] `src/data/*` — routes, trails, shops, POIs ([DATA.md](DATA.md))

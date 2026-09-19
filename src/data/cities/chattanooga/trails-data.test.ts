@@ -99,7 +99,7 @@ describe('Chattanooga trail import geometry', () => {
 
       const feature = byName.get(trail.trailName);
       expect(profile.profile.length).toBeGreaterThan(1);
-      expect(profile.segmentStarts ?? []).toHaveLength(
+      expect(profile.geometryGapDetails ?? []).toHaveLength(
         Math.max(0, (feature?.geometry.coordinates.length ?? 0) - 1),
       );
       expect(Number((profile.distance / 5280).toFixed(2))).toBe(

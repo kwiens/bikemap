@@ -105,6 +105,15 @@ function requireEveryPartInProfile(
   geometry: MultiLineString,
   profile: NonNullable<Measurements['profile']>,
 ): void {
+  if (
+    (profile.geometryGapDetails?.length ?? 0) !==
+    Math.max(0, geometry.coordinates.length - 1)
+  ) {
+    throw new Error(
+      `${trailName}: its prepared profile omitted a geometry break; no files were written.`,
+    );
+  }
+
   const profileCoordinates = new Set(
     profile.profile.map(
       ([, , longitude, latitude]) => `${longitude},${latitude}`,

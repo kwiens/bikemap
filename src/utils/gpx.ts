@@ -4,6 +4,7 @@
 import { splitRideSegments, type StoredRidePoint } from '../data/ride';
 import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
+import type { ElevationProfile } from '@/data/mountain-bike-trails';
 import { FEET_PER_METER } from './format';
 
 export function escapeXml(str: string): string {
@@ -107,12 +108,20 @@ ${trksegs}
 export function buildProfileGpx(
   name: string,
   points: [number, number, number, number][],
-  segmentStarts: number[] = [],
+  gapDetails: ElevationProfile['geometryGapDetails'] = [],
 ): string {
-  const starts = new Set(segmentStarts);
+  const gapEdges = new Set(
+    gapDetails.map(({ from, to }) => `${from[0]},${from[1]}:${to[0]},${to[1]}`),
+  );
   const segments: [number, number, number, number][][] = [];
   for (let index = 0; index < points.length; index++) {
-    if (segments.length === 0 || starts.has(index)) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const startsPart =
+      index === 0 ||
+      current[0] <= previous[0] ||
+      gapEdges.has(`${previous[2]},${previous[3]}:${current[2]},${current[3]}`);
+    if (startsPart) {
       segments.push([]);
     }
     segments[segments.length - 1].push(points[index]);

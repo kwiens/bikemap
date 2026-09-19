@@ -1,10 +1,17 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ElevationProfile,
   gradeToColor,
-  computeGradeColors,
+  computeGrades,
   downsampleStops,
+  formatGrade,
   findClosestProfileIndex,
   loadProfile,
   profilePointToXY,
@@ -46,39 +53,105 @@ describe('gradeToColor', () => {
   });
 });
 
-describe('computeGradeColors', () => {
-  it('returns empty array for 0 points', () => {
-    expect(computeGradeColors([])).toEqual([]);
+describe('computeGrades', () => {
+  const climb: [number, number, number, number][] = [
+    [0, 100, -85, 35],
+    [100, 110, -85, 35],
+    [200, 120, -85, 35],
+    [300, 130, -85, 35],
+    [400, 140, -85, 35],
+    [500, 150, -85, 35],
+  ];
+
+  it('reads a steady grade correctly', () => {
+    expect(computeGrades(climb)[3]).toBeCloseTo(10, 5);
   });
 
-  it('returns single green entry for 1 point', () => {
-    const result = computeGradeColors([[0, 100, -85, 35]]);
-    expect(result).toHaveLength(1);
-    expect(result[0]).toBe('rgb(34,197,94)');
+  it('signs a descent negative', () => {
+    const drop: [number, number, number, number][] = climb.map(
+      ([distance, elevation, lng, lat]) => [
+        distance,
+        200 - elevation,
+        lng,
+        lat,
+      ],
+    );
+
+    expect(computeGrades(drop)[3]).toBeCloseTo(-10, 5);
   });
 
-  it('returns array same length as input', () => {
-    const points: [number, number, number, number][] = [
+  it('weights uneven samples by their run distance', () => {
+    const uneven: [number, number, number, number][] = [
       [0, 100, -85, 35],
-      [100, 110, -85.001, 35.001],
-      [200, 130, -85.002, 35.002],
-      [300, 120, -85.003, 35.003],
-      [400, 150, -85.004, 35.004],
+      [6, 116, -85, 35],
+      [11, 116, -85, 35],
+      [90, 111, -85, 35],
+      [112, 110, -85, 35],
+      [131, 115, -85, 35],
     ];
-    const result = computeGradeColors(points);
-    expect(result).toHaveLength(points.length);
+
+    expect(computeGrades(uneven)[3]).toBeCloseTo(11.45, 2);
   });
 
-  it('returns all valid rgb() strings', () => {
-    const points: [number, number, number, number][] = [
+  it('does not smooth across explicit geometry gaps', () => {
+    const gapped: [number, number, number, number][] = [
       [0, 100, -85, 35],
-      [100, 120, -85.001, 35.001],
-      [200, 110, -85.002, 35.002],
+      [100, 110, -85.1, 35],
+      [600, 210, -86, 36],
+      [700, 200, -86.1, 36],
+      [800, 190, -86.2, 36],
     ];
-    const result = computeGradeColors(points);
-    for (const color of result) {
-      expect(color).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
-    }
+    const gaps = [
+      {
+        feet: 500,
+        from: [-85.1, 35] as [number, number],
+        to: [-86, 36] as [number, number],
+      },
+    ];
+
+    const grades = computeGrades(gapped, gaps);
+
+    expect(grades[1]).toBeCloseTo(10, 5);
+    expect(grades[2]).toBeCloseTo(-10, 5);
+  });
+
+  it('does not smooth across repeated-distance ride segment breaks', () => {
+    const segmentedRide: [number, number, number, number][] = [
+      [0, 100, -85, 35],
+      [100, 110, -85.1, 35],
+      [200, 120, -85.2, 35],
+      [200, 200, -86, 36],
+      [300, 190, -86.1, 36],
+      [400, 180, -86.2, 36],
+    ];
+
+    const grades = computeGrades(segmentedRide);
+
+    expect(grades[2]).toBeCloseTo(10, 5);
+    expect(grades[3]).toBeCloseTo(-10, 5);
+  });
+
+  it('returns one grade per point and handles degenerate profiles', () => {
+    expect(computeGrades(climb)).toHaveLength(climb.length);
+    expect(computeGrades([[0, 100, -85, 35]])).toEqual([0]);
+    expect(computeGrades([])).toEqual([]);
+  });
+});
+
+describe('formatGrade', () => {
+  it('signs climbs and descents', () => {
+    expect(formatGrade(8.42)).toBe('+8.4%');
+    expect(formatGrade(-8.42)).toBe('−8.4%');
+  });
+
+  it('does not add a sign to zero', () => {
+    expect(formatGrade(0)).toBe('0.0%');
+    expect(formatGrade(0.01)).toBe('0.0%');
+  });
+
+  it('degrades instead of displaying an invalid number', () => {
+    expect(formatGrade(undefined)).toBe('—');
+    expect(formatGrade(Number.NaN)).toBe('—');
   });
 });
 
@@ -286,6 +359,48 @@ describe('loadProfile', () => {
 });
 
 describe('ElevationProfile selection source', () => {
+  it('uses readable grade text with a separate color swatch', () => {
+    const profile: ElevationProfileData = {
+      trail: 'Test Trail',
+      distance: 400,
+      gain: 40,
+      loss: 0,
+      min: 100,
+      max: 140,
+      profile: [
+        [0, 100, -85.3, 35],
+        [100, 110, -85.301, 35.001],
+        [200, 120, -85.302, 35.002],
+        [300, 130, -85.303, 35.003],
+        [400, 140, -85.304, 35.004],
+      ],
+    };
+
+    render(<ElevationProfile />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, {
+          detail: { profile },
+        }),
+      );
+    });
+
+    const chart = screen.getByRole('img', {
+      name: 'Elevation profile for Test Trail',
+    });
+    vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      width: 400,
+    } as DOMRect);
+    fireEvent.mouseMove(chart, { clientX: 200 });
+
+    const grade = screen.getByText('+10.0%');
+    expect(grade).toHaveClass('text-gray-700');
+    expect(grade.querySelector('[aria-hidden="true"]')).toHaveStyle({
+      backgroundColor: gradeToColor(computeGrades(profile.profile)[2]),
+    });
+  });
+
   it('loads a curated profile when an OSM trail with the same name was selected', async () => {
     const osmProfile: ElevationProfileData = {
       trail: 'Big Forest',

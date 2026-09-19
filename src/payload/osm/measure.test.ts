@@ -146,7 +146,7 @@ describe('measureParts', () => {
     );
 
     expect(measured.profile).not.toBeNull();
-    expect(measured.profile?.segmentStarts).toHaveLength(1);
+    expect(measured.profile?.geometryGapDetails).toHaveLength(1);
     expect(coordinates.has(`${SHORT[0][0]},${SHORT[0][1]}`)).toBe(true);
     expect(coordinates.has(`${SHORT[1][0]},${SHORT[1][1]}`)).toBe(true);
   });
