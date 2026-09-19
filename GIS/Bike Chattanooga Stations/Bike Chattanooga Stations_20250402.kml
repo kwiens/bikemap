@@ -1,0 +1,382 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<kml xmlns:kml="http://earth.google.com/kml/2.2">
+  <Document id="featureCollection">
+<Style id="defaultStyle">
+  <LineStyle>
+    <width>1.5</width>
+  </LineStyle>
+  <PolyStyle>
+    <color>7d8a30c4</color>
+  </PolyStyle>
+</Style>
+  <Folder><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>100 Manufacturers Rd</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1297</value></Data><Data name="address"><value>100 Manufacturers Rd</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.063014</value></Data><Data name="longitude"><value>-85.310469</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.310469,35.063014
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>100 Walnut St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1319</value></Data><Data name="address"><value>100 Walnut St</value></Data><Data name="capacity"><value>25</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.055687</value></Data><Data name="longitude"><value>-85.307813</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.307813,35.055687
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>10 North Shore</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1435</value></Data><Data name="address"><value>20 Cherokee Blvd</value></Data><Data name="capacity"><value>11</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.0631455</value></Data><Data name="longitude"><value>-85.3095094</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.3095094,35.0631455
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>1216 Broad St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1349</value></Data><Data name="address"><value>1216 Broad St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.040549</value></Data><Data name="longitude"><value>-85.309554</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.309554,35.040549
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>1826 Carter St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1351</value></Data><Data name="address"><value>1826 Carter St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.037433</value></Data><Data name="longitude"><value>-85.315093</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.315093,35.037433
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>200 River St Outdoor Chattanooga</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1299</value></Data><Data name="address"><value>200 River St</value></Data><Data name="capacity"><value>25</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.06141</value></Data><Data name="longitude"><value>-85.306574</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.306574,35.06141
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>215 Broad St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1303</value></Data><Data name="address"><value>215 Broad St</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>ELECTRICBIKESTATION</value></Data><Data name="latitude"><value>35.053928</value></Data><Data name="longitude"><value>-85.310925</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.310925,35.053928
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>301 Manufacturers Rd</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1301</value></Data><Data name="address"><value>301 Manufacturers Rd</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.063304</value></Data><Data name="longitude"><value>-85.315211</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.315211,35.063304
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>400 East Main Street</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1331</value></Data><Data name="address"><value>400 East Main Street</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.0342</value></Data><Data name="longitude"><value>-85.302458</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.302458,35.0342
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>500 Georgia Ave</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1353</value></Data><Data name="address"><value>500 Georgia Ave</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.050771</value></Data><Data name="longitude"><value>-85.305346</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.305346,35.050771
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>800 E 8th St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1333</value></Data><Data name="address"><value>800 E 8th St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.043639</value></Data><Data name="longitude"><value>-85.297988</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.297988,35.043639
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Blue Goose Hollow</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1429</value></Data><Data name="address"><value>Blue Goose Hollow River Park Entrance</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.050405</value></Data><Data name="longitude"><value>-85.323739</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.323739,35.050405
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Broad St &amp; W 10th St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1363</value></Data><Data name="address"><value>Broad St &amp; W 10th St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.044458</value></Data><Data name="longitude"><value>-85.310458</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.310458,35.044458
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Broad St &amp; W 4th St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1343</value></Data><Data name="address"><value>401 Broad St</value></Data><Data name="capacity"><value>11</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.05251</value></Data><Data name="longitude"><value>-85.310874</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.310874,35.05251
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Broad St &amp; W 6th St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1317</value></Data><Data name="address"><value>Broad St &amp; W 6th St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.049429</value></Data><Data name="longitude"><value>-85.310399</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.310399,35.049429
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Broad St &amp; W 8th St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1345</value></Data><Data name="address"><value>735 Broad St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.047205</value></Data><Data name="longitude"><value>-85.310675</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.310675,35.047205
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Carter St &amp; W 12th St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1315</value></Data><Data name="address"><value>Carter St &amp; W 12th St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.043367</value></Data><Data name="longitude"><value>-85.312762</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.312762,35.043367
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Chestnut St &amp; Riverfront Pkwy</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1313</value></Data><Data name="address"><value>100 Riverfront Parkway</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.056655</value></Data><Data name="longitude"><value>-85.310487</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.310487,35.056655
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Curtain Pole</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1430</value></Data><Data name="address"><value>Curtain Pole River Park Entrance</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.065416</value></Data><Data name="longitude"><value>-85.274031</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.274031,35.065416
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Douglas St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1369</value></Data><Data name="address"><value>Douglas St &amp; Vine St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.048285</value></Data><Data name="longitude"><value>-85.300237</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.300237,35.048285
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>E Main St &amp; Rossville Ave</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1341</value></Data><Data name="address"><value>218 E Main St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.035217</value></Data><Data name="longitude"><value>-85.305187</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.305187,35.035217
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>High St &amp; E 2nd St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1321</value></Data><Data name="address"><value>High St &amp; E 2nd St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.054161</value></Data><Data name="longitude"><value>-85.305448</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.305448,35.054161
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Hubert Fry Center Tennessee Riverpark</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1373</value></Data><Data name="address"><value>4310 Amnicola Hwy</value></Data><Data name="capacity"><value>25</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.096003</value></Data><Data name="longitude"><value>-85.254503</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.254503,35.096003
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Market &amp; E 4th Street</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1307</value></Data><Data name="address"><value>Market and E 4th</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.052701</value></Data><Data name="longitude"><value>-85.309483</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.309483,35.052701
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Market St &amp; Cowart St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1311</value></Data><Data name="address"><value>Market St &amp; Cowart St</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.040771</value></Data><Data name="longitude"><value>-85.308394</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.308394,35.040771
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Market St &amp; E 14th St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1305</value></Data><Data name="address"><value>Market St &amp; E 14th St</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.036904</value></Data><Data name="longitude"><value>-85.307269</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.307269,35.036904
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Market St &amp; W 12th St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1309</value></Data><Data name="address"><value>Market St &amp; W 12th St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.042774</value></Data><Data name="longitude"><value>-85.309331</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.309331,35.042774
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>McCallie Ave &amp; Lindsay St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1329</value></Data><Data name="address"><value>McCallie Ave &amp; Lindsay St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.047319</value></Data><Data name="longitude"><value>-85.305834</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.305834,35.047319
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Middle St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1432</value></Data><Data name="address"><value>Middle st</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.019621</value></Data><Data name="longitude"><value>-85.324018</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.324018,35.019621
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Miller Park</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1325</value></Data><Data name="address"><value>928 Market Street</value></Data><Data name="capacity"><value>11</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.044895</value></Data><Data name="longitude"><value>-85.309299</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.309299,35.044895
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>MLK and University St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1431</value></Data><Data name="address"><value>526 E MLK Blvd</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.043238</value></Data><Data name="longitude"><value>-85.301804</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.301804,35.043238
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>ML King Blvd &amp; Lindsay St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1327</value></Data><Data name="address"><value>M.L. King Blvd &amp; Lindsay St</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.044973</value></Data><Data name="longitude"><value>-85.307015</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.307015,35.044973
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>North Market</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1437</value></Data><Data name="address"><value>415 N. Market St</value></Data><Data name="capacity"><value>11</value></Data><Data name="physical_configuration"><value>ELECTRICBIKESTATION</value></Data><Data name="latitude"><value>35.066155</value></Data><Data name="longitude"><value>-85.309093</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.309093,35.066155
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Oak St &amp; Houston St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1337</value></Data><Data name="address"><value>Oak St &amp; Houston St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.047574</value></Data><Data name="longitude"><value>-85.302739</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.302739,35.047574
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Oak St &amp; University Greenway</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1335</value></Data><Data name="address"><value>Oak St &amp; University Greenway</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.045057</value></Data><Data name="longitude"><value>-85.296087</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.296087,35.045057
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Pine St. &amp; W. 6th St.</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1421</value></Data><Data name="address"><value>Pine St. &amp; W. 6th St.</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.049271</value></Data><Data name="longitude"><value>-85.312617</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.312617,35.049271
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Power Alley &amp; Riverfront Pkwy</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1323</value></Data><Data name="address"><value>Power Alley &amp; Riverfront Pkwy</value></Data><Data name="capacity"><value>17</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.055582</value></Data><Data name="longitude"><value>-85.312797</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.312797,35.055582
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>SpringHill Suites</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1420</value></Data><Data name="address"><value>495 Riverfront Pkwy</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.053801</value></Data><Data name="longitude"><value>-85.32021</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.32021,35.053801
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>St Elmo</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1438</value></Data><Data name="address"><value>3917 St Elmo Avenue</value></Data><Data name="capacity"><value>19</value></Data><Data name="physical_configuration"><value>ELECTRICBIKESTATION</value></Data><Data name="latitude"><value>35.0095361</value></Data><Data name="longitude"><value>-85.32854099999997</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.328541,35.0095361
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>Westin Chattanooga</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1433</value></Data><Data name="address"><value>801 Pine Street</value></Data><Data name="capacity"><value>11</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.047222</value></Data><Data name="longitude"><value>-85.313087</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.313087,35.047222
+    </coordinates></Point>
+    </Placemark><Placemark>
+      <styleUrl>#defaultStyle</styleUrl>
+      <name>W Main St &amp; Cowart St</name>
+      <ExtendedData>
+        <Data name="station_id"><value>1347</value></Data><Data name="address"><value>343 W Main St</value></Data><Data name="capacity"><value>15</value></Data><Data name="physical_configuration"><value>REGULAR</value></Data><Data name="latitude"><value>35.037381</value></Data><Data name="longitude"><value>-85.310411</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+      -85.310411,35.037381
+    </coordinates></Point>
+    </Placemark></Folder>  </Document>
+  </kml>
