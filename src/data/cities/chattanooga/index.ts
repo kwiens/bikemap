@@ -7,8 +7,6 @@ import {
   GODSEY_SOURCE_LAYER,
   MTN_BIKE_LAYER_ID,
   MTN_BIKE_SOURCE_ID,
-  MTN_BIKE_SOURCE_LAYER,
-  MTN_BIKE_TILESET_URL,
   mountainBikeTrails,
   regionFor,
 } from '@/data/mountain-bike-trails';
@@ -36,9 +34,13 @@ export const chattanoogaData: CityData = {
       {
         layerId: MTN_BIKE_LAYER_ID,
         sourceId: MTN_BIKE_SOURCE_ID,
-        tilesetUrl: MTN_BIKE_TILESET_URL,
-        sourceLayer: MTN_BIKE_SOURCE_LAYER,
+        // Served from Payload after `db:seed:chattanooga`. The permitted GIS
+        // snapshot used by the seed remains the fallback when the CMS is down
+        // or has not been seeded yet.
+        geojsonUrl: '/api/map/trails?city=chattanooga',
+        geojsonFallbackUrl: '/data/chattanooga/trails.geojson',
         trailProp: 'Trail',
+        matchBy: 'name',
       },
       {
         layerId: GODSEY_LAYER_ID,

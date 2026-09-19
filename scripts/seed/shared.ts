@@ -2,10 +2,10 @@
  * Shared machinery for the per-city trail seeds.
  *
  * The cities get their own scripts because their pipelines genuinely differ —
- * Bend is OSM-derived with real geometry, Chattanooga is a Mapbox tileset with
- * none — and a single script behind a `--city` flag hid that. What's actually
- * common is only this: connecting to Payload, translating a `MountainBikeTrail`
- * into a row, and upserting it.
+ * Bend is OSM-derived, while Chattanooga imports a permitted GIS snapshot with
+ * no OSM way ids — and a single script behind a `--city` flag hid that. What's
+ * actually common is only this: connecting to Payload, translating a
+ * `MountainBikeTrail` into a row, and upserting it.
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -37,8 +37,7 @@ export async function GET(request: Request) {
     );
   }
 
-  // `empty` is a real answer, not a failure: a city with no seeded trails (or
-  // one whose geometry lives elsewhere, like Chattanooga's Mapbox tileset)
+  // `empty` is a real answer, not a failure: a city that has not been seeded
   // legitimately has no curated GeoJSON. Reporting that as 503 would send
   // someone debugging a database that is working fine.
 

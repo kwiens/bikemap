@@ -4,9 +4,9 @@
  *   pnpm db:seed:chattanooga
  *   pnpm db:seed:chattanooga --dry-run
  *
- * **Not run by default.** Chattanooga doesn't fit the OSM-referenced model yet,
- * and importing it would put several hundred rows in the database that the
- * editor can't meaningfully work on. Run it deliberately when you want them.
+ * **Not run by default.** Chattanooga still does not fit the OSM-referenced
+ * model: its trails have no OSM way ids. Run this deliberately when you want
+ * to import its curated metadata and the archived regional GIS geometry.
  *
  * The difference from Bend is the whole reason these are separate scripts:
  *
@@ -14,35 +14,65 @@
  *     here can be rebuilt from OSM. Whether they *can* be matched is the open
  *     question in ADR-0001 — `scripts/align_bend_geometry.py` against Tennessee
  *     is the experiment that would answer it.
- *   - No geometry. Its lines live in a Mapbox Studio tileset, which the map
- *     renders directly; there is no GeoJSON in the repo to import.
+ *   - Geometry comes from public/data/chattanooga/trails.geojson, generated
+ *     from the permitted regional-trails shapefile by
+ *     scripts/prepare_chattanooga_trails.py and matched by raw `Trail` name.
  *
- * So these import as `geometrySource: 'imported'`: metadata only, and the OSM
- * rebuild hook leaves them alone. Once a trail has been matched to way ids, set
- * its source to 'osm' and it starts being maintained from OSM like Bend's.
+ * These import as `geometrySource: 'imported'`, so the OSM rebuild hook leaves
+ * the archived line alone. Once a trail has been matched to way ids, set its
+ * source to 'osm' and it starts being maintained from OSM like Bend's.
  *
  * Re-running is safe: rows match on (trailName, city) and update, and a trail
  * whose line was drawn in the admin keeps it — see `upsertTrail`.
  */
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { chattanoogaData } from '../../src/data/cities/chattanooga';
 import {
   connect,
   parseArgs,
   report,
+  repoRoot,
   run,
   emptyVocabulary,
   loadVocabulary,
   upsertArea,
   upsertTrail,
+  type MultiLineString,
 } from './shared';
+
+const GEOJSON = 'public/data/chattanooga/trails.geojson';
+
+/** Raw `Trail` value -> imported MultiLineString. */
+async function loadGeometry(): Promise<Map<string, MultiLineString>> {
+  const raw = await readFile(path.join(repoRoot, GEOJSON), 'utf8');
+  const collection = JSON.parse(raw) as {
+    features: {
+      geometry: MultiLineString;
+      properties: { Trail?: string };
+    }[];
+  };
+
+  const byName = new Map<string, MultiLineString>();
+  for (const feature of collection.features) {
+    if (
+      feature.properties.Trail &&
+      feature.geometry?.type === 'MultiLineString'
+    ) {
+      byName.set(feature.properties.Trail, feature.geometry);
+    }
+  }
+  return byName;
+}
 
 run(async () => {
   const { dryRun } = parseArgs(process.argv.slice(2));
   const payload = await connect();
 
+  const geometry = await loadGeometry();
   const trails = chattanoogaData.mountainBikeTrails;
   payload.logger.info(
-    `chattanooga: importing ${trails.length} trails (metadata only — geometry stays in the Mapbox tileset)`,
+    `chattanooga: importing ${trails.length} trails (${geometry.size} geometries in ${GEOJSON})`,
   );
 
   // Areas are created on first mention; the cache keeps that to one
@@ -54,9 +84,18 @@ run(async () => {
   const vocabulary = dryRun ? emptyVocabulary() : await loadVocabulary(payload);
   let created = 0;
   let updated = 0;
+  let withGeometry = 0;
+  const missingGeometry: string[] = [];
   const preserved: string[] = [];
 
   for (const trail of trails) {
+    const geom = geometry.get(trail.trailName) ?? null;
+    if (geom) {
+      withGeometry += 1;
+    } else {
+      missingGeometry.push(trail.trailName);
+    }
+
     if (dryRun) {
       continue;
     }
@@ -73,7 +112,7 @@ run(async () => {
       areaId,
       vocabulary,
       city: 'chattanooga',
-      geom: null,
+      geom,
       geometrySource: 'imported',
       trail,
     });
@@ -90,7 +129,15 @@ run(async () => {
   report(
     payload,
     'chattanooga',
-    { created, preserved, updated, withGeometry: 0 },
+    { created, preserved, updated, withGeometry },
     dryRun,
   );
+
+  if (missingGeometry.length > 0) {
+    payload.logger.warn(
+      `chattanooga: ${missingGeometry.length} trails had no geometry in ${GEOJSON}: ${missingGeometry
+        .slice(0, 10)
+        .join(', ')}${missingGeometry.length > 10 ? ', …' : ''}`,
+    );
+  }
 });

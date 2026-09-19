@@ -61,9 +61,9 @@ async function fetchProfile(
  * sidebar shows; a static file cannot update itself and would keep drawing an
  * old line beside new numbers.
  *
- * The files are still the only source for a trail whose geometry isn't in a row
- * — Chattanooga's ~220 trails ride on a Mapbox tileset, and a deployment with
- * no DATABASE_URL has no rows at all — so a miss falls through to
+ * The files are still the only source for a trail whose database row has no
+ * measured profile, and a deployment with no DATABASE_URL has no rows at all,
+ * so a miss falls through to
  * `/data/elevation/<city>/<slug>.json` rather than leaving the pane blank.
  *
  * An abort is not a miss: it means the selection changed, and refetching the

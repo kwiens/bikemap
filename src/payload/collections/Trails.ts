@@ -112,7 +112,7 @@ export const Trails: CollectionConfig = {
                   admin: {
                     width: '100%',
                     description:
-                      'The name everything else follows from. It is also the raw `Trail` value from the Mapbox tileset and the join key to rendered features — so on an existing trail, change it only if the upstream GIS data changed.',
+                      'The name everything else follows from. It is also the raw `Trail` value from the source GIS and the join key to rendered features — so on an existing trail, change it only if the upstream data changed.',
                   },
                 },
                 {
@@ -274,9 +274,9 @@ export const Trails: CollectionConfig = {
             {
               name: 'osmIds',
               type: 'json',
-              // Not required: trails imported from a source other than OSM (today,
-              // Chattanooga — its geometry lives in a Mapbox tileset and it has no way
-              // ids) are legitimate rows. `geometrySource` records which kind this is.
+              // Not required: trails imported from a source other than OSM
+              // (today, Chattanooga's permitted GIS snapshot) are legitimate
+              // rows. `geometrySource` records which kind this is.
               admin: {
                 components: {
                   // No UI of its own — the map above authors this. See the component

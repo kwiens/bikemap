@@ -11,7 +11,7 @@
  *            re-measured from it so they never drift from the line on screen.
  *
  * ('imported' is the third case — geometry that came from somewhere else
- * entirely, today a Mapbox tileset. It is left completely alone.)
+ * entirely, such as an archived GIS snapshot. It is left completely alone.)
  *
  * Both paths are server-authoritative: the admin can supply ways or a line, but
  * every derived number is computed here, never accepted from the client.
@@ -115,7 +115,7 @@ export const resolveTrailGeometry: CollectionBeforeChangeHook = async (
     return data;
   }
 
-  // Trails whose geometry came from somewhere else (a Mapbox tileset, say) are
+  // Trails whose geometry came from somewhere else (a GIS import, say) are
   // not maintained here, so leave what they arrived with alone.
   const source = data.geometrySource ?? originalDoc?.geometrySource;
   if (source === 'imported') {
