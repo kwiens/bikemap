@@ -175,6 +175,7 @@ export async function loadBikeRouteOptimizedStyle(
   styleUrl: string,
   accessToken: string,
   pruneStudioRoutes: boolean,
+  signal?: AbortSignal,
 ): Promise<mapboxgl.StyleSpecification | string> {
   // A city without runtime route GeoJSON still needs its Studio-owned route
   // layers. In that case Mapbox can load the configured optimized style
@@ -192,13 +193,17 @@ export async function loadBikeRouteOptimizedStyle(
   apiUrl.searchParams.set('access_token', accessToken);
 
   try {
-    const response = await fetch(apiUrl);
+    const response = await fetch(apiUrl, { signal });
     if (!response.ok) {
       throw new Error(`Mapbox style request failed (${response.status})`);
     }
     const style = (await response.json()) as mapboxgl.StyleSpecification;
     return removeStyleOwnedBikeRoutes(style);
   } catch (error) {
+    // Teardown deliberately aborts this request. Do not turn that into a
+    // fallback style load (or a warning) in the effect that is going away.
+    if (signal?.aborted) throw error;
+
     console.warn(
       'Could not prune Studio-owned route tilesets; using the configured style.',
       error,

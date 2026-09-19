@@ -1741,12 +1741,14 @@ describe('removeStyleOwnedBikeRoutes', () => {
       json: async () => style,
     });
     global.fetch = fetchMock;
+    const controller = new AbortController();
 
     try {
       const result = (await loadBikeRouteOptimizedStyle(
         'mapbox://styles/example/style?optimize=true',
         'test-token',
         true,
+        controller.signal,
       )) as mapboxgl.StyleSpecification;
       const request = fetchMock.mock.calls[0][0] as URL;
 
@@ -1754,10 +1756,35 @@ describe('removeStyleOwnedBikeRoutes', () => {
       expect(request.pathname).toBe('/styles/v1/example/style');
       expect(request.searchParams.get('optimize')).toBe('true');
       expect(request.searchParams.get('access_token')).toBe('test-token');
+      expect(fetchMock).toHaveBeenCalledWith(request, {
+        signal: controller.signal,
+      });
       expect(result.layers).toEqual([]);
       expect((result.sources.composite as { url: string }).url).not.toContain(
         routeTileset,
       );
+    } finally {
+      global.fetch = previousFetch;
+    }
+  });
+
+  it('propagates teardown aborts instead of loading the fallback style', async () => {
+    const previousFetch = global.fetch;
+    const controller = new AbortController();
+    const abortError = new DOMException('Aborted', 'AbortError');
+    const fetchMock = vi.fn().mockRejectedValue(abortError);
+    global.fetch = fetchMock;
+    controller.abort();
+
+    try {
+      await expect(
+        loadBikeRouteOptimizedStyle(
+          'mapbox://styles/example/style?optimize=true',
+          'test-token',
+          true,
+          controller.signal,
+        ),
+      ).rejects.toBe(abortError);
     } finally {
       global.fetch = previousFetch;
     }

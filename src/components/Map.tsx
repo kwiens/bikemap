@@ -956,6 +956,7 @@ const MapboxMap = memo(function MapboxMap() {
     let compassButton: Element | null = null;
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
+    const styleRequestController = new AbortController();
 
     const handleCompassButtonClick = () => {
       if (compassCleanup.current) {
@@ -980,6 +981,7 @@ const MapboxMap = memo(function MapboxMap() {
             mapConfig.mapbox.styleUrl,
             mapConfig.mapbox.accessToken,
             Boolean(bikeRoutesUrl),
+            styleRequestController.signal,
           );
           const container = mapContainer.current;
           if (cancelled || !container) return;
@@ -1058,7 +1060,7 @@ const MapboxMap = memo(function MapboxMap() {
           if (!combinedRouteLayer) {
             for (const route of bikeRoutes) {
               const layer = newMap.getLayer(route.id);
-              if (!layer || layer.type !== 'line' || !('source' in layer)) {
+              if (layer?.type !== 'line' || !('source' in layer)) {
                 continue;
               }
 
@@ -1357,6 +1359,7 @@ const MapboxMap = memo(function MapboxMap() {
     // Cleanup event listener
     return () => {
       cancelled = true;
+      styleRequestController.abort();
       compassButton?.removeEventListener('click', handleCompassButtonClick);
       if (resizeTimer) clearTimeout(resizeTimer);
 
