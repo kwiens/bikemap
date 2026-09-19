@@ -1,9 +1,9 @@
-import type { Access, CollectionConfig } from 'payload';
+import type { Access, CollectionConfig, FilterOptions } from 'payload';
 import { resolveTrailGeometry } from '@/payload/hooks/resolveTrailGeometry';
-import { activeCityId } from '@/config/map.config';
+import { cityOptions, isCityId } from '@/config/map.config';
 import { DEFAULT_KIND_VALUE, UNRATED_VALUE } from '@/data/trail-vocabulary';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
-import { MAX_WAYS_PER_REQUEST } from '@/payload/osm/overpass';
+import { validateOsmIds } from '@/payload/osm/ids';
 import { slugify } from '@/utils/string';
 import { defaultVocabularyId } from './vocabulary-fields';
 
@@ -46,11 +46,25 @@ const cityScoped: Access = ({ req }) => {
   return user.city ? { city: { equals: user.city } } : false;
 };
 
+const areasForTrailCity: FilterOptions = ({ data }) =>
+  isCityId(data.city) ? { city: { equals: data.city } } : true;
+
+const stewardsForTrailCity: FilterOptions = ({ data }) =>
+  isCityId(data.city)
+    ? {
+        or: [{ city: { equals: data.city } }, { city: { exists: false } }],
+      }
+    : true;
+
 export const Trails: CollectionConfig = {
   slug: 'trails',
+  indexes: [
+    { fields: ['city', 'trailName'], unique: true },
+    { fields: ['city', 'slug'], unique: true },
+  ],
   admin: {
     useAsTitle: 'displayName',
-    defaultColumns: ['displayName', 'area', 'rating', 'distance'],
+    defaultColumns: ['displayName', 'city', 'area', 'rating', 'distance'],
     group: 'Trails',
     listSearchableFields: ['displayName', 'trailName'],
   },
@@ -110,7 +124,7 @@ export const Trails: CollectionConfig = {
                   required: true,
                   index: true,
                   admin: {
-                    width: '100%',
+                    width: '70%',
                     description:
                       'The name everything else follows from. It is also the raw `Trail` value from the source GIS and the join key to rendered features — so on an existing trail, change it only if the upstream data changed.',
                   },
@@ -119,17 +133,11 @@ export const Trails: CollectionConfig = {
                   name: 'city',
                   type: 'select',
                   required: true,
-                  defaultValue: activeCityId,
-                  options: [
-                    { label: 'Chattanooga', value: 'chattanooga' },
-                    { label: 'Bend', value: 'bend' },
-                  ],
+                  options: cityOptions,
                   admin: {
-                    // Hidden because a deployment serves one city, so asking on every
-                    // trail is noise. The column stays: getCityTrails filters on it,
-                    // the seeds set it per city, and editor access is scoped by it.
-                    // Drop `hidden` to bring the picker back for a multi-city admin.
-                    hidden: true,
+                    description:
+                      'Which public city map serves this trail. The admin and database are shared across every city.',
+                    width: '30%',
                   },
                 },
               ],
@@ -143,6 +151,7 @@ export const Trails: CollectionConfig = {
                   relationTo: 'trail-areas',
                   required: true,
                   label: 'Trail complex',
+                  filterOptions: areasForTrailCity,
                   admin: {
                     width: '50%',
                     description:
@@ -156,6 +165,7 @@ export const Trails: CollectionConfig = {
                   // Label only — the field name stays `organization`, as the
                   // collection slug stays `organizations`. See Organizations.ts.
                   label: 'Steward',
+                  filterOptions: stewardsForTrailCity,
                   admin: {
                     width: '50%',
                     description:
@@ -501,50 +511,4 @@ function storedValue({
  */
 function validateGeometry(value: unknown): string | true {
   return parseTrailGeometry(value).error ?? true;
-}
-
-/**
- * Validates the way-id list before a save triggers an Overpass request.
- *
- * Catching a bad paste here means the editor sees a field error instead of the
- * build hook firing a doomed request at a shared community endpoint.
- */
-function validateOsmIds(value: unknown): string | true {
-  const raw = typeof value === 'string' ? tryParse(value) : value;
-
-  // Empty is allowed — an imported trail has no way ids yet. The rebuild hook
-  // simply has nothing to do until some are picked.
-  if (raw === null || raw === undefined) {
-    return true;
-  }
-  if (!Array.isArray(raw)) {
-    return 'OSM ways must be a list of way ids.';
-  }
-  if (raw.length === 0) {
-    return true;
-  }
-  if (raw.length > MAX_WAYS_PER_REQUEST) {
-    return `A trail can reference at most ${MAX_WAYS_PER_REQUEST} OSM ways; this has ${raw.length}.`;
-  }
-
-  for (const entry of raw) {
-    const id = Number(entry);
-    if (!Number.isInteger(id) || id <= 0) {
-      return `"${String(entry)}" is not an OSM way id. Ids are positive whole numbers.`;
-    }
-  }
-
-  if (new Set(raw.map(Number)).size !== raw.length) {
-    return 'The same OSM way is listed more than once.';
-  }
-
-  return true;
-}
-
-function tryParse(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
 }

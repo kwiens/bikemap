@@ -172,6 +172,12 @@ const DEFAULT_CITY_ID: CityId = 'chattanooga';
  */
 export const cityIds: CityId[] = Object.keys(cityConfigs) as CityId[];
 
+/** Shared admin-select options, derived from the city registry. */
+export const cityOptions = cityIds.map((value) => ({
+  label: cityConfigs[value].region.displayName,
+  value,
+}));
+
 /** Narrows arbitrary input (a query param, a CLI flag) to a supported city. */
 export function isCityId(value: unknown): value is CityId {
   return typeof value === 'string' && Object.hasOwn(cityConfigs, value);

@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload';
-import { activeCityId } from '@/config/map.config';
+import { cityOptions } from '@/config/map.config';
 
 /**
  * Trail complexes — the places trails are grouped under in the sidebar
@@ -24,13 +24,14 @@ import { activeCityId } from '@/config/map.config';
  */
 export const TrailAreas: CollectionConfig = {
   slug: 'trail-areas',
+  indexes: [{ fields: ['city', 'name'], unique: true }],
   labels: {
     plural: 'Trail complexes',
     singular: 'Trail complex',
   },
   admin: {
     useAsTitle: 'name',
-    defaultColumns: ['name', 'region'],
+    defaultColumns: ['name', 'city', 'region'],
     description:
       'Trail complexes trails are grouped under, and the region each sits in. Anything added here becomes selectable on a trail.',
     group: 'Lists',
@@ -56,22 +57,19 @@ export const TrailAreas: CollectionConfig = {
           admin: {
             description:
               'As shown in the sidebar, e.g. "Phil\'s Trail Complex".',
-            width: '100%',
+            width: '70%',
           },
         },
         {
           name: 'city',
           type: 'select',
           required: true,
-          defaultValue: activeCityId,
-          options: [
-            { label: 'Chattanooga', value: 'chattanooga' },
-            { label: 'Bend', value: 'bend' },
-          ],
-          // Hidden: a deployment serves one city. The column stays so
-          // complexes remain scoped per city and a multi-city admin only needs
-          // `hidden` removed.
-          admin: { hidden: true },
+          options: cityOptions,
+          admin: {
+            description:
+              'Which city owns this complex in the shared global database.',
+            width: '30%',
+          },
         },
       ],
     },

@@ -1,7 +1,12 @@
 import { spawnSync } from 'node:child_process';
+import { shouldRunMigrations } from './ci-build-policy';
 
-if (process.env.DATABASE_URL) {
+if (shouldRunMigrations(process.env)) {
   runPnpm('db:migrate');
+} else if (process.env.DATABASE_URL && process.env.VERCEL_ENV) {
+  console.log(
+    `Skipping Payload migrations in the ${process.env.VERCEL_ENV} Vercel environment; only production may migrate the shared database.`,
+  );
 } else {
   console.log('DATABASE_URL is not set; skipping Payload migrations.');
 }

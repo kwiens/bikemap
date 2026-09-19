@@ -226,6 +226,26 @@ describe('other sources', () => {
     expect(result.rebuildGeometry).toBe(false);
   });
 
+  it.each([
+    ['malformed JSON', '[1,'],
+    ['a partially invalid list', [1, 'not-a-way']],
+  ])('rejects %s before it can clear or rebuild geometry', async (_label, osmIds) => {
+    const failed = await run({
+      data: { geometrySource: 'osm', osmIds },
+      originalDoc: {
+        distance: 4.2,
+        geom: multiLine([A, B]),
+        osmIds: [1],
+      },
+    }).catch((error: unknown) => error as ValidationError);
+
+    expect(fetched).toBe(0);
+    expect(failed).toBeInstanceOf(ValidationError);
+    expect((failed as ValidationError).data.errors).toEqual([
+      { message: expect.any(String), path: 'osmIds' },
+    ]);
+  });
+
   it('leaves the ways alone when a save does not mention them', async () => {
     // A partial update — publishing a draft over the API, say — carries no
     // osmIds key at all. Reading that as "the curator removed every way" would

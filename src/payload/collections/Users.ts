@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload';
+import { cityOptions } from '@/config/map.config';
 
 /**
  * Admin accounts. Payload's own auth — `auth: true` adds the email/password
@@ -57,10 +58,7 @@ export const Users: CollectionConfig = {
     {
       name: 'city',
       type: 'select',
-      options: [
-        { label: 'Chattanooga', value: 'chattanooga' },
-        { label: 'Bend', value: 'bend' },
-      ],
+      options: cityOptions,
       admin: {
         description:
           'Which city this user can change. Ignored for admins, who can edit every city.',

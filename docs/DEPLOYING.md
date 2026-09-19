@@ -173,9 +173,12 @@ Set `PAYLOAD_SECRET`, `NEXT_PUBLIC_MAPBOX_TOKEN`,
 Neon integration supplies `DATABASE_URL` (pooled application traffic) and
 `DATABASE_URL_UNPOOLED` (schema migrations).
 
-`vercel.ts` runs committed Payload migrations before each Vercel build when a
-database is connected. Neon gives preview deployments isolated database
-branches, so a PR migration does not mutate the production branch. A
+Production builds run committed Payload migrations through
+`DATABASE_URL_UNPOOLED` before the new code goes live. Preview and Development
+deployments intentionally share the same global database and admin accounts, so
+their builds skip migrations: reviewing a PR must never change the production
+schema. Treat previews as live-data surfaces, and keep schema changes
+backward-compatible until the production deployment applies them. A
 database-free fork skips migrations and still builds the checked-in fallback
 map.
 
