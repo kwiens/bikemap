@@ -55,7 +55,7 @@ import {
   ensureBikeNetworkSource,
   setBikeNetworkVisible,
   ensureInlineRoutes,
-  loadBikeRouteOptimizedStyle,
+  loadOptimizedMapStyle,
   queryNearbyLineFeatures,
   registerPointerCursor,
   registerOsmTrailSelection,
@@ -977,7 +977,7 @@ const MapboxMap = memo(function MapboxMap() {
           // Expose map for console debugging (e.g. querying tileset features)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__map = null;
-          const mapStyle = await loadBikeRouteOptimizedStyle(
+          const mapStyle = await loadOptimizedMapStyle(
             mapConfig.mapbox.styleUrl,
             mapConfig.mapbox.accessToken,
             Boolean(bikeRoutesUrl),
@@ -1158,8 +1158,8 @@ const MapboxMap = memo(function MapboxMap() {
             initMtnBikeLayers(newMap);
           }
 
-          // Suppress orphan trail layers baked into the Studio style (e.g. the
-          // leftover TPL trails layer) so they don't render over our routes.
+          // The optimized style path removes orphan trail data before load.
+          // Keep this as a visual fallback if fetching that style failed.
           hideStrayStyleLayers(newMap);
 
           if (showTrails) {
