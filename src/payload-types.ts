@@ -132,21 +132,48 @@ export interface UserAuthOperations {
   };
 }
 /**
+ * Every published Route appears in Casual mode. A Route may use imported geometry or reuse an existing Trail.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "routes".
  */
 export interface Route {
   id: number;
-  name: string;
+  /**
+   * Leave blank on a new trail-backed route to use the trail name.
+   */
+  name?: string | null;
   city: 'chattanooga' | 'bend';
   /**
-   * Stable public identifier used by map selection and exports.
+   * Stable public identifier used by map selection and exports. Leave blank on a new trail-backed route to use the trail slug.
    */
-  routeId: string;
+  routeId?: string | null;
+  kind?: ('ride' | 'greenway' | 'path' | 'trail') | null;
   /**
-   * Normalized WGS84 route geometry. Import tooling owns this value.
+   * An existing trail stays linked; edits to that trail automatically update this route.
    */
-  geom:
+  geometrySource: 'imported' | 'trail';
+  /**
+   * Select a curated trail to expose it in the Casual routes tab.
+   */
+  sourceTrail?: (number | null) | Trail;
+  /**
+   * Short description shown under the route in Casual mode.
+   */
+  description?: string | null;
+  color: string;
+  defaultWidth: number;
+  opacity: number;
+  /**
+   * Imported route distance in miles.
+   */
+  distance?: number | null;
+  hideArrows?: boolean | null;
+  reverseDirection?: boolean | null;
+  /**
+   * Imported [west, south, east, north] bounds.
+   */
+  bounds?:
     | {
         [k: string]: unknown;
       }
@@ -155,9 +182,33 @@ export interface Route {
     | number
     | boolean
     | null;
-  sourcePath: string;
-  sourceSha256: string;
-  sourceFeatureCount: number;
+  /**
+   * Optional bounds where route arrows need their direction flipped.
+   */
+  reverseArrowBounds?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Normalized WGS84 route geometry. Import tooling owns this value.
+   */
+  geom?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  sourcePath?: string | null;
+  sourceSha256?: string | null;
+  sourceFeatureCount?: number | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -533,6 +584,18 @@ export interface RoutesSelect<T extends boolean = true> {
   name?: T;
   city?: T;
   routeId?: T;
+  kind?: T;
+  geometrySource?: T;
+  sourceTrail?: T;
+  description?: T;
+  color?: T;
+  defaultWidth?: T;
+  opacity?: T;
+  distance?: T;
+  hideArrows?: T;
+  reverseDirection?: T;
+  bounds?: T;
+  reverseArrowBounds?: T;
   geom?: T;
   sourcePath?: T;
   sourceSha256?: T;

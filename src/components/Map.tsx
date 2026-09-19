@@ -10,7 +10,6 @@ import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { useEmbed } from '@/components/EmbedContext';
 
 import {
-  bikeRoutes,
   mapFeatures,
   bikeResources,
   hiddenStyleLayerIds,
@@ -19,6 +18,7 @@ import {
   bikeRoutesUrl,
   inlineBikeRouteIds,
 } from '@/data/geo_data';
+import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import {
   createLocationMarker,
@@ -111,6 +111,7 @@ if (!hasMapboxToken) {
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
+  const bikeRoutes = getBikeRoutes();
   const { isEmbed, options: embedOptions } = useEmbed();
   // Embed mode is fixed for the lifetime of the tree, but the init effect runs
   // once on mount and must not list it as a dependency.
@@ -178,30 +179,33 @@ const MapboxMap = memo(function MapboxMap() {
   useWakeLock(watchingLocation || recordingActive);
 
   // Handle ride select — show ride on map
-  const handleRideSelect = useCallback(async (event: CustomEvent) => {
-    if (!map.current) return;
-    const { rideId } = event.detail;
-    const ride = await loadRide(rideId);
-    if (!ride) return;
+  const handleRideSelect = useCallback(
+    async (event: CustomEvent) => {
+      if (!map.current) return;
+      const { rideId } = event.detail;
+      const ride = await loadRide(rideId);
+      if (!ride) return;
 
-    const segments = splitRideSegments(ride.points).map((segment) =>
-      segment.map((p) => [p.lng, p.lat] as [number, number]),
-    );
-    addRideLayer(map.current, segments);
+      const segments = splitRideSegments(ride.points).map((segment) =>
+        segment.map((p) => [p.lng, p.lat] as [number, number]),
+      );
+      addRideLayer(map.current, segments);
 
-    // Dim other routes/trails
-    updateRouteOpacity(map.current, bikeRoutes, null, {
-      selected: 0.1,
-      unselected: 0.1,
-    });
-    updateMtnBikeOpacity(map.current, null);
+      // Dim other routes/trails
+      updateRouteOpacity(map.current, bikeRoutes, null, {
+        selected: 0.1,
+        unselected: 0.1,
+      });
+      updateMtnBikeOpacity(map.current, null);
 
-    // Fly to ride bounds
-    const [swLng, swLat, neLng, neLat] = ride.bounds;
-    const bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
-    pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-    flyToBounds(map.current, bounds);
-  }, []);
+      // Fly to ride bounds
+      const [swLng, swLat, neLng, neLat] = ride.bounds;
+      const bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+      pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
+      flyToBounds(map.current, bounds);
+    },
+    [bikeRoutes],
+  );
 
   // Handle ride deselect — remove ride from map
   const handleRideDeselect = useCallback(() => {
@@ -212,7 +216,7 @@ const MapboxMap = memo(function MapboxMap() {
       unselected: 1,
     });
     updateMtnBikeOpacity(map.current, null);
-  }, []);
+  }, [bikeRoutes]);
 
   // Set up ride select/deselect event listeners
   useEffect(() => {
@@ -452,7 +456,7 @@ const MapboxMap = memo(function MapboxMap() {
         flyToBounds(map.current, bounds);
       }
     },
-    [showToast],
+    [bikeRoutes, showToast],
   );
 
   // Handle trail selection events
@@ -499,7 +503,7 @@ const MapboxMap = memo(function MapboxMap() {
         flyToBounds(map.current, bounds);
       }
     },
-    [showToast],
+    [bikeRoutes, showToast],
   );
 
   // Routes' resting opacity: dimmed while any marker layer is shown so the
@@ -517,7 +521,7 @@ const MapboxMap = memo(function MapboxMap() {
   const handleRouteDeselect = useCallback(() => {
     if (!map.current) return;
     updateRouteOpacity(map.current, bikeRoutes, null, restingRouteOpacity());
-  }, [restingRouteOpacity]);
+  }, [bikeRoutes, restingRouteOpacity]);
 
   const handleTrailDeselect = useCallback(() => {
     if (!map.current) return;
@@ -532,7 +536,7 @@ const MapboxMap = memo(function MapboxMap() {
       detectCandidateRef.current = null;
       detectConfirmCountRef.current = 0;
     }
-  }, [restingRouteOpacity]);
+  }, [bikeRoutes, restingRouteOpacity]);
 
   // Handle area (rec area heading) selection — zoom to area bounds
   const handleAreaSelect = useCallback(
@@ -556,7 +560,7 @@ const MapboxMap = memo(function MapboxMap() {
         flyToBounds(map.current, bounds);
       }
     },
-    [showToast],
+    [bikeRoutes, showToast],
   );
 
   // Handle layer toggle events
@@ -677,7 +681,7 @@ const MapboxMap = memo(function MapboxMap() {
         }
       }
     },
-    [restingRouteOpacity],
+    [bikeRoutes, restingRouteOpacity],
   );
 
   // Handler for centering on a specific location

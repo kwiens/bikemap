@@ -3,6 +3,10 @@ import { shouldRunMigrations } from './ci-build-policy';
 
 if (shouldRunMigrations(process.env)) {
   runPnpm('db:migrate');
+  // Bend route geometry derives from a committed source, so production can
+  // safely sync these eight rows after the schema is current. The importer
+  // skips unchanged rows and therefore does not create a version per deploy.
+  runPnpm('db:seed:bend-routes');
 } else if (process.env.DATABASE_URL && process.env.VERCEL_ENV) {
   console.log(
     `Skipping Payload migrations in the ${process.env.VERCEL_ENV} Vercel environment; only production may migrate the shared database.`,

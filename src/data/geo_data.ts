@@ -3,7 +3,6 @@ import { activeCityData } from './cities';
 import { hiddenStyleLayerIdsFor } from './mapbox-style';
 
 export type { BikeRoute } from './bike-routes';
-export const bikeRoutes = activeCityData.bikeRoutes;
 
 export { MTN_BIKE_LAYER_ID } from './mountain-bike-trails';
 export type {

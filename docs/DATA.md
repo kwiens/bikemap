@@ -1,7 +1,7 @@
 # Data files
 
-Display metadata and checked-in fallbacks live in `src/data/` as typed
-TypeScript arrays. Published trail and route geometry can come from Payload,
+Seed metadata and checked-in trail fallbacks live in `src/data/` as typed
+TypeScript arrays. Published trail and route content comes from Payload,
 while other content can remain explicitly configured to use static files or
 Mapbox Studio layers. Payload-owned route geometry has no implicit Studio
 fallback.
@@ -27,10 +27,11 @@ The MTB trail array lives in its own `mountain-bike-trails.data.ts` so the
 
 ## BikeRoute (`bike-routes.ts`)
 
-Route display metadata lives in TypeScript. Geometry comes from the active
-city's `bikeRoutesUrl` GeoJSON when configured, otherwise from a Mapbox Studio
-line layer. Chattanooga's Riverwalk URL is database-backed, and its Studio line
-stays disabled even when Payload is unavailable or has not been imported yet.
+The TypeScript arrays are import metadata, not the public Casual list. Published
+Route records supply both display metadata and geometry through
+`/api/map/routes?city=<city>`; they have no Studio or checked-in route-GeoJSON
+fallback. A Route may instead select a same-city Trail, in which case the read
+path uses that Trail's current geometry, distance, and bounds.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -42,6 +43,7 @@ stays disabled even when Payload is unavailable or has not been imported yet.
 | `defaultWidth` | `number` | Line width in px |
 | `opacity` | `number` | 0–1 |
 | `distance` | `number` | Miles |
+| `kind?` | `ride \| greenway \| path \| trail` | Editorial route classification |
 | `defaultBounds?` | `[swLng, swLat, neLng, neLat]` | Zoom-to-fit fallback when runtime bounds aren't available |
 | `bounds?` | `mapboxgl.LngLatBounds` | Computed at runtime — do not hand-author |
 

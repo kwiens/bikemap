@@ -14,6 +14,7 @@ import type { ReactElement } from 'react';
 import { getRequestHostname } from '@/utils/request-hostname';
 import { resolveActiveCityId } from '@/config/map.config';
 import { getCityTrails } from '@/payload/read/trails';
+import { getCityRoutes } from '@/payload/read/routes';
 import HomeClient from './HomeClient';
 
 // Rendered per request, because reading the hostname makes it so. One
@@ -22,7 +23,10 @@ import HomeClient from './HomeClient';
 // resolved city travels with them so the client can reject a mismatch.
 export default async function Home(): Promise<ReactElement> {
   const cityId = resolveActiveCityId(await getRequestHostname());
-  const { trails } = await getCityTrails(cityId);
+  const [{ trails }, { routes }] = await Promise.all([
+    getCityTrails(cityId),
+    getCityRoutes(cityId),
+  ]);
 
-  return <HomeClient cityId={cityId} trails={trails} />;
+  return <HomeClient cityId={cityId} routes={routes} trails={trails} />;
 }

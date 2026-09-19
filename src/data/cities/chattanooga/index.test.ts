@@ -15,17 +15,15 @@ describe('Chattanooga curated trail source', () => {
     );
   });
 
-  it('uses Payload as the only Riverwalk geometry source', () => {
+  it('uses Payload as the only curated route geometry source', () => {
     expect(chattanoogaData.bikeRoutesUrl).toBe(
       '/api/map/routes?city=chattanooga',
     );
-    expect(chattanoogaData.inlineBikeRouteIds).toEqual([
-      'riverwalk-loop-v3-public',
-    ]);
+    expect(chattanoogaData.inlineBikeRouteIds).toBeUndefined();
     expect(hiddenStyleLayerIdsFor(chattanoogaData)).toContain(
       'riverwalk-loop-v3-public',
     );
-    expect(hiddenStyleLayerIdsFor(chattanoogaData)).not.toContain(
+    expect(hiddenStyleLayerIdsFor(chattanoogaData)).toContain(
       'zoo-loop-v2-full-public',
     );
   });

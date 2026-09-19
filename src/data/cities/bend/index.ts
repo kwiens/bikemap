@@ -75,6 +75,6 @@ export const bendData: CityData = {
   },
   // OSM-derived classified bike network (Casual mode overlay).
   bikeNetworkUrl: '/data/bend/bike-network.geojson',
-  // Curated greenway routes (geometry attached at runtime from GeoJSON).
-  bikeRoutesUrl: '/data/bend/routes.geojson',
+  // Curated Casual routes are database-owned, including normalized geometry.
+  bikeRoutesUrl: '/api/map/routes?city=bend',
 };

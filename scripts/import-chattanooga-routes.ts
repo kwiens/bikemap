@@ -8,11 +8,10 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { Payload } from 'payload';
 import { chattanoogaData } from '../src/data/cities/chattanooga';
-import type { Route } from '../src/payload-types';
 import type { MultiLineString } from './seed/shared';
 import { connect, repoRoot } from './seed/shared';
+import { upsertImportedRoute } from './seed/routes';
 
 const execFileAsync = promisify(execFile);
 const PYTHON_SCRIPT = path.join(
@@ -69,10 +68,7 @@ async function normalizeRoutes(
   return collection.features;
 }
 
-async function upsertRoute(
-  payload: Payload,
-  feature: NormalizedRouteFeature,
-): Promise<'created' | 'updated'> {
+function importedRoute(feature: NormalizedRouteFeature) {
   const route = chattanoogaData.bikeRoutes.find(
     (candidate) => candidate.id === feature.properties.id,
   );
@@ -82,40 +78,14 @@ async function upsertRoute(
     );
   }
 
-  const data = {
-    _status: 'published' as const,
+  return {
     city: 'chattanooga' as const,
-    geom: feature.geometry as unknown as Route['geom'],
-    name: route.name,
-    routeId: route.id,
+    geom: feature.geometry,
+    route,
     sourceFeatureCount: feature.properties.sourceFeatureCount,
     sourcePath: feature.properties.sourcePath,
     sourceSha256: feature.properties.sourceSha256,
   };
-  const existing = await payload.find({
-    collection: 'routes',
-    depth: 0,
-    limit: 1,
-    pagination: false,
-    where: {
-      and: [
-        { city: { equals: 'chattanooga' } },
-        { routeId: { equals: route.id } },
-      ],
-    },
-  });
-
-  if (existing.docs[0]) {
-    await payload.update({
-      collection: 'routes',
-      id: existing.docs[0].id,
-      data,
-    });
-    return 'updated';
-  }
-
-  await payload.create({ collection: 'routes', data });
-  return 'created';
 }
 
 async function main(): Promise<void> {
@@ -131,12 +101,16 @@ async function main(): Promise<void> {
 
   const payload = await connect();
   const results = await Promise.all(
-    features.map((feature) => upsertRoute(payload, feature)),
+    features.map((feature) =>
+      upsertImportedRoute(payload, importedRoute(feature)),
+    ),
   );
   const created = results.filter((result) => result === 'created').length;
-  const updated = results.length - created;
+  const updated = results.filter((result) => result === 'updated').length;
+  const preserved = results.filter((result) => result === 'preserved').length;
+  const unchanged = results.length - created - updated - preserved;
   payload.logger.info(
-    `chattanooga routes: ${created} created, ${updated} updated`,
+    `chattanooga routes: ${created} created, ${updated} updated, ${unchanged} unchanged, ${preserved} trail-linked kept`,
   );
 }
 

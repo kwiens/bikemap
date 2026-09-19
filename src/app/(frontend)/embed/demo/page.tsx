@@ -4,6 +4,7 @@ import { siteConfigForHostname } from '@/config/site.config';
 import { getRequestHostname } from '@/utils/request-hostname';
 import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
+import { getCityRoutes } from '@/payload/read/routes';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -14,7 +15,8 @@ export const metadata: Metadata = {
 export default async function EmbedDemoPage(): Promise<ReactElement> {
   const hostname = await getRequestHostname();
   const config = siteConfigForHostname(hostname);
-  const builderConfig = embedBuilderConfig(hostname);
+  const { routes } = await getCityRoutes(config.cityId);
+  const builderConfig = embedBuilderConfig(hostname, routes);
 
   return (
     <div className="min-h-screen bg-white text-gray-800">

@@ -54,8 +54,8 @@ export const chattanoogaData: CityData = {
     ],
     hiddenTrails: HIDDEN_TRAILS,
   },
-  // Riverwalk is imported into Payload from the verified GIS archive. Payload
-  // is its sole geometry source; the same-named Studio layer stays disabled.
+  // Curated routes are database-owned. The importer currently loads Riverwalk;
+  // any additional published Route (including a linked Trail) joins the same
+  // runtime source without needing a new city config entry.
   bikeRoutesUrl: '/api/map/routes?city=chattanooga',
-  inlineBikeRouteIds: ['riverwalk-loop-v3-public'],
 };

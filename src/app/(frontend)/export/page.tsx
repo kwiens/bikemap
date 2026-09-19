@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { bikeRoutes, bikeRoutesUrl, inlineBikeRouteIds } from '@/data/geo_data';
+import { bikeRoutesUrl, inlineBikeRouteIds } from '@/data/geo_data';
 import { mapConfig } from '@/config/map.config';
 import { buildSvg } from '@/utils/svg';
 import { buildGpx } from '@/utils/gpx';
 import { slugify } from '@/utils/string';
 import { downloadFile } from '@/utils/format';
 import { loadRouteFeatures, type RouteFeatures } from '@/utils/route-export';
+import { useExportRoutes } from './ExportRoutesContext';
 
 mapboxgl.accessToken = mapConfig.mapbox.accessToken;
 
@@ -32,6 +33,7 @@ const disabledStyle: React.CSSProperties = {
 };
 
 export default function ExportPage() {
+  const bikeRoutes = useExportRoutes();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -68,7 +70,7 @@ export default function ExportPage() {
         map.current = null;
       }
     };
-  }, []);
+  }, [bikeRoutes]);
 
   function handleDownloadGpx(routeId: string) {
     const route = bikeRoutes.find((r) => r.id === routeId);

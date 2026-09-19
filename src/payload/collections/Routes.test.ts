@@ -24,4 +24,12 @@ describe('validateRouteGeometry', () => {
       validateRouteGeometry({ type: 'Point', coordinates: [-85.3, 35] }),
     ).toContain('MultiLineString or LineString');
   });
+
+  it('allows geometry to come from a linked trail', () => {
+    expect(
+      validateRouteGeometry(undefined, {
+        siblingData: { geometrySource: 'trail' },
+      }),
+    ).toBe(true);
+  });
 });

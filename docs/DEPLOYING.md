@@ -77,12 +77,11 @@ contract of `BikeRoute`, `MountainBikeTrail`, `BikeResource`, `MapFeature`, and
 
 ## 6. Routes and curated trails
 
-- **Routes** — draw/upload each route as a line layer in your style, then set
-  each `BikeRoute.id` in `bike-routes.ts` to that layer's ID. A verified route
-  may instead be imported into Payload and served from
-  `/api/map/routes?city=<city>`. Once Payload owns a route, include its id in
-  `inlineBikeRouteIds`; the same-named Studio layer is then never used as a
-  fallback.
+- **Routes** — publish Route records in Payload; Casual mode reads them from
+  `/api/map/routes?city=<city>` with no Studio fallback. Imported routes store
+  normalized geometry plus provenance. To reuse an existing curated trail,
+  choose “Existing trail” as the geometry source and select a same-city Trail;
+  its current line, distance, and bounds then drive the route automatically.
 - **Trails** — prepare a WGS84 GeoJSON file with one `MultiLineString` feature
   per curated trail, seed it into Payload, and configure the city layer with
   `/api/map/trails?city=<city>` plus the static file as
@@ -218,13 +217,19 @@ A database-free fork skips migrations and still builds the checked-in fallback
 map.
 
 Seed every city into the same fresh database after the initial migration. Both
-commands are idempotent and match existing rows on `(trailName, city)`:
+commands are idempotent; Bend's command also seeds its eight Casual routes:
 
 ```bash
 pnpm db:migrate
 pnpm db:seed:chattanooga
 pnpm db:seed:bend
 ```
+
+Production builds also run `pnpm db:seed:bend-routes` after migrations. It
+derives only those eight rows from the committed bike network and skips rows
+whose geometry and metadata are already current; it also preserves rows a
+curator has switched to a Trail source. Chattanooga route imports remain
+manual because their verified GIS archive is not committed.
 
 Any Node host also works: set the same variables, run `pnpm run ci`, then
 `pnpm start`.
