@@ -129,6 +129,28 @@ describe('computeGrades', () => {
     expect(computeGrades(uneven)[3]).toBeCloseTo(11.45, 2);
   });
 
+  it('does not smooth across explicit geometry gaps', () => {
+    const gapped: [number, number, number, number][] = [
+      [0, 100, -85, 35],
+      [100, 110, -85.1, 35],
+      [600, 210, -86, 36],
+      [700, 200, -86.1, 36],
+      [800, 190, -86.2, 36],
+    ];
+    const gaps = [
+      {
+        feet: 500,
+        from: [-85.1, 35] as [number, number],
+        to: [-86, 36] as [number, number],
+      },
+    ];
+
+    const grades = computeGrades(gapped, gaps);
+
+    expect(grades[1]).toBeCloseTo(10, 5);
+    expect(grades[2]).toBeCloseTo(-10, 5);
+  });
+
   it('returns one grade per point and handles degenerate profiles', () => {
     expect(computeGrades(climb)).toHaveLength(climb.length);
     expect(computeGrades([[0, 100, -85, 35]])).toEqual([0]);

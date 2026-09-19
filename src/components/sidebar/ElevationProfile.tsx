@@ -113,35 +113,68 @@ export function formatGrade(grade: number | undefined): string {
 /** Percent grade at each point, smoothed. Positive is uphill. */
 export function computeGrades(
   points: [number, number, number, number][],
+  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
 ): number[] {
   if (points.length < 2) return points.map(() => 0);
 
+  const gapEdges = new Set(
+    gapDetails.map(({ from, to }) =>
+      profileEdgeKey(from[0], from[1], to[0], to[1]),
+    ),
+  );
+  const segmentStarts = new Set<number>();
   const rises: number[] = [0];
   const runs: number[] = [0];
   for (let i = 1; i < points.length; i++) {
+    const previous = points[i - 1];
+    const current = points[i];
+    if (
+      gapEdges.has(
+        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
+      )
+    ) {
+      segmentStarts.add(i);
+    }
     const run = points[i][0] - points[i - 1][0];
     const rise = points[i][1] - points[i - 1][1];
     runs.push(run > 0 ? run : 0);
     rises.push(run > 0 ? rise : 0);
   }
 
-  const smoothed: number[] = [];
+  const smoothed = points.map(() => 0);
   const WINDOW = 2;
-  for (let i = 0; i < runs.length; i++) {
-    let totalRise = 0;
-    let totalRun = 0;
-    for (
-      let j = Math.max(0, i - WINDOW);
-      j <= Math.min(runs.length - 1, i + WINDOW);
-      j++
-    ) {
-      totalRise += rises[j];
-      totalRun += runs[j];
+  let segmentStart = 0;
+  for (let segmentEnd = 1; segmentEnd <= points.length; segmentEnd++) {
+    if (segmentEnd < points.length && !segmentStarts.has(segmentEnd)) {
+      continue;
     }
-    smoothed.push(totalRun > 0 ? (totalRise / totalRun) * 100 : 0);
+
+    for (let i = segmentStart; i < segmentEnd; i++) {
+      let totalRise = 0;
+      let totalRun = 0;
+      for (
+        let j = Math.max(segmentStart + 1, i - WINDOW);
+        j <= Math.min(segmentEnd - 1, i + WINDOW);
+        j++
+      ) {
+        totalRise += rises[j];
+        totalRun += runs[j];
+      }
+      smoothed[i] = totalRun > 0 ? (totalRise / totalRun) * 100 : 0;
+    }
+    segmentStart = segmentEnd;
   }
 
   return smoothed;
+}
+
+function profileEdgeKey(
+  fromLng: number,
+  fromLat: number,
+  toLng: number,
+  toLat: number,
+): string {
+  return `${fromLng},${fromLat}:${toLng},${toLat}`;
 }
 
 // Force strictly increasing offsets. Consecutive profile points can share a
@@ -568,7 +601,8 @@ export function ElevationProfile() {
   }, []);
 
   const grades = useMemo(
-    () => (profile ? computeGrades(profile.profile) : []),
+    () =>
+      profile ? computeGrades(profile.profile, profile.geometryGapDetails) : [],
     [profile],
   );
   const gradeColors = useMemo(
