@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 
 // Store original console methods
