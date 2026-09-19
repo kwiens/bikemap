@@ -32,11 +32,18 @@ console says so explicitly.
 2. Create a **public access token** at
    <https://account.mapbox.com/access-tokens/> (starts with `pk.`). Scope it to
    your domains.
-3. Put the token in `.env.local`:
+3. Put the token **and your style URL** in `.env.local`:
    ```
    NEXT_PUBLIC_MAPBOX_TOKEN=pk.your_token_here
+   NEXT_PUBLIC_MAPBOX_STYLE_URL=mapbox://styles/<you>/<your-style-id>
    ```
-   Set the same variable in your host's environment for production.
+   Set both in your host's environment for production.
+
+> **You must set your own style.** The default belongs to the upstream Mapbox
+> account, and its `composite` source mixes Mapbox's tilesets with private
+> `swuller.*` ones. With any other token that composite 404s and Mapbox drops
+> the **whole basemap** with no visible error — you get trails and overlays
+> floating on a blank background. If your map looks like that, this is why.
 
 ## 3. Branding — `src/config/site.config.ts`
 
@@ -56,7 +63,7 @@ Brand colors also live in `tailwind.config.ts` as `app-primary` / `app-secondary
 
 | Field | What to set |
 |---|---|
-| `mapbox.styleUrl` | Your Mapbox style URL from step 2 |
+| `mapbox.styleUrl` | Comes from `NEXT_PUBLIC_MAPBOX_STYLE_URL` (step 2) — no code change needed |
 | `defaultView` | `center` `[lng, lat]`, `zoom`, `pitch`, `bearing` — where the map opens |
 | `gbfs.baseUrl` | Your city's [GBFS](https://gbfs.org/) feed, or remove the bike-share layer if there's none |
 | `region.name` / `region.displayName` | Your region's slug and display name |
@@ -68,25 +75,35 @@ file is a typed array — see **[DATA.md](DATA.md)** for the full field-by-field
 contract of `BikeRoute`, `MountainBikeTrail`, `BikeResource`, `MapFeature`, and
 `LocalResource`.
 
-## 6. Routes & trails in Mapbox Studio
+## 6. Routes and curated trails
 
 - **Routes** — draw/upload each route as a line layer in your style, then set
   each `BikeRoute.id` in `bike-routes.ts` to that layer's ID.
-- **Trails** — upload your mountain bike trail GIS data as a Mapbox **tileset**,
-  then set `MTN_BIKE_TILESET_URL` and `MTN_BIKE_SOURCE_LAYER` in
-  `src/data/mountain-bike-trails.ts`. The app attaches this tileset at runtime
-  (`ensureMtnBikeSource`), so it does not need to be in the Studio style.
-  Each `MountainBikeTrail.trailName` must match the tileset's `Trail` feature
-  property. See `AGENTS.md` for DevTools snippets to discover layer/tileset
-  names after a GIS re-upload.
-  - **Keep the elevation script in sync:** `scripts/add_trail_elevation.py`
-    has its own `MVT_TILESET` constant. If you use the pipeline in step 7,
-    point it at the **same** tileset as `MTN_BIKE_TILESET_URL`.
+- **Trails** — prepare a WGS84 GeoJSON file with one `MultiLineString` feature
+  per curated trail, seed it into Payload, and configure the city layer with
+  `/api/map/trails?city=<city>` plus the static file as
+  `geojsonFallbackUrl`. Each `MountainBikeTrail.trailName` must match the
+  feature's `Trail` property.
+
+Chattanooga's source is an ESRI shapefile; its checked-in converter performs
+the reprojection and grouping:
+
+```bash
+python scripts/prepare_chattanooga_trails.py /path/to/Chattanooga_Regional_Trails_4.shp
+pnpm prepare:chattanooga-measurements
+pnpm db:seed:chattanooga
+```
+
+The measurement step requires `NEXT_PUBLIC_MAPBOX_TOKEN`. It uses the same
+measurement code as Payload and regenerates both the checked-in summaries and
+static elevation profiles before the seed imports them with the geometry.
 
 ## 7. Trail elevation pipeline (optional)
 
-Only if you have mountain bike trails. Generates per-trail elevation profiles
-and bounds from your tileset + Mapbox Terrain-RGB.
+Only if you have mountain bike trails. `pnpm backfill:elevation` measures a
+database trail that has geometry but no stored profile. Chattanooga's prepared
+seed already includes profiles; the legacy Python script remains available for
+the historical Mapbox-vector-tile workflow.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -129,13 +146,91 @@ Replace with your own:
 pnpm build      # verify the production build locally
 ```
 
-On **Vercel**: import the repo, and add `NEXT_PUBLIC_MAPBOX_TOKEN` under
-Settings → Environment Variables for **Production, Preview, and Development**.
-Any Node host works — `pnpm build` then `pnpm start`.
+On **Vercel**, one project can serve every city and one Neon database can hold
+all of their content. Rows are scoped by the required `city` field; splitting a
+city out later is a data move and environment-variable change, not a different
+application schema.
+
+```bash
+# Link the repository to its Vercel project.
+vercel link
+
+# Provision one shared Neon resource in the same region as the app. Payload
+# owns admin authentication, so Neon Auth is not needed.
+vercel integration add neon \
+  --name bikemap-global \
+  --plan free_v3 \
+  --metadata region=iad1 \
+  --metadata auth=false
+
+# Pull the pooled runtime URL and direct migration URL locally.
+vercel env pull .env.local --yes
+```
+
+Set `PAYLOAD_SECRET`, `NEXT_PUBLIC_MAPBOX_TOKEN`,
+`NEXT_PUBLIC_MAPBOX_STYLE_URL`, `NEXT_PUBLIC_CITY_ID`, and
+`NEXT_PUBLIC_CITY_HOST_MAP` for **Production, Preview, and Development**. The
+Neon integration supplies `DATABASE_URL` (pooled application traffic) and
+`DATABASE_URL_UNPOOLED` (schema migrations).
+
+### Preview and production database policy
+
+"Preview uses the same database as production" means that the running preview
+application connects to the same Neon database with the same Payload secret.
+It sees the same content and users, and an admin edit made from a preview is a
+real edit that production will also see. Browser login cookies are scoped to a
+hostname, so an administrator may still need to sign in separately on a preview
+URL with the same credentials.
+
+It does **not** mean that a preview build may change the shared database schema:
+
+| Vercel environment | Data and admin accounts | Application writes | Schema migrations during build |
+|---|---|---|---|
+| Preview | Shared with production | Live; visible in production | Skipped |
+| Development | Shared when configured with the shared URLs | Live; visible in production | Skipped |
+| Production | Shared global database | Live | Applied through `DATABASE_URL_UNPOOLED` |
+
+This separation prevents an unmerged commit from changing the database under
+the currently deployed production code. It also prevents previews for different
+branches from racing to apply incompatible migrations.
+
+For a schema-changing pull request, the deployment sequence is:
+
+1. The preview build skips migrations and runs against the current production
+   schema.
+2. The change is reviewed and merged. Until then, its application code must
+   remain compatible with the current schema.
+3. The production build applies the committed Payload migrations through
+   `DATABASE_URL_UNPOOLED`.
+4. Vercel starts serving the new production code against the migrated schema.
+
+The tradeoff is deliberate: a preview can exercise shared accounts, content,
+and normal writes, but it cannot fully exercise a new schema before the
+production deployment. Use a separate Neon branch or database when a change
+requires pre-merge migration testing; do not point that isolated preview at the
+global database.
+
+A database-free fork skips migrations and still builds the checked-in fallback
+map.
+
+Seed every city into the same fresh database after the initial migration. Both
+commands are idempotent and match existing rows on `(trailName, city)`:
+
+```bash
+pnpm db:migrate
+pnpm db:seed:chattanooga
+pnpm db:seed:bend
+```
+
+Any Node host also works: set the same variables, run `pnpm run ci`, then
+`pnpm start`.
 
 ## Checklist
 
 - [ ] `.env.local` has `NEXT_PUBLIC_MAPBOX_TOKEN`
+- [ ] Vercel has one shared Neon resource with pooled and unpooled URLs
+- [ ] `PAYLOAD_SECRET` is set in every deployed environment
+- [ ] Payload migrations and both city seeds have completed
 - [ ] `src/config/site.config.ts` — name, description, URL, colors, storage prefix
 - [ ] `src/config/map.config.ts` — style URL, default view, GBFS, region
 - [ ] `src/data/*` — routes, trails, shops, POIs ([DATA.md](DATA.md))

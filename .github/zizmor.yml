@@ -1,0 +1,8 @@
+# Audit workflows for shell interpolation, excessive permissions, spoofable
+# identity checks, and other GitHub Actions security mistakes. Major-version
+# action tags are deliberate and Dependabot keeps them current.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        '*': ref-pin

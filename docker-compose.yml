@@ -1,0 +1,31 @@
+# Local Postgres for the content backend (see docs/adr/0001).
+#
+#   docker compose up -d
+#
+# Credentials and port match the DATABASE_URL in .env.example.
+#
+# Plain Postgres, not PostGIS: trail geometry is a JSON cache rebuilt from OSM,
+# so nothing queries it spatially. If that ever changes, swap the image for
+# postgis/postgis:16-3.4 — ADR-0001 records how to add a geometry column without
+# a custom Drizzle type.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bikemap
+    ports:
+      # Default Postgres port — stop any system Postgres first, or change both
+      # this and DATABASE_URL if you need it on another port.
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d bikemap']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:

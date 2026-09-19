@@ -1,3 +1,5 @@
+import 'fake-indexeddb/auto';
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { RecordedRide, RideStats, RidePoint } from '../data/ride';
 import {

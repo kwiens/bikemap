@@ -1,6 +1,10 @@
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
-import '@testing-library/jest-dom';
-import 'fake-indexeddb/auto';
+
+// DOM matchers are only useful in the files that opt into jsdom. Avoid loading
+// Testing Library's matcher bundle in every pure Node test worker.
+if (typeof document !== 'undefined') {
+  await import('@testing-library/jest-dom/vitest');
+}
 
 // Store original console methods
 const originalConsoleLog = console.log;

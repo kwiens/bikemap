@@ -1,11 +1,21 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+/** @vitest-environment jsdom */
+
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ElevationProfile,
   gradeToColor,
-  computeGradeColors,
+  computeGrades,
   downsampleStops,
+  formatGrade,
   findClosestProfileIndex,
+  loadProfile,
   profilePointToXY,
 } from './ElevationProfile';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
@@ -45,27 +55,44 @@ describe('gradeToColor', () => {
   });
 });
 
-describe('computeGradeColors', () => {
-  it('returns empty array for 0 points', () => {
-    expect(computeGradeColors([])).toEqual([]);
+describe('computeGrades', () => {
+  const climb: [number, number, number, number][] = [
+    [0, 100, -85, 35],
+    [100, 110, -85, 35],
+    [200, 120, -85, 35],
+    [300, 130, -85, 35],
+    [400, 140, -85, 35],
+    [500, 150, -85, 35],
+  ];
+
+  it('reads a steady grade correctly', () => {
+    expect(computeGrades(climb)[3]).toBeCloseTo(10, 5);
   });
 
-  it('returns single green entry for 1 point', () => {
-    const result = computeGradeColors([[0, 100, -85, 35]]);
-    expect(result).toHaveLength(1);
-    expect(result[0]).toBe('rgb(34,197,94)');
+  it('signs a descent negative', () => {
+    const drop: [number, number, number, number][] = climb.map(
+      ([distance, elevation, lng, lat]) => [
+        distance,
+        200 - elevation,
+        lng,
+        lat,
+      ],
+    );
+
+    expect(computeGrades(drop)[3]).toBeCloseTo(-10, 5);
   });
 
-  it('returns array same length as input', () => {
-    const points: [number, number, number, number][] = [
+  it('weights uneven samples by their run distance', () => {
+    const uneven: [number, number, number, number][] = [
       [0, 100, -85, 35],
-      [100, 110, -85.001, 35.001],
-      [200, 130, -85.002, 35.002],
-      [300, 120, -85.003, 35.003],
-      [400, 150, -85.004, 35.004],
+      [6, 116, -85, 35],
+      [11, 116, -85, 35],
+      [90, 111, -85, 35],
+      [112, 110, -85, 35],
+      [131, 115, -85, 35],
     ];
-    const result = computeGradeColors(points);
-    expect(result).toHaveLength(points.length);
+
+    expect(computeGrades(uneven)[2]).toBeCloseTo(12.22, 2);
   });
 
   it('keeps a short pitch visible in the middle of a profile', () => {
@@ -77,19 +104,68 @@ describe('computeGradeColors', () => {
       [400, 130, -85, 35],
     ];
 
-    expect(computeGradeColors(points)[2]).toBe(gradeToColor(10));
+    expect(computeGrades(points)[2]).toBeCloseTo(10, 5);
   });
 
-  it('returns all valid rgb() strings', () => {
-    const points: [number, number, number, number][] = [
+  it('does not smooth across explicit geometry gaps', () => {
+    const gapped: [number, number, number, number][] = [
       [0, 100, -85, 35],
-      [100, 120, -85.001, 35.001],
-      [200, 110, -85.002, 35.002],
+      [100, 110, -85.1, 35],
+      [600, 210, -86, 36],
+      [700, 200, -86.1, 36],
+      [800, 190, -86.2, 36],
     ];
-    const result = computeGradeColors(points);
-    for (const color of result) {
-      expect(color).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
-    }
+    const gaps = [
+      {
+        feet: 500,
+        from: [-85.1, 35] as [number, number],
+        to: [-86, 36] as [number, number],
+      },
+    ];
+
+    const grades = computeGrades(gapped, gaps);
+
+    expect(grades[1]).toBeCloseTo(10, 5);
+    expect(grades[2]).toBeCloseTo(-10, 5);
+  });
+
+  it('does not smooth across repeated-distance ride segment breaks', () => {
+    const segmentedRide: [number, number, number, number][] = [
+      [0, 100, -85, 35],
+      [100, 110, -85.1, 35],
+      [200, 120, -85.2, 35],
+      [200, 200, -86, 36],
+      [300, 190, -86.1, 36],
+      [400, 180, -86.2, 36],
+    ];
+
+    const grades = computeGrades(segmentedRide);
+
+    expect(grades[2]).toBeCloseTo(10, 5);
+    expect(grades[3]).toBeCloseTo(-10, 5);
+  });
+
+  it('returns one grade per point and handles degenerate profiles', () => {
+    expect(computeGrades(climb)).toHaveLength(climb.length);
+    expect(computeGrades([[0, 100, -85, 35]])).toEqual([0]);
+    expect(computeGrades([])).toEqual([]);
+  });
+});
+
+describe('formatGrade', () => {
+  it('signs climbs and descents', () => {
+    expect(formatGrade(8.42)).toBe('+8.4%');
+    expect(formatGrade(-8.42)).toBe('−8.4%');
+  });
+
+  it('does not add a sign to zero', () => {
+    expect(formatGrade(0)).toBe('0.0%');
+    expect(formatGrade(0.01)).toBe('0.0%');
+  });
+
+  it('degrades instead of displaying an invalid number', () => {
+    expect(formatGrade(undefined)).toBe('—');
+    expect(formatGrade(Number.NaN)).toBe('—');
   });
 });
 
@@ -103,7 +179,7 @@ describe('downsampleStops', () => {
     ]) as [number, number, number, number][];
   }
 
-  it('returns all points when count is <= 200', () => {
+  it('returns all points when count is <= 600', () => {
     const points = makePoints(50);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
@@ -205,7 +281,140 @@ describe('profilePointToXY', () => {
   });
 });
 
+describe('loadProfile', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const stored: ElevationProfileData = {
+    trail: 'Stored',
+    distance: 10,
+    gain: 1,
+    loss: 1,
+    min: 0,
+    max: 1,
+    profile: [[0, 0, -85.3, 35]],
+  };
+  const onDisk: ElevationProfileData = { ...stored, trail: 'On disk' };
+
+  function stubFetch(
+    responses: Record<string, { ok: boolean; body?: ElevationProfileData }>,
+  ) {
+    const fetchMock = vi.fn(async (url: string) => {
+      const match = Object.entries(responses).find(([prefix]) =>
+        url.startsWith(prefix),
+      );
+      if (!match) throw new Error(`Unexpected fetch: ${url}`);
+      return {
+        ok: match[1].ok,
+        status: match[1].ok ? 200 : 404,
+        json: async () => match[1].body,
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('prefers the stored profile and scopes it to the city', async () => {
+    const fetchMock = stubFetch({
+      '/api/map/elevation/': { ok: true, body: stored },
+      '/data/elevation/': { ok: true, body: onDisk },
+    });
+
+    const result = await loadProfile(
+      'ridge-trail',
+      'bend',
+      new AbortController().signal,
+    );
+
+    expect(result).toEqual(stored);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/map/elevation/ridge-trail?city=bend',
+    );
+  });
+
+  it.each(['bend', 'chattanooga'] as const)(
+    'falls back to the %s file when nothing is stored',
+    async (city) => {
+      // Chattanooga's trails are seeded without geometry, so they have no stored
+      // profile and only the offline file can draw their chart.
+      const fetchMock = stubFetch({
+        '/api/map/elevation/': { ok: false },
+        [`/data/elevation/${city}/`]: { ok: true, body: onDisk },
+      });
+
+      const result = await loadProfile(
+        'ridge-trail',
+        city,
+        new AbortController().signal,
+      );
+
+      expect(result).toEqual(onDisk);
+      expect(fetchMock.mock.calls[1][0]).toBe(
+        `/data/elevation/${city}/ridge-trail.json`,
+      );
+    },
+  );
+
+  it('does not fall back when the selection changed', async () => {
+    const abortError = new Error('The operation was aborted.');
+    abortError.name = 'AbortError';
+    const fetchMock = vi.fn(async () => {
+      throw abortError;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      loadProfile('ridge-trail', 'bend', new AbortController().signal),
+    ).rejects.toThrow(/aborted/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('ElevationProfile selection source', () => {
+  it('uses readable grade text with a separate color swatch', () => {
+    const profile: ElevationProfileData = {
+      trail: 'Test Trail',
+      distance: 400,
+      gain: 40,
+      loss: 0,
+      min: 100,
+      max: 140,
+      profile: [
+        [0, 100, -85.3, 35],
+        [100, 110, -85.301, 35.001],
+        [200, 120, -85.302, 35.002],
+        [300, 130, -85.303, 35.003],
+        [400, 140, -85.304, 35.004],
+      ],
+    };
+
+    render(<ElevationProfile />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, {
+          detail: { profile },
+        }),
+      );
+    });
+
+    const chart = screen.getByRole('img', {
+      name: 'Elevation profile for Test Trail',
+    });
+    vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      width: 400,
+    } as DOMRect);
+    fireEvent.mouseMove(chart, { clientX: 200 });
+
+    const grade = screen.getByText('+10.0%');
+    expect(grade).toHaveClass('text-gray-700');
+    expect(grade.querySelector('[aria-hidden="true"]')).toHaveStyle({
+      backgroundColor: gradeToColor(computeGrades(profile.profile)[2]),
+    });
+  });
+
   it('loads a curated profile when an OSM trail with the same name was selected', async () => {
     const osmProfile: ElevationProfileData = {
       trail: 'Big Forest',
@@ -226,10 +435,12 @@ describe('ElevationProfile selection source', () => {
       ...osmProfile,
       gain: 123,
     };
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => curatedProfile,
-    } as Response);
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+      .mockResolvedValue({
+        ok: true,
+        json: async () => curatedProfile,
+      } as Response);
 
     render(<ElevationProfile />);
     act(() => {
