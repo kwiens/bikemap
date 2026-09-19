@@ -575,6 +575,27 @@ describe('rideToElevationProfile', () => {
     expect(profile?.profile[5][0]).toBe(profile?.profile[4][0]);
   });
 
+  it('preserves a segment break whose boundary point has no altitude', () => {
+    const points = makeTrack(10, { startAlt: 200, altStep: 1 });
+    points[5] = {
+      ...points[5],
+      altitude: null,
+      segmentStart: true,
+    };
+
+    const profile = pointsToElevationProfile(points, 'Segmented Ride');
+
+    expect(profile).not.toBeNull();
+    expect(profile?.geometryGapDetails).toEqual([
+      {
+        feet: expect.any(Number),
+        from: [points[4].lng, points[4].lat],
+        to: [points[6].lng, points[6].lat],
+      },
+    ]);
+    expect(profile?.profile[5][0]).toBeGreaterThan(profile?.profile[4][0] ?? 0);
+  });
+
   it('converts elevation to feet', () => {
     const points = makeTrack(10, { startAlt: 100, altStep: 0 });
     const profile = rideToElevationProfile(makeRide(points));
