@@ -31,7 +31,7 @@ Surveyed 2026-08-14 on `main` (+ PR #100/#109 branches where noted).
 |---|---|---|---|
 | D1 | `mapbox-gl` v3 (the library) | `Map.tsx`, `MapMarkers.tsx`, `utils/map.ts`, `app/export/page.tsx`, `hooks/useMapResize.ts`, CSS import in `app/layout.tsx` | **MapLibre GL JS** |
 | D2 | Studio basemap style `swuller/cm91zy289001p01qu4cdsdcgt` — basemap + Chattanooga route line layers + Godsey Ridge layer + Maki sprite icons for OSM POIs | `map.config.ts`, route layer IDs in `bike-routes.ts` | **Open basemap style** (OpenFreeMap default; self-hosted PMTiles option) + all overlay layers moved to runtime sources |
-| D3 | Hosted MTB vector tileset `mapbox://swuller.ccfw1cmr` | `MTN_BIKE_TILESET_URL` in `mountain-bike-trails.ts`, attached at runtime | **GeoJSON from the app** (PR #100 already moves trail geometry to Postgres/OSM) |
+| D3 | Hosted MTB vector tileset `mapbox://swuller.ccfw1cmr` | Runtime: `MTN_BIKE_TILESET_URL` in `mountain-bike-trails.ts`. Tooling: `MVT_TILESET` in `scripts/add_trail_elevation.py`, which independently fetches the same tileset for trail geometry. | **One canonical GeoJSON/Postgres geometry source** shared by the app and offline elevation tooling (PR #100 already moves trail geometry to Postgres/OSM) |
 | D4 | Terrain-RGB elevation tiles | Client: `utils/osm-elevation.ts` (per-click sampling), `utils/dem.ts` + `public/terrain/` (21 MB cached tiles). Scripts: `add_trail_elevation.py`, `osm_trail_elevation.py`, `build_bend_trails.py` | **AWS Terrain Tiles** (Terrarium encoding, free, no token) |
 | D5 | Geocoding API (`mapbox.places`) | `utils/map.ts:1327`, single call site | **Nominatim or Photon** (OSM geocoders) |
 | D6 | Token plumbing | `NEXT_PUBLIC_MAPBOX_TOKEN` / `NEXT_PUBLIC_MAPBOX_STYLE_URL`, `mapboxgl.accessToken`, docs | Deleted (or reduced to an optional basemap-provider key) |
@@ -99,6 +99,14 @@ Remaining work:
   Chattanooga's 220 trails are served like Bend's (blocked on the
   "does Chattanooga generalise?" question in ADR-0001 — the name/geometry
   match against OSM).
+- Make that same canonical geometry available to offline tooling as a
+  deterministic GeoJSON export (whether its source of truth is OSM or
+  Postgres). Refactor `scripts/add_trail_elevation.py` to read its
+  LineString/MultiLineString features from that export, keyed by `Trail`,
+  instead of fetching `MVT_TILESET`. The runtime and elevation backfill must
+  consume the same geometry revision; then remove the script's MVT decoder,
+  tile cache, Mapbox token reader, and short-trail zoom retry together with
+  the runtime tileset attach.
 
 ### Terrain — AWS Terrain Tiles (Terrarium)
 
@@ -133,8 +141,8 @@ together.
 
 | Phase | What | Size |
 |---|---|---|
-| **0. Prep** | Add `license` to `package.json` (flagged in ADR-0001, still missing). Consolidate the five Terrain-RGB decoders to two. Export Chattanooga route + Godsey GeoJSON from Studio while we still have the account handy. | S |
-| **1+2. Library + basemap** | mapbox-gl → maplibre-gl; checked-in Liberty-based style; overlay layers to runtime sources; Maki sprite; delete token plumbing from the map path; `export/page.tsx` too. | L |
+| **0. Prep** | Add `license` to `package.json` (flagged in ADR-0001, still missing). Consolidate the five Terrain-RGB decoders to two. Export Chattanooga route, Godsey, and MTB geometry from Studio while we still have the account handy. Define the deterministic MTB GeoJSON export that the app and offline tooling will share. | S |
+| **1+2. Library + basemap** | mapbox-gl → maplibre-gl; checked-in Liberty-based style; overlay layers to runtime sources; change `add_trail_elevation.py` from `MVT_TILESET` to the shared MTB GeoJSON/Postgres export; Maki sprite; delete token plumbing from the map and elevation-script paths; `export/page.tsx` too. | L |
 | **3. Terrain** | Terrarium URL + decode in the two consolidated helpers; regenerate `public/terrain/`; write the tile-fetch script; rerun elevation backfill; tolerance report. | M |
 | **4. Geocoding** | Nominatim swap, configurable endpoint. | S |
 | **5. Cleanup + docs** | Remove `NEXT_PUBLIC_MAPBOX_*`; rewrite DEPLOYING.md steps 2/6/8 (they mostly disappear); update CLAUDE.md's Mapbox debugging sections; document the PMTiles self-host path. | M |
@@ -151,6 +159,9 @@ both.
 - `grep -ri mapbox src scripts` finds only historical comments (or nothing).
 - `pnpm build` contains no `mapbox-gl`; bundle diff reviewed (MapLibre is
   slightly smaller).
+- `python scripts/add_trail_elevation.py --trail "Trail Name"` and the full
+  backfill both run with `NEXT_PUBLIC_MAPBOX_TOKEN` unset, reading the same
+  geometry revision the app renders.
 - Visual checklist at 3 zooms × both cities: basemap legible, route colors and
   MTB rating colors unchanged, closure dashes (#109) render, POI icons render,
   popups/markers styled correctly (`map.css` selectors renamed —
