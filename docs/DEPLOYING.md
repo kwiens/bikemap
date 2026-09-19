@@ -173,13 +173,44 @@ Set `PAYLOAD_SECRET`, `NEXT_PUBLIC_MAPBOX_TOKEN`,
 Neon integration supplies `DATABASE_URL` (pooled application traffic) and
 `DATABASE_URL_UNPOOLED` (schema migrations).
 
-Production builds run committed Payload migrations through
-`DATABASE_URL_UNPOOLED` before the new code goes live. Preview and Development
-deployments intentionally share the same global database and admin accounts, so
-their builds skip migrations: reviewing a PR must never change the production
-schema. Treat previews as live-data surfaces, and keep schema changes
-backward-compatible until the production deployment applies them. A
-database-free fork skips migrations and still builds the checked-in fallback
+### Preview and production database policy
+
+"Preview uses the same database as production" means that the running preview
+application connects to the same Neon database with the same Payload secret.
+It sees the same content and users, and an admin edit made from a preview is a
+real edit that production will also see. Browser login cookies are scoped to a
+hostname, so an administrator may still need to sign in separately on a preview
+URL with the same credentials.
+
+It does **not** mean that a preview build may change the shared database schema:
+
+| Vercel environment | Data and admin accounts | Application writes | Schema migrations during build |
+|---|---|---|---|
+| Preview | Shared with production | Live; visible in production | Skipped |
+| Development | Shared when configured with the shared URLs | Live; visible in production | Skipped |
+| Production | Shared global database | Live | Applied through `DATABASE_URL_UNPOOLED` |
+
+This separation prevents an unmerged commit from changing the database under
+the currently deployed production code. It also prevents previews for different
+branches from racing to apply incompatible migrations.
+
+For a schema-changing pull request, the deployment sequence is:
+
+1. The preview build skips migrations and runs against the current production
+   schema.
+2. The change is reviewed and merged. Until then, its application code must
+   remain compatible with the current schema.
+3. The production build applies the committed Payload migrations through
+   `DATABASE_URL_UNPOOLED`.
+4. Vercel starts serving the new production code against the migrated schema.
+
+The tradeoff is deliberate: a preview can exercise shared accounts, content,
+and normal writes, but it cannot fully exercise a new schema before the
+production deployment. Use a separate Neon branch or database when a change
+requires pre-merge migration testing; do not point that isolated preview at the
+global database.
+
+A database-free fork skips migrations and still builds the checked-in fallback
 map.
 
 Seed every city into the same fresh database after the initial migration. Both
