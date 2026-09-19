@@ -73,7 +73,8 @@ export interface MapConfig {
 // trails floating on nothing.
 //
 // A fork therefore needs its own style: set NEXT_PUBLIC_MAPBOX_STYLE_URL.
-const DEFAULT_STYLE_URL = 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt';
+const DEFAULT_STYLE_URL =
+  'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt?optimize=true';
 
 const styleUrl = process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL || DEFAULT_STYLE_URL;
 

@@ -20,6 +20,11 @@ import {
   toLngLatBounds,
   loadCuratedGeojson,
   TRAIL_LAYERS,
+  BIKE_ROUTE_LAYER_ID,
+  BIKE_ROUTE_CASING_LAYER_ID,
+  removeStyleOwnedBikeRoutes,
+  loadBikeRouteOptimizedStyle,
+  queryNearbyLineFeatures,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
   OSM_BIKE_TRAIL_FILTER,
@@ -35,6 +40,10 @@ import {
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import { MTN_BIKE_LAYER_ID } from '@/data/geo_data';
 import { TRAIL_METADATA, RATING_COLORS } from '@/data/trail-metadata';
+import {
+  STYLE_OWNED_ROUTE_LAYER_IDS,
+  STYLE_OWNED_ROUTE_TILESET_IDS,
+} from '@/data/mapbox-style';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type mapboxgl from 'mapbox-gl';
 
@@ -431,6 +440,28 @@ describe('Mapbox Geo Integration', () => {
       expect(mockMap.addLayer).not.toHaveBeenCalled();
     });
 
+    it('filters the shared route source to the requested route', () => {
+      const mockMap = {
+        querySourceFeatures: vi.fn().mockReturnValue([]),
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(undefined),
+        addLayer: vi.fn(),
+      } as unknown as mapboxgl.Map;
+      const layer = {
+        id: BIKE_ROUTE_LAYER_ID,
+        type: 'line',
+        source: 'bike-routes-source',
+      } as mapboxgl.AnyLayer;
+
+      syncRouteArrowLayer(mockMap, route, layer);
+
+      expect(mockMap.querySourceFeatures).toHaveBeenCalledWith(
+        'bike-routes-source',
+        { filter: ['==', ['get', 'id'], route.id] },
+      );
+    });
+
     it('should skip routes configured to hide arrows', () => {
       const mockMap = {
         querySourceFeatures: vi.fn(),
@@ -563,10 +594,66 @@ describe('Mapbox Geo Integration', () => {
   });
 
   describe('updateRouteOpacity', () => {
+    it('updates shared route layers and preserves selected-route arrows', () => {
+      const mockMap = {
+        setPaintProperty: vi.fn(),
+        getLayer: vi.fn((id: string) =>
+          [
+            BIKE_ROUTE_LAYER_ID,
+            BIKE_ROUTE_CASING_LAYER_ID,
+            'route2-arrows',
+          ].includes(id)
+            ? { id }
+            : undefined,
+        ),
+      } as unknown as mapboxgl.Map;
+      const routes: BikeRoute[] = [
+        {
+          id: 'route1',
+          name: 'Route 1',
+          color: '#FF0000',
+          description: 'Test route',
+          icon: {} as IconDefinition,
+          defaultWidth: 8,
+          opacity: 1,
+          distance: 5,
+        },
+        {
+          id: 'route2',
+          name: 'Route 2',
+          color: '#00FF00',
+          description: 'Test route',
+          icon: {} as IconDefinition,
+          defaultWidth: 6,
+          opacity: 1,
+          distance: 4,
+        },
+      ];
+
+      updateRouteOpacity(mockMap, routes, 'route2', {
+        selected: 0.8,
+        unselected: 0.2,
+      });
+
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        BIKE_ROUTE_LAYER_ID,
+        'line-opacity',
+        ['case', ['==', ['get', 'id'], 'route2'], 0.8, 0.2],
+      );
+      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
+        'route2-arrows',
+        'icon-opacity',
+        0.8,
+      );
+      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(4);
+    });
+
     it('should update opacity for selected and unselected routes', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
-        getLayer: vi.fn().mockReturnValue(true),
+        getLayer: vi.fn((id: string) =>
+          id === BIKE_ROUTE_LAYER_ID ? undefined : { id },
+        ),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -710,7 +797,9 @@ describe('Mapbox Geo Integration', () => {
     it('should set all routes to unselected when selectedId is null', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
-        getLayer: vi.fn().mockReturnValue(true),
+        getLayer: vi.fn((id: string) =>
+          id === BIKE_ROUTE_LAYER_ID ? undefined : { id },
+        ),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -1040,6 +1129,7 @@ describe('updateMtnBikeOpacity', () => {
   it('should set conditional expressions when a trail is selected', () => {
     const mockMap = {
       setPaintProperty: vi.fn(),
+      setLayoutProperty: vi.fn(),
       getLayer: vi.fn().mockReturnValue(true),
     } as unknown as mapboxgl.Map;
 
@@ -1061,6 +1151,7 @@ describe('updateMtnBikeOpacity', () => {
   it('should reset to default opacity and width when selectedTrailName is null', () => {
     const mockMap = {
       setPaintProperty: vi.fn(),
+      setLayoutProperty: vi.fn(),
       getLayer: vi.fn().mockReturnValue(true),
     } as unknown as mapboxgl.Map;
 
@@ -1075,6 +1166,11 @@ describe('updateMtnBikeOpacity', () => {
       MTN_BIKE_LAYER_ID,
       'line-width',
       3,
+    );
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      `${MTN_BIKE_LAYER_ID} Glow`,
+      'visibility',
+      'none',
     );
   });
 
@@ -1103,6 +1199,7 @@ describe('updateMtnBikeOpacity', () => {
   it('should also update casing and glow layers when they exist and trail is selected', () => {
     const mockMap = {
       setPaintProperty: vi.fn(),
+      setLayoutProperty: vi.fn(),
       getLayer: vi.fn().mockReturnValue(true),
     } as unknown as mapboxgl.Map;
 
@@ -1131,6 +1228,11 @@ describe('updateMtnBikeOpacity', () => {
       'line-width',
       expect.anything(),
     );
+    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+      `${MTN_BIKE_LAYER_ID} Glow`,
+      'visibility',
+      'visible',
+    );
   });
 });
 
@@ -1149,6 +1251,7 @@ describe('highlightMtnBikeArea', () => {
   it('should highlight trails matching by recArea', () => {
     const mockMap = {
       setPaintProperty: vi.fn(),
+      setLayoutProperty: vi.fn(),
       getLayer: vi.fn().mockReturnValue(true),
     } as unknown as mapboxgl.Map;
 
@@ -1424,6 +1527,7 @@ describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
     ]);
     const mockMap = {
       setPaintProperty: vi.fn(),
+      setLayoutProperty: vi.fn(),
       getLayer: vi.fn((id: string) => (allLayers.has(id) ? { id } : undefined)),
     } as unknown as mapboxgl.Map;
 
@@ -1455,7 +1559,7 @@ describe('detectTrailAtPoint', () => {
     const mockMap = createMockMap({
       queryRenderedFeatures: vi.fn().mockReturnValue([
         {
-          layer: { id: `${MTN_BIKE_LAYER_ID} Hit` },
+          layer: { id: MTN_BIKE_LAYER_ID },
           properties: { Trail: 'Big Forest' },
         },
       ]),
@@ -1465,8 +1569,11 @@ describe('detectTrailAtPoint', () => {
     expect(result).toBe('Big Forest');
     expect(mockMap.project).toHaveBeenCalled();
     expect(mockMap.queryRenderedFeatures).toHaveBeenCalledWith(
-      { x: 100, y: 100 },
-      { layers: expect.arrayContaining([`${MTN_BIKE_LAYER_ID} Hit`]) },
+      [
+        [88, 88],
+        [112, 112],
+      ],
+      { layers: expect.arrayContaining([MTN_BIKE_LAYER_ID]) },
     );
   });
 
@@ -1474,7 +1581,7 @@ describe('detectTrailAtPoint', () => {
     const mockMap = createMockMap({
       queryRenderedFeatures: vi.fn().mockReturnValue([
         {
-          layer: { id: 'Godsey Ridge Trails Hit' },
+          layer: { id: 'Godsey Ridge Trails' },
           properties: { Name: 'Green as built' },
         },
       ]),
@@ -1503,7 +1610,7 @@ describe('detectTrailAtPoint', () => {
     expect(mockMap.queryRenderedFeatures).not.toHaveBeenCalled();
   });
 
-  it('returns null when hit layers do not exist on map', () => {
+  it('returns null when visible trail layers do not exist on map', () => {
     const mockMap = createMockMap({
       getLayer: vi.fn().mockReturnValue(undefined),
     });
@@ -1517,7 +1624,7 @@ describe('detectTrailAtPoint', () => {
     const mockMap = createMockMap({
       queryRenderedFeatures: vi.fn().mockReturnValue([
         {
-          layer: { id: `${MTN_BIKE_LAYER_ID} Hit` },
+          layer: { id: MTN_BIKE_LAYER_ID },
           properties: {},
         },
       ]),
@@ -1525,6 +1632,164 @@ describe('detectTrailAtPoint', () => {
 
     const result = detectTrailAtPoint(mockMap, [-85.3, 35.0]);
     expect(result).toBeNull();
+  });
+});
+
+describe('queryNearbyLineFeatures', () => {
+  it('queries existing layers in a touch-friendly screen-space box', () => {
+    const queryRenderedFeatures = vi.fn().mockReturnValue([]);
+    const mockMap = {
+      getLayer: vi.fn((id: string) =>
+        id === 'visible-line' ? { id } : undefined,
+      ),
+      queryRenderedFeatures,
+    } as unknown as mapboxgl.Map;
+
+    queryNearbyLineFeatures(
+      mockMap,
+      { x: 40, y: 60 },
+      ['visible-line', 'missing-line'],
+      10,
+    );
+
+    expect(queryRenderedFeatures).toHaveBeenCalledWith(
+      [
+        [30, 50],
+        [50, 70],
+      ],
+      { layers: ['visible-line'] },
+    );
+  });
+});
+
+describe('removeStyleOwnedBikeRoutes', () => {
+  it('removes route layers and tilesets while preserving trail tilesets', () => {
+    const routeTileset = STYLE_OWNED_ROUTE_TILESET_IDS[0];
+    const style = {
+      version: 8,
+      sources: {
+        composite: {
+          type: 'vector',
+          url: `mapbox://mapbox.mapbox-streets-v8,${routeTileset},swuller.cvsl09xq?style=test`,
+        },
+      },
+      layers: [
+        {
+          id: STYLE_OWNED_ROUTE_LAYER_IDS[0],
+          type: 'line',
+          source: 'composite',
+          'source-layer': 'route',
+        },
+        {
+          id: 'trail-layer',
+          type: 'line',
+          source: 'composite',
+          'source-layer': 'trail',
+        },
+      ],
+    } satisfies mapboxgl.StyleSpecification;
+
+    const result = removeStyleOwnedBikeRoutes(style);
+    const composite = result.sources.composite as { url: string };
+
+    expect(result.layers.map((layer) => layer.id)).toEqual(['trail-layer']);
+    expect(composite.url).not.toContain(routeTileset);
+    expect(composite.url).toContain('swuller.cvsl09xq');
+    expect(composite.url).toContain('?style=test');
+    expect(style.layers).toHaveLength(2);
+  });
+
+  it('leaves Studio-owned routes intact for cities without runtime GeoJSON', async () => {
+    const previousFetch = global.fetch;
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock;
+
+    try {
+      const styleUrl = 'mapbox://styles/example/style?optimize=true';
+      const result = await loadBikeRouteOptimizedStyle(
+        styleUrl,
+        'test-token',
+        false,
+      );
+
+      expect(result).toBe(styleUrl);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = previousFetch;
+    }
+  });
+
+  it('fetches and prunes an optimized style for runtime route GeoJSON', async () => {
+    const previousFetch = global.fetch;
+    const routeTileset = STYLE_OWNED_ROUTE_TILESET_IDS[0];
+    const style = {
+      version: 8,
+      sources: {
+        composite: {
+          type: 'vector',
+          url: `mapbox://mapbox.mapbox-streets-v8,${routeTileset}`,
+        },
+      },
+      layers: [
+        {
+          id: STYLE_OWNED_ROUTE_LAYER_IDS[0],
+          type: 'line',
+          source: 'composite',
+        },
+      ],
+    } satisfies mapboxgl.StyleSpecification;
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => style,
+    });
+    global.fetch = fetchMock;
+    const controller = new AbortController();
+
+    try {
+      const result = (await loadBikeRouteOptimizedStyle(
+        'mapbox://styles/example/style?optimize=true',
+        'test-token',
+        true,
+        controller.signal,
+      )) as mapboxgl.StyleSpecification;
+      const request = fetchMock.mock.calls[0][0] as URL;
+
+      expect(request.origin).toBe('https://api.mapbox.com');
+      expect(request.pathname).toBe('/styles/v1/example/style');
+      expect(request.searchParams.get('optimize')).toBe('true');
+      expect(request.searchParams.get('access_token')).toBe('test-token');
+      expect(fetchMock).toHaveBeenCalledWith(request, {
+        signal: controller.signal,
+      });
+      expect(result.layers).toEqual([]);
+      expect((result.sources.composite as { url: string }).url).not.toContain(
+        routeTileset,
+      );
+    } finally {
+      global.fetch = previousFetch;
+    }
+  });
+
+  it('propagates teardown aborts instead of loading the fallback style', async () => {
+    const previousFetch = global.fetch;
+    const controller = new AbortController();
+    const abortError = new DOMException('Aborted', 'AbortError');
+    const fetchMock = vi.fn().mockRejectedValue(abortError);
+    global.fetch = fetchMock;
+    controller.abort();
+
+    try {
+      await expect(
+        loadBikeRouteOptimizedStyle(
+          'mapbox://styles/example/style?optimize=true',
+          'test-token',
+          true,
+          controller.signal,
+        ),
+      ).rejects.toBe(abortError);
+    } finally {
+      global.fetch = previousFetch;
+    }
   });
 });
 
