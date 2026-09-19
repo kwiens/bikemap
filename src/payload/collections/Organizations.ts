@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload';
+import { cityOptions } from '@/config/map.config';
 
 /**
  * Stewards — whoever looks after a trail. Volunteer clubs (COTA in Bend, SORBA
@@ -30,7 +31,7 @@ export const Organizations: CollectionConfig = {
   },
   admin: {
     useAsTitle: 'name',
-    defaultColumns: ['name', 'abbreviation', 'url'],
+    defaultColumns: ['name', 'abbreviation', 'city', 'url'],
     description:
       'The clubs and agencies that look after trails — volunteer groups and land managers alike. Anything added here becomes selectable on a trail.',
     group: 'Lists',
@@ -71,13 +72,11 @@ export const Organizations: CollectionConfig = {
     {
       name: 'city',
       type: 'select',
-      options: [
-        { label: 'Chattanooga', value: 'chattanooga' },
-        { label: 'Bend', value: 'bend' },
-      ],
-      // Hidden: a deployment serves one city. Left blank an organization
-      // applies everywhere, which is the right default here.
-      admin: { hidden: true },
+      options: cityOptions,
+      admin: {
+        description:
+          'Optional. Leave blank for a steward shared by every city, or choose the city it belongs to.',
+      },
     },
     {
       name: 'url',

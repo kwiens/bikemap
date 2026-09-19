@@ -1,3 +1,4 @@
+import type * as GeoJSON from 'geojson';
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import { mountainBikeConfig, trailMetadata } from '@/data/geo_data';
@@ -7,7 +8,11 @@ import {
   onMountainBikeTrailsChange,
 } from '@/data/trail-source';
 import { RATING_COLORS, UNRATED_COLOR } from '@/data/trail-metadata';
-import { STYLE_STRAY_LAYER_IDS } from '@/data/mapbox-style';
+import {
+  STYLE_OWNED_ROUTE_LAYER_IDS,
+  STYLE_OWNED_ROUTE_TILESET_IDS,
+  STYLE_STRAY_LAYER_IDS,
+} from '@/data/mapbox-style';
 import {
   OSM_TRAILS_SOURCE_ID,
   OSM_TRAILS_LAYER_ID,
@@ -106,38 +111,279 @@ function linesOfFeature(feature: GeoJSON.Feature): GeoJSON.Position[][] {
   return [];
 }
 
+export const BIKE_ROUTE_SOURCE_ID = 'bike-routes-source';
+export const BIKE_ROUTE_LAYER_ID = 'bike-routes';
+export const BIKE_ROUTE_CASING_LAYER_ID = 'bike-routes-casing';
+export const LINE_HIT_TOLERANCE_PX = 12;
+
+const styleRouteTilesetIds = new Set(STYLE_OWNED_ROUTE_TILESET_IDS);
+
+function routePropertyExpression(
+  routes: BikeRoute[],
+  property: 'color' | 'defaultWidth',
+): mapboxgl.Expression {
+  const expression: unknown[] = ['match', ['get', 'id']];
+  for (const route of routes) {
+    expression.push(route.id, route[property]);
+  }
+  expression.push(property === 'color' ? '#2563EB' : 8);
+  return expression as mapboxgl.Expression;
+}
+
+/** Remove Studio-owned route layers and their dedicated vector tilesets. */
+export function removeStyleOwnedBikeRoutes(
+  style: mapboxgl.StyleSpecification,
+): mapboxgl.StyleSpecification {
+  const routeLayerIds = new Set(STYLE_OWNED_ROUTE_LAYER_IDS);
+  const composite = style.sources.composite;
+  let nextComposite = composite;
+
+  if (
+    composite &&
+    'url' in composite &&
+    typeof composite.url === 'string' &&
+    composite.url.startsWith('mapbox://')
+  ) {
+    const queryIndex = composite.url.indexOf('?');
+    const sourceList = composite.url.slice(
+      'mapbox://'.length,
+      queryIndex === -1 ? undefined : queryIndex,
+    );
+    const query = queryIndex === -1 ? '' : composite.url.slice(queryIndex);
+    const keptSources = sourceList
+      .split(',')
+      .filter((sourceId) => !styleRouteTilesetIds.has(sourceId));
+
+    nextComposite = {
+      ...composite,
+      url: `mapbox://${keptSources.join(',')}${query}`,
+    };
+  }
+
+  return {
+    ...style,
+    sources: {
+      ...style.sources,
+      ...(nextComposite ? { composite: nextComposite } : {}),
+    },
+    layers: style.layers.filter((layer) => !routeLayerIds.has(layer.id)),
+  };
+}
+
+/** Fetch the optimized Studio style once so unused route tilesets can be pruned. */
+export async function loadBikeRouteOptimizedStyle(
+  styleUrl: string,
+  accessToken: string,
+  pruneStudioRoutes: boolean,
+  signal?: AbortSignal,
+): Promise<mapboxgl.StyleSpecification | string> {
+  // A city without runtime route GeoJSON still needs its Studio-owned route
+  // layers. In that case Mapbox can load the configured optimized style
+  // directly, and the legacy layer setup in Map.tsx remains functional.
+  if (!pruneStudioRoutes) return styleUrl;
+
+  const match = /^mapbox:\/\/styles\/([^/]+)\/([^?]+)/.exec(styleUrl);
+  if (!match) return styleUrl;
+
+  const [, owner, styleId] = match;
+  const apiUrl = new URL(
+    `https://api.mapbox.com/styles/v1/${owner}/${styleId}`,
+  );
+  apiUrl.searchParams.set('optimize', 'true');
+  apiUrl.searchParams.set('access_token', accessToken);
+
+  try {
+    const response = await fetch(apiUrl, { signal });
+    if (!response.ok) {
+      throw new Error(`Mapbox style request failed (${response.status})`);
+    }
+    const style = (await response.json()) as mapboxgl.StyleSpecification;
+    return removeStyleOwnedBikeRoutes(style);
+  } catch (error) {
+    // Teardown deliberately aborts this request. Do not turn that into a
+    // fallback style load (or a warning) in the effect that is going away.
+    if (signal?.aborted) throw error;
+
+    console.warn(
+      'Could not prune Studio-owned route tilesets; using the configured style.',
+      error,
+    );
+    return styleUrl;
+  }
+}
+
 // Route utilities
+export const ROUTE_DIRECTION_ARROW_IMAGE_ID = 'route-direction-arrow';
+
+export function createArrowSdfImage(size: number = 20): ImageData {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D context not available');
+  ctx.clearRect(0, 0, size, size);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = size * 0.25;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  const px = size * 0.25;
+  const py = size * 0.1;
+  ctx.moveTo(px, py);
+  ctx.lineTo(size - px, size / 2);
+  ctx.lineTo(px, size - py);
+  ctx.stroke();
+  return ctx.getImageData(0, 0, size, size);
+}
+
+export function syncRouteArrowLayer(
+  map: mapboxgl.Map,
+  route: BikeRoute,
+  layer: mapboxgl.AnyLayer,
+  beforeId?: string,
+): void {
+  if (route.hideArrows || !('source' in layer)) return;
+
+  const sourceId = layer.source;
+  if (typeof sourceId !== 'string') return;
+
+  const sourceLayer = layer['source-layer'];
+  const layerFilter = 'filter' in layer ? layer.filter : undefined;
+  const routeFilter: mapboxgl.FilterSpecification | undefined =
+    layer.id === BIKE_ROUTE_LAYER_ID
+      ? ['==', ['get', 'id'], route.id]
+      : undefined;
+  const filter: mapboxgl.FilterSpecification | undefined =
+    layerFilter && routeFilter
+      ? ['all', layerFilter, routeFilter]
+      : (layerFilter ?? routeFilter);
+  const features = map.querySourceFeatures(sourceId, {
+    ...(sourceLayer ? { sourceLayer } : {}),
+    ...(filter ? { filter } : {}),
+  });
+  const arrowData: GeoJSON.FeatureCollection<GeoJSON.LineString> = {
+    type: 'FeatureCollection',
+    features: applyArrowDirectionOverrides(
+      removeOverlappingSegments(features),
+      route.reverseArrowBounds,
+    ),
+  };
+  const arrowSourceId = `${route.id}-arrows-source`;
+  const arrowLayerId = `${route.id}-arrows`;
+  const arrowSource = map.getSource(arrowSourceId) as
+    | mapboxgl.GeoJSONSource
+    | undefined;
+
+  if (arrowSource) {
+    arrowSource.setData(arrowData);
+  } else {
+    map.addSource(arrowSourceId, { type: 'geojson', data: arrowData });
+  }
+
+  if (map.getLayer(arrowLayerId)) return;
+
+  map.addLayer(
+    {
+      id: arrowLayerId,
+      type: 'symbol',
+      source: arrowSourceId,
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 160,
+        'icon-image': ROUTE_DIRECTION_ARROW_IMAGE_ID,
+        'icon-size': 1.2,
+        'icon-rotate': route.reverseDirection ? 180 : 0,
+        'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+      },
+      paint: {
+        'icon-color': route.color,
+        'icon-opacity': 0,
+      },
+    },
+    beforeId,
+  );
+}
+
 export function updateRouteOpacity(
   map: mapboxgl.Map,
   routes: BikeRoute[],
   selectedId: string | null,
   opacity: { selected: number; unselected: number },
 ) {
-  routes.forEach((route) => {
-    try {
-      const isSelected = route.id === selectedId;
-      map.setPaintProperty(
-        route.id,
-        'line-opacity',
-        isSelected ? opacity.selected : opacity.unselected,
-      );
+  const hasCombinedLayer = Boolean(map.getLayer(BIKE_ROUTE_LAYER_ID));
 
-      // Update casing layer
-      const casingId = `${route.id}-casing`;
-      if (map.getLayer(casingId)) {
+  if (hasCombinedLayer) {
+    const width = routePropertyExpression(routes, 'defaultWidth');
+    const isSelected: mapboxgl.Expression = [
+      '==',
+      ['get', 'id'],
+      selectedId ?? '',
+    ];
+    const routeOpacity: number | mapboxgl.Expression = selectedId
+      ? ['case', isSelected, opacity.selected, opacity.unselected]
+      : opacity.unselected;
+
+    map.setPaintProperty(BIKE_ROUTE_LAYER_ID, 'line-opacity', routeOpacity);
+
+    if (map.getLayer(BIKE_ROUTE_CASING_LAYER_ID)) {
+      const casingOpacity: number | mapboxgl.Expression = selectedId
+        ? ['case', isSelected, opacity.selected * 0.8, opacity.unselected * 0.8]
+        : opacity.unselected * 0.8;
+      const casingWidth: mapboxgl.Expression = selectedId
+        ? ['case', isSelected, ['+', width, 4], ['+', width, 2]]
+        : ['+', width, 2];
+
+      map.setPaintProperty(
+        BIKE_ROUTE_CASING_LAYER_ID,
+        'line-opacity',
+        casingOpacity,
+      );
+      map.setPaintProperty(
+        BIKE_ROUTE_CASING_LAYER_ID,
+        'line-width',
+        casingWidth,
+      );
+    }
+  }
+
+  routes.forEach((route) => {
+    const isSelected = route.id === selectedId;
+    if (!hasCombinedLayer) {
+      try {
         map.setPaintProperty(
-          casingId,
+          route.id,
           'line-opacity',
-          isSelected ? opacity.selected * 0.8 : opacity.unselected * 0.8,
+          isSelected ? opacity.selected : opacity.unselected,
         );
-        map.setPaintProperty(
-          casingId,
-          'line-width',
-          isSelected ? route.defaultWidth + 4 : route.defaultWidth + 2,
-        );
+
+        // Update casing layer
+        const casingId = `${route.id}-casing`;
+        if (map.getLayer(casingId)) {
+          map.setPaintProperty(
+            casingId,
+            'line-opacity',
+            isSelected ? opacity.selected * 0.8 : opacity.unselected * 0.8,
+          );
+          map.setPaintProperty(
+            casingId,
+            'line-width',
+            isSelected ? route.defaultWidth + 4 : route.defaultWidth + 2,
+          );
+        }
+      } catch (error) {
+        console.error(`Error setting opacity for route ${route.id}:`, error);
       }
-    } catch (error) {
-      console.error(`Error setting opacity for route ${route.id}:`, error);
+    }
+
+    const arrowLayerId = `${route.id}-arrows`;
+    if (map.getLayer(arrowLayerId)) {
+      map.setPaintProperty(
+        arrowLayerId,
+        'icon-opacity',
+        isSelected ? opacity.selected : 0,
+      );
     }
   });
 }
@@ -190,6 +436,175 @@ export function calculateRouteBounds(
   return bounds.isEmpty() ? null : bounds;
 }
 
+// Remove line edges traversed by more than one path. Comparing edges instead of
+// individual coordinates preserves arrows where routes merely cross or meet.
+export function removeOverlappingSegments(
+  features: GeoJSON.Feature[],
+): GeoJSON.Feature<GeoJSON.LineString>[] {
+  interface Path {
+    coordinates: GeoJSON.Position[];
+    ownerId: string;
+  }
+
+  const paths: Path[] = [];
+  features.forEach((feature, featureIndex) => {
+    const geom = feature.geometry;
+    if (geom.type === 'LineString') {
+      paths.push({
+        coordinates: geom.coordinates,
+        ownerId: pathOwnerId(feature, featureIndex, 0),
+      });
+    } else if (geom.type === 'MultiLineString') {
+      geom.coordinates.forEach((coordinates, partIndex) => {
+        paths.push({
+          coordinates,
+          ownerId: pathOwnerId(feature, featureIndex, partIndex),
+        });
+      });
+    }
+  });
+
+  if (paths.length === 0) return [];
+
+  const cellSize = 0.00003; // ~3 meters; absorbs vector-tile quantization.
+  const coordinateKey = (coordinate: GeoJSON.Position) =>
+    `${Math.round(coordinate[0] / cellSize)},${Math.round(coordinate[1] / cellSize)}`;
+  const edgeKey = (start: GeoJSON.Position, end: GeoJSON.Position): string => {
+    const startKey = coordinateKey(start);
+    const endKey = coordinateKey(end);
+    return startKey < endKey
+      ? `${startKey}|${endKey}`
+      : `${endKey}|${startKey}`;
+  };
+
+  const edgeOwners = new Map<string, Set<string>>();
+  for (const path of paths) {
+    for (let i = 0; i < path.coordinates.length - 1; i++) {
+      const key = edgeKey(path.coordinates[i], path.coordinates[i + 1]);
+      const owners = edgeOwners.get(key) ?? new Set<string>();
+      owners.add(path.ownerId);
+      edgeOwners.set(key, owners);
+    }
+  }
+
+  const result: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+
+  for (const path of paths) {
+    let currentRun: GeoJSON.Position[] = [];
+
+    for (let i = 0; i < path.coordinates.length - 1; i++) {
+      const start = path.coordinates[i];
+      const end = path.coordinates[i + 1];
+      const owners = edgeOwners.get(edgeKey(start, end));
+
+      if ((owners?.size ?? 0) > 1) {
+        pushLineString(result, currentRun);
+        currentRun = [];
+        continue;
+      }
+
+      if (currentRun.length === 0) currentRun.push(start);
+      currentRun.push(end);
+    }
+
+    pushLineString(result, currentRun);
+  }
+
+  return result;
+}
+
+export function applyArrowDirectionOverrides(
+  features: GeoJSON.Feature<GeoJSON.LineString>[],
+  reverseBounds: [number, number, number, number][] = [],
+): GeoJSON.Feature<GeoJSON.LineString>[] {
+  if (reverseBounds.length === 0) return features;
+
+  return features.flatMap((feature) => {
+    const coordinates = feature.geometry.coordinates;
+    if (coordinates.length < 2) return [];
+
+    const result: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+    let shouldReverse = edgeMatchesBounds(
+      coordinates[0],
+      coordinates[1],
+      reverseBounds,
+    );
+    let currentRun = [coordinates[0], coordinates[1]];
+
+    for (let i = 1; i < coordinates.length - 1; i++) {
+      const edgeShouldReverse = edgeMatchesBounds(
+        coordinates[i],
+        coordinates[i + 1],
+        reverseBounds,
+      );
+
+      if (edgeShouldReverse === shouldReverse) {
+        currentRun.push(coordinates[i + 1]);
+        continue;
+      }
+
+      pushDirectedLineString(result, currentRun, shouldReverse);
+      currentRun = [coordinates[i], coordinates[i + 1]];
+      shouldReverse = edgeShouldReverse;
+    }
+
+    pushDirectedLineString(result, currentRun, shouldReverse);
+    return result;
+  });
+}
+
+function edgeMatchesBounds(
+  start: GeoJSON.Position,
+  end: GeoJSON.Position,
+  bounds: [number, number, number, number][],
+): boolean {
+  const midpointLng = (start[0] + end[0]) / 2;
+  const midpointLat = (start[1] + end[1]) / 2;
+  return bounds.some(
+    ([swLng, swLat, neLng, neLat]) =>
+      midpointLng >= swLng &&
+      midpointLng <= neLng &&
+      midpointLat >= swLat &&
+      midpointLat <= neLat,
+  );
+}
+
+function pushDirectedLineString(
+  result: GeoJSON.Feature<GeoJSON.LineString>[],
+  coordinates: GeoJSON.Position[],
+  reverse: boolean,
+): void {
+  result.push({
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'LineString',
+      coordinates: reverse ? [...coordinates].reverse() : coordinates,
+    },
+  });
+}
+
+function pathOwnerId(
+  feature: GeoJSON.Feature,
+  featureIndex: number,
+  partIndex: number,
+): string {
+  const featureId = feature.id ?? `feature-${featureIndex}`;
+  return `${String(featureId)}:${partIndex}`;
+}
+
+function pushLineString(
+  result: GeoJSON.Feature<GeoJSON.LineString>[],
+  coordinates: GeoJSON.Position[],
+): void {
+  if (coordinates.length < 2) return;
+  result.push({
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'LineString', coordinates },
+  });
+}
+
 // Coordinate utilities
 export function findLocationInArray<
   T extends { latitude: number; longitude: number },
@@ -198,6 +613,23 @@ export function findLocationInArray<
     (item) =>
       item.longitude === coordinates[0] && item.latitude === coordinates[1],
   );
+}
+
+/** Query visible line layers inside a touch-friendly screen-space box. */
+export function queryNearbyLineFeatures(
+  map: mapboxgl.Map,
+  point: { x: number; y: number },
+  layerIds: string[],
+  tolerance = LINE_HIT_TOLERANCE_PX,
+): mapboxgl.MapboxGeoJSONFeature[] {
+  const activeLayers = layerIds.filter((id) => map.getLayer(id));
+  if (activeLayers.length === 0) return [];
+
+  const bounds: [[number, number], [number, number]] = [
+    [point.x - tolerance, point.y - tolerance],
+    [point.x + tolerance, point.y + tolerance],
+  ];
+  return map.queryRenderedFeatures(bounds, { layers: activeLayers });
 }
 
 // Mountain bike trail utilities
@@ -460,9 +892,6 @@ function casingId(layerId: string): string {
 }
 function glowId(layerId: string): string {
   return `${layerId} Glow`;
-}
-function hitId(layerId: string): string {
-  return `${layerId} Hit`;
 }
 
 export { TRAIL_LAYERS };
@@ -849,80 +1278,56 @@ export function setBikeNetworkVisible(
 
 // --- Inline (GeoJSON-backed) bike routes -------------------------------------
 
-const INLINE_ROUTES_SOURCE_ID = 'inline-routes-source';
-
-// Attach curated routes whose geometry ships as a static GeoJSON (one feature
-// per route, keyed by `id`) rather than a Mapbox Studio layer. Each route gets a
-// white casing, the colored line (`id === route.id`), and a wide transparent hit
-// target — the same `${route.id}` / `-casing` / `-hit` layer ids the existing
-// route selection, opacity, and click-handler code keys off, so they work
-// unchanged. Idempotent.
+// Attach every curated route from one static GeoJSON source. Color, width, and
+// selection state are data-driven so the renderer only evaluates one casing
+// and one route layer regardless of how many routes a city has. Idempotent.
 export function ensureInlineRoutes(
   map: mapboxgl.Map,
   url: string,
   routes: BikeRoute[],
 ): void {
   try {
-    ensureSource(map, INLINE_ROUTES_SOURCE_ID, { type: 'geojson', data: url });
+    ensureSource(map, BIKE_ROUTE_SOURCE_ID, {
+      type: 'geojson',
+      data: url,
+      maxzoom: 14,
+      tolerance: 0.5,
+      promoteId: 'id',
+    });
     const beforeId = firstSymbolLayerId(map);
-    for (const route of routes) {
-      // A city may migrate a route out of the shared Studio style without
-      // changing its public layer id. Remove the style-backed copy first so
-      // the repository-owned GeoJSON becomes authoritative.
-      for (const layerId of [
-        `${route.id}-hit`,
-        route.id,
-        `${route.id}-casing`,
-      ]) {
-        const existing = map.getLayer(layerId) as mapboxgl.AnyLayer | undefined;
-        if (
-          existing &&
-          'source' in existing &&
-          existing.source !== INLINE_ROUTES_SOURCE_ID
-        ) {
-          map.removeLayer(layerId);
-        }
-      }
+    const color = routePropertyExpression(routes, 'color');
+    const width = routePropertyExpression(routes, 'defaultWidth');
 
-      const filter: mapboxgl.FilterSpecification = [
-        '==',
-        ['get', 'id'],
-        route.id,
-      ];
-      const sublayers = [
-        {
-          id: `${route.id}-casing`,
-          color: '#ffffff',
-          width: route.defaultWidth + 2,
-          opacity: 0.4,
+    addLayerOnce(
+      map,
+      {
+        id: BIKE_ROUTE_CASING_LAYER_ID,
+        type: 'line',
+        source: BIKE_ROUTE_SOURCE_ID,
+        layout: ROUND_LINE,
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': ['+', width, 2],
+          'line-opacity': 0.3,
         },
-        {
-          id: route.id,
-          color: route.color,
-          width: route.defaultWidth,
-          opacity: route.opacity,
+      },
+      beforeId,
+    );
+    addLayerOnce(
+      map,
+      {
+        id: BIKE_ROUTE_LAYER_ID,
+        type: 'line',
+        source: BIKE_ROUTE_SOURCE_ID,
+        layout: ROUND_LINE,
+        paint: {
+          'line-color': color,
+          'line-width': width,
+          'line-opacity': 0.2,
         },
-        { id: `${route.id}-hit`, color: '#000000', width: 24, opacity: 0 },
-      ];
-      for (const s of sublayers) {
-        addLayerOnce(
-          map,
-          {
-            id: s.id,
-            type: 'line',
-            source: INLINE_ROUTES_SOURCE_ID,
-            filter,
-            layout: ROUND_LINE,
-            paint: {
-              'line-color': s.color,
-              'line-width': s.width,
-              'line-opacity': s.opacity,
-            },
-          },
-          beforeId,
-        );
-      }
-    }
+      },
+      beforeId,
+    );
   } catch (error) {
     console.error('Failed to attach inline routes:', error);
   }
@@ -1154,9 +1559,10 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
 
     const source = (layer as { source?: string }).source ?? 'composite';
     const cId = casingId(cfg.layerId);
+    const gId = glowId(cfg.layerId);
 
-    // Insertion order matters: casing slides under the base layer, glow under
-    // the casing, and the transparent hit target is appended on top.
+    // Insertion order matters: casing slides under the base layer and the
+    // selection-only glow sits beneath the casing.
     const sublayers: {
       id: string;
       paint: mapboxgl.LineLayerSpecification['paint'];
@@ -1172,7 +1578,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
         beforeId: cfg.layerId,
       },
       {
-        id: glowId(cfg.layerId),
+        id: gId,
         paint: {
           'line-color': '#ffffff',
           'line-width': 0,
@@ -1180,14 +1586,6 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
           'line-blur': 10,
         },
         beforeId: cId,
-      },
-      {
-        id: hitId(cfg.layerId),
-        paint: {
-          'line-color': 'rgba(0,0,0,0)',
-          'line-width': 10,
-          'line-opacity': 0,
-        },
       },
     ];
     for (const s of sublayers) {
@@ -1198,7 +1596,10 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
           type: 'line',
           source,
           ...(cfg.sourceLayer ? { 'source-layer': cfg.sourceLayer } : {}),
-          layout: ROUND_LINE_LIMIT,
+          layout:
+            s.id === gId
+              ? { ...ROUND_LINE_LIMIT, visibility: 'none' }
+              : ROUND_LINE_LIMIT,
           paint: s.paint,
         },
         s.beforeId,
@@ -1225,7 +1626,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
     // unnamed, retired, or non-MTB lines alongside the trails represented in
     // the sidebar; drawing those would create unselectable gray features. OSM
     // layers match by way id, while imported GIS layers match by raw name.
-    let filter: mapboxgl.FilterSpecification | null = null;
+    let filter: mapboxgl.FilterSpecification;
     if (cfg.matchBy === 'osmId') {
       const curatedIds = getMountainBikeTrails()
         .flatMap((t) => t.osmIds ?? [])
@@ -1260,11 +1661,9 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
             ]
           : curatedFilter;
     }
-    if (filter) {
-      for (const id of [cfg.layerId, ...sublayers.map((s) => s.id)]) {
-        if (map.getLayer(id)) {
-          map.setFilter(id, filter);
-        }
+    for (const id of [cfg.layerId, ...sublayers.map((s) => s.id)]) {
+      if (map.getLayer(id)) {
+        map.setFilter(id, filter);
       }
     }
   }
@@ -1289,6 +1688,7 @@ function setTrailOpacity(
     }
 
     if (map.getLayer(gId)) {
+      map.setLayoutProperty(gId, 'visibility', 'visible');
       map.setPaintProperty(gId, 'line-opacity', ['case', sel, 0.7, 0]);
       map.setPaintProperty(gId, 'line-width', ['case', sel, 24, 0]);
     }
@@ -1304,6 +1704,7 @@ function setTrailOpacity(
     if (map.getLayer(gId)) {
       map.setPaintProperty(gId, 'line-opacity', 0);
       map.setPaintProperty(gId, 'line-width', 0);
+      map.setLayoutProperty(gId, 'visibility', 'none');
     }
   }
 }
@@ -1359,6 +1760,7 @@ export function highlightMtnBikeArea(
       if (map.getLayer(gId)) {
         map.setPaintProperty(gId, 'line-opacity', 0);
         map.setPaintProperty(gId, 'line-width', 0);
+        map.setLayoutProperty(gId, 'visibility', 'none');
       }
     } catch (error) {
       console.error('Error highlighting mountain bike area:', error);
@@ -1429,7 +1831,7 @@ export function removeRideLayer(map: mapboxgl.Map): void {
 }
 
 // Trail auto-detection: given a GPS coordinate, returns the trail name at that
-// point (using the invisible hit-test layers), or null if not on any trail.
+// point using a screen-space tolerance, or null if not on any trail.
 export function detectTrailAtPoint(
   map: mapboxgl.Map,
   lngLat: [number, number],
@@ -1447,15 +1849,11 @@ export function detectTrailAtPoint(
     return null;
   }
 
-  const hitLayerIds = TRAIL_LAYERS.map((cfg) => hitId(cfg.layerId));
-
-  // Only query layers that actually exist on the map
-  const activeLayers = hitLayerIds.filter((id) => map.getLayer(id));
-  if (activeLayers.length === 0) return null;
-
-  const features = map.queryRenderedFeatures(point, {
-    layers: activeLayers,
-  });
+  const features = queryNearbyLineFeatures(
+    map,
+    point,
+    TRAIL_LAYERS.map((cfg) => cfg.layerId),
+  );
   if (features.length === 0) return null;
 
   const feature = features[0];
@@ -1463,7 +1861,7 @@ export function detectTrailAtPoint(
   if (!layerId) return null;
 
   // Find the matching TRAIL_LAYERS config to get the correct property name
-  const cfg = TRAIL_LAYERS.find((c) => hitId(c.layerId) === layerId);
+  const cfg = TRAIL_LAYERS.find((c) => c.layerId === layerId);
   if (!cfg) return null;
 
   const rawName = feature.properties?.[cfg.trailProp];

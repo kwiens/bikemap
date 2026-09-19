@@ -13,6 +13,7 @@ import { getPayload, type Payload } from 'payload';
 import config from '../../src/payload.config';
 import type { CityId } from '../../src/data/cities/types';
 import {
+  type ElevationProfile,
   type MountainBikeTrail,
   slugForTrail,
 } from '../../src/data/mountain-bike-trails';
@@ -221,6 +222,11 @@ export interface UpsertArgs {
    * keeps whatever it arrived with and the rebuild hook leaves it alone.
    */
   geometrySource: 'imported' | 'osm';
+  /**
+   * Prepared profile for an imported line. Omit when a later backfill owns it;
+   * pass null when the import owns profiles but this row has no source line.
+   */
+  elevationProfile?: ElevationProfile | null;
   trail: MountainBikeTrail;
 }
 
@@ -231,9 +237,9 @@ export interface UpsertArgs {
  * A row already marked `geometrySource: 'edited'` keeps its line, its source,
  * and everything measured from it — the seed only refreshes its metadata. That
  * is the whole point of the flag: the checked-in geometry is what a curator
- * edited *away* from, and the stored `elevationProfile` (which no seed writes)
- * still charts the drawn line, so restoring the static one leaves the trail
- * disagreeing with its own chart.
+ * edited *away* from, and the stored `elevationProfile` still charts the drawn
+ * line, so restoring the static one leaves the trail disagreeing with its own
+ * chart.
  *
  * Always passes `context.skipOsmRebuild`. Without it the beforeChange hook
  * would fire one Overpass request per trail — several hundred against a shared
@@ -242,7 +248,15 @@ export interface UpsertArgs {
  */
 export async function upsertTrail(
   payload: Payload,
-  { areaId, city, geom, geometrySource, trail, vocabulary }: UpsertArgs,
+  {
+    areaId,
+    city,
+    elevationProfile,
+    geom,
+    geometrySource,
+    trail,
+    vocabulary,
+  }: UpsertArgs,
 ): Promise<'created' | 'preserved' | 'updated'> {
   // What the seed exists to carry: what the trail is called and what it belongs
   // to. Written on every run, however the row's geometry is maintained.
@@ -269,6 +283,12 @@ export async function upsertTrail(
     elevationLoss: trail.elevationLoss ?? null,
     elevationMax: trail.elevationMax ?? null,
     elevationMin: trail.elevationMin ?? null,
+    ...(elevationProfile !== undefined
+      ? {
+          elevationProfile:
+            elevationProfile as unknown as Trail['elevationProfile'],
+        }
+      : {}),
     // Payload types a `json` field as an open-ended JSON value, so the precise
     // GeoJSON shape has to be widened at this boundary.
     geom: geom as Trail['geom'],

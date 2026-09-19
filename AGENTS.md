@@ -9,8 +9,9 @@ pnpm dev          # Start development server at localhost:3000
 pnpm build        # Build for production
 pnpm test         # Run tests in watch mode
 pnpm test:run     # Run tests once
-pnpm lint         # Run ESLint + Biome lint + Biome format checks
-pnpm lint:fix     # Auto-fix linting/formatting issues
+pnpm check        # Run ESLint, Biome formatting, types, and Knip
+pnpm lint:fix     # Auto-fix ESLint and formatting issues
+pnpm dedupe:check # Verify the lockfile has no avoidable duplicates
 ```
 
 Content backend (Payload + OSM — see below):
@@ -36,6 +37,10 @@ gh pr list                                          # List open PRs
 gh issue list                                       # List issues
 gh issue view [number]                              # View issue details
 ```
+
+GitHub posts written by an agent start with `🤖` alone on the first line. This
+applies to issue and pull-request bodies, comments, reviews, and review-thread
+replies. Do not add the marker to commits, titles, or file contents.
 
 ## Architecture
 
@@ -158,6 +163,7 @@ from NAD83 / UTM zone 16N to WGS84 GeoJSON by
 python -m venv .venv && source .venv/bin/activate
 pip install -r scripts/requirements.txt
 python scripts/prepare_chattanooga_trails.py /path/to/Chattanooga_Regional_Trails_4.shp
+pnpm prepare:chattanooga-measurements
 pnpm db:seed:chattanooga
 ```
 
@@ -166,7 +172,11 @@ pieces into one `MultiLineString` per raw `Trail` value. The seed matches those
 names against the 224 curated rows and stores geometry as
 `geometrySource: 'imported'`; 218 match. The six Godsey Ridge trails remain in
 the separate `Godsey Ridge Trails` style layer because that geometry was not in
-the regional shapefile.
+the regional shapefile. `prepare:chattanooga-measurements` uses the same
+`measureParts` implementation as Payload to regenerate summary metadata and
+the city-scoped static profiles from those exact 218 lines. The seed imports
+the prepared profile alongside each line; never seed after changing the
+GeoJSON without regenerating these artifacts first.
 
 `ensureMtnBikeSource(map)` attaches `MTN_BIKE_SOURCE_ID` as GeoJSON, reads
 `/api/map/trails?city=chattanooga`, and falls back to the checked-in GeoJSON if
@@ -345,6 +355,24 @@ The map can be framed on third-party sites via `<iframe src="https://bikechatt.c
 - File order: exported component → subcomponents → helpers → static content → types
 - Use existing icon libraries (Font Awesome or lucide-react) - don't add new ones
 - Directories use lowercase-dash naming
+- Include units in names when the unit is not obvious (`retryDelayMs`,
+  `distanceMeters`) and phrase booleans as questions (`isLoading`, `hasRoute`).
+- Prefer precise domain verbs and nouns. Do not create catch-all `Utils`,
+  `Helpers`, or `Managers` when a narrower responsibility can be named.
+- Comments explain constraints and why a choice exists; do not narrate code that
+  is already clear from its names and structure.
+- State the bound for data-dependent loops. Batch independent network or
+  database work, avoid accidental serial round trips, and fetch only the fields
+  a caller needs.
+
+### Dependency hygiene
+
+- Pin direct dependencies and dev dependencies to exact versions. Let
+  Dependabot make version changes explicitly rather than widening manifest
+  ranges.
+- Keep `@types/node` on the same major as the Node runtime in `.nvmrc`.
+- After changing dependencies, run `pnpm install`, `pnpm dedupe`, and
+  `pnpm dedupe:check`; commit the resulting lockfile.
 
 ### Styling with Tailwind CSS
 
@@ -455,9 +483,10 @@ Things to know before touching it:
   The pane fetches `/api/map/elevation/<slug>?city=<city>`, serving the profile
   measured on the trail's last save. A miss falls back to
   `public/data/elevation/<city>/<slug>.json`, which keeps charts working for
-  unseeded Chattanooga deployments and installations without a CMS. Keep the city in
-  both lookups so same-named trails cannot collide. `pnpm backfill:elevation`
-  measures trails that have geometry but no profile, without touching Overpass.
+  unseeded Chattanooga deployments and installations without a CMS. Keep the
+  city in both lookups so same-named trails cannot collide. Chattanooga's seed
+  imports its prepared profiles directly; `pnpm backfill:elevation` measures
+  any trail that still has geometry but no profile, without touching Overpass.
 - **`computeElevation`'s spike filter needs a run cap.** It replaces readings
   further than `ELEVATION_SPIKE_THRESHOLD` (25 m) from a running EMA. On a
   sustained climb the EMA lags by about `step * (1-alpha)/alpha`, and on a ~30%

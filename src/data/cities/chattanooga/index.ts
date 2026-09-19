@@ -7,11 +7,12 @@ import {
   GODSEY_SOURCE_LAYER,
   MTN_BIKE_LAYER_ID,
   MTN_BIKE_SOURCE_ID,
-  mountainBikeTrails,
+  mountainBikeTrails as baseMountainBikeTrails,
   regionFor,
 } from '@/data/mountain-bike-trails';
 import { TRAIL_METADATA } from '@/data/trail-metadata';
 import type { CityData } from '@/data/cities/types';
+import { applyChattanoogaMeasurements } from './measurements';
 
 const HIDDEN_TRAILS = [
   'Tennessee Riverwalk',
@@ -19,6 +20,8 @@ const HIDDEN_TRAILS = [
   'South Chick Greenway',
   'South Chickamauga Creek Greenway',
 ];
+
+const mountainBikeTrails = applyChattanoogaMeasurements(baseMountainBikeTrails);
 
 export const chattanoogaData: CityData = {
   cityId: 'chattanooga',

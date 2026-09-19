@@ -11,6 +11,7 @@
  * deliberately small — a handful of way ids from one editor pressing save —
  * and must send a User-Agent or Overpass answers 406.
  */
+import { MAX_WAYS_PER_REQUEST } from './ids';
 
 /** A single OSM way with its full-resolution geometry. */
 export interface OsmWay {
@@ -34,12 +35,6 @@ const DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 // operators can see who's calling.
 const USER_AGENT =
   'open-bike-map/1.0 (+https://github.com/kwiens/bikemap; trail editor)';
-
-/**
- * Guards against a runaway request from a bad paste. A curated trail is
- * assembled from a handful of ways; hundreds means something is wrong.
- */
-export const MAX_WAYS_PER_REQUEST = 100;
 
 interface OverpassElement {
   geometry?: { lat: number; lon: number }[];
@@ -72,7 +67,10 @@ const BASE_BACKOFF_MS = 2000;
  */
 const MAX_BACKOFF_MS = 30_000;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 /**
  * Retry-After as milliseconds, or null when it can't be read as delay-seconds.

@@ -118,35 +118,110 @@ export function gradeToColor(grade: number): string {
   return `rgb(${r},${green},${b})`;
 }
 
-export function computeGradeColors(
+/** Format signed grade for the hover readout. */
+export function formatGrade(grade: number | undefined): string {
+  if (grade === undefined || !Number.isFinite(grade)) {
+    return '—';
+  }
+  if (Math.abs(grade) < 0.05) {
+    return '0.0%';
+  }
+  return `${grade > 0 ? '+' : '\u2212'}${Math.abs(grade).toFixed(1)}%`;
+}
+
+/** Percent grade at each point, smoothed. Positive is uphill. */
+export function computeGrades(
   points: [number, number, number, number][],
-): string[] {
-  if (points.length < 2) return points.map(() => gradeToColor(0));
+  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
+): number[] {
+  if (points.length < 2) return points.map(() => 0);
 
-  const rawGrades: number[] = [0];
+  const gapEdges = new Set(
+    gapDetails.map(({ from, to }) =>
+      profileEdgeKey(from[0], from[1], to[0], to[1]),
+    ),
+  );
+  const segmentStarts = new Set<number>();
+  const rises: number[] = [0];
+  const runs: number[] = [0];
   for (let i = 1; i < points.length; i++) {
-    const dx = points[i][0] - points[i - 1][0];
-    const dy = points[i][1] - points[i - 1][1];
-    rawGrades.push(dx > 0 ? (dy / dx) * 100 : 0);
-  }
-
-  const smoothed: number[] = [];
-  const WINDOW = 2;
-  for (let i = 0; i < rawGrades.length; i++) {
-    let sum = 0;
-    let count = 0;
-    for (
-      let j = Math.max(0, i - WINDOW);
-      j <= Math.min(rawGrades.length - 1, i + WINDOW);
-      j++
+    const previous = points[i - 1];
+    const current = points[i];
+    const run = current[0] - previous[0];
+    if (
+      run <= 0 ||
+      gapEdges.has(
+        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
+      )
     ) {
-      sum += rawGrades[j];
-      count++;
+      segmentStarts.add(i);
     }
-    smoothed.push(sum / count);
+    const rise = current[1] - previous[1];
+    runs.push(run > 0 ? run : 0);
+    rises.push(run > 0 ? rise : 0);
   }
 
-  return smoothed.map((g) => gradeToColor(g));
+  const smoothed = points.map(() => 0);
+  const WINDOW = 2;
+  let segmentStart = 0;
+  for (let segmentEnd = 1; segmentEnd <= points.length; segmentEnd++) {
+    if (segmentEnd < points.length && !segmentStarts.has(segmentEnd)) {
+      continue;
+    }
+
+    for (let i = segmentStart; i < segmentEnd; i++) {
+      let totalRise = 0;
+      let totalRun = 0;
+      for (
+        let j = Math.max(segmentStart + 1, i - WINDOW);
+        j <= Math.min(segmentEnd - 1, i + WINDOW);
+        j++
+      ) {
+        totalRise += rises[j];
+        totalRun += runs[j];
+      }
+      smoothed[i] = totalRun > 0 ? (totalRise / totalRun) * 100 : 0;
+    }
+    segmentStart = segmentEnd;
+  }
+
+  return smoothed;
+}
+
+function profileEdgeKey(
+  fromLng: number,
+  fromLat: number,
+  toLng: number,
+  toLat: number,
+): string {
+  return `${fromLng},${fromLat}:${toLng},${toLat}`;
+}
+
+function profileSegmentRanges(
+  points: [number, number, number, number][],
+  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
+): [number, number][] {
+  if (points.length === 0) return [];
+  const gapEdges = new Set(
+    gapDetails.map(({ from, to }) =>
+      profileEdgeKey(from[0], from[1], to[0], to[1]),
+    ),
+  );
+  const starts = [0];
+  for (let index = 1; index < points.length; index++) {
+    const previous = points[index - 1];
+    const current = points[index];
+    if (
+      current[0] <= previous[0] ||
+      gapEdges.has(
+        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
+      )
+    ) {
+      starts.push(index);
+    }
+  }
+  starts.push(points.length);
+  return starts.slice(0, -1).map((start, index) => [start, starts[index + 1]]);
 }
 
 // Force strictly increasing offsets. Consecutive profile points can share a
@@ -194,7 +269,11 @@ export function downsampleStops(
 const profileCache = new Map<string, ElevationProfileData>();
 
 function downloadGpx(profile: ElevationProfileData): void {
-  const gpx = buildProfileGpx(profile.trail, profile.profile);
+  const gpx = buildProfileGpx(
+    profile.trail,
+    profile.profile,
+    profile.geometryGapDetails,
+  );
   downloadFile(gpx, `${slugify(profile.trail)}.gpx`, 'application/gpx+xml');
 }
 
@@ -572,9 +651,14 @@ export function ElevationProfile() {
     );
   }, []);
 
-  const gradeColors = useMemo(
-    () => (profile ? computeGradeColors(profile.profile) : []),
+  const grades = useMemo(
+    () =>
+      profile ? computeGrades(profile.profile, profile.geometryGapDetails) : [],
     [profile],
+  );
+  const gradeColors = useMemo(
+    () => grades.map((grade) => gradeToColor(grade)),
+    [grades],
   );
 
   const hasProfile =
@@ -649,13 +733,22 @@ export function ElevationProfile() {
           <button
             type="button"
             className={ACTION_BTN_CLASS}
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              window.dispatchEvent(
-                new CustomEvent(MAP_EVENTS.TOAST, {
-                  detail: { message: 'Link copied' },
-                }),
-              );
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(window.location.href);
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.TOAST, {
+                    detail: { message: 'Link copied' },
+                  }),
+                );
+              } catch (error) {
+                console.error('Failed to copy link:', error);
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.TOAST, {
+                    detail: { message: 'Could not copy link' },
+                  }),
+                );
+              }
             }}
             title="Copy link"
           >
@@ -749,9 +842,21 @@ export function ElevationProfile() {
       </div>
 
       <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
-        {hoverIndex !== null
-          ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft`
-          : '\u00A0'}
+        {hoverIndex !== null ? (
+          <>
+            {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
+            <span className="inline-flex items-center gap-1 text-gray-700">
+              <span
+                aria-hidden="true"
+                className="inline-block h-2 w-2 rounded-full border border-black/10"
+                style={{ backgroundColor: gradeColors[hoverIndex] }}
+              />
+              {formatGrade(grades[hoverIndex])}
+            </span>
+          </>
+        ) : (
+          '\u00A0'
+        )}
       </div>
     </div>
   );
@@ -790,14 +895,31 @@ const ElevationSvg = React.memo(function ElevationSvg({
     PLOT_HEIGHT -
     ((e - profile.min) / yRange) * PLOT_HEIGHT;
 
-  const linePath = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? 'M' : 'L'}${xScale(p[0]).toFixed(1)} ${yScale(p[1]).toFixed(1)}`,
+  const baseline = CHART_HEIGHT - CHART_PADDING_BOTTOM;
+  const ranges = profileSegmentRanges(points, profile.geometryGapDetails);
+  const linePath = ranges
+    .map(([start, end]) =>
+      points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' '),
     )
     .join(' ');
-
-  const areaPath = `${linePath} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
+  const areaPath = ranges
+    .map(([start, end]) => {
+      const segmentLine = points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' ');
+      return `${segmentLine} L${xScale(points[end - 1][0]).toFixed(1)} ${baseline} L${xScale(points[start][0]).toFixed(1)} ${baseline} Z`;
+    })
+    .join(' ');
 
   const gradientStops = downsampleStops(points, gradeColors, maxDist);
 

@@ -38,8 +38,10 @@ import {
   geocodeAddress,
   updateRouteOpacity,
   flyToBounds,
-  calculateRouteBounds,
   findLocationInArray,
+  createArrowSdfImage,
+  ROUTE_DIRECTION_ARROW_IMAGE_ID,
+  syncRouteArrowLayer,
   calculateTrailBounds,
   initTrailBoundsFromDefaults,
   initRouteBoundsFromDefaults,
@@ -54,9 +56,13 @@ import {
   ensureBikeNetworkSource,
   setBikeNetworkVisible,
   ensureInlineRoutes,
+  loadBikeRouteOptimizedStyle,
+  queryNearbyLineFeatures,
+  registerPointerCursor,
   registerOsmTrailSelection,
   hideStyleLayers,
   hideStrayStyleLayers,
+  BIKE_ROUTE_LAYER_ID,
   TRAIL_LAYERS,
   trailNameForOsmId,
   addRideLayer,
@@ -948,6 +954,20 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
+    let compassButton: Element | null = null;
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    const styleRequestController = new AbortController();
+
+    const handleCompassButtonClick = () => {
+      if (compassCleanup.current) {
+        compassCleanup.current();
+        compassCleanup.current = null;
+      }
+      compassHeading.current = null;
+      setCompassMode(false);
+    };
+
     // Initialize map
     if (mapContainer.current) {
       const initializeMap = async () => {
@@ -958,14 +978,24 @@ const MapboxMap = memo(function MapboxMap() {
           // Expose map for console debugging (e.g. querying tileset features)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__map = null;
+          const mapStyle = await loadBikeRouteOptimizedStyle(
+            mapConfig.mapbox.styleUrl,
+            mapConfig.mapbox.accessToken,
+            Boolean(bikeRoutesUrl),
+            styleRequestController.signal,
+          );
+          const container = mapContainer.current;
+          if (cancelled || !container) return;
+
           const newMap = new mapboxgl.Map({
-            container: mapContainer.current as HTMLElement,
-            style: mapConfig.mapbox.styleUrl,
+            container,
+            style: mapStyle,
             center: embedOptions.center ?? mapConfig.defaultView.center,
             zoom: embedOptions.zoom ?? mapConfig.defaultView.zoom,
             pitch: mapConfig.defaultView.pitch,
             bearing: mapConfig.defaultView.bearing,
-            antialias: true,
+            antialias: false,
+            performanceMetricsCollection: false,
           });
 
           map.current = newMap;
@@ -991,10 +1021,20 @@ const MapboxMap = memo(function MapboxMap() {
               reject(event.error ?? new Error('Mapbox style failed to load')),
             );
           });
+          if (cancelled || map.current !== newMap) return;
 
           // Find the road-label layer — route lines will be inserted
           // just below it so street names remain visible on top of routes.
           const style = newMap.getStyle();
+
+          // Register SDF arrow image for route direction indicators
+          if (!newMap.hasImage(ROUTE_DIRECTION_ARROW_IMAGE_ID)) {
+            const arrowImage = createArrowSdfImage(20);
+            newMap.addImage(ROUTE_DIRECTION_ARROW_IMAGE_ID, arrowImage, {
+              sdf: true,
+            });
+          }
+
           let firstLabelId: string | undefined;
           if (style?.layers) {
             for (const l of style.layers) {
@@ -1008,8 +1048,7 @@ const MapboxMap = memo(function MapboxMap() {
           hideStyleLayers(newMap, hiddenStyleLayerIds);
 
           // Attach curated routes whose geometry ships as GeoJSON (not Studio
-          // layers) BEFORE the route styling/hit-handler blocks below, so they
-          // pick up the route.id layers exactly like Studio routes.
+          // layers) before route styling and click handling below.
           if (bikeRoutesUrl) {
             const inlineRoutes = bikeRoutes.filter(
               (route) => inlineBikeRouteIds?.includes(route.id) ?? true,
@@ -1017,136 +1056,96 @@ const MapboxMap = memo(function MapboxMap() {
             ensureInlineRoutes(newMap, bikeRoutesUrl, inlineRoutes);
           }
 
-          // Inline route setup can replace style-backed layers while retaining
-          // their public ids. Read the current style so subsequent styling,
-          // bounds, and hit-target setup use the authoritative layer objects.
-          const routeLayers = newMap.getStyle().layers;
+          const combinedRouteLayer = newMap.getLayer(BIKE_ROUTE_LAYER_ID);
 
-          // Set initial line width for specific layers
-          if (routeLayers) {
-            routeLayers.forEach((layer) => {
-              if (layer.type === 'line') {
-                const route = bikeRoutes.find((r) => r.id === layer.id);
-                if (route) {
-                  newMap.setPaintProperty(
-                    layer.id,
-                    'line-width',
-                    route.defaultWidth,
-                  );
-                  newMap.setPaintProperty(layer.id, 'line-color', route.color);
-                  newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
-                  newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
-                  newMap.setLayoutProperty(layer.id, 'line-join', 'round');
-
-                  // Move route layer below road labels so street names show
-                  if (firstLabelId) {
-                    newMap.moveLayer(layer.id, firstLabelId);
-                  }
-
-                  // Add white casing layer beneath the route
-                  const casingId = `${layer.id}-casing`;
-                  if (!newMap.getLayer(casingId)) {
-                    const routeLayer = layer as {
-                      source?: string;
-                      'source-layer'?: string;
-                    };
-                    newMap.addLayer(
-                      {
-                        id: casingId,
-                        type: 'line',
-                        source: routeLayer.source ?? 'composite',
-                        ...(routeLayer['source-layer']
-                          ? { 'source-layer': routeLayer['source-layer'] }
-                          : {}),
-                        layout: {
-                          'line-cap': 'round',
-                          'line-join': 'round',
-                        },
-                        paint: {
-                          'line-color': '#ffffff',
-                          'line-width': route.defaultWidth + 2,
-                          'line-opacity': 0.3,
-                        },
-                        ...(layer.filter ? { filter: layer.filter } : {}),
-                      },
-                      layer.id, // casing goes directly below route
-                    );
-                  }
-
-                  // Calculate and store route bounds
-                  const bounds = calculateRouteBounds(newMap, route, layer);
-                  if (bounds) {
-                    route.bounds = bounds;
-                  }
-                }
+          // Cities can still rely on route layers baked into the Studio style
+          // while they migrate to the shared GeoJSON source. Preserve that
+          // path, but avoid creating extra per-route layers for migrated cities.
+          if (!combinedRouteLayer) {
+            for (const route of bikeRoutes) {
+              const layer = newMap.getLayer(route.id);
+              if (layer?.type !== 'line' || !('source' in layer)) {
+                continue;
               }
-            });
-          }
 
-          // Add invisible hit-test layers and click handlers for routes.
-          // The hit layer is wider than the visible route to make tapping
-          // easier on phones — same pattern used for mountain bike trails.
-          bikeRoutes.forEach((route) => {
-            const hitId = `${route.id}-hit`;
-            const routeLayer = routeLayers?.find((l) => l.id === route.id) as
-              | { source?: string; 'source-layer'?: string; filter?: unknown }
-              | undefined;
-
-            if (routeLayer && !newMap.getLayer(hitId)) {
-              newMap.addLayer({
-                id: hitId,
-                type: 'line',
-                source: routeLayer.source ?? 'composite',
-                ...(routeLayer['source-layer']
-                  ? { 'source-layer': routeLayer['source-layer'] }
-                  : {}),
-                layout: { 'line-cap': 'round', 'line-join': 'round' },
-                paint: {
-                  'line-color': '#000000',
-                  'line-width': 24,
-                  'line-opacity': 0,
-                },
-                ...(routeLayer.filter
-                  ? {
-                      filter: routeLayer.filter as mapboxgl.FilterSpecification,
-                    }
-                  : {}),
-              });
-            }
-
-            const clickTarget = newMap.getLayer(hitId) ? hitId : route.id;
-
-            newMap.on('click', clickTarget, (e) => {
-              e.preventDefault();
-              // Selecting a route also clears any active trail selection, so
-              // the trail highlight + elevation profile don't linger. Mirrors
-              // the sidebar route-click path in MapLegend.
-              window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
-              window.dispatchEvent(
-                new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
-                  detail: { routeId: route.id },
-                }),
+              newMap.setPaintProperty(
+                layer.id,
+                'line-width',
+                route.defaultWidth,
               );
-            });
+              newMap.setPaintProperty(layer.id, 'line-color', route.color);
+              newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
+              newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
+              newMap.setLayoutProperty(layer.id, 'line-join', 'round');
+              newMap.setLayoutProperty(layer.id, 'visibility', 'visible');
 
-            newMap.on('mouseenter', clickTarget, () => {
-              newMap.getCanvas().style.cursor = 'pointer';
-            });
+              if (firstLabelId) newMap.moveLayer(layer.id, firstLabelId);
 
-            newMap.on('mouseleave', clickTarget, () => {
-              newMap.getCanvas().style.cursor = '';
-            });
-          });
-
-          // Fill in default bounds for any routes that couldn't be calculated at runtime
-          initRouteBoundsFromDefaults(bikeRoutes);
-
-          // Ensure all route layers are visible (some may be hidden in Mapbox Studio)
-          for (const route of bikeRoutes) {
-            if (newMap.getLayer(route.id)) {
-              newMap.setLayoutProperty(route.id, 'visibility', 'visible');
+              const casingId = `${layer.id}-casing`;
+              if (!newMap.getLayer(casingId)) {
+                newMap.addLayer(
+                  {
+                    id: casingId,
+                    type: 'line',
+                    source: layer.source,
+                    ...('source-layer' in layer && layer['source-layer']
+                      ? { 'source-layer': layer['source-layer'] }
+                      : {}),
+                    layout: { 'line-cap': 'round', 'line-join': 'round' },
+                    paint: {
+                      'line-color': '#ffffff',
+                      'line-width': route.defaultWidth + 2,
+                      'line-opacity': 0.3,
+                    },
+                    ...('filter' in layer && layer.filter
+                      ? { filter: layer.filter }
+                      : {}),
+                  },
+                  layer.id,
+                );
+              }
             }
           }
+
+          const routeLayerIds = combinedRouteLayer
+            ? [BIKE_ROUTE_LAYER_ID]
+            : bikeRoutes
+                .map((route) => route.id)
+                .filter((layerId) => newMap.getLayer(layerId));
+
+          const syncRouteArrows = () => {
+            const currentLayers = newMap.getStyle().layers;
+            const sharedLayer = currentLayers?.find(
+              (candidate) => candidate.id === BIKE_ROUTE_LAYER_ID,
+            );
+            for (const route of bikeRoutes) {
+              const layer =
+                sharedLayer ??
+                currentLayers?.find((candidate) => candidate.id === route.id);
+              if (layer?.type === 'line') {
+                syncRouteArrowLayer(newMap, route, layer, firstLabelId);
+              }
+            }
+          };
+
+          // Source queries only include loaded tiles. Refresh after the map
+          // settles following a pan/zoom so arrows cover the new viewport.
+          syncRouteArrows();
+          let routeArrowSyncScheduled = false;
+          const scheduleRouteArrowSync = () => {
+            if (routeArrowSyncScheduled) return;
+            routeArrowSyncScheduled = true;
+            newMap.once('idle', () => {
+              routeArrowSyncScheduled = false;
+              syncRouteArrows();
+            });
+          };
+          scheduleRouteArrowSync();
+          newMap.on('moveend', scheduleRouteArrowSync);
+
+          // Route geometry ships with precalculated bounds, avoiding source
+          // scans during initialization and keeping the interaction path fast.
+          initRouteBoundsFromDefaults(bikeRoutes);
 
           // Embed mode is Casual-only: the MTB tab is hidden, so attaching the
           // trail tilesets would cost the partner's page two extra vector
@@ -1169,8 +1168,8 @@ const MapboxMap = memo(function MapboxMap() {
 
           if (showTrails) {
             // Attach the nationwide OSM bike-trails layer (hidden until toggled).
-            // Its click handler is registered later, after the curated route/MTB
-            // hit handlers, so curated trails win clicks in overlapping areas.
+            // Its click handler is registered later, after the curated
+            // route/MTB query, so curated trails win overlapping clicks.
             // Replay any toggle the user flipped before the style finished loading.
             ensureOsmTrailsSource(newMap);
             if (osmTrailsVisibleRef.current) {
@@ -1193,43 +1192,83 @@ const MapboxMap = memo(function MapboxMap() {
             updateMtnBikeOpacity(newMap, null);
           }
 
-          for (const cfg of showTrails ? TRAIL_LAYERS : []) {
-            if (!newMap.getLayer(cfg.layerId)) continue;
+          const curatedTrailLayerIds = (showTrails ? TRAIL_LAYERS : [])
+            .map((cfg) => cfg.layerId)
+            .filter((layerId) => newMap.getLayer(layerId));
 
-            // Click handler on hit-test layer for easier tapping
-            const hId = `${cfg.layerId} Hit`;
-            if (newMap.getLayer(hId)) {
-              newMap.on('click', hId, (e) => {
-                if (e.defaultPrevented) return;
+          for (const layerId of [...routeLayerIds, ...curatedTrailLayerIds]) {
+            registerPointerCursor(newMap, layerId);
+          }
+
+          // One screen-space query replaces a wide transparent layer for every
+          // route and curated trail. It preserves a 24px tap target while
+          // removing layers the renderer otherwise evaluates on every frame.
+          // Register before the nationwide OSM handler so curated content wins
+          // wherever the geometries overlap.
+          newMap.on('click', (e) => {
+            if (e.defaultPrevented) return;
+            const target = e.originalEvent.target as HTMLElement;
+            if (!newMap.getCanvas().contains(target)) return;
+
+            const routeFeature = queryNearbyLineFeatures(
+              newMap,
+              e.point,
+              routeLayerIds,
+            )[0];
+            if (routeFeature) {
+              const routeId = combinedRouteLayer
+                ? routeFeature.properties?.id
+                : routeFeature.layer?.id;
+              if (bikeRoutes.some((route) => route.id === routeId)) {
                 e.preventDefault();
-                const rawName = e.features?.[0]?.properties?.[cfg.trailProp];
-                if (!rawName) return;
-                // osmId-matched layers carry an OSM_ID; resolve it to the
-                // curated trail it belongs to. Name layers map via metadata.
-                const trailName =
-                  cfg.matchBy === 'osmId'
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.TRAIL_DESELECT),
+                );
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
+                    detail: { routeId },
+                  }),
+                );
+                return;
+              }
+            }
+
+            const trailFeature = queryNearbyLineFeatures(
+              newMap,
+              e.point,
+              curatedTrailLayerIds,
+            )[0];
+            if (trailFeature) {
+              const cfg = TRAIL_LAYERS.find(
+                (candidate) => candidate.layerId === trailFeature.layer?.id,
+              );
+              const rawName = cfg
+                ? trailFeature.properties?.[cfg.trailProp]
+                : undefined;
+              const trailName =
+                cfg && rawName !== undefined
+                  ? cfg.matchBy === 'osmId'
                     ? trailNameForOsmId(rawName)
-                    : (trailMetadata[rawName]?.displayName ?? rawName);
-                if (!trailName) return;
+                    : (trailMetadata[String(rawName)]?.displayName ??
+                      String(rawName))
+                  : null;
+              if (trailName) {
+                e.preventDefault();
                 window.dispatchEvent(
                   new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
                     detail: { trailName },
                   }),
                 );
-              });
-
-              newMap.on('mouseenter', hId, () => {
-                newMap.getCanvas().style.cursor = 'pointer';
-              });
-
-              newMap.on('mouseleave', hId, () => {
-                newMap.getCanvas().style.cursor = '';
-              });
+                return;
+              }
             }
-          }
+
+            window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
+            window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+          });
 
           // Register the OSM trail click handler AFTER the curated route + MTB
-          // hit handlers above. Mapbox fires delegated layer handlers in
+          // screen-space handler above. Mapbox fires click handlers in
           // registration order, so where an OSM way overlaps a curated trail the
           // curated handler runs first and preventDefault()s; the OSM handler
           // then bails on the already-handled click. Clear any prior registration
@@ -1239,36 +1278,15 @@ const MapboxMap = memo(function MapboxMap() {
             osmSelectionCleanup.current = registerOsmTrailSelection(newMap);
           }
 
-          // Click on empty map area deselects routes and trails.
-          // Check originalEvent.target to ignore ghost clicks that land on
-          // the canvas after an overlay (e.g. elevation panel) is removed
-          // mid-tap on mobile.
-          newMap.on('click', (e) => {
-            if (e.defaultPrevented) return; // a route/trail layer handled it
-            const target = e.originalEvent.target as HTMLElement;
-            if (!newMap.getCanvas().contains(target)) return;
-            window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-            window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
-          });
-
           // Tapping the Mapbox north-arrow compass button should exit
           // compass (heading-up) mode so the bearing stays north.
-          const compassBtn = newMap
+          compassButton = newMap
             .getContainer()
             .querySelector('.mapboxgl-ctrl-compass');
-          if (compassBtn) {
-            compassBtn.addEventListener('click', () => {
-              if (compassCleanup.current) {
-                compassCleanup.current();
-                compassCleanup.current = null;
-              }
-              compassHeading.current = null;
-              setCompassMode(false);
-            });
-          }
+          compassButton?.addEventListener('click', handleCompassButtonClick);
 
           // Force a resize to ensure proper display
-          setTimeout(() => {
+          resizeTimer = setTimeout(() => {
             if (map.current) {
               map.current.resize();
             }
@@ -1327,12 +1345,14 @@ const MapboxMap = memo(function MapboxMap() {
           if (map.current !== newMap) return;
           setMapReady();
         } catch (error) {
-          console.error('Error initializing map:', error);
-          setMapFailed(true);
+          if (!cancelled) {
+            console.error('Error initializing map:', error);
+            setMapFailed(true);
+          }
         }
       };
 
-      initializeMap();
+      void initializeMap();
     }
 
     // Capture refs for cleanup
@@ -1342,6 +1362,11 @@ const MapboxMap = memo(function MapboxMap() {
 
     // Cleanup event listener
     return () => {
+      cancelled = true;
+      styleRequestController.abort();
+      compassButton?.removeEventListener('click', handleCompassButtonClick);
+      if (resizeTimer) clearTimeout(resizeTimer);
+
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
       }
@@ -1691,7 +1716,7 @@ const MapboxMap = memo(function MapboxMap() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              toggleWatchLocation();
+              void toggleWatchLocation();
             }
           }}
           role="button"

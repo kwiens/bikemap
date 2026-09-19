@@ -373,6 +373,7 @@ One script per city, because their pipelines genuinely differ:
 |---|---|---|
 | Trails | 182 | 224 |
 | Geometry | `public/data/bend/trails.geojson`, by slug | `public/data/chattanooga/trails.geojson`, by raw `Trail` name |
+| Prepared profile | none — run the backfill | imported from `public/data/elevation/chattanooga`, measured from the same GIS line |
 | `osmIds` | yes | none |
 | `geometrySource` | `osm` — rebuildable from OSM | `imported` — the rebuild hook skips it |
 
@@ -516,10 +517,13 @@ Two things it has to keep doing. `getTrailSummary` **never throws**, like
 in, so an exception there is an admin nobody can get into, over a decorative
 panel. And an unreachable database shows `—`, never `0` — a zero is a claim.
 
-One query in it is deliberately done in JavaScript. `osmReport` is a plain
-`json` column, and asking Postgres whether its `warnings` array is non-empty
-means indexing into it: `osmReport.warnings.0` compiles to a jsonb path Postgres
-rejects outright, which took the whole panel down to `—`.
+The warning count is deliberately derived in JavaScript from the lightweight
+metadata query. `osmReport` is a plain `json` column, and asking Postgres whether
+its `warnings` array is non-empty means indexing into it:
+`osmReport.warnings.0` compiles to a jsonb path Postgres rejects outright. The
+missing-line and missing-profile totals remain database counts, so the dashboard
+does not download every trail's large geometry and elevation JSON just to test
+whether those fields exist.
 
 ## Reference collections
 
@@ -614,17 +618,19 @@ trail *and every stored version* at the matching row, and only then drops. The
 Going back down is lossy by nature: the enum only holds what it shipped with, so
 a rating a curator added comes back as `unrated`.
 
-### City is hidden in the admin
+### City is explicit in the shared admin
 
-A deployment serves one city, so the `city` picker is hidden on trails,
-complexes, and stewards, defaulting to `activeCityId`. The column stays:
+One admin and one global database serve every city. The `city` picker is visible
+on trails, complexes, and stewards; trails and complexes require an explicit
+choice so the server's fallback city cannot misfile global-admin edits.
 `getCityTrails` filters on it, the seeds set it per city, and user access is
-scoped by it. Removing `hidden` brings the picker back for a multi-city admin.
+scoped by it. The dashboard shows a separate, city-filtered summary for every
+configured city.
 
 ## Where the elevation chart comes from
 
 `/api/map/elevation/<slug>?city=<id>` first, and the checked-in
-`public/data/elevation/<slug>.json` when that has nothing. The API serves the
+`public/data/elevation/<city>/<slug>.json` when that has nothing. The API serves the
 `elevationProfile` measured when the trail was last saved, recalculated whenever
 its ways change or its line is redrawn.
 
@@ -641,7 +647,7 @@ env-default city.
 
 ### Why the database wins, and why the files are still there
 
-`public/data/elevation/*.json`, generated offline by
+`public/data/elevation/<city>/*.json`, generated offline by
 `scripts/add_trail_elevation.py`, are the fallback, never the first choice.
 Three reasons, in order of how much they cost:
 
@@ -655,10 +661,10 @@ Three reasons, in order of how much they cost:
 3. **They come from a different pipeline** — see below.
 
 So a trail with no database row falls back to its checked-in file rather than
-losing its chart. Chattanooga's seed now supplies imported GIS geometry, but
-its existing static elevation profiles remain the fallback until
-`pnpm backfill:elevation` measures those rows. Deployments with no database keep
-the offline profiles they have always had.
+losing its chart. Chattanooga's generated profiles are measured from the same
+GIS geometry as the static map fallback, and the seed imports that profile with
+the line. Deployments with or without the database therefore show the same
+path, distance, and elevation statistics.
 
 `pnpm backfill:elevation` measures every trail that has geometry but no profile.
 It samples terrain only — the geometry is already in the row — so it needs no

@@ -24,25 +24,13 @@ import {
   samePartsAs,
   toTrailGeometry,
 } from '@/payload/osm/geometry';
+import { parseOsmIds } from '@/payload/osm/ids';
 import { measureParts } from '@/payload/osm/measure';
 
 /** Reads an osmIds value that may arrive as an array, a JSON string, or null. */
 function readOsmIds(value: unknown): number[] {
-  const raw = typeof value === 'string' ? safeParse(value) : value;
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  return raw
-    .map((entry) => Number(entry))
-    .filter((id) => Number.isInteger(id) && id > 0);
-}
-
-function safeParse(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
+  const parsed = parseOsmIds(value);
+  return parsed.ok ? parsed.ids : [];
 }
 
 function sameIds(a: number[], b: number[]): boolean {
@@ -106,7 +94,22 @@ function storedGeometry(originalDoc: TrailData | undefined) {
 export const resolveTrailGeometry: CollectionBeforeChangeHook = async (
   args,
 ) => {
-  const { context, data, originalDoc } = args;
+  const { context, data, originalDoc, req } = args;
+
+  // Payload runs collection hooks before field validation. Validate here too,
+  // or a mixed valid/invalid list would be silently filtered before the field
+  // validator ever saw it — and an entirely invalid list would clear the line.
+  if ('osmIds' in data) {
+    const parsed = parseOsmIds(data.osmIds);
+    if (!parsed.ok) {
+      throw new ValidationError({
+        collection: 'trails',
+        errors: [{ message: parsed.error, path: 'osmIds' }],
+        req,
+      });
+    }
+    data.osmIds = parsed.ids;
+  }
 
   // Bulk imports bring their own geometry and measurements. Without this, a
   // seed of a few hundred trails would fire one Overpass request each and get

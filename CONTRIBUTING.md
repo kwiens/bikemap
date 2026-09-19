@@ -13,7 +13,9 @@ community, see the README's "Deploying for your community" section.
 
 ## Development setup
 
-**Prerequisites:** Node.js 20+ and pnpm 10+.
+**Prerequisites:** Node.js 24 and pnpm 11. The repository pins both versions;
+with `nvm` and Corepack installed, run `nvm use` and `corepack enable` before
+installing dependencies.
 
 ```bash
 git clone https://github.com/kwiens/bikemap.git
@@ -32,14 +34,15 @@ token for the map to render.
 2. Make your change, with tests where it makes sense.
 3. Run the full check locally — CI runs the same:
    ```bash
-   pnpm test:run && pnpm lint
+   pnpm test:run && pnpm check && pnpm build
    ```
 4. Open a PR against `main` and fill in the template.
 
 ## Code style
 
-Linting and formatting are enforced (Biome + ESLint, `--max-warnings 0`).
-Run `pnpm lint:fix` to auto-fix most issues. Beyond that:
+ESLint owns lint rules, while Biome owns formatting. TypeScript and Knip catch
+type errors and unused code. Run `pnpm check` for every static check and
+`pnpm lint:fix` to auto-fix lint and formatting issues. Beyond that:
 
 - Use the `function` keyword for components and pure functions.
 - Prefer `interface` over `type` aliases; avoid `enum` (use object maps).

@@ -117,7 +117,17 @@ function TrailRow({
           <span className="text-[11px] text-gray-500 ml-auto shrink-0">
             {trail.distance ? `${trail.distance} mi` : ''}
             {trail.distance && trail.elevationGain ? ' \u00B7 ' : ''}
-            {trail.elevationGain ? `\u2191${trail.elevationGain} ft` : ''}
+            {trail.elevationGain ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="inline-block text-[14px] leading-none align-[-1px]"
+                >
+                  {'\u2191'}
+                </span>
+                {trail.elevationGain} ft
+              </>
+            ) : null}
           </span>
         ) : null}
       </div>
@@ -131,9 +141,11 @@ export function MountainBikeTrails({
   onAreaSelect,
 }: MountainBikeTrailsProps) {
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(
-    new Set(),
+    () => new Set(),
   );
-  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
+  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 

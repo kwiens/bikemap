@@ -78,6 +78,7 @@ import {
   toTrailGeometry,
   type TrailGeometry,
 } from '@/payload/osm/geometry';
+import { parseOsmIds } from '@/payload/osm/ids';
 import { METERS_TO_MILES } from '@/payload/osm/units';
 import { OSM_BIKE_TRAIL_FILTER } from '@/utils/map';
 import { Banner, linkButtonStyle } from './admin-ui';
@@ -173,11 +174,8 @@ export function TrailMapEditor({
   const [lineWays, setLineWays] = useState<number[]>([]);
 
   const ids = useMemo<number[]>(() => {
-    const raw =
-      typeof osmIdsValue === 'string' ? safeParse(osmIdsValue) : osmIdsValue;
-    return Array.isArray(raw)
-      ? raw.map(Number).filter((id) => Number.isInteger(id) && id > 0)
-      : [];
+    const parsed = parseOsmIds(osmIdsValue);
+    return parsed.ok ? parsed.ids : [];
   }, [osmIdsValue]);
 
   // Everything the map's handlers read goes through a ref — see the note above.
@@ -999,14 +997,6 @@ function applyWayStyle(map: mapboxgl.Map, ids: number[], mode: Mode) {
       'visibility',
       picking ? 'visible' : 'none',
     );
-  }
-}
-
-function safeParse(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
   }
 }
 

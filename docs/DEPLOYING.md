@@ -90,15 +90,20 @@ the reprojection and grouping:
 
 ```bash
 python scripts/prepare_chattanooga_trails.py /path/to/Chattanooga_Regional_Trails_4.shp
+pnpm prepare:chattanooga-measurements
 pnpm db:seed:chattanooga
 ```
 
+The measurement step requires `NEXT_PUBLIC_MAPBOX_TOKEN`. It uses the same
+measurement code as Payload and regenerates both the checked-in summaries and
+static elevation profiles before the seed imports them with the geometry.
+
 ## 7. Trail elevation pipeline (optional)
 
-Only if you have mountain bike trails. The legacy Chattanooga script generates
-per-trail elevation profiles and bounds from the historical vector tileset plus
-Mapbox Terrain-RGB; new database-backed imports can instead use
-`pnpm backfill:elevation` after seeding.
+Only if you have mountain bike trails. `pnpm backfill:elevation` measures a
+database trail that has geometry but no stored profile. Chattanooga's prepared
+seed already includes profiles; the legacy Python script remains available for
+the historical Mapbox-vector-tile workflow.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -141,13 +146,91 @@ Replace with your own:
 pnpm build      # verify the production build locally
 ```
 
-On **Vercel**: import the repo, and add `NEXT_PUBLIC_MAPBOX_TOKEN` under
-Settings → Environment Variables for **Production, Preview, and Development**.
-Any Node host works — `pnpm build` then `pnpm start`.
+On **Vercel**, one project can serve every city and one Neon database can hold
+all of their content. Rows are scoped by the required `city` field; splitting a
+city out later is a data move and environment-variable change, not a different
+application schema.
+
+```bash
+# Link the repository to its Vercel project.
+vercel link
+
+# Provision one shared Neon resource in the same region as the app. Payload
+# owns admin authentication, so Neon Auth is not needed.
+vercel integration add neon \
+  --name bikemap-global \
+  --plan free_v3 \
+  --metadata region=iad1 \
+  --metadata auth=false
+
+# Pull the pooled runtime URL and direct migration URL locally.
+vercel env pull .env.local --yes
+```
+
+Set `PAYLOAD_SECRET`, `NEXT_PUBLIC_MAPBOX_TOKEN`,
+`NEXT_PUBLIC_MAPBOX_STYLE_URL`, `NEXT_PUBLIC_CITY_ID`, and
+`NEXT_PUBLIC_CITY_HOST_MAP` for **Production, Preview, and Development**. The
+Neon integration supplies `DATABASE_URL` (pooled application traffic) and
+`DATABASE_URL_UNPOOLED` (schema migrations).
+
+### Preview and production database policy
+
+"Preview uses the same database as production" means that the running preview
+application connects to the same Neon database with the same Payload secret.
+It sees the same content and users, and an admin edit made from a preview is a
+real edit that production will also see. Browser login cookies are scoped to a
+hostname, so an administrator may still need to sign in separately on a preview
+URL with the same credentials.
+
+It does **not** mean that a preview build may change the shared database schema:
+
+| Vercel environment | Data and admin accounts | Application writes | Schema migrations during build |
+|---|---|---|---|
+| Preview | Shared with production | Live; visible in production | Skipped |
+| Development | Shared when configured with the shared URLs | Live; visible in production | Skipped |
+| Production | Shared global database | Live | Applied through `DATABASE_URL_UNPOOLED` |
+
+This separation prevents an unmerged commit from changing the database under
+the currently deployed production code. It also prevents previews for different
+branches from racing to apply incompatible migrations.
+
+For a schema-changing pull request, the deployment sequence is:
+
+1. The preview build skips migrations and runs against the current production
+   schema.
+2. The change is reviewed and merged. Until then, its application code must
+   remain compatible with the current schema.
+3. The production build applies the committed Payload migrations through
+   `DATABASE_URL_UNPOOLED`.
+4. Vercel starts serving the new production code against the migrated schema.
+
+The tradeoff is deliberate: a preview can exercise shared accounts, content,
+and normal writes, but it cannot fully exercise a new schema before the
+production deployment. Use a separate Neon branch or database when a change
+requires pre-merge migration testing; do not point that isolated preview at the
+global database.
+
+A database-free fork skips migrations and still builds the checked-in fallback
+map.
+
+Seed every city into the same fresh database after the initial migration. Both
+commands are idempotent and match existing rows on `(trailName, city)`:
+
+```bash
+pnpm db:migrate
+pnpm db:seed:chattanooga
+pnpm db:seed:bend
+```
+
+Any Node host also works: set the same variables, run `pnpm run ci`, then
+`pnpm start`.
 
 ## Checklist
 
 - [ ] `.env.local` has `NEXT_PUBLIC_MAPBOX_TOKEN`
+- [ ] Vercel has one shared Neon resource with pooled and unpooled URLs
+- [ ] `PAYLOAD_SECRET` is set in every deployed environment
+- [ ] Payload migrations and both city seeds have completed
 - [ ] `src/config/site.config.ts` — name, description, URL, colors, storage prefix
 - [ ] `src/config/map.config.ts` — style URL, default view, GBFS, region
 - [ ] `src/data/*` — routes, trails, shops, POIs ([DATA.md](DATA.md))

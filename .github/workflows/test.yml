@@ -5,44 +5,89 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
-    name: Run Tests
+  workflow-lint:
+    name: Workflow Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Install workflow linters
+        run: pip install actionlint-py==1.7.12.24 zizmor==1.30.1
+
+      - name: Check workflow syntax
+        run: actionlint
+
+      - name: Audit workflow security
+        run: >-
+          zizmor --offline --config .github/zizmor.yml
+          --min-severity=medium --min-confidence=medium .github/
+
+  test:
+    name: Unit and Static Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version-file: .nvmrc
           cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache static analysis
+        uses: actions/cache@v6
+        with:
+          path: .cache
+          key: ${{ runner.os }}-static-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-static-${{ hashFiles('pnpm-lock.yaml') }}-
+
       - name: Run tests
         run: pnpm test:run
 
-      - name: Run linter
-        run: pnpm lint
+      # The parallel Build Check job runs the full TypeScript check as part of
+      # `next build`, so avoid doing the same work twice in CI.
+      - name: Run remaining static checks
+        run: pnpm lint && pnpm format && pnpm knip
 
   python-tests:
     name: Python Script Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -56,22 +101,45 @@ jobs:
   build:
     name: Build Check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version-file: .nvmrc
           cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build project
-        run: pnpm build
+      - name: Cache Next.js build
+        uses: actions/cache@v6
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Build project and check dependency deduplication
+        run: |
+          set +e
+          pnpm build &
+          build_pid=$!
+          pnpm dedupe:check &
+          dedupe_pid=$!
+
+          wait "$build_pid"
+          build_status=$?
+          wait "$dedupe_pid"
+          dedupe_status=$?
+
+          if ((build_status != 0 || dedupe_status != 0)); then
+            exit 1
+          fi

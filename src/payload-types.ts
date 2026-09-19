@@ -136,9 +136,12 @@ export interface UserAuthOperations {
 export interface Trail {
   id: number;
   /**
-   * The name everything else follows from. It is also the raw `Trail` value from the Mapbox tileset and the join key to rendered features — so on an existing trail, change it only if the upstream GIS data changed.
+   * The name everything else follows from. It is also the raw `Trail` value from the source GIS and the join key to rendered features — so on an existing trail, change it only if the upstream data changed.
    */
   trailName: string;
+  /**
+   * Which public city map serves this trail. The admin and database are shared across every city.
+   */
   city: 'chattanooga' | 'bend';
   /**
    * Manage the list under Lists → Trail complexes.
@@ -250,6 +253,9 @@ export interface TrailArea {
    * As shown in the sidebar, e.g. "Phil's Trail Complex".
    */
   name: string;
+  /**
+   * Which city owns this complex in the shared global database.
+   */
   city: 'chattanooga' | 'bend';
   /**
    * The heading this complex sits under in the sidebar — the level above it, e.g. "Bend" or "Cascade Lakes". Leave blank to use the built-in mapping.
@@ -278,6 +284,9 @@ export interface Organization {
    * e.g. "COTA". Shown where space is tight.
    */
   abbreviation?: string | null;
+  /**
+   * Optional. Leave blank for a steward shared by every city, or choose the city it belongs to.
+   */
   city?: ('chattanooga' | 'bend') | null;
   /**
    * Where riders can find them — membership, trail reports.
@@ -376,6 +385,7 @@ export interface User {
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
+  resetPasswordRequestedAt?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -573,6 +583,7 @@ export interface UsersSelect<T extends boolean = true> {
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  resetPasswordRequestedAt?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:

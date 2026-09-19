@@ -71,6 +71,7 @@ export default async function Layout({ children }: Args) {
         //
         // Content is custom properties only; see sanitizeCss in read/theme.ts
         // for why it cannot close its own <style> element.
+        // eslint-disable-next-line @eslint-react/dom-no-dangerously-set-innerhtml -- sanitizeCss restricts this to safe custom properties.
         <style dangerouslySetInnerHTML={{ __html: themeCss }} />
       )}
       {children}
