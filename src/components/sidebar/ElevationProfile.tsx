@@ -96,7 +96,86 @@ export function computeGradeColors(
     smoothed.push(sum / count);
   }
 
-  return smoothed.map((g) => gradeToColor(g));
+  return smoothed.map((grade) => gradeToColor(grade));
+}
+
+/** Format signed grade for the hover readout. */
+export function formatGrade(grade: number | undefined): string {
+  if (grade === undefined || !Number.isFinite(grade)) {
+    return '—';
+  }
+  if (Math.abs(grade) < 0.05) {
+    return '0.0%';
+  }
+  return `${grade > 0 ? '+' : '\u2212'}${Math.abs(grade).toFixed(1)}%`;
+}
+
+/** Percent grade at each point, smoothed. Positive is uphill. */
+export function computeGrades(
+  points: [number, number, number, number][],
+  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
+): number[] {
+  if (points.length < 2) return points.map(() => 0);
+
+  const gapEdges = new Set(
+    gapDetails.map(({ from, to }) =>
+      profileEdgeKey(from[0], from[1], to[0], to[1]),
+    ),
+  );
+  const segmentStarts = new Set<number>();
+  const rises: number[] = [0];
+  const runs: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    const previous = points[i - 1];
+    const current = points[i];
+    const run = current[0] - previous[0];
+    if (
+      run <= 0 ||
+      gapEdges.has(
+        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
+      )
+    ) {
+      segmentStarts.add(i);
+    }
+    const rise = current[1] - previous[1];
+    runs.push(run > 0 ? run : 0);
+    rises.push(run > 0 ? rise : 0);
+  }
+
+  const smoothed = points.map(() => 0);
+  const WINDOW = 2;
+  let segmentStart = 0;
+  for (let segmentEnd = 1; segmentEnd <= points.length; segmentEnd++) {
+    if (segmentEnd < points.length && !segmentStarts.has(segmentEnd)) {
+      continue;
+    }
+
+    for (let i = segmentStart; i < segmentEnd; i++) {
+      let totalRise = 0;
+      let totalRun = 0;
+      for (
+        let j = Math.max(segmentStart + 1, i - WINDOW);
+        j <= Math.min(segmentEnd - 1, i + WINDOW);
+        j++
+      ) {
+        totalRise += rises[j];
+        totalRun += runs[j];
+      }
+      smoothed[i] = totalRun > 0 ? (totalRise / totalRun) * 100 : 0;
+    }
+    segmentStart = segmentEnd;
+  }
+
+  return smoothed;
+}
+
+function profileEdgeKey(
+  fromLng: number,
+  fromLat: number,
+  toLng: number,
+  toLat: number,
+): string {
+  return `${fromLng},${fromLat}:${toLng},${toLat}`;
 }
 
 // Force strictly increasing offsets. Consecutive profile points can share a
@@ -522,6 +601,11 @@ export function ElevationProfile() {
     );
   }, []);
 
+  const grades = useMemo(
+    () =>
+      profile ? computeGrades(profile.profile, profile.geometryGapDetails) : [],
+    [profile],
+  );
   const gradeColors = useMemo(
     () => (profile ? computeGradeColors(profile.profile) : []),
     [profile],
@@ -699,9 +783,21 @@ export function ElevationProfile() {
       </div>
 
       <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
-        {hoverIndex !== null
-          ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft`
-          : '\u00A0'}
+        {hoverIndex !== null ? (
+          <>
+            {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
+            <span className="inline-flex items-center gap-1 text-gray-700">
+              <span
+                aria-hidden="true"
+                className="inline-block h-2 w-2 rounded-full border border-black/10"
+                style={{ backgroundColor: gradeColors[hoverIndex] }}
+              />
+              {formatGrade(grades[hoverIndex])}
+            </span>
+          </>
+        ) : (
+          '\u00A0'
+        )}
       </div>
     </div>
   );
