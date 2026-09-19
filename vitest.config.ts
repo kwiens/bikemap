@@ -4,7 +4,9 @@ import { resolve } from 'node:path';
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'jsdom',
+    // Keep the fast Node environment for logic tests. Browser-facing tests opt
+    // into jsdom with an `@vitest-environment` docblock.
+    environment: 'node',
     watch: false,
     setupFiles: ['./tests/vitest-setup.ts'],
     alias: {

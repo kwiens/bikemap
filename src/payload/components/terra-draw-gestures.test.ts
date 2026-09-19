@@ -1,3 +1,5 @@
+/** @vitest-environment jsdom */
+
 /**
  * What Terra Draw's editing gestures actually do.
  *
