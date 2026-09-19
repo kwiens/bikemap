@@ -23,6 +23,7 @@ export const hiddenStyleLayerIds = hiddenStyleLayerIdsFor(activeCityData);
 export const regionFor = activeCityData.regionFor;
 export const bikeNetworkUrl = activeCityData.bikeNetworkUrl;
 export const bikeRoutesUrl = activeCityData.bikeRoutesUrl;
+export const inlineBikeRouteIds = activeCityData.inlineBikeRouteIds;
 // Per-city curated trail elevation JSONs ({slug}.json lives under this path).
 // City-scoped so same-named trails in different cities can't collide.
 export const elevationBasePath = `/data/elevation/${activeCityData.cityId}`;

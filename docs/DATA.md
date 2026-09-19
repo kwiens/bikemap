@@ -25,12 +25,13 @@ The MTB trail array lives in its own `mountain-bike-trails.data.ts` so the
 
 ## BikeRoute (`bike-routes.ts`)
 
-Routes are line layers styled in Mapbox Studio; the entry here wires a layer to
-its sidebar card.
+Route display metadata lives in TypeScript. Geometry comes from the active
+city's `bikeRoutesUrl` GeoJSON when configured, otherwise from a Mapbox Studio
+line layer.
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | `string` | **Must equal the Mapbox Studio layer ID** for this route |
+| `id` | `string` | Must equal the GeoJSON feature `id` or Mapbox Studio layer ID |
 | `name` | `string` | Display name |
 | `color` | `string` | Hex; should match the layer's color in Studio |
 | `description` | `string` | Sidebar copy |
@@ -81,6 +82,8 @@ pointless, they get overwritten. See [DEPLOYING.md](DEPLOYING.md) for setup.
 
 | Script | Writes |
 |---|---|
+| `prepare_chattanooga_routes.py` | `public/data/chattanooga/routes.geojson` from verified archived route shapefiles |
+| `fix_route_directions.py` | Detects and repairs inconsistent multipart loop direction |
 | `add_trail_elevation.py` | `MountainBikeTrail` elevation stats (`elevationGain/Loss/Min/Max`, `distance`) + per-trail `public/data/elevation/chattanooga/{slug}.json` |
 | `add_trail_bounds.py` | `MountainBikeTrail.defaultBounds` and `distance` |
 | `validate_trails.py` | Read-only — flags geometry/elevation anomalies |

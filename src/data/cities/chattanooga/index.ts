@@ -51,4 +51,6 @@ export const chattanoogaData: CityData = {
     ],
     hiddenTrails: HIDDEN_TRAILS,
   },
+  bikeRoutesUrl: '/data/chattanooga/routes.geojson',
+  inlineBikeRouteIds: ['riverwalk-loop-v3-public'],
 };

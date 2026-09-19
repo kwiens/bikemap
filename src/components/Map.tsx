@@ -17,6 +17,7 @@ import {
   trailMetadata,
   bikeNetworkUrl,
   bikeRoutesUrl,
+  inlineBikeRouteIds,
 } from '@/data/geo_data';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import {
@@ -1010,7 +1011,10 @@ const MapboxMap = memo(function MapboxMap() {
           // layers) BEFORE the route styling/hit-handler blocks below, so they
           // pick up the route.id layers exactly like Studio routes.
           if (bikeRoutesUrl) {
-            ensureInlineRoutes(newMap, bikeRoutesUrl, bikeRoutes);
+            const inlineRoutes = bikeRoutes.filter(
+              (route) => inlineBikeRouteIds?.includes(route.id) ?? true,
+            );
+            ensureInlineRoutes(newMap, bikeRoutesUrl, inlineRoutes);
           }
 
           // Set initial line width for specific layers
