@@ -4,7 +4,9 @@ import {
   ElevationProfile,
   gradeToColor,
   computeGradeColors,
+  computeGrades,
   downsampleStops,
+  formatGrade,
   findClosestProfileIndex,
   profilePointToXY,
 } from './ElevationProfile';
@@ -78,6 +80,57 @@ describe('computeGradeColors', () => {
     for (const color of result) {
       expect(color).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
     }
+  });
+});
+
+describe('computeGrades', () => {
+  const climb: [number, number, number, number][] = [
+    [0, 100, -85, 35],
+    [100, 110, -85, 35],
+    [200, 120, -85, 35],
+    [300, 130, -85, 35],
+    [400, 140, -85, 35],
+    [500, 150, -85, 35],
+  ];
+
+  it('reads a steady grade correctly', () => {
+    expect(computeGrades(climb)[3]).toBeCloseTo(10, 5);
+  });
+
+  it('signs a descent negative', () => {
+    const drop: [number, number, number, number][] = climb.map(
+      ([distance, elevation, lng, lat]) => [
+        distance,
+        200 - elevation,
+        lng,
+        lat,
+      ],
+    );
+
+    expect(computeGrades(drop)[3]).toBeCloseTo(-10, 5);
+  });
+
+  it('returns one grade per point and handles degenerate profiles', () => {
+    expect(computeGrades(climb)).toHaveLength(climb.length);
+    expect(computeGrades([[0, 100, -85, 35]])).toEqual([0]);
+    expect(computeGrades([])).toEqual([]);
+  });
+});
+
+describe('formatGrade', () => {
+  it('signs climbs and descents', () => {
+    expect(formatGrade(8.42)).toBe('+8.4%');
+    expect(formatGrade(-8.42)).toBe('−8.4%');
+  });
+
+  it('does not add a sign to zero', () => {
+    expect(formatGrade(0)).toBe('0.0%');
+    expect(formatGrade(0.01)).toBe('0.0%');
+  });
+
+  it('degrades instead of displaying an invalid number', () => {
+    expect(formatGrade(undefined)).toBe('—');
+    expect(formatGrade(Number.NaN)).toBe('—');
   });
 });
 

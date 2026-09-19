@@ -68,10 +68,22 @@ export function gradeToColor(grade: number): string {
   return `rgb(${r},${green},${b})`;
 }
 
-export function computeGradeColors(
+/** Format signed grade for the hover readout. */
+export function formatGrade(grade: number | undefined): string {
+  if (grade === undefined || !Number.isFinite(grade)) {
+    return '—';
+  }
+  if (Math.abs(grade) < 0.05) {
+    return '0.0%';
+  }
+  return `${grade > 0 ? '+' : '\u2212'}${Math.abs(grade).toFixed(1)}%`;
+}
+
+/** Percent grade at each point, smoothed. Positive is uphill. */
+export function computeGrades(
   points: [number, number, number, number][],
-): string[] {
-  if (points.length < 2) return points.map(() => gradeToColor(0));
+): number[] {
+  if (points.length < 2) return points.map(() => 0);
 
   const rawGrades: number[] = [0];
   for (let i = 1; i < points.length; i++) {
@@ -96,7 +108,13 @@ export function computeGradeColors(
     smoothed.push(sum / count);
   }
 
-  return smoothed.map((g) => gradeToColor(g));
+  return smoothed;
+}
+
+export function computeGradeColors(
+  points: [number, number, number, number][],
+): string[] {
+  return computeGrades(points).map((grade) => gradeToColor(grade));
 }
 
 // Force strictly increasing offsets. Consecutive profile points can share a
@@ -522,9 +540,13 @@ export function ElevationProfile() {
     );
   }, []);
 
-  const gradeColors = useMemo(
-    () => (profile ? computeGradeColors(profile.profile) : []),
+  const grades = useMemo(
+    () => (profile ? computeGrades(profile.profile) : []),
     [profile],
+  );
+  const gradeColors = useMemo(
+    () => grades.map((grade) => gradeToColor(grade)),
+    [grades],
   );
 
   const hasProfile =
@@ -699,9 +721,16 @@ export function ElevationProfile() {
       </div>
 
       <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
-        {hoverIndex !== null
-          ? `${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft`
-          : '\u00A0'}
+        {hoverIndex !== null ? (
+          <>
+            {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
+            <span style={{ color: gradeColors[hoverIndex] }}>
+              {formatGrade(grades[hoverIndex])}
+            </span>
+          </>
+        ) : (
+          '\u00A0'
+        )}
       </div>
     </div>
   );
