@@ -1202,10 +1202,10 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
       ROUND_LINE_LIMIT['line-round-limit'],
     );
 
-    // For OSM-tileset-backed layers (nationwide source), restrict rendering to
-    // the union of curated way ids — otherwise the layer would draw every trail
-    // in the country. For name-based tilesets, just hide trails that overlap
-    // bike route layers.
+    // Restrict every source to the curated list. A source snapshot can contain
+    // unnamed, retired, or non-MTB lines alongside the trails represented in
+    // the sidebar; drawing those would create unselectable gray features. OSM
+    // layers match by way id, while imported GIS layers match by raw name.
     let filter: mapboxgl.FilterSpecification | null = null;
     if (cfg.matchBy === 'osmId') {
       const curatedIds = getMountainBikeTrails()
@@ -1216,15 +1216,30 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
         ['to-string', ['get', 'OSM_ID']],
         ['literal', curatedIds],
       ];
-    } else if (mountainBikeConfig.hiddenTrails.length > 0) {
-      filter = [
-        '!',
-        [
-          'in',
-          ['get', cfg.trailProp],
-          ['literal', mountainBikeConfig.hiddenTrails],
-        ],
+    } else {
+      const curatedNames = getMountainBikeTrails().map((trail) =>
+        cfg.toRawName(trail.trailName),
+      );
+      const curatedFilter: mapboxgl.FilterSpecification = [
+        'in',
+        ['get', cfg.trailProp],
+        ['literal', curatedNames],
       ];
+      filter =
+        mountainBikeConfig.hiddenTrails.length > 0
+          ? [
+              'all',
+              curatedFilter,
+              [
+                '!',
+                [
+                  'in',
+                  ['get', cfg.trailProp],
+                  ['literal', mountainBikeConfig.hiddenTrails],
+                ],
+              ],
+            ]
+          : curatedFilter;
     }
     if (filter) {
       for (const id of [cfg.layerId, ...sublayers.map((s) => s.id)]) {

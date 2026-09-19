@@ -61,9 +61,9 @@ async function fetchProfile(
  * sidebar shows; a static file cannot update itself and would keep drawing an
  * old line beside new numbers.
  *
- * The files are still the only source for a trail whose geometry isn't in a row
- * — Chattanooga's ~220 trails ride on a Mapbox tileset, and a deployment with
- * no DATABASE_URL has no rows at all — so a miss falls through to
+ * The files are still the only source for a trail whose database row has no
+ * measured profile, and a deployment with no DATABASE_URL has no rows at all,
+ * so a miss falls through to
  * `/data/elevation/<city>/<slug>.json` rather than leaving the pane blank.
  *
  * An abort is not a miss: it means the selection changed, and refetching the
@@ -197,6 +197,33 @@ function profileEdgeKey(
   return `${fromLng},${fromLat}:${toLng},${toLat}`;
 }
 
+function profileSegmentRanges(
+  points: [number, number, number, number][],
+  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
+): [number, number][] {
+  if (points.length === 0) return [];
+  const gapEdges = new Set(
+    gapDetails.map(({ from, to }) =>
+      profileEdgeKey(from[0], from[1], to[0], to[1]),
+    ),
+  );
+  const starts = [0];
+  for (let index = 1; index < points.length; index++) {
+    const previous = points[index - 1];
+    const current = points[index];
+    if (
+      current[0] <= previous[0] ||
+      gapEdges.has(
+        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
+      )
+    ) {
+      starts.push(index);
+    }
+  }
+  starts.push(points.length);
+  return starts.slice(0, -1).map((start, index) => [start, starts[index + 1]]);
+}
+
 // Force strictly increasing offsets. Consecutive profile points can share a
 // distance (multi-segment trails repeat distance at a seam), which would yield
 // duplicate gradient offsets — invalid as React keys and pointless zero-width
@@ -242,7 +269,11 @@ export function downsampleStops(
 const profileCache = new Map<string, ElevationProfileData>();
 
 function downloadGpx(profile: ElevationProfileData): void {
-  const gpx = buildProfileGpx(profile.trail, profile.profile);
+  const gpx = buildProfileGpx(
+    profile.trail,
+    profile.profile,
+    profile.geometryGapDetails,
+  );
   downloadFile(gpx, `${slugify(profile.trail)}.gpx`, 'application/gpx+xml');
 }
 
@@ -855,14 +886,31 @@ const ElevationSvg = React.memo(function ElevationSvg({
     PLOT_HEIGHT -
     ((e - profile.min) / yRange) * PLOT_HEIGHT;
 
-  const linePath = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? 'M' : 'L'}${xScale(p[0]).toFixed(1)} ${yScale(p[1]).toFixed(1)}`,
+  const baseline = CHART_HEIGHT - CHART_PADDING_BOTTOM;
+  const ranges = profileSegmentRanges(points, profile.geometryGapDetails);
+  const linePath = ranges
+    .map(([start, end]) =>
+      points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' '),
     )
     .join(' ');
-
-  const areaPath = `${linePath} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
+  const areaPath = ranges
+    .map(([start, end]) => {
+      const segmentLine = points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' ');
+      return `${segmentLine} L${xScale(points[end - 1][0]).toFixed(1)} ${baseline} L${xScale(points[start][0]).toFixed(1)} ${baseline} Z`;
+    })
+    .join(' ');
 
   const gradientStops = downsampleStops(points, gradeColors, maxDist);
 

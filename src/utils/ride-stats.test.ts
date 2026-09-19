@@ -573,6 +573,7 @@ describe('rideToElevationProfile', () => {
 
     expect(profile).not.toBeNull();
     expect(profile?.profile[5][0]).toBe(profile?.profile[4][0]);
+    expect(profile?.geometryGapDetails).toHaveLength(1);
   });
 
   it('preserves a segment break whose boundary point has no altitude', () => {

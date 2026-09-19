@@ -136,7 +136,7 @@ export interface UserAuthOperations {
 export interface Trail {
   id: number;
   /**
-   * The name everything else follows from. It is also the raw `Trail` value from the Mapbox tileset and the join key to rendered features — so on an existing trail, change it only if the upstream GIS data changed.
+   * The name everything else follows from. It is also the raw `Trail` value from the source GIS and the join key to rendered features — so on an existing trail, change it only if the upstream data changed.
    */
   trailName: string;
   city: 'chattanooga' | 'bend';

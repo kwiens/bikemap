@@ -100,8 +100,10 @@ What it changes:
 - **The editor is a way-picker**, which fits inside Payload as a custom field.
 - **Fixes go upstream.** A curator correcting a line edits OSM, and every
   consumer benefits — which suits this project's copyleft intent.
-- **It deletes a recurring failure.** Chattanooga renders from a Mapbox tileset
-  that keeps getting renamed upstream; unifying on OSM removes that.
+- **It deletes a recurring failure.** Chattanooga's permitted regional GIS
+  snapshot is imported into Payload instead of rendered from a custom Mapbox
+  tileset that kept getting renamed. Matching those imported rows to OSM ways
+  remains follow-up work.
 
 With geometry no longer the deciding factor, Payload's admin is worth more than
 what it costs, and "build our own" loses its case.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGpx, buildRideGpx, type GpxRoute } from './gpx';
+import { buildGpx, buildProfileGpx, buildRideGpx, type GpxRoute } from './gpx';
 
 function lineStringFeature(
   coords: [number, number][],
@@ -169,6 +169,30 @@ describe('buildRideGpx', () => {
         { lng: -121.3, lat: 44.001, altitude: 501, timestamp: 4000 },
       ],
     });
+
+    expect(gpx.match(/<trkseg>/g)).toHaveLength(2);
+    expect(gpx.match(/<\/trkseg>/g)).toHaveLength(2);
+  });
+});
+
+describe('buildProfileGpx', () => {
+  it('writes disconnected profile parts as separate track segments', () => {
+    const gpx = buildProfileGpx(
+      'Split Trail',
+      [
+        [0, 500, -85.3, 35],
+        [100, 510, -85.3, 35.001],
+        [100, 900, -84.3, 34],
+        [200, 910, -84.3, 34.001],
+      ],
+      [
+        {
+          feet: 1000,
+          from: [-85.3, 35.001],
+          to: [-84.3, 34],
+        },
+      ],
+    );
 
     expect(gpx.match(/<trkseg>/g)).toHaveLength(2);
     expect(gpx.match(/<\/trkseg>/g)).toHaveLength(2);

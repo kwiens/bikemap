@@ -6,9 +6,8 @@ Usage:
   2. Run this in the browser console to extract trail coordinates:
 
      const map = window.__map;
-     // MTB trails are attached at runtime under their own source — see
-     // MTN_BIKE_SOURCE_ID / MTN_BIKE_SOURCE_LAYER in mountain-bike-trails.ts.
-     const features = map.querySourceFeatures('mtb-trails-source', { sourceLayer: 'Chattanooga_Regional_Trails_4-dhs2zs' });
+     // Chattanooga's regional trails are attached as database-backed GeoJSON.
+     const features = map.querySourceFeatures('mtb-trails-source');
      const trails = {};
      for (const f of features) {
        const name = f.properties.Trail;

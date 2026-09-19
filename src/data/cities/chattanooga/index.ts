@@ -7,13 +7,12 @@ import {
   GODSEY_SOURCE_LAYER,
   MTN_BIKE_LAYER_ID,
   MTN_BIKE_SOURCE_ID,
-  MTN_BIKE_SOURCE_LAYER,
-  MTN_BIKE_TILESET_URL,
-  mountainBikeTrails,
+  mountainBikeTrails as baseMountainBikeTrails,
   regionFor,
 } from '@/data/mountain-bike-trails';
 import { TRAIL_METADATA } from '@/data/trail-metadata';
 import type { CityData } from '@/data/cities/types';
+import { applyChattanoogaMeasurements } from './measurements';
 
 const HIDDEN_TRAILS = [
   'Tennessee Riverwalk',
@@ -21,6 +20,8 @@ const HIDDEN_TRAILS = [
   'South Chick Greenway',
   'South Chickamauga Creek Greenway',
 ];
+
+const mountainBikeTrails = applyChattanoogaMeasurements(baseMountainBikeTrails);
 
 export const chattanoogaData: CityData = {
   cityId: 'chattanooga',
@@ -36,9 +37,13 @@ export const chattanoogaData: CityData = {
       {
         layerId: MTN_BIKE_LAYER_ID,
         sourceId: MTN_BIKE_SOURCE_ID,
-        tilesetUrl: MTN_BIKE_TILESET_URL,
-        sourceLayer: MTN_BIKE_SOURCE_LAYER,
+        // Served from Payload after `db:seed:chattanooga`. The permitted GIS
+        // snapshot used by the seed remains the fallback when the CMS is down
+        // or has not been seeded yet.
+        geojsonUrl: '/api/map/trails?city=chattanooga',
+        geojsonFallbackUrl: '/data/chattanooga/trails.geojson',
         trailProp: 'Trail',
+        matchBy: 'name',
       },
       {
         layerId: GODSEY_LAYER_ID,

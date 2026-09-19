@@ -361,8 +361,9 @@ a `const` binding would capture the checked-in data at import time and never see
 the database rows. `utils/map.ts` builds its `trailByName` / `osmIdOwner` lookups
 lazily for the same reason, and drops them when the list changes.
 
-Geometry follows the same path: Bend's curated layer points at
-`/api/map/trails?city=bend` instead of the static file.
+Geometry follows the same path: both cities point their regional curated layer
+at `/api/map/trails?city=<city>` and keep the GeoJSON used by the seed as a
+static fallback.
 
 ### Seeding
 
@@ -371,16 +372,17 @@ One script per city, because their pipelines genuinely differ:
 | | `pnpm db:seed:bend` | `pnpm db:seed:chattanooga` |
 |---|---|---|
 | Trails | 182 | 224 |
-| Geometry | `public/data/bend/trails.geojson`, by slug | none — its lines live in a Mapbox tileset |
+| Geometry | `public/data/bend/trails.geojson`, by slug | `public/data/chattanooga/trails.geojson`, by raw `Trail` name |
+| Prepared profile | none — run the backfill | imported from `public/data/elevation/chattanooga`, measured from the same GIS line |
 | `osmIds` | yes | none |
 | `geometrySource` | `osm` — rebuildable from OSM | `imported` — the rebuild hook skips it |
 
 (`edited` is the third value, set by the geometry editor rather than a seed.)
 
-**Only Bend is seeded by default.** Chattanooga doesn't fit the OSM-referenced
-model yet, so importing it would add several hundred rows the editor can't
-meaningfully work on. Run its script deliberately when you want them; whether
-its trails *can* be matched to OSM ways is the open question in ADR-0001.
+**Only Bend is seeded by default.** Run Chattanooga's seed deliberately: its
+geometry is an imported snapshot, not an OSM reference, so edits are maintained
+in Payload until those trails can be matched to OSM ways. That OSM alignment is
+still the open question in ADR-0001.
 
 Both take `--dry-run`, and both pass `context.skipOsmRebuild` — without it the
 `beforeChange` hook fires one Overpass request per row and gets the machine
@@ -404,10 +406,9 @@ In every no-rows case the client keeps the checked-in data, because
 `setMountainBikeTrails` ignores an empty list. Losing the CMS must not take the
 public map down with it.
 
-**One gap:** that fallback covers trail *metadata*, not *geometry*. With the
-database down, `/api/map/trails` returns 503 and Bend's curated lines won't
-draw, even though the sidebar still lists them. Restoring a static-file fallback
-for geometry is unfinished work.
+Geometry has the same protection: each database-backed curated source names the
+static GeoJSON used by its seed as `geojsonFallbackUrl`, and the loader uses it
+when the API fails or answers with no features.
 
 ### Cache
 
@@ -655,12 +656,10 @@ Three reasons, in order of how much they cost:
 3. **They come from a different pipeline** — see below.
 
 So a trail with no database row falls back to its checked-in file rather than
-losing its chart. That is Chattanooga today, whose geometry lives in a Mapbox
-tileset rather than the CMS, so it is `imported` and there is no line here to
-sample; it is also every deployment running with no database at all. Those
-trails keep the offline profile they have always had, and the day a trail gets a
-row, the measured profile takes over. Chattanooga gets its own CMS; the files
-stay on disk until then, and stay useful as the offline path afterwards.
+losing its chart. Chattanooga's generated profiles are measured from the same
+GIS geometry as the static map fallback, and the seed imports that profile with
+the line. Deployments with or without the database therefore show the same
+path, distance, and elevation statistics.
 
 `pnpm backfill:elevation` measures every trail that has geometry but no profile.
 It samples terrain only — the geometry is already in the row — so it needs no
@@ -791,8 +790,8 @@ the most time to diagnose, because nothing about it looks like a failure.
 - **Trails not in OSM.** Every trail must be mapped upstream first; brand-new or
   deliberately unmapped ones need an OSM edit or a hand-drawn line, which takes
   them out of the maintained-upstream model.
-- **Migrating Chattanooga's trails.** They have no `osmIds` at all — they render
-  from a Mapbox Studio tileset. Whether they can move to this model is an open
-  question worth testing with `scripts/align_bend_geometry.py` against
+- **Migrating Chattanooga's trails to OSM references.** Their permitted GIS
+  snapshot is imported into Payload, but the rows still have no `osmIds`.
+  Whether they can move from `imported` to the maintained-upstream model is an
+  open question worth testing with `scripts/align_bend_geometry.py` against
   Tennessee.
-- **Serving the map from the database.** Still reads `src/data/`.

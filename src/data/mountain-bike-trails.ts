@@ -2,13 +2,10 @@ import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type { OsmTrailDetails } from './osm-trails';
 import { slugify } from '@/utils/string';
 
-// MTB trails tileset. The Mapbox Studio style no longer references this
-// tileset, so we add it ourselves at runtime (see ensureMtnBikeSource).
-// MTN_BIKE_SOURCE_LAYER and MTN_BIKE_TILESET_URL must match the current
-// tileset on Mapbox Studio; the source/layer ids are our own.
+// Stable runtime ids for Chattanooga's database-backed regional trail layer.
+// The source is attached from GeoJSON in the city config; these ids stay fixed
+// so styling, selection, and hit-testing do not care where geometry came from.
 export const MTN_BIKE_LAYER_ID = 'mtb-trails';
-export const MTN_BIKE_SOURCE_LAYER = 'Chattanooga_Regional_Trails_4-dhs2zs';
-export const MTN_BIKE_TILESET_URL = 'mapbox://swuller.ccfw1cmr';
 export const MTN_BIKE_SOURCE_ID = 'mtb-trails-source';
 
 export const GODSEY_LAYER_ID = 'Godsey Ridge Trails';
@@ -17,7 +14,7 @@ export const GODSEY_SOURCE_LAYER = 'LineStrings';
 // Mountain Bike Trails Interface and Data
 export interface MountainBikeTrail {
   slug?: string; // Canonical source slug when it differs from the display name
-  trailName: string; // Trail property value from Mapbox features
+  trailName: string; // Trail property value from the curated source features
   displayName: string; // Human-friendly display name
   recArea: string; // Recreation area grouping
   // Sidebar heading this trail's area sits under. Set when the area came from
