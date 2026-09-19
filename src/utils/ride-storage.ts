@@ -30,7 +30,7 @@ function openDB(): Promise<IDBDatabase> {
       cachedDB = db;
       // Migration is best-effort: a failed transaction (corrupt legacy payload,
       // quota) must not leave this promise unsettled forever.
-      migrateFromLocalStorage(db)
+      void migrateFromLocalStorage(db)
         .catch(() => {})
         .then(() => resolve(db));
     };

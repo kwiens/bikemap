@@ -45,7 +45,7 @@ export function BikeRentalList({
     };
 
     if (show) {
-      fetchRentalLocations();
+      void fetchRentalLocations();
     }
   }, [show]);
 

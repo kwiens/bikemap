@@ -733,13 +733,22 @@ export function ElevationProfile() {
           <button
             type="button"
             className={ACTION_BTN_CLASS}
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              window.dispatchEvent(
-                new CustomEvent(MAP_EVENTS.TOAST, {
-                  detail: { message: 'Link copied' },
-                }),
-              );
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(window.location.href);
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.TOAST, {
+                    detail: { message: 'Link copied' },
+                  }),
+                );
+              } catch (error) {
+                console.error('Failed to copy link:', error);
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.TOAST, {
+                    detail: { message: 'Could not copy link' },
+                  }),
+                );
+              }
             }}
             title="Copy link"
           >

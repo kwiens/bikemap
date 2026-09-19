@@ -9,11 +9,17 @@ function createMockLock() {
     release: vi.fn(function (this: { released: boolean }) {
       this.released = true;
       for (const fn of listeners.release ?? []) fn();
+      return Promise.resolve();
     }),
     addEventListener: vi.fn(
       (event: string, fn: () => void) =>
         (listeners[event] = [...(listeners[event] ?? []), fn]),
     ),
+    removeEventListener: vi.fn((event: string, fn: () => void) => {
+      listeners[event] = (listeners[event] ?? []).filter(
+        (listener) => listener !== fn,
+      );
+    }),
     // Helper to simulate OS-initiated release (e.g. Android backgrounding)
     _simulateOSRelease() {
       this.released = true;

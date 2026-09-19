@@ -517,11 +517,15 @@ export function useRideRecording(
   }, [isRecording, cleanup, onNotify]);
 
   useEffect(() => {
-    loadInProgress().then((data) => {
-      if (data && data.points.length >= 2) {
-        setHasRecovery(true);
-      }
-    });
+    void loadInProgress()
+      .then((data) => {
+        if (data && data.points.length >= 2) {
+          setHasRecovery(true);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load ride recovery state:', error);
+      });
   }, []);
 
   const recoverRide = useCallback(async (): Promise<RecordedRide | null> => {
