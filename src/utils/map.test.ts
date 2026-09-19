@@ -14,6 +14,7 @@ import {
   loadCuratedGeojson,
   TRAIL_LAYERS,
   ensureOsmTrailsSource,
+  ensureInlineRoutes,
   setOsmTrailsVisible,
   OSM_BIKE_TRAIL_FILTER,
   OSM_POI_FILTER,
@@ -287,6 +288,56 @@ describe('Mapbox Geo Integration', () => {
           unselected: 0.2,
         });
       }).not.toThrow();
+    });
+  });
+
+  describe('ensureInlineRoutes', () => {
+    it('replaces a style-backed route with the configured GeoJSON source', () => {
+      const layers = new Map<string, mapboxgl.AnyLayer>([
+        [
+          'route1',
+          {
+            id: 'route1',
+            type: 'line',
+            source: 'composite',
+          } as mapboxgl.AnyLayer,
+        ],
+      ]);
+      const mockMap = {
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getStyle: vi.fn().mockReturnValue({
+          layers: [{ id: 'labels', type: 'symbol' }],
+        }),
+        getLayer: vi.fn((id: string) => layers.get(id)),
+        removeLayer: vi.fn((id: string) => layers.delete(id)),
+        addLayer: vi.fn((layer: mapboxgl.AnyLayer) => {
+          layers.set(layer.id, layer);
+        }),
+      } as unknown as mapboxgl.Map;
+      const route: BikeRoute = {
+        id: 'route1',
+        name: 'Route 1',
+        color: '#2563EB',
+        description: 'Test route',
+        icon: {} as IconDefinition,
+        defaultWidth: 8,
+        opacity: 1,
+        distance: 5,
+      };
+
+      ensureInlineRoutes(mockMap, '/data/routes.geojson', [route]);
+
+      expect(mockMap.removeLayer).toHaveBeenCalledWith('route1');
+      expect(mockMap.addSource).toHaveBeenCalledWith('inline-routes-source', {
+        type: 'geojson',
+        data: '/data/routes.geojson',
+      });
+      expect(mockMap.addLayer).toHaveBeenCalledTimes(3);
+      expect(layers.get('route1')).toMatchObject({
+        id: 'route1',
+        source: 'inline-routes-source',
+      });
     });
   });
 

@@ -865,6 +865,24 @@ export function ensureInlineRoutes(
     ensureSource(map, INLINE_ROUTES_SOURCE_ID, { type: 'geojson', data: url });
     const beforeId = firstSymbolLayerId(map);
     for (const route of routes) {
+      // A city may migrate a route out of the shared Studio style without
+      // changing its public layer id. Remove the style-backed copy first so
+      // the repository-owned GeoJSON becomes authoritative.
+      for (const layerId of [
+        `${route.id}-hit`,
+        route.id,
+        `${route.id}-casing`,
+      ]) {
+        const existing = map.getLayer(layerId) as mapboxgl.AnyLayer | undefined;
+        if (
+          existing &&
+          'source' in existing &&
+          existing.source !== INLINE_ROUTES_SOURCE_ID
+        ) {
+          map.removeLayer(layerId);
+        }
+      }
+
       const filter: mapboxgl.FilterSpecification = [
         '==',
         ['get', 'id'],
