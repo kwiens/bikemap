@@ -2,7 +2,11 @@
   "name": "bikemap",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
+  "packageManager": "pnpm@11.0.6",
+  "engines": {
+    "node": ">=22.18.0",
+    "pnpm": ">=11.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,8 +14,12 @@
     "test": "vitest",
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "pnpm typecheck && eslint . --max-warnings 0 && biome lint --error-on-warnings && biome format",
-    "lint:fix": "eslint . --fix --max-warnings 0 && biome lint --write --unsafe && biome format --write",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0 && pnpm format:fix",
+    "format": "biome format .",
+    "format:fix": "biome format --write .",
+    "knip": "knip --no-progress",
+    "check": "pnpm lint && pnpm format && pnpm typecheck && pnpm knip",
     "prepare": "husky"
   },
   "dependencies": {
@@ -28,7 +36,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.16",
+    "@biomejs/biome": "^2.5.14",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.9.1",
@@ -41,6 +49,7 @@
     "fake-indexeddb": "^6.2.5",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "knip": "^6.37.0",
     "lint-staged": "^17.0.7",
     "postcss": "^8.5.15",
     "sharp": "^0.34.5",
