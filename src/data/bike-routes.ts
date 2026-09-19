@@ -73,7 +73,7 @@ export const bikeRoutes: BikeRoute[] = [
     opacity: 1.0,
     distance: 9.9,
     hideArrows: true,
-    defaultBounds: [-85.260157, 35.042472, -85.212365, 35.089989],
+    defaultBounds: [-85.261317, 35.003829, -85.199618, 35.089994],
   },
   {
     id: 'cherokeeloop',

@@ -21,6 +21,7 @@
     "dev": "next dev",
     "build": "next build",
     "ci": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/ci-build.ts",
+    "data:routes": "node scripts/build_bike_routes.mjs",
     "start": "next start",
     "test": "vitest",
     "test:run": "vitest run",

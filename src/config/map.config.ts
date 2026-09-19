@@ -75,7 +75,11 @@ export interface MapConfig {
 // A fork therefore needs its own style: set NEXT_PUBLIC_MAPBOX_STYLE_URL.
 const DEFAULT_STYLE_URL = 'mapbox://styles/swuller/cm91zy289001p01qu4cdsdcgt';
 
-const styleUrl = process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL || DEFAULT_STYLE_URL;
+const configuredStyleUrl =
+  process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL || DEFAULT_STYLE_URL;
+const styleUrl = /[?&]optimize=/.test(configuredStyleUrl)
+  ? configuredStyleUrl
+  : `${configuredStyleUrl}${configuredStyleUrl.includes('?') ? '&' : '?'}optimize=true`;
 
 // Chattanooga configuration
 const chattanoogaConfig: MapConfig = {
