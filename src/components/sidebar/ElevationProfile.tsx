@@ -43,7 +43,23 @@ function profileSlug(trailName: string): string {
   const trail = mountainBikeTrails.find((item) => item.trailName === trailName);
   return trail ? slugForTrail(trail) : slugify(trailName);
 }
-const MAX_GRADIENT_STOPS = 200;
+
+/**
+ * Maximum color stops per chart.
+ *
+ * Long profiles were previously reduced to 200 stops, which flattened short
+ * pitches. Six hundred preserves much more of that detail while keeping the
+ * memoized SVG gradient reasonably small.
+ */
+const MAX_GRADIENT_STOPS = 600;
+
+/**
+ * Samples on either side of a point included in its smoothed grade.
+ *
+ * Terrain elevation needs some smoothing, but the old five-sample window hid
+ * short, steep sections. A three-sample window keeps those sections visible.
+ */
+const GRADE_SMOOTHING_WINDOW = 1;
 
 const CHART_SVG_CLASS =
   'w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none';
@@ -81,13 +97,12 @@ export function computeGradeColors(
   }
 
   const smoothed: number[] = [];
-  const WINDOW = 2;
   for (let i = 0; i < rawGrades.length; i++) {
     let sum = 0;
     let count = 0;
     for (
-      let j = Math.max(0, i - WINDOW);
-      j <= Math.min(rawGrades.length - 1, i + WINDOW);
+      let j = Math.max(0, i - GRADE_SMOOTHING_WINDOW);
+      j <= Math.min(rawGrades.length - 1, i + GRADE_SMOOTHING_WINDOW);
       j++
     ) {
       sum += rawGrades[j];
