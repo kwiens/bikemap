@@ -1,11 +1,11 @@
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
+import { mountainBikeConfig, trailMetadata } from '@/data/geo_data';
+import { regionOf } from '@/data/trail-region';
 import {
-  mountainBikeConfig,
-  mountainBikeTrails,
-  regionFor,
-  trailMetadata,
-} from '@/data/geo_data';
+  getMountainBikeTrails,
+  onMountainBikeTrailsChange,
+} from '@/data/trail-source';
 import { RATING_COLORS, UNRATED_COLOR } from '@/data/trail-metadata';
 import { STYLE_STRAY_LAYER_IDS } from '@/data/mapbox-style';
 import {
@@ -273,8 +273,7 @@ export function getAreaBounds(
   const bounds = new mapboxgl.LngLatBounds();
   let hasCoords = false;
   for (const trail of trails) {
-    if (trail.recArea !== areaName && regionFor(trail.recArea) !== areaName)
-      continue;
+    if (trail.recArea !== areaName && regionOf(trail) !== areaName) continue;
     const trailBounds = trail.bounds ?? toLngLatBounds(trail.defaultBounds);
     if (trailBounds) {
       bounds.extend(trailBounds);
@@ -293,6 +292,7 @@ interface TrailLayerConfig {
   sourceId?: string;
   tilesetUrl?: string;
   geojsonUrl?: string;
+  geojsonFallbackUrl?: string;
   matchBy?: 'name' | 'osmId';
   // Maps the raw feature-property value (e.g. tileset 'Trail' name) to the
   // line color. Falls back to UNRATED_COLOR for anything unlisted.
@@ -303,9 +303,28 @@ interface TrailLayerConfig {
   toRawName: (displayName: string) => string;
 }
 
+// These two lookups are derived from the trail list, which now arrives from the
+// database at render time rather than being fixed at import time. Building them
+// lazily (and dropping them when the list changes) keeps the derivation in one
+// place instead of forcing every caller to thread trails through.
+let trailByNameCache: Map<string, MountainBikeTrail> | null = null;
+let osmIdOwnerCache: Map<string, MountainBikeTrail> | null = null;
+
+onMountainBikeTrailsChange(() => {
+  trailByNameCache = null;
+  osmIdOwnerCache = null;
+});
+
 // Look up a curated trail by its trailName (used to resolve osmIds for layers
 // that match by OSM_ID rather than by name).
-const TRAIL_BY_NAME = new Map(mountainBikeTrails.map((t) => [t.trailName, t]));
+function trailByName(): Map<string, MountainBikeTrail> {
+  if (!trailByNameCache) {
+    trailByNameCache = new Map(
+      getMountainBikeTrails().map((t) => [t.trailName, t]),
+    );
+  }
+  return trailByNameCache;
+}
 
 // A single OSM way can be shared by several curated trails (named trails that
 // physically overlap on one way). Pick ONE deterministic owner per way id so
@@ -313,7 +332,11 @@ const TRAIL_BY_NAME = new Map(mountainBikeTrails.map((t) => [t.trailName, t]));
 // silent array-order tiebreak. Owner = most specific (fewest ways), then
 // shortest, then name, so a short trail that *is* the way wins over a long
 // trail merely passing through it.
-const OSM_ID_OWNER: Map<string, MountainBikeTrail> = (() => {
+function osmIdOwner(): Map<string, MountainBikeTrail> {
+  if (osmIdOwnerCache) {
+    return osmIdOwnerCache;
+  }
+
   const owner = new Map<string, MountainBikeTrail>();
   const moreSpecific = (
     a: MountainBikeTrail,
@@ -327,15 +350,17 @@ const OSM_ID_OWNER: Map<string, MountainBikeTrail> = (() => {
     if (ad !== bd) return ad < bd;
     return a.trailName < b.trailName;
   };
-  for (const trail of mountainBikeTrails) {
+  for (const trail of getMountainBikeTrails()) {
     for (const id of trail.osmIds ?? []) {
       const key = String(id);
       const cur = owner.get(key);
       if (!cur || moreSpecific(trail, cur)) owner.set(key, trail);
     }
   }
+
+  osmIdOwnerCache = owner;
   return owner;
-})();
+}
 
 // The key expression a layer's color/match expressions read. OSM_ID is numeric
 // in the tiles; coerce to string so literal id lists compare reliably.
@@ -351,7 +376,7 @@ function trailMatchExpr(
   trailName: string,
 ): mapboxgl.Expression {
   if (cfg.matchBy === 'osmId') {
-    const ids = (TRAIL_BY_NAME.get(trailName)?.osmIds ?? []).map(String);
+    const ids = (trailByName().get(trailName)?.osmIds ?? []).map(String);
     return ['in', ['to-string', ['get', 'OSM_ID']], ['literal', ids]];
   }
   return ['==', ['get', cfg.trailProp], cfg.toRawName(trailName)];
@@ -361,7 +386,7 @@ function trailMatchExpr(
 // Uses the same deterministic owner as the color expression so a clicked
 // segment's name and its color can never disagree.
 export function trailNameForOsmId(osmId: string | number): string | null {
-  return OSM_ID_OWNER.get(String(osmId))?.trailName ?? null;
+  return osmIdOwner().get(String(osmId))?.trailName ?? null;
 }
 
 // Boolean "does this feature belong to any of these trails?" expression.
@@ -399,7 +424,7 @@ function buildTrailLayerConfig(): TrailLayerConfig[] {
       // Color keyed by OSM_ID, using the deterministic per-way owner so a
       // shared way is colored as the same trail a click would select.
       colorMap = {};
-      for (const [id, trail] of OSM_ID_OWNER) colorMap[id] = trail.color;
+      for (const [id, trail] of osmIdOwner()) colorMap[id] = trail.color;
     } else if (hasMetadata) {
       colorMap = Object.fromEntries(
         Object.entries(metadata).map(([rawName, meta]) => [
@@ -409,7 +434,7 @@ function buildTrailLayerConfig(): TrailLayerConfig[] {
       );
     } else {
       colorMap = Object.fromEntries(
-        mountainBikeTrails.map((trail) => [trail.trailName, trail.color]),
+        getMountainBikeTrails().map((trail) => [trail.trailName, trail.color]),
       );
     }
     const displayToRaw = Object.fromEntries(
@@ -458,13 +483,33 @@ export function ensureMtnBikeSource(map: mapboxgl.Map): void {
     for (const cfg of TRAIL_LAYERS) {
       if (!cfg.sourceId || (!cfg.tilesetUrl && !cfg.geojsonUrl)) continue;
 
-      ensureSource(
-        map,
-        cfg.sourceId,
-        cfg.geojsonUrl
-          ? { type: 'geojson', data: cfg.geojsonUrl }
-          : { type: 'vector', url: cfg.tilesetUrl as string },
-      );
+      if (!map.getSource(cfg.sourceId)) {
+        const { geojsonFallbackUrl, geojsonUrl, sourceId } = cfg;
+        if (geojsonUrl && geojsonFallbackUrl) {
+          // Fetched here rather than handed to Mapbox, which has no answer to
+          // the URL failing. The source must exist before the layer below reads
+          // it, so it starts empty and is filled in when the fetch settles —
+          // deliberately not awaited, as the layers have to be added in this
+          // same synchronous style-load pass.
+          map.addSource(sourceId, {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+          });
+          void loadCuratedGeojson(
+            map,
+            sourceId,
+            geojsonUrl,
+            geojsonFallbackUrl,
+          );
+        } else {
+          map.addSource(
+            sourceId,
+            geojsonUrl
+              ? { type: 'geojson', data: geojsonUrl }
+              : { type: 'vector', url: cfg.tilesetUrl as string },
+          );
+        }
+      }
       addLayerOnce(map, {
         id: cfg.layerId,
         type: 'line',
@@ -480,6 +525,60 @@ export function ensureMtnBikeSource(map: mapboxgl.Map): void {
     }
   } catch (error) {
     console.error('Failed to attach MTB trail source/layer:', error);
+  }
+}
+
+/**
+ * Fills a curated trail source from its API, falling back to the static file
+ * the database was seeded from.
+ *
+ * The API is database-backed: with no `DATABASE_URL` or a database that is down
+ * it answers 503, and one that has never been seeded answers with an empty
+ * FeatureCollection. Both draw zero lines while the sidebar still lists every
+ * trail from the checked-in data, so clicking one zooms to blank basemap. An
+ * empty answer is therefore treated as a miss here — for a city configured with
+ * a fallback, "no trails" is not a state the map is meant to be able to reach.
+ */
+export async function loadCuratedGeojson(
+  map: mapboxgl.Map,
+  sourceId: string,
+  url: string,
+  fallbackUrl: string,
+): Promise<void> {
+  const primary = await fetchFeatureCollection(url);
+  const data = primary?.features.length
+    ? primary
+    : ((await fetchFeatureCollection(fallbackUrl)) ?? primary);
+
+  if (!data) {
+    console.error(
+      `No curated trail GeoJSON from ${url} or its fallback ${fallbackUrl}.`,
+    );
+    return;
+  }
+
+  const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
+  // The style can be swapped out from under an in-flight fetch, which takes the
+  // source with it.
+  if (source?.setData) {
+    source.setData(data);
+  }
+}
+
+async function fetchFeatureCollection(
+  url: string,
+): Promise<GeoJSON.FeatureCollection | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`Trail GeoJSON at ${url} returned ${response.status}.`);
+      return null;
+    }
+    const data = (await response.json()) as GeoJSON.FeatureCollection;
+    return Array.isArray(data?.features) ? data : null;
+  } catch (error) {
+    console.error(`Failed to load trail GeoJSON from ${url}:`, error);
+    return null;
   }
 }
 
@@ -563,7 +662,7 @@ export function ensureOsmTrailsSource(map: mapboxgl.Map): void {
 
     // Exclude source ways represented by curated trails so they aren't stroked
     // twice and curated clicks win over the nationwide hit layer.
-    const curatedIds = mountainBikeTrails
+    const curatedIds = getMountainBikeTrails()
       .flatMap((t) => t.osmIds ?? [])
       .map(String);
     const baseFilter: mapboxgl.FilterSpecification =
@@ -1109,7 +1208,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
     // bike route layers.
     let filter: mapboxgl.FilterSpecification | null = null;
     if (cfg.matchBy === 'osmId') {
-      const curatedIds = mountainBikeTrails
+      const curatedIds = getMountainBikeTrails()
         .flatMap((t) => t.osmIds ?? [])
         .map(String);
       filter = [
@@ -1196,7 +1295,7 @@ export function highlightMtnBikeArea(
   areaName: string,
 ): void {
   const matchedTrails = trails.filter(
-    (t) => t.recArea === areaName || regionFor(t.recArea) === areaName,
+    (t) => t.recArea === areaName || regionOf(t) === areaName,
   );
   if (matchedTrails.length === 0) return;
 

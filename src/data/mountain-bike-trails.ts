@@ -20,6 +20,10 @@ export interface MountainBikeTrail {
   trailName: string; // Trail property value from Mapbox features
   displayName: string; // Human-friendly display name
   recArea: string; // Recreation area grouping
+  // Sidebar heading this trail's area sits under. Set when the area came from
+  // the database and carries one; otherwise `regionFor` derives it from the
+  // built-in REGION_MAP.
+  region?: string;
   rating: string; // "easy" | "intermediate" | "advanced" | "expert" | ""
   color: string; // Display color
   icon: IconDefinition;

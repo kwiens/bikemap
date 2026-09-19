@@ -32,11 +32,18 @@ console says so explicitly.
 2. Create a **public access token** at
    <https://account.mapbox.com/access-tokens/> (starts with `pk.`). Scope it to
    your domains.
-3. Put the token in `.env.local`:
+3. Put the token **and your style URL** in `.env.local`:
    ```
    NEXT_PUBLIC_MAPBOX_TOKEN=pk.your_token_here
+   NEXT_PUBLIC_MAPBOX_STYLE_URL=mapbox://styles/<you>/<your-style-id>
    ```
-   Set the same variable in your host's environment for production.
+   Set both in your host's environment for production.
+
+> **You must set your own style.** The default belongs to the upstream Mapbox
+> account, and its `composite` source mixes Mapbox's tilesets with private
+> `swuller.*` ones. With any other token that composite 404s and Mapbox drops
+> the **whole basemap** with no visible error — you get trails and overlays
+> floating on a blank background. If your map looks like that, this is why.
 
 ## 3. Branding — `src/config/site.config.ts`
 
@@ -56,7 +63,7 @@ Brand colors also live in `tailwind.config.ts` as `app-primary` / `app-secondary
 
 | Field | What to set |
 |---|---|
-| `mapbox.styleUrl` | Your Mapbox style URL from step 2 |
+| `mapbox.styleUrl` | Comes from `NEXT_PUBLIC_MAPBOX_STYLE_URL` (step 2) — no code change needed |
 | `defaultView` | `center` `[lng, lat]`, `zoom`, `pitch`, `bearing` — where the map opens |
 | `gbfs.baseUrl` | Your city's [GBFS](https://gbfs.org/) feed, or remove the bike-share layer if there's none |
 | `region.name` / `region.displayName` | Your region's slug and display name |
@@ -129,13 +136,57 @@ Replace with your own:
 pnpm build      # verify the production build locally
 ```
 
-On **Vercel**: import the repo, and add `NEXT_PUBLIC_MAPBOX_TOKEN` under
-Settings → Environment Variables for **Production, Preview, and Development**.
-Any Node host works — `pnpm build` then `pnpm start`.
+On **Vercel**, one project can serve every city and one Neon database can hold
+all of their content. Rows are scoped by the required `city` field; splitting a
+city out later is a data move and environment-variable change, not a different
+application schema.
+
+```bash
+# Link the repository to its Vercel project.
+vercel link
+
+# Provision one shared Neon resource in the same region as the app. Payload
+# owns admin authentication, so Neon Auth is not needed.
+vercel integration add neon \
+  --name bikemap-global \
+  --plan free_v3 \
+  --metadata region=iad1 \
+  --metadata auth=false
+
+# Pull the pooled runtime URL and direct migration URL locally.
+vercel env pull .env.local --yes
+```
+
+Set `PAYLOAD_SECRET`, `NEXT_PUBLIC_MAPBOX_TOKEN`,
+`NEXT_PUBLIC_MAPBOX_STYLE_URL`, `NEXT_PUBLIC_CITY_ID`, and
+`NEXT_PUBLIC_CITY_HOST_MAP` for **Production, Preview, and Development**. The
+Neon integration supplies `DATABASE_URL` (pooled application traffic) and
+`DATABASE_URL_UNPOOLED` (schema migrations).
+
+`vercel.ts` runs committed Payload migrations before each Vercel build when a
+database is connected. Neon gives preview deployments isolated database
+branches, so a PR migration does not mutate the production branch. A
+database-free fork skips migrations and still builds the checked-in fallback
+map.
+
+Seed every city into the same fresh database after the initial migration. Both
+commands are idempotent and match existing rows on `(trailName, city)`:
+
+```bash
+pnpm db:migrate
+pnpm db:seed:chattanooga
+pnpm db:seed:bend
+```
+
+Any Node host also works: set the same variables, run `pnpm run ci`, then
+`pnpm start`.
 
 ## Checklist
 
 - [ ] `.env.local` has `NEXT_PUBLIC_MAPBOX_TOKEN`
+- [ ] Vercel has one shared Neon resource with pooled and unpooled URLs
+- [ ] `PAYLOAD_SECRET` is set in every deployed environment
+- [ ] Payload migrations and both city seeds have completed
 - [ ] `src/config/site.config.ts` — name, description, URL, colors, storage prefix
 - [ ] `src/config/map.config.ts` — style URL, default view, GBFS, region
 - [ ] `src/data/*` — routes, trails, shops, POIs ([DATA.md](DATA.md))
