@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.0.6",
   "engines": {
-    "node": ">=22.18.0",
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0",
     "pnpm": ">=11.0.0"
   },
   "pnpm": {
@@ -78,6 +78,7 @@
     "@types/react-dom": "19.3.0",
     "@vercel/config": "0.7.1",
     "cross-env": "10.1.0",
+    "esbuild": "0.28.2",
     "eslint": "10.11.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "fake-indexeddb": "6.2.5",
