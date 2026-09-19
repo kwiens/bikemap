@@ -161,13 +161,14 @@ export function calculateRouteBounds(
   const sourceId = layer.source;
   const sourceLayer = layer['source-layer'];
 
-  if (!sourceId || !sourceLayer) {
+  if (!sourceId) {
     return null;
   }
 
-  // Query all features in this layer
+  const filter = 'filter' in layer ? layer.filter : undefined;
   const features = map.querySourceFeatures(sourceId, {
-    sourceLayer: sourceLayer,
+    ...(sourceLayer ? { sourceLayer } : {}),
+    ...(filter ? { filter } : {}),
   });
 
   if (features.length === 0) {

@@ -428,6 +428,44 @@ describe('Mapbox Geo Integration', () => {
       expect(bounds).not.toBeNull();
     });
 
+    it('filters shared GeoJSON sources to the requested inline route', () => {
+      const mockMap = {
+        querySourceFeatures: vi.fn().mockReturnValue([
+          {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-85.3, 35.0],
+                [-85.31, 35.01],
+              ],
+            },
+          },
+        ]),
+      } as unknown as mapboxgl.Map;
+      const mockRoute = {
+        id: 'test-route',
+      } as BikeRoute;
+      const filter: mapboxgl.FilterSpecification = [
+        '==',
+        ['get', 'id'],
+        'test-route',
+      ];
+      const mockLayer = {
+        id: 'test-route',
+        type: 'line',
+        source: 'inline-routes-source',
+        filter,
+      } as mapboxgl.AnyLayer;
+
+      expect(
+        calculateRouteBounds(mockMap, mockRoute, mockLayer),
+      ).not.toBeNull();
+      expect(mockMap.querySourceFeatures).toHaveBeenCalledWith(
+        'inline-routes-source',
+        { filter },
+      );
+    });
+
     it('should return null when layer has no source', () => {
       const mockMap = {} as mapboxgl.Map;
 

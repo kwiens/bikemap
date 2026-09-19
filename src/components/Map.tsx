@@ -1017,9 +1017,14 @@ const MapboxMap = memo(function MapboxMap() {
             ensureInlineRoutes(newMap, bikeRoutesUrl, inlineRoutes);
           }
 
+          // Inline route setup can replace style-backed layers while retaining
+          // their public ids. Read the current style so subsequent styling,
+          // bounds, and hit-target setup use the authoritative layer objects.
+          const routeLayers = newMap.getStyle().layers;
+
           // Set initial line width for specific layers
-          if (style?.layers) {
-            style.layers.forEach((layer) => {
+          if (routeLayers) {
+            routeLayers.forEach((layer) => {
               if (layer.type === 'line') {
                 const route = bikeRoutes.find((r) => r.id === layer.id);
                 if (route) {
@@ -1083,7 +1088,7 @@ const MapboxMap = memo(function MapboxMap() {
           // easier on phones — same pattern used for mountain bike trails.
           bikeRoutes.forEach((route) => {
             const hitId = `${route.id}-hit`;
-            const routeLayer = style?.layers?.find((l) => l.id === route.id) as
+            const routeLayer = routeLayers?.find((l) => l.id === route.id) as
               | { source?: string; 'source-layer'?: string; filter?: unknown }
               | undefined;
 
