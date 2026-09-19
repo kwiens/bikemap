@@ -75,25 +75,30 @@ file is a typed array — see **[DATA.md](DATA.md)** for the full field-by-field
 contract of `BikeRoute`, `MountainBikeTrail`, `BikeResource`, `MapFeature`, and
 `LocalResource`.
 
-## 6. Routes & trails in Mapbox Studio
+## 6. Routes and curated trails
 
 - **Routes** — draw/upload each route as a line layer in your style, then set
   each `BikeRoute.id` in `bike-routes.ts` to that layer's ID.
-- **Trails** — upload your mountain bike trail GIS data as a Mapbox **tileset**,
-  then set `MTN_BIKE_TILESET_URL` and `MTN_BIKE_SOURCE_LAYER` in
-  `src/data/mountain-bike-trails.ts`. The app attaches this tileset at runtime
-  (`ensureMtnBikeSource`), so it does not need to be in the Studio style.
-  Each `MountainBikeTrail.trailName` must match the tileset's `Trail` feature
-  property. See `AGENTS.md` for DevTools snippets to discover layer/tileset
-  names after a GIS re-upload.
-  - **Keep the elevation script in sync:** `scripts/add_trail_elevation.py`
-    has its own `MVT_TILESET` constant. If you use the pipeline in step 7,
-    point it at the **same** tileset as `MTN_BIKE_TILESET_URL`.
+- **Trails** — prepare a WGS84 GeoJSON file with one `MultiLineString` feature
+  per curated trail, seed it into Payload, and configure the city layer with
+  `/api/map/trails?city=<city>` plus the static file as
+  `geojsonFallbackUrl`. Each `MountainBikeTrail.trailName` must match the
+  feature's `Trail` property.
+
+Chattanooga's source is an ESRI shapefile; its checked-in converter performs
+the reprojection and grouping:
+
+```bash
+python scripts/prepare_chattanooga_trails.py /path/to/Chattanooga_Regional_Trails_4.shp
+pnpm db:seed:chattanooga
+```
 
 ## 7. Trail elevation pipeline (optional)
 
-Only if you have mountain bike trails. Generates per-trail elevation profiles
-and bounds from your tileset + Mapbox Terrain-RGB.
+Only if you have mountain bike trails. The legacy Chattanooga script generates
+per-trail elevation profiles and bounds from the historical vector tileset plus
+Mapbox Terrain-RGB; new database-backed imports can instead use
+`pnpm backfill:elevation` after seeding.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate

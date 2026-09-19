@@ -10,3 +10,4 @@ pnpm-lock.yaml                          linguist-generated=true
 src/payload-types.ts                    linguist-generated=true
 src/migrations/*.json                   linguist-generated=true
 src/app/(payload)/admin/importMap.js    linguist-generated=true
+public/data/chattanooga/trails.geojson linguist-generated=true

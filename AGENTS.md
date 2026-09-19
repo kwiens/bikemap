@@ -142,73 +142,54 @@ Routes are styled via Mapbox Studio (referenced by layer IDs like `riverwalk-loo
 
 ### Mountain Bike Trails
 
-The MTB trails layer contains 220+ trails identified by the `Trail` feature property. The editable trail array (`mountainBikeTrails`) lives in `src/data/mountain-bike-trails.data.ts` with precalculated `defaultBounds` for zoom-to-fit and `distance` in miles; the wrapper `src/data/mountain-bike-trails.ts` holds the types, the `MTN_BIKE_*` layer-id constants, and `REGION_MAP`/`regionFor`, and re-exports the array. Both are re-exported from `src/data/geo_data.ts`. Code uses `MTN_BIKE_*` constants and the `mountainBikeTrails` array everywhere — names like "SORBA" only appear when referring to the upstream GIS dataset.
+The MTB trails layer contains 220+ trails identified by the `Trail` feature
+property. The checked-in fallback metadata (`mountainBikeTrails`) lives in
+`src/data/mountain-bike-trails.data.ts`; Payload replaces it at runtime after a
+city is seeded.
 
-#### The Mapbox style ≠ the MTB trails tileset
+#### Chattanooga regional GIS → Payload
 
-The Mapbox Studio style does **not** include the MTB trails tileset. We attach it ourselves at runtime via `ensureMtnBikeSource(map)` (in `utils/map.ts`), called during `style.load` before `initMtnBikeColors` / `initMtnBikeLayers`. The source is added as `MTN_BIKE_SOURCE_ID` pointing at `MTN_BIKE_TILESET_URL` (currently `mapbox://swuller.ccfw1cmr`), with the main `MTN_BIKE_LAYER_ID` layer attached on top. Everything downstream (color expression, casing/glow/hit, filter, opacity, selection, hit-testing) assumes the layer is named `MTN_BIKE_LAYER_ID` regardless of how it was attached.
+Chattanooga's main regional layer no longer renders from a custom Mapbox
+tileset. Its permitted `Chattanooga_Regional_Trails_4` shapefile is converted
+from NAD83 / UTM zone 16N to WGS84 GeoJSON by
+`scripts/prepare_chattanooga_trails.py`:
 
-The Godsey Ridge trails layer (`Godsey Ridge Trails`, source-layer `LineStrings`) *is* baked into the Mapbox Studio style, so it doesn't need a runtime `addSource` — only the casing/glow/hit sublayers are added.
-
-#### When a tileset gets renamed
-
-GIS layers in Mapbox Studio get re-uploaded and renamed periodically. When that happens you'll see one of:
-
-- The `MTN_BIKE_LAYER_ID` layer is missing from `getStyle().layers` → **this is normal**, the layer is attached at runtime. Don't conclude it was removed/renamed without first checking whether `ensureMtnBikeSource` ran successfully (look for `map.getSource(MTN_BIKE_SOURCE_ID)` and `map.getLayer(MTN_BIKE_LAYER_ID)` after style load).
-- The `Trail` property values in the rendered features look unfamiliar (e.g. greenways or OHV trails instead of MTB trails) → **the underlying tileset was swapped**. Don't auto-update `MTN_BIKE_TILESET_URL` / `MTN_BIKE_SOURCE_LAYER` to whatever new tileset shows up in the style — the new tileset is often a different curated dataset (e.g. TPL paved greenways), not a rename. Verify the tileset's `vector_layers` and feature properties (`rating`, `Rec_Area`, `Trail`) match what the app expects before pointing the constants at it.
-- The constants `MTN_BIKE_SOURCE_LAYER` (in `mountain-bike-trails.ts`) and `MVT_TILESET` (in `scripts/add_trail_elevation.py`) need to stay in sync with the **same** MTB tileset — both reference it independently.
-
-To confirm a tileset is the right MTB one:
 ```bash
-curl -s "https://api.mapbox.com/v4/<TILESET_ID>.json?access_token=<TOKEN>" \
-  | jq '.vector_layers[0].fields | keys'
+python -m venv .venv && source .venv/bin/activate
+pip install -r scripts/requirements.txt
+python scripts/prepare_chattanooga_trails.py /path/to/Chattanooga_Regional_Trails_4.shp
+pnpm db:seed:chattanooga
 ```
-Expect to see `Trail`, `Rec_Area`, `rating`, `Use_` among the fields.
 
-When trails are added or modified in the Mapbox tileset, run `scripts/add_trail_bounds.py` to recalculate bounding boxes and distances. The script takes raw coordinate data extracted from the Mapbox layer via Chrome DevTools console (see the script header for the extraction snippet) and computes both `defaultBounds` and `distance` fields.
+The converter writes `public/data/chattanooga/trails.geojson`, grouping source
+pieces into one `MultiLineString` per raw `Trail` value. The seed matches those
+names against the 224 curated rows and stores geometry as
+`geometrySource: 'imported'`; 218 match. The six Godsey Ridge trails remain in
+the separate `Godsey Ridge Trails` style layer because that geometry was not in
+the regional shapefile.
 
-#### Debugging Trails in Chrome DevTools
+`ensureMtnBikeSource(map)` attaches `MTN_BIKE_SOURCE_ID` as GeoJSON, reads
+`/api/map/trails?city=chattanooga`, and falls back to the checked-in GeoJSON if
+the database is unavailable or unseeded. `initMtnBikeLayers` filters every
+name-based source to the curated trail list, so retired/non-MTB source features
+cannot appear as unselectable gray lines.
 
-The map instance is exposed as `window.__map`. Use it to inspect layers and query trail features.
+The Godsey Ridge layer (`Godsey Ridge Trails`, source-layer `LineStrings`) is
+still baked into the Mapbox Studio style, so only its casing/glow/hit sublayers
+are added at runtime.
 
-**Find the current source layer name** (needed when GIS data is re-uploaded):
+To inspect the database-backed layer in Chrome DevTools:
+
 ```js
-// MTB trails are attached at runtime — confirm the source + layer are in place
 __map.getSource('mtb-trails-source')
 __map.getLayer('mtb-trails')
-
-// What source-layer is the runtime-attached MTB layer reading?
-__map.getStyle().layers.find(l => l.id === 'mtb-trails')?.['source-layer']
-
-// List all source-layers in the (Mapbox-Studio-managed) composite source — useful
-// when checking what other layers are in the style, but the MTB layer won't appear here
-[...new Set(__map.getStyle().layers.filter(l => l.source === 'composite').map(l => l['source-layer']))].sort()
+[...new Set(__map.querySourceFeatures('mtb-trails-source')
+  .map(f => f.properties.Trail))].sort()
 ```
 
-**Find which tileset contains a source layer** (needed to update `MVT_TILESET` in the elevation script):
-```js
-// Fetch the current style to get tileset IDs
-fetch('https://api.mapbox.com/styles/v1/swuller/cm91zy289001p01qu4cdsdcgt?access_token=<TOKEN>')
-  .then(r => r.json()).then(d => console.log(d.sources.composite.url))
-
-// Then query each swuller.* tileset to find the one matching the source layer
-const token = '<TOKEN from map.config.ts>';
-['id1','id2','...'].forEach(id =>
-  fetch(`https://api.mapbox.com/v4/swuller.${id}.json?access_token=${token}`)
-    .then(r=>r.json()).then(d=>console.log(id, d.vector_layers?.map(l=>l.id))))
-```
-
-**List all trail names** (pan to the area first — `querySourceFeatures` only returns loaded tiles). The MTB layer has its own source (`mtb-trails-source`), not `composite`:
-```js
-[...new Set(__map.querySourceFeatures('mtb-trails-source',
-  {sourceLayer: '<CURRENT_SOURCE_LAYER>'}).map(f => f.properties.Trail))].sort()
-```
-
-**Inspect a specific trail's properties**:
-```js
-__map.querySourceFeatures('mtb-trails-source', {sourceLayer: '<CURRENT_SOURCE_LAYER>'})
-  .filter(f => f.properties.Trail === 'Trail Name').map(f => f.properties)
-```
+The older elevation-generation script still reads the historical Mapbox vector
+tileset as an offline input. That constant is local to
+`scripts/add_trail_elevation.py`; it is no longer a runtime map dependency.
 
 #### Generating Elevation Profiles
 
@@ -445,8 +426,8 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
 - `src/payload/collections/{TrailRatings,TrailKinds}.ts` — the difficulty and
   type vocabularies, also curated. See "Rating and kind are data" below
 - `scripts/seed/{bend,chattanooga}.ts` — one script per city; their pipelines
-  differ (Bend has osmIds + geometry, Chattanooga has neither), and **only Bend
-  is seeded by default**
+  differ (Bend has OSM-referenced geometry; Chattanooga imports an archived GIS
+  snapshot without osmIds), and **only Bend is seeded by default**
 
 **How the public map gets its trails.** `src/app/(frontend)/page.tsx` is a
 server component: it calls `getCityTrails()` (Payload's Local API — a typed
@@ -474,7 +455,7 @@ Things to know before touching it:
   The pane fetches `/api/map/elevation/<slug>?city=<city>`, serving the profile
   measured on the trail's last save. A miss falls back to
   `public/data/elevation/<city>/<slug>.json`, which keeps charts working for
-  Chattanooga's tileset trails and deployments without a CMS. Keep the city in
+  unseeded Chattanooga deployments and installations without a CMS. Keep the city in
   both lookups so same-named trails cannot collide. `pnpm backfill:elevation`
   measures trails that have geometry but no profile, without touching Overpass.
 - **`computeElevation`'s spike filter needs a run cap.** It replaces readings
