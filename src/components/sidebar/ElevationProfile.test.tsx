@@ -68,6 +68,18 @@ describe('computeGradeColors', () => {
     expect(result).toHaveLength(points.length);
   });
 
+  it('keeps a short pitch visible in the middle of a profile', () => {
+    const points: [number, number, number, number][] = [
+      [0, 100, -85, 35],
+      [100, 100, -85, 35],
+      [200, 130, -85, 35],
+      [300, 130, -85, 35],
+      [400, 130, -85, 35],
+    ];
+
+    expect(computeGradeColors(points)[2]).toBe(gradeToColor(10));
+  });
+
   it('returns all valid rgb() strings', () => {
     const points: [number, number, number, number][] = [
       [0, 100, -85, 35],
@@ -99,12 +111,12 @@ describe('downsampleStops', () => {
     expect(stops).toHaveLength(50);
   });
 
-  it('returns exactly 200 stops when count is > 200', () => {
-    const points = makePoints(500);
+  it('caps the stop count on a profile longer than the cap', () => {
+    const points = makePoints(700);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
     const stops = downsampleStops(points, colors, maxDist);
-    expect(stops).toHaveLength(200);
+    expect(stops).toHaveLength(600);
   });
 
   it('first offset is 0 and last is approximately 1', () => {
