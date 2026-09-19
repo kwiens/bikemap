@@ -1,0 +1,9 @@
+# pnpm 11 requires an explicit decision for dependency build scripts.
+allowBuilds:
+  # Biome and Sharp are direct development dependencies with native binaries.
+  '@biomejs/biome': true
+  sharp: true
+  # Both packages publish platform-specific binaries, so their install scripts
+  # are unnecessary for this project.
+  esbuild: false
+  unrs-resolver: false

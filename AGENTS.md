@@ -9,8 +9,8 @@ pnpm dev          # Start development server at localhost:3000
 pnpm build        # Build for production
 pnpm test         # Run tests in watch mode
 pnpm test:run     # Run tests once
-pnpm lint         # Run ESLint + Biome lint + Biome format checks
-pnpm lint:fix     # Auto-fix linting/formatting issues
+pnpm check        # Run ESLint, Biome formatting, types, and Knip
+pnpm lint:fix     # Auto-fix ESLint and formatting issues
 ```
 
 ## Git & GitHub
@@ -26,6 +26,10 @@ gh pr list                                          # List open PRs
 gh issue list                                       # List issues
 gh issue view [number]                              # View issue details
 ```
+
+GitHub posts written by an agent start with `🤖` alone on the first line. This
+applies to issue and pull-request bodies, comments, reviews, and review-thread
+replies. Do not add the marker to commits, titles, or file contents.
 
 ## Architecture
 
