@@ -8,6 +8,7 @@ import { TrailKinds } from './payload/collections/TrailKinds';
 import { TrailRatings } from './payload/collections/TrailRatings';
 import { Trails } from './payload/collections/Trails';
 import { Users } from './payload/collections/Users';
+import { resolveDatabaseUrl } from './payload/database';
 import { Theme } from './payload/globals/Theme';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,7 +55,7 @@ export default buildConfig({
   },
   db: postgresAdapter({
     pool: {
-      connectionString: process.env.DATABASE_URL || '',
+      connectionString: resolveDatabaseUrl(),
       ssl: process.env.DATABASE_SSL === 'disable' ? false : undefined,
     },
     // Schema changes go through committed migrations, not dev push.
