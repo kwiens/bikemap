@@ -67,7 +67,10 @@ const BASE_BACKOFF_MS = 2000;
  */
 const MAX_BACKOFF_MS = 30_000;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 /**
  * Retry-After as milliseconds, or null when it can't be read as delay-seconds.

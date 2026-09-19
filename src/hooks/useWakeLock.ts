@@ -15,6 +15,10 @@ export function useWakeLock(active: boolean) {
 
     let cancelled = false;
     let reacquireTimer: ReturnType<typeof setTimeout> | null = null;
+    let releaseListener: {
+      lock: WakeLockSentinel;
+      handleRelease: () => void;
+    } | null = null;
 
     function acquire() {
       if (cancelled) return;
@@ -25,11 +29,12 @@ export function useWakeLock(active: boolean) {
         .request('screen')
         .then((lock) => {
           if (cancelled) {
-            lock.release();
+            void lock.release().catch(() => {});
             return;
           }
           lockRef.current = lock;
-          lock.addEventListener('release', () => {
+          const handleRelease = () => {
+            releaseListener = null;
             if (lockRef.current === lock) {
               lockRef.current = null;
               // OS may silently release the lock (e.g. Android battery
@@ -39,7 +44,12 @@ export function useWakeLock(active: boolean) {
                 reacquireTimer = setTimeout(acquire, 1000);
               }
             }
-          });
+          };
+          releaseListener = { lock, handleRelease };
+          // Removed through releaseListener in the effect cleanup; the rule
+          // cannot follow a listener registered inside this promise callback.
+          // eslint-disable-next-line @eslint-react/web-api-no-leaked-event-listener
+          lock.addEventListener('release', handleRelease, { once: true });
         })
         .catch(() => {});
     }
@@ -57,8 +67,15 @@ export function useWakeLock(active: boolean) {
       cancelled = true;
       if (reacquireTimer) clearTimeout(reacquireTimer);
       document.removeEventListener('visibilitychange', handleVisibility);
+      if (releaseListener) {
+        releaseListener.lock.removeEventListener(
+          'release',
+          releaseListener.handleRelease,
+        );
+        releaseListener = null;
+      }
       if (lockRef.current) {
-        lockRef.current.release();
+        void lockRef.current.release().catch(() => {});
         lockRef.current = null;
       }
     };

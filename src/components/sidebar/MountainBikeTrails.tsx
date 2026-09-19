@@ -141,9 +141,11 @@ export function MountainBikeTrails({
   onAreaSelect,
 }: MountainBikeTrailsProps) {
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(
-    new Set(),
+    () => new Set(),
   );
-  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
+  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 

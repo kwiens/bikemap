@@ -8,6 +8,8 @@ interface UseMapResizeOptions {
 
 export function useMapResize({ map }: UseMapResizeOptions) {
   useEffect(() => {
+    let sidebarResizeTimer: ReturnType<typeof setTimeout> | null = null;
+
     const handleResize = () => {
       if (map.current) {
         map.current.resize();
@@ -16,7 +18,8 @@ export function useMapResize({ map }: UseMapResizeOptions) {
 
     const handleSidebarToggle = () => {
       // Delay to wait for sidebar transition
-      setTimeout(() => {
+      if (sidebarResizeTimer) clearTimeout(sidebarResizeTimer);
+      sidebarResizeTimer = setTimeout(() => {
         if (map.current) {
           map.current.resize();
         }
@@ -27,6 +30,7 @@ export function useMapResize({ map }: UseMapResizeOptions) {
     window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
 
     return () => {
+      if (sidebarResizeTimer) clearTimeout(sidebarResizeTimer);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener(
         MAP_EVENTS.SIDEBAR_TOGGLE,

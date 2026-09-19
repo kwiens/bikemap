@@ -1469,7 +1469,7 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
     // unnamed, retired, or non-MTB lines alongside the trails represented in
     // the sidebar; drawing those would create unselectable gray features. OSM
     // layers match by way id, while imported GIS layers match by raw name.
-    let filter: mapboxgl.FilterSpecification | null = null;
+    let filter: mapboxgl.FilterSpecification;
     if (cfg.matchBy === 'osmId') {
       const curatedIds = getMountainBikeTrails()
         .flatMap((t) => t.osmIds ?? [])
@@ -1504,11 +1504,9 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
             ]
           : curatedFilter;
     }
-    if (filter) {
-      for (const id of [cfg.layerId, ...sublayers.map((s) => s.id)]) {
-        if (map.getLayer(id)) {
-          map.setFilter(id, filter);
-        }
+    for (const id of [cfg.layerId, ...sublayers.map((s) => s.id)]) {
+      if (map.getLayer(id)) {
+        map.setFilter(id, filter);
       }
     }
   }

@@ -950,6 +950,18 @@ const MapboxMap = memo(function MapboxMap() {
       return;
     }
 
+    let compassButton: Element | null = null;
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleCompassButtonClick = () => {
+      if (compassCleanup.current) {
+        compassCleanup.current();
+        compassCleanup.current = null;
+      }
+      compassHeading.current = null;
+      setCompassMode(false);
+    };
+
     // Initialize map
     if (mapContainer.current) {
       const initializeMap = async () => {
@@ -1288,22 +1300,13 @@ const MapboxMap = memo(function MapboxMap() {
 
           // Tapping the Mapbox north-arrow compass button should exit
           // compass (heading-up) mode so the bearing stays north.
-          const compassBtn = newMap
+          compassButton = newMap
             .getContainer()
             .querySelector('.mapboxgl-ctrl-compass');
-          if (compassBtn) {
-            compassBtn.addEventListener('click', () => {
-              if (compassCleanup.current) {
-                compassCleanup.current();
-                compassCleanup.current = null;
-              }
-              compassHeading.current = null;
-              setCompassMode(false);
-            });
-          }
+          compassButton?.addEventListener('click', handleCompassButtonClick);
 
           // Force a resize to ensure proper display
-          setTimeout(() => {
+          resizeTimer = setTimeout(() => {
             if (map.current) {
               map.current.resize();
             }
@@ -1367,7 +1370,7 @@ const MapboxMap = memo(function MapboxMap() {
         }
       };
 
-      initializeMap();
+      void initializeMap();
     }
 
     // Capture refs for cleanup
@@ -1377,6 +1380,9 @@ const MapboxMap = memo(function MapboxMap() {
 
     // Cleanup event listener
     return () => {
+      compassButton?.removeEventListener('click', handleCompassButtonClick);
+      if (resizeTimer) clearTimeout(resizeTimer);
+
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
       }
@@ -1726,7 +1732,7 @@ const MapboxMap = memo(function MapboxMap() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              toggleWatchLocation();
+              void toggleWatchLocation();
             }
           }}
           role="button"

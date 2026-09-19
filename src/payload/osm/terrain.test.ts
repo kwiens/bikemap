@@ -43,7 +43,7 @@ function errorTile(status: number): Response {
   } as unknown as Response;
 }
 
-function useFetch(stub: ReturnType<typeof vi.fn>) {
+function setFetchStub(stub: ReturnType<typeof vi.fn>) {
   globalThis.fetch = stub as unknown as typeof fetch;
   return stub;
 }
@@ -65,7 +65,7 @@ afterEach(() => {
 describe('sampleTerrain tile caching', () => {
   it('retries a tile that failed with a server error on a later call', async () => {
     let broken = true;
-    const stub = useFetch(
+    const stub = setFetchStub(
       vi.fn(async () => (broken ? errorTile(500) : okTile(100))),
     );
 
@@ -85,7 +85,7 @@ describe('sampleTerrain tile caching', () => {
 
   it('retries a tile whose request threw', async () => {
     let broken = true;
-    const stub = useFetch(
+    const stub = setFetchStub(
       vi.fn(async () => {
         if (broken) {
           throw new Error('socket hang up');
@@ -105,7 +105,7 @@ describe('sampleTerrain tile caching', () => {
   });
 
   it('caches a 404 — the DEM genuinely has nothing there', async () => {
-    const stub = useFetch(vi.fn(async () => errorTile(404)));
+    const stub = setFetchStub(vi.fn(async () => errorTile(404)));
 
     expect(await sampleTerrain(LINE, TOKEN)).toBeNull();
     const afterFirst = stub.mock.calls.length;
@@ -117,7 +117,7 @@ describe('sampleTerrain tile caching', () => {
   });
 
   it('serves a decoded tile from the cache rather than refetching it', async () => {
-    const stub = useFetch(vi.fn(async () => okTile(100)));
+    const stub = setFetchStub(vi.fn(async () => okTile(100)));
 
     await sampleTerrain(LINE, TOKEN);
     const afterFirst = stub.mock.calls.length;
@@ -129,7 +129,7 @@ describe('sampleTerrain tile caching', () => {
 
 describe('sampleTerrainParts', () => {
   it('samples each part on its own, never across the gap between them', async () => {
-    useFetch(vi.fn(async () => okTile(100)));
+    setFetchStub(vi.fn(async () => okTile(100)));
 
     const near: [number, number][] = [
       [-121.4, 44.0],
@@ -154,7 +154,7 @@ describe('sampleTerrainParts', () => {
   });
 
   it('ignores parts too short to draw and returns null when none are usable', async () => {
-    useFetch(vi.fn(async () => okTile(100)));
+    setFetchStub(vi.fn(async () => okTile(100)));
 
     expect(await sampleTerrainParts([[[-121.4, 44.0]]], TOKEN)).toBeNull();
     expect(await sampleTerrainParts([], TOKEN)).toBeNull();

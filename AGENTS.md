@@ -11,6 +11,7 @@ pnpm test         # Run tests in watch mode
 pnpm test:run     # Run tests once
 pnpm check        # Run ESLint, Biome formatting, types, and Knip
 pnpm lint:fix     # Auto-fix ESLint and formatting issues
+pnpm dedupe:check # Verify the lockfile has no avoidable duplicates
 ```
 
 Content backend (Payload + OSM — see below):
@@ -354,6 +355,24 @@ The map can be framed on third-party sites via `<iframe src="https://bikechatt.c
 - File order: exported component → subcomponents → helpers → static content → types
 - Use existing icon libraries (Font Awesome or lucide-react) - don't add new ones
 - Directories use lowercase-dash naming
+- Include units in names when the unit is not obvious (`retryDelayMs`,
+  `distanceMeters`) and phrase booleans as questions (`isLoading`, `hasRoute`).
+- Prefer precise domain verbs and nouns. Do not create catch-all `Utils`,
+  `Helpers`, or `Managers` when a narrower responsibility can be named.
+- Comments explain constraints and why a choice exists; do not narrate code that
+  is already clear from its names and structure.
+- State the bound for data-dependent loops. Batch independent network or
+  database work, avoid accidental serial round trips, and fetch only the fields
+  a caller needs.
+
+### Dependency hygiene
+
+- Pin direct dependencies and dev dependencies to exact versions. Let
+  Dependabot make version changes explicitly rather than widening manifest
+  ranges.
+- Keep `@types/node` on the same major as the Node runtime in `.nvmrc`.
+- After changing dependencies, run `pnpm install`, `pnpm dedupe`, and
+  `pnpm dedupe:check`; commit the resulting lockfile.
 
 ### Styling with Tailwind CSS
 
