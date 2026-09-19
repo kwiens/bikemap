@@ -1,3 +1,5 @@
+/** @vitest-environment jsdom */
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getRideStyle } from './WelcomeModal';
 import { setSetting } from '@/utils/settings';
