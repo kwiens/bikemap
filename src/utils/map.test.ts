@@ -1,3 +1,4 @@
+import type * as GeoJSON from 'geojson';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   geocodeAddress,

@@ -1,3 +1,4 @@
+import type * as GeoJSON from 'geojson';
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import { mountainBikeConfig, trailMetadata } from '@/data/geo_data';
