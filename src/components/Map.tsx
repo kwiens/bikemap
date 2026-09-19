@@ -955,6 +955,7 @@ const MapboxMap = memo(function MapboxMap() {
 
     let compassButton: Element | null = null;
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
 
     const handleCompassButtonClick = () => {
       if (compassCleanup.current) {
@@ -978,9 +979,13 @@ const MapboxMap = memo(function MapboxMap() {
           const mapStyle = await loadBikeRouteOptimizedStyle(
             mapConfig.mapbox.styleUrl,
             mapConfig.mapbox.accessToken,
+            Boolean(bikeRoutesUrl),
           );
+          const container = mapContainer.current;
+          if (cancelled || !container) return;
+
           const newMap = new mapboxgl.Map({
-            container: mapContainer.current as HTMLElement,
+            container,
             style: mapStyle,
             center: embedOptions.center ?? mapConfig.defaultView.center,
             zoom: embedOptions.zoom ?? mapConfig.defaultView.zoom,
@@ -1013,6 +1018,7 @@ const MapboxMap = memo(function MapboxMap() {
               reject(event.error ?? new Error('Mapbox style failed to load')),
             );
           });
+          if (cancelled || map.current !== newMap) return;
 
           // Find the road-label layer — route lines will be inserted
           // just below it so street names remain visible on top of routes.
@@ -1039,8 +1045,7 @@ const MapboxMap = memo(function MapboxMap() {
           hideStyleLayers(newMap, hiddenStyleLayerIds);
 
           // Attach curated routes whose geometry ships as GeoJSON (not Studio
-          // layers) BEFORE the route styling/hit-handler blocks below, so they
-          // pick up the route.id layers exactly like Studio routes.
+          // layers) before route styling and click handling below.
           if (bikeRoutesUrl) {
             ensureInlineRoutes(newMap, bikeRoutesUrl, bikeRoutes);
           }
@@ -1157,8 +1162,8 @@ const MapboxMap = memo(function MapboxMap() {
 
           if (showTrails) {
             // Attach the nationwide OSM bike-trails layer (hidden until toggled).
-            // Its click handler is registered later, after the curated route/MTB
-            // hit handlers, so curated trails win clicks in overlapping areas.
+            // Its click handler is registered later, after the curated
+            // route/MTB query, so curated trails win overlapping clicks.
             // Replay any toggle the user flipped before the style finished loading.
             ensureOsmTrailsSource(newMap);
             if (osmTrailsVisibleRef.current) {
@@ -1257,7 +1262,7 @@ const MapboxMap = memo(function MapboxMap() {
           });
 
           // Register the OSM trail click handler AFTER the curated route + MTB
-          // hit handlers above. Mapbox fires delegated layer handlers in
+          // screen-space handler above. Mapbox fires click handlers in
           // registration order, so where an OSM way overlaps a curated trail the
           // curated handler runs first and preventDefault()s; the OSM handler
           // then bails on the already-handled click. Clear any prior registration
@@ -1334,8 +1339,10 @@ const MapboxMap = memo(function MapboxMap() {
           if (map.current !== newMap) return;
           setMapReady();
         } catch (error) {
-          console.error('Error initializing map:', error);
-          setMapFailed(true);
+          if (!cancelled) {
+            console.error('Error initializing map:', error);
+            setMapFailed(true);
+          }
         }
       };
 
@@ -1349,6 +1356,7 @@ const MapboxMap = memo(function MapboxMap() {
 
     // Cleanup event listener
     return () => {
+      cancelled = true;
       compassButton?.removeEventListener('click', handleCompassButtonClick);
       if (resizeTimer) clearTimeout(resizeTimer);
 

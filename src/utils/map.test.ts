@@ -21,6 +21,7 @@ import {
   BIKE_ROUTE_LAYER_ID,
   BIKE_ROUTE_CASING_LAYER_ID,
   removeStyleOwnedBikeRoutes,
+  loadBikeRouteOptimizedStyle,
   queryNearbyLineFeatures,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
@@ -1694,6 +1695,72 @@ describe('removeStyleOwnedBikeRoutes', () => {
     expect(composite.url).toContain('swuller.cvsl09xq');
     expect(composite.url).toContain('?style=test');
     expect(style.layers).toHaveLength(2);
+  });
+
+  it('leaves Studio-owned routes intact for cities without runtime GeoJSON', async () => {
+    const previousFetch = global.fetch;
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock;
+
+    try {
+      const styleUrl = 'mapbox://styles/example/style?optimize=true';
+      const result = await loadBikeRouteOptimizedStyle(
+        styleUrl,
+        'test-token',
+        false,
+      );
+
+      expect(result).toBe(styleUrl);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = previousFetch;
+    }
+  });
+
+  it('fetches and prunes an optimized style for runtime route GeoJSON', async () => {
+    const previousFetch = global.fetch;
+    const routeTileset = STYLE_OWNED_ROUTE_TILESET_IDS[0];
+    const style = {
+      version: 8,
+      sources: {
+        composite: {
+          type: 'vector',
+          url: `mapbox://mapbox.mapbox-streets-v8,${routeTileset}`,
+        },
+      },
+      layers: [
+        {
+          id: STYLE_OWNED_ROUTE_LAYER_IDS[0],
+          type: 'line',
+          source: 'composite',
+        },
+      ],
+    } satisfies mapboxgl.StyleSpecification;
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => style,
+    });
+    global.fetch = fetchMock;
+
+    try {
+      const result = (await loadBikeRouteOptimizedStyle(
+        'mapbox://styles/example/style?optimize=true',
+        'test-token',
+        true,
+      )) as mapboxgl.StyleSpecification;
+      const request = fetchMock.mock.calls[0][0] as URL;
+
+      expect(request.origin).toBe('https://api.mapbox.com');
+      expect(request.pathname).toBe('/styles/v1/example/style');
+      expect(request.searchParams.get('optimize')).toBe('true');
+      expect(request.searchParams.get('access_token')).toBe('test-token');
+      expect(result.layers).toEqual([]);
+      expect((result.sources.composite as { url: string }).url).not.toContain(
+        routeTileset,
+      );
+    } finally {
+      global.fetch = previousFetch;
+    }
   });
 });
 

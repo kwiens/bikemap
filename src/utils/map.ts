@@ -174,7 +174,13 @@ export function removeStyleOwnedBikeRoutes(
 export async function loadBikeRouteOptimizedStyle(
   styleUrl: string,
   accessToken: string,
+  pruneStudioRoutes: boolean,
 ): Promise<mapboxgl.StyleSpecification | string> {
+  // A city without runtime route GeoJSON still needs its Studio-owned route
+  // layers. In that case Mapbox can load the configured optimized style
+  // directly, and the legacy layer setup in Map.tsx remains functional.
+  if (!pruneStudioRoutes) return styleUrl;
+
   const match = /^mapbox:\/\/styles\/([^/]+)\/([^?]+)/.exec(styleUrl);
   if (!match) return styleUrl;
 
