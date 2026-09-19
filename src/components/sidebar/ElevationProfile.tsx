@@ -68,22 +68,10 @@ export function gradeToColor(grade: number): string {
   return `rgb(${r},${green},${b})`;
 }
 
-/** Format signed grade for the hover readout. */
-export function formatGrade(grade: number | undefined): string {
-  if (grade === undefined || !Number.isFinite(grade)) {
-    return '—';
-  }
-  if (Math.abs(grade) < 0.05) {
-    return '0.0%';
-  }
-  return `${grade > 0 ? '+' : '\u2212'}${Math.abs(grade).toFixed(1)}%`;
-}
-
-/** Percent grade at each point, smoothed. Positive is uphill. */
-export function computeGrades(
+export function computeGradeColors(
   points: [number, number, number, number][],
-): number[] {
-  if (points.length < 2) return points.map(() => 0);
+): string[] {
+  if (points.length < 2) return points.map(() => gradeToColor(0));
 
   const rawGrades: number[] = [0];
   for (let i = 1; i < points.length; i++) {
@@ -108,13 +96,52 @@ export function computeGrades(
     smoothed.push(sum / count);
   }
 
-  return smoothed;
+  return smoothed.map((grade) => gradeToColor(grade));
 }
 
-export function computeGradeColors(
+/** Format signed grade for the hover readout. */
+export function formatGrade(grade: number | undefined): string {
+  if (grade === undefined || !Number.isFinite(grade)) {
+    return '—';
+  }
+  if (Math.abs(grade) < 0.05) {
+    return '0.0%';
+  }
+  return `${grade > 0 ? '+' : '\u2212'}${Math.abs(grade).toFixed(1)}%`;
+}
+
+/** Percent grade at each point, smoothed. Positive is uphill. */
+export function computeGrades(
   points: [number, number, number, number][],
-): string[] {
-  return computeGrades(points).map((grade) => gradeToColor(grade));
+): number[] {
+  if (points.length < 2) return points.map(() => 0);
+
+  const rises: number[] = [0];
+  const runs: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    const run = points[i][0] - points[i - 1][0];
+    const rise = points[i][1] - points[i - 1][1];
+    runs.push(run > 0 ? run : 0);
+    rises.push(run > 0 ? rise : 0);
+  }
+
+  const smoothed: number[] = [];
+  const WINDOW = 2;
+  for (let i = 0; i < runs.length; i++) {
+    let totalRise = 0;
+    let totalRun = 0;
+    for (
+      let j = Math.max(0, i - WINDOW);
+      j <= Math.min(runs.length - 1, i + WINDOW);
+      j++
+    ) {
+      totalRise += rises[j];
+      totalRun += runs[j];
+    }
+    smoothed.push(totalRun > 0 ? (totalRise / totalRun) * 100 : 0);
+  }
+
+  return smoothed;
 }
 
 // Force strictly increasing offsets. Consecutive profile points can share a
@@ -545,8 +572,8 @@ export function ElevationProfile() {
     [profile],
   );
   const gradeColors = useMemo(
-    () => grades.map((grade) => gradeToColor(grade)),
-    [grades],
+    () => (profile ? computeGradeColors(profile.profile) : []),
+    [profile],
   );
 
   const hasProfile =
@@ -724,7 +751,12 @@ export function ElevationProfile() {
         {hoverIndex !== null ? (
           <>
             {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
-            <span style={{ color: gradeColors[hoverIndex] }}>
+            <span className="inline-flex items-center gap-1 text-gray-700">
+              <span
+                aria-hidden="true"
+                className="inline-block h-2 w-2 rounded-full border border-black/10"
+                style={{ backgroundColor: gradeColors[hoverIndex] }}
+              />
               {formatGrade(grades[hoverIndex])}
             </span>
           </>

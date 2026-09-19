@@ -1,4 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ElevationProfile,
@@ -108,6 +114,19 @@ describe('computeGrades', () => {
     );
 
     expect(computeGrades(drop)[3]).toBeCloseTo(-10, 5);
+  });
+
+  it('weights uneven samples by their run distance', () => {
+    const uneven: [number, number, number, number][] = [
+      [0, 100, -85, 35],
+      [6, 116, -85, 35],
+      [11, 116, -85, 35],
+      [90, 111, -85, 35],
+      [112, 110, -85, 35],
+      [131, 115, -85, 35],
+    ];
+
+    expect(computeGrades(uneven)[3]).toBeCloseTo(11.45, 2);
   });
 
   it('returns one grade per point and handles degenerate profiles', () => {
@@ -247,6 +266,48 @@ describe('profilePointToXY', () => {
 });
 
 describe('ElevationProfile selection source', () => {
+  it('uses readable grade text with a separate color swatch', () => {
+    const profile: ElevationProfileData = {
+      trail: 'Test Trail',
+      distance: 400,
+      gain: 40,
+      loss: 0,
+      min: 100,
+      max: 140,
+      profile: [
+        [0, 100, -85.3, 35],
+        [100, 110, -85.301, 35.001],
+        [200, 120, -85.302, 35.002],
+        [300, 130, -85.303, 35.003],
+        [400, 140, -85.304, 35.004],
+      ],
+    };
+
+    render(<ElevationProfile />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, {
+          detail: { profile },
+        }),
+      );
+    });
+
+    const chart = screen.getByRole('img', {
+      name: 'Elevation profile for Test Trail',
+    });
+    vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      width: 400,
+    } as DOMRect);
+    fireEvent.mouseMove(chart, { clientX: 200 });
+
+    const grade = screen.getByText('+10.0%');
+    expect(grade).toHaveClass('text-gray-700');
+    expect(grade.querySelector('[aria-hidden="true"]')).toHaveStyle({
+      backgroundColor: computeGradeColors(profile.profile)[2],
+    });
+  });
+
   it('loads a curated profile when an OSM trail with the same name was selected', async () => {
     const osmProfile: ElevationProfileData = {
       trail: 'Big Forest',
