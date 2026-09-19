@@ -44,6 +44,12 @@ export function slugForTrail(trail: MountainBikeTrail): string {
   return trail.slug ?? slugify(trail.trailName);
 }
 
+export interface ElevationProfileGapDetail {
+  feet: number;
+  from: [number, number];
+  to: [number, number];
+}
+
 export interface ElevationProfile {
   trail: string;
   distance: number; // Total distance in feet
@@ -52,6 +58,9 @@ export interface ElevationProfile {
   min: number;
   max: number;
   profile: [number, number, number, number][]; // [distance_ft, elevation_ft, lng, lat]
+  // Boundaries where the source geometry is disconnected. The distance and
+  // elevation jump between these coordinates must not be treated as trail.
+  geometryGapDetails?: ElevationProfileGapDetail[];
   // OSM trails only: a tiny tag summary shown beneath the pane header. Curated
   // trails and recorded rides leave this undefined.
   osm?: OsmTrailDetails;
