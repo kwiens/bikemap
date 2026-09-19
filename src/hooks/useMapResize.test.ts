@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useMapResize } from './useMapResize';
+import { syncMapPixelRatio, useMapResize } from './useMapResize';
 
 describe('useMapResize', () => {
   let addSpy: ReturnType<typeof vi.spyOn>;
@@ -69,5 +69,64 @@ describe('useMapResize', () => {
     expect(() => {
       window.dispatchEvent(new Event('resize'));
     }).not.toThrow();
+  });
+});
+
+describe('syncMapPixelRatio', () => {
+  const originalDevicePixelRatio = window.devicePixelRatio;
+
+  afterEach(() => {
+    Object.defineProperty(window, 'devicePixelRatio', {
+      configurable: true,
+      value: originalDevicePixelRatio,
+    });
+  });
+
+  function createMap(canvasWidth: number, canvasHeight: number) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    return {
+      map: {
+        getCanvas: () => canvas,
+        transform: {
+          width: 100,
+          height: 50,
+          resize: vi.fn(),
+        },
+        painter: { resize: vi.fn() },
+        _resizeCanvas: vi.fn(),
+        triggerRepaint: vi.fn(),
+      } as unknown as Parameters<typeof syncMapPixelRatio>[0],
+      canvas,
+    };
+  }
+
+  it('does nothing when the canvas backing size matches the current DPR', () => {
+    Object.defineProperty(window, 'devicePixelRatio', {
+      configurable: true,
+      value: 2,
+    });
+    const { map } = createMap(200, 100);
+
+    expect(syncMapPixelRatio(map)).toBe(false);
+    expect(map._resizeCanvas).not.toHaveBeenCalled();
+    expect(map.painter.resize).not.toHaveBeenCalled();
+    expect(map.triggerRepaint).not.toHaveBeenCalled();
+  });
+
+  it('resynchronizes Mapbox when the DPR changes without a CSS resize', () => {
+    Object.defineProperty(window, 'devicePixelRatio', {
+      configurable: true,
+      value: 2,
+    });
+    const { map } = createMap(100, 50);
+
+    expect(syncMapPixelRatio(map)).toBe(true);
+    expect(map._resizeCanvas).toHaveBeenCalledWith(100, 50);
+    expect(map.transform.resize).toHaveBeenCalledWith(100, 50);
+    expect(map.painter.resize).toHaveBeenCalledWith(100, 50);
+    expect(map.triggerRepaint).toHaveBeenCalledOnce();
   });
 });
