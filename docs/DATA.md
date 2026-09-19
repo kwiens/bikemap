@@ -2,8 +2,9 @@
 
 Display metadata and checked-in fallbacks live in `src/data/` as typed
 TypeScript arrays. Published trail and route geometry can come from Payload,
-while static files and Mapbox Studio layers keep the public map useful when the
-database is unavailable or unseeded.
+while other content can remain explicitly configured to use static files or
+Mapbox Studio layers. Payload-owned route geometry has no implicit Studio
+fallback.
 
 Each file exports a typed array; the `interface` at the top of the file is the
 contract. `icon` fields are Font Awesome `IconDefinition` values imported from
@@ -28,8 +29,8 @@ The MTB trail array lives in its own `mountain-bike-trails.data.ts` so the
 
 Route display metadata lives in TypeScript. Geometry comes from the active
 city's `bikeRoutesUrl` GeoJSON when configured, otherwise from a Mapbox Studio
-line layer. Chattanooga's Riverwalk URL is database-backed; the Studio line
-remains visible when Payload is unavailable or has not been imported yet.
+line layer. Chattanooga's Riverwalk URL is database-backed, and its Studio line
+stays disabled even when Payload is unavailable or has not been imported yet.
 
 | Field | Type | Notes |
 |---|---|---|

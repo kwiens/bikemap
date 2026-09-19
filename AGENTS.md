@@ -143,7 +143,7 @@ The app uses custom DOM events (`window.dispatchEvent`) for component communicat
 
 ### Map Styling
 
-Route display metadata is keyed by stable layer IDs such as `riverwalk-loop-v3-public`. Geometry may come from Mapbox Studio or the configured city GeoJSON/API; Chattanooga's imported Riverwalk row comes from Payload and retains Studio as its unavailable/unseeded fallback.
+Route display metadata is keyed by stable layer IDs such as `riverwalk-loop-v3-public`. Geometry may come from Mapbox Studio or the configured city GeoJSON/API. Chattanooga's imported Riverwalk geometry comes only from Payload; its same-named Studio layer must stay disabled even when the database is unavailable or unseeded.
 
 ### Mountain Bike Trails
 

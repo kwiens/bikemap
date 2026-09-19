@@ -92,7 +92,7 @@ describe('loadRouteFeatures', () => {
     expect(map.querySourceFeatures).not.toHaveBeenCalled();
   });
 
-  it('falls back to the Studio route when the database is unavailable', async () => {
+  it('does not export Studio geometry for a database-owned route', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: false, status: 503 }),
@@ -127,9 +127,7 @@ describe('loadRouteFeatures', () => {
         bikeRoutesUrl: '/api/map/routes?city=chattanooga',
         inlineBikeRouteIds: ['inline-route'],
       }),
-    ).resolves.toContainEqual({
-      routeId: 'inline-route',
-      features: [studioFeature],
-    });
+    ).resolves.toEqual([]);
+    expect(map.querySourceFeatures).not.toHaveBeenCalled();
   });
 });

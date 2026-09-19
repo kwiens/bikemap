@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { hiddenStyleLayerIdsFor } from '@/data/mapbox-style';
 import { chattanoogaData } from './index';
 
 describe('Chattanooga curated trail source', () => {
@@ -14,12 +15,18 @@ describe('Chattanooga curated trail source', () => {
     );
   });
 
-  it('replaces Riverwalk with Payload geometry when it is available', () => {
+  it('uses Payload as the only Riverwalk geometry source', () => {
     expect(chattanoogaData.bikeRoutesUrl).toBe(
       '/api/map/routes?city=chattanooga',
     );
     expect(chattanoogaData.inlineBikeRouteIds).toEqual([
       'riverwalk-loop-v3-public',
     ]);
+    expect(hiddenStyleLayerIdsFor(chattanoogaData)).toContain(
+      'riverwalk-loop-v3-public',
+    );
+    expect(hiddenStyleLayerIdsFor(chattanoogaData)).not.toContain(
+      'zoo-loop-v2-full-public',
+    );
   });
 });

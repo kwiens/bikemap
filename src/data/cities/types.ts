@@ -52,6 +52,7 @@ export interface CityData {
   // It may be a static file or a database-backed map API.
   bikeRoutesUrl?: string;
   // Optional subset expected from bikeRoutesUrl. Omit when the source contains
-  // every configured route. A partial source keeps Studio layers as fallbacks.
+  // every configured route. These route ids are owned exclusively by the
+  // runtime source; they never fall back to same-named Studio layers.
   inlineBikeRouteIds?: string[];
 }

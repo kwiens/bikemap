@@ -266,7 +266,7 @@ export function syncRouteArrowLayer(
     features: applyArrowDirectionOverrides(
       removeOverlappingSegments(features),
       // The database importer has already normalized multipart directions.
-      // Studio remains the fallback and still needs its legacy bounds repair.
+      // Studio-owned geometry still needs its legacy bounds repair.
       layer.id === BIKE_ROUTE_LAYER_ID ? [] : route.reverseArrowBounds,
     ),
   };
@@ -1285,11 +1285,23 @@ export function setBikeNetworkVisible(
 // and one route layer regardless of how many routes a city has. Idempotent.
 export function ensureInlineRoutes(
   map: mapboxgl.Map,
-  collection: GeoJSON.FeatureCollection,
+  collection: GeoJSON.FeatureCollection | null,
   routes: BikeRoute[],
 ): void {
   try {
     const routeIds = new Set(routes.map((route) => route.id));
+    for (const route of routes) {
+      for (const layerId of [`${route.id}-casing`, route.id]) {
+        const existing = map.getLayer(layerId);
+        if (existing) {
+          map.removeLayer(layerId);
+        }
+      }
+    }
+
+    if (!collection) {
+      return;
+    }
     const data: GeoJSON.FeatureCollection = {
       ...collection,
       features: collection.features.filter((feature) => {
@@ -1299,15 +1311,6 @@ export function ensureInlineRoutes(
     };
     if (data.features.length === 0) {
       return;
-    }
-
-    for (const route of routes) {
-      for (const layerId of [`${route.id}-casing`, route.id]) {
-        const existing = map.getLayer(layerId);
-        if (existing) {
-          map.removeLayer(layerId);
-        }
-      }
     }
 
     ensureSource(map, BIKE_ROUTE_SOURCE_ID, {

@@ -77,10 +77,7 @@ import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
 import { clearMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
-import {
-  fetchRouteCollection,
-  routeIdsInCollection,
-} from '@/utils/route-source';
+import { fetchRouteCollection } from '@/utils/route-source';
 
 // Ride recording is unreachable in embed mode, and its subtree (history, GPX,
 // ride stats and storage) is a sizeable chunk to make a partner's page
@@ -1059,21 +1056,18 @@ const MapboxMap = memo(function MapboxMap() {
 
           hideStyleLayers(newMap, hiddenStyleLayerIds);
 
-          // Only replace Studio-backed fallbacks after the route API has
-          // returned usable geometry. A missing database leaves Studio intact.
-          const availableRouteIds = routeIdsInCollection(routeCollection);
+          // Runtime-owned routes never fall back to same-named Studio layers.
+          // If the database has no usable geometry, that route remains absent.
           const configuredInlineIds = new Set(
             inlineBikeRouteIds ?? bikeRoutes.map((route) => route.id),
           );
-          const inlineRoutes = bikeRoutes.filter(
-            (route) =>
-              configuredInlineIds.has(route.id) &&
-              availableRouteIds.has(route.id),
+          const configuredInlineRoutes = bikeRoutes.filter((route) =>
+            configuredInlineIds.has(route.id),
           );
-          const inlineRouteIds = new Set(inlineRoutes.map((route) => route.id));
-          if (routeCollection && inlineRoutes.length > 0) {
-            ensureInlineRoutes(newMap, routeCollection, inlineRoutes);
+          if (bikeRoutesUrl) {
+            ensureInlineRoutes(newMap, routeCollection, configuredInlineRoutes);
           }
+          const inlineRouteIds = configuredInlineIds;
 
           const combinedRouteLayer = newMap.getLayer(BIKE_ROUTE_LAYER_ID);
 

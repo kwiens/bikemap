@@ -40,11 +40,9 @@ export async function loadRouteFeatures(
 
   const styleLayers = map.getStyle().layers;
   return routes.flatMap((route) => {
-    const inlineFeature = inlineIds.has(route.id)
-      ? inlineFeatures.get(route.id)
-      : undefined;
-    if (inlineFeature) {
-      return [{ routeId: route.id, features: [inlineFeature] }];
+    if (inlineIds.has(route.id)) {
+      const feature = inlineFeatures.get(route.id);
+      return feature ? [{ routeId: route.id, features: [feature] }] : [];
     }
 
     const layer = styleLayers.find((item) => item.id === route.id);

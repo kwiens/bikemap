@@ -14,8 +14,9 @@ export const STYLE_OWNED_ROUTE_LAYER_IDS = chattanoogaBikeRoutes.map(
 );
 
 // Dedicated Chattanooga route tilesets baked into the shared Studio style.
-// A city with its own runtime route source can remove these from the composite;
-// Chattanooga keeps them because Studio remains its route source of truth.
+// A city whose complete route set comes from runtime GeoJSON can remove these
+// from the composite. Chattanooga still needs most of them while its routes
+// migrate one at a time.
 export const STYLE_OWNED_ROUTE_TILESET_IDS = [
   'swuller.a2odh3pm',
   'swuller.b0vlobi3',
@@ -28,17 +29,15 @@ export const STYLE_OWNED_ROUTE_TILESET_IDS = [
 // Orphan layers baked into the style that no city manages — hidden for all.
 export const STYLE_STRAY_LAYER_IDS = ['Chatt_TPL_Trails-public'];
 
-/**
- * Style-owned route layers the given city must hide: everything the style
- * bakes in except the city's own routes.
- */
+/** Hide foreign routes and routes whose geometry is owned by a runtime source. */
 export function hiddenStyleLayerIdsFor(city: CityData): string[] {
-  // A complete runtime source replaces every Studio route. A partial source
-  // keeps its configured Studio layers as fallbacks until usable API geometry
-  // has loaded; `ensureInlineRoutes` removes only the routes it can replace.
-  if (city.bikeRoutesUrl && !city.inlineBikeRouteIds) {
-    return STYLE_OWNED_ROUTE_LAYER_IDS;
-  }
   const ownRouteIds = new Set(city.bikeRoutes.map((route) => route.id));
-  return STYLE_OWNED_ROUTE_LAYER_IDS.filter((id) => !ownRouteIds.has(id));
+  const runtimeRouteIds = new Set(
+    city.bikeRoutesUrl
+      ? (city.inlineBikeRouteIds ?? city.bikeRoutes.map((route) => route.id))
+      : [],
+  );
+  return STYLE_OWNED_ROUTE_LAYER_IDS.filter(
+    (id) => !ownRouteIds.has(id) || runtimeRouteIds.has(id),
+  );
 }

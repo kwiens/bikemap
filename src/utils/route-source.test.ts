@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchRouteCollection, routeIdsInCollection } from './route-source';
+import { fetchRouteCollection } from './route-source';
 
 describe('route source', () => {
   afterEach(() => {
@@ -7,7 +7,7 @@ describe('route source', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns a non-empty FeatureCollection and indexes its route ids', async () => {
+  it('returns a non-empty FeatureCollection', async () => {
     const collection = {
       type: 'FeatureCollection' as const,
       features: [
@@ -31,9 +31,6 @@ describe('route source', () => {
     );
 
     expect(result).toEqual(collection);
-    expect(routeIdsInCollection(result)).toEqual(
-      new Set(['riverwalk-loop-v3-public']),
-    );
   });
 
   it('treats an unavailable or unseeded database as a miss', async () => {
@@ -52,7 +49,7 @@ describe('route source', () => {
     await expect(fetchRouteCollection('/empty')).resolves.toBeNull();
   });
 
-  it('bounds how long a slow database can delay the Studio fallback', async () => {
+  it('bounds how long a slow database can delay map initialization', async () => {
     vi.useFakeTimers();
     vi.stubGlobal(
       'fetch',

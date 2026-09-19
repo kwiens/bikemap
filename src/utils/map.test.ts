@@ -1007,6 +1007,41 @@ describe('Mapbox Geo Integration', () => {
         source: 'bike-routes-source',
       });
     });
+
+    it('removes a runtime-owned Studio route when the database has no geometry', () => {
+      const layers = new Map<string, mapboxgl.AnyLayer>([
+        [
+          'route1',
+          {
+            id: 'route1',
+            type: 'line',
+            source: 'composite',
+          } as mapboxgl.AnyLayer,
+        ],
+      ]);
+      const mockMap = {
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getLayer: vi.fn((id: string) => layers.get(id)),
+        removeLayer: vi.fn((id: string) => layers.delete(id)),
+      } as unknown as mapboxgl.Map;
+      const route: BikeRoute = {
+        id: 'route1',
+        name: 'Route 1',
+        color: '#2563EB',
+        description: 'Test route',
+        icon: {} as IconDefinition,
+        defaultWidth: 8,
+        opacity: 1,
+        distance: 5,
+      };
+
+      ensureInlineRoutes(mockMap, null, [route]);
+
+      expect(mockMap.removeLayer).toHaveBeenCalledWith('route1');
+      expect(mockMap.addSource).not.toHaveBeenCalled();
+      expect(layers.has('route1')).toBe(false);
+    });
   });
 
   describe('calculateRouteBounds', () => {

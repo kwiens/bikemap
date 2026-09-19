@@ -1,6 +1,6 @@
 const ROUTE_FETCH_TIMEOUT_MS = 5_000;
 
-/** Fetch route GeoJSON before replacing any Studio-backed fallback layers. */
+/** Fetch route GeoJSON without letting a slow database block indefinitely. */
 export async function fetchRouteCollection(
   url: string,
   signal?: AbortSignal,
@@ -45,15 +45,4 @@ export async function fetchRouteCollection(
     clearTimeout(timeout);
     signal?.removeEventListener('abort', abortFromCaller);
   }
-}
-
-export function routeIdsInCollection(
-  collection: GeoJSON.FeatureCollection | null,
-): Set<string> {
-  return new Set(
-    collection?.features.flatMap((feature) => {
-      const id = feature.properties?.id;
-      return typeof id === 'string' ? [id] : [];
-    }) ?? [],
-  );
 }
