@@ -14,8 +14,8 @@ export const STYLE_OWNED_ROUTE_LAYER_IDS = chattanoogaBikeRoutes.map(
 );
 
 // Dedicated Chattanooga route tilesets baked into the shared Studio style.
-// Both supported cities render curated routes from a single runtime GeoJSON
-// source, so these can be removed from the composite source before map load.
+// A city with its own runtime route source can remove these from the composite;
+// Chattanooga keeps them because Studio remains its route source of truth.
 export const STYLE_OWNED_ROUTE_TILESET_IDS = [
   'swuller.a2odh3pm',
   'swuller.b0vlobi3',

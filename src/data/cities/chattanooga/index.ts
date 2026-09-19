@@ -32,7 +32,6 @@ export const chattanoogaData: CityData = {
   mountainBikeTrails,
   trailMetadata: TRAIL_METADATA,
   regionFor,
-  bikeRoutesUrl: '/data/chattanooga/routes.geojson',
   mountainBike: {
     layers: [
       {

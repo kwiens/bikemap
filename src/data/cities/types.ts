@@ -48,7 +48,8 @@ export interface CityData {
   // Static GeoJSON URL for the classified bike-network overlay (Casual mode).
   // Undefined for cities without one (the toggle is hidden).
   bikeNetworkUrl?: string;
-  // Static GeoJSON URL for curated routes attached at runtime, keyed by route
-  // id. Cities may omit it only while still relying on Studio-owned layers.
+  // Static GeoJSON URL for curated routes whose geometry isn't in the Mapbox
+  // Studio style (attached at runtime, keyed by route id). Undefined for cities
+  // whose routes are Studio layers (e.g. Chattanooga).
   bikeRoutesUrl?: string;
 }
