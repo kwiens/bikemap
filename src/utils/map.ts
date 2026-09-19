@@ -109,7 +109,7 @@ export function syncRouteArrowLayer(
       },
       paint: {
         'icon-color': route.color,
-        'icon-opacity': 0.2,
+        'icon-opacity': 0,
       },
     },
     beforeId,
@@ -123,10 +123,8 @@ export function updateRouteOpacity(
   opacity: { selected: number; unselected: number },
 ) {
   routes.forEach((route) => {
-    const targetOpacity =
-      route.id === selectedId ? opacity.selected : opacity.unselected;
+    const isSelected = route.id === selectedId;
     try {
-      const isSelected = route.id === selectedId;
       map.setPaintProperty(
         route.id,
         'line-opacity',
@@ -152,7 +150,11 @@ export function updateRouteOpacity(
     }
     const arrowLayerId = `${route.id}-arrows`;
     if (map.getLayer(arrowLayerId)) {
-      map.setPaintProperty(arrowLayerId, 'icon-opacity', targetOpacity);
+      map.setPaintProperty(
+        arrowLayerId,
+        'icon-opacity',
+        isSelected ? opacity.selected : 0,
+      );
     }
   });
 }

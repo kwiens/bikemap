@@ -327,6 +327,10 @@ describe('Mapbox Geo Integration', () => {
         expect.objectContaining({
           id: 'route1-arrows',
           source: 'route1-arrows-source',
+          paint: {
+            'icon-color': route.color,
+            'icon-opacity': 0,
+          },
         }),
         'road-label',
       );
@@ -561,7 +565,7 @@ describe('Mapbox Geo Integration', () => {
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route1-arrows',
         'icon-opacity',
-        0.2,
+        0,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route2',
@@ -601,7 +605,7 @@ describe('Mapbox Geo Integration', () => {
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route3-arrows',
         'icon-opacity',
-        0.2,
+        0,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(12);
     });
@@ -690,7 +694,7 @@ describe('Mapbox Geo Integration', () => {
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route1-arrows',
         'icon-opacity',
-        0.1,
+        0,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route2',
@@ -705,7 +709,7 @@ describe('Mapbox Geo Integration', () => {
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route2-arrows',
         'icon-opacity',
-        0.1,
+        0,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(8);
     });
