@@ -57,19 +57,42 @@ describe('Chattanooga trail import geometry', () => {
       'Godsey Ridge Green',
     ]);
 
+    const invalidGeometry: string[] = [];
+    const invalidCoordinates: {
+      coordinate: [number, number];
+      trail: string;
+    }[] = [];
+
     for (const feature of collection.features) {
-      expect(feature.geometry.type).toBe('MultiLineString');
-      expect(feature.geometry.coordinates.length).toBeGreaterThan(0);
+      if (
+        feature.geometry.type !== 'MultiLineString' ||
+        feature.geometry.coordinates.length === 0
+      ) {
+        invalidGeometry.push(feature.properties.Trail);
+      }
       for (const part of feature.geometry.coordinates) {
-        expect(part.length).toBeGreaterThanOrEqual(2);
+        if (part.length < 2) {
+          invalidGeometry.push(feature.properties.Trail);
+        }
         for (const [longitude, latitude] of part) {
-          expect(longitude).toBeGreaterThanOrEqual(-86);
-          expect(longitude).toBeLessThanOrEqual(-84);
-          expect(latitude).toBeGreaterThanOrEqual(34);
-          expect(latitude).toBeLessThanOrEqual(36);
+          if (
+            (longitude < -86 ||
+              longitude > -84 ||
+              latitude < 34 ||
+              latitude > 36) &&
+            invalidCoordinates.length < 20
+          ) {
+            invalidCoordinates.push({
+              coordinate: [longitude, latitude],
+              trail: feature.properties.Trail,
+            });
+          }
         }
       }
     }
+
+    expect(invalidGeometry).toEqual([]);
+    expect(invalidCoordinates).toEqual([]);
   });
 
   it('keeps imported geometry, summaries, and static profiles in sync', () => {
