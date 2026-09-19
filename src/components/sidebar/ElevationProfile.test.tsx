@@ -320,28 +320,28 @@ describe('loadProfile', () => {
     );
   });
 
-  it.each([
-    'bend',
-    'chattanooga',
-  ] as const)('falls back to the %s file when nothing is stored', async (city) => {
-    // Chattanooga's trails are seeded without geometry, so they have no stored
-    // profile and only the offline file can draw their chart.
-    const fetchMock = stubFetch({
-      '/api/map/elevation/': { ok: false },
-      [`/data/elevation/${city}/`]: { ok: true, body: onDisk },
-    });
+  it.each(['bend', 'chattanooga'] as const)(
+    'falls back to the %s file when nothing is stored',
+    async (city) => {
+      // Chattanooga's trails are seeded without geometry, so they have no stored
+      // profile and only the offline file can draw their chart.
+      const fetchMock = stubFetch({
+        '/api/map/elevation/': { ok: false },
+        [`/data/elevation/${city}/`]: { ok: true, body: onDisk },
+      });
 
-    const result = await loadProfile(
-      'ridge-trail',
-      city,
-      new AbortController().signal,
-    );
+      const result = await loadProfile(
+        'ridge-trail',
+        city,
+        new AbortController().signal,
+      );
 
-    expect(result).toEqual(onDisk);
-    expect(fetchMock.mock.calls[1][0]).toBe(
-      `/data/elevation/${city}/ridge-trail.json`,
-    );
-  });
+      expect(result).toEqual(onDisk);
+      expect(fetchMock.mock.calls[1][0]).toBe(
+        `/data/elevation/${city}/ridge-trail.json`,
+      );
+    },
+  );
 
   it('does not fall back when the selection changed', async () => {
     const abortError = new Error('The operation was aborted.');

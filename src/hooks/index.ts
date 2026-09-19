@@ -2,4 +2,3 @@ export { useToast } from './useToast';
 export { useMapResize } from './useMapResize';
 export { useRideRecording } from './useRideRecording';
 export { useWakeLock } from './useWakeLock';
-export { useUrlDeepLink } from './useUrlDeepLink';

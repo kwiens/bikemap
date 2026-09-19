@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
+  "packageManager": "pnpm@11.0.6",
+  "engines": {
+    "node": ">=22.18.0",
+    "pnpm": ">=11.0.0"
+  },
   "pnpm": {
     "overrides": {
       "brace-expansion@1": "1.1.18",
@@ -21,9 +25,12 @@
     "test": "vitest",
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "pnpm typecheck && eslint . --max-warnings 0 && biome lint --error-on-warnings && biome format",
-    "lint:fix": "eslint . --fix --max-warnings 0 && biome lint --write --unsafe && biome format --write",
-    "prepare": "husky",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0 && pnpm format:fix",
+    "format": "biome format .",
+    "format:fix": "biome format --write .",
+    "knip": "knip --no-progress",
+    "check": "pnpm lint && pnpm format && pnpm typecheck && pnpm knip",
     "payload": "payload",
     "generate:types": "payload generate:types",
     "generate:importmap": "payload generate:importmap",
@@ -33,7 +40,8 @@
     "db:seed:bend": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/bend.ts",
     "db:seed:chattanooga": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/chattanooga.ts",
     "prepare:chattanooga-measurements": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/prepare_chattanooga_measurements.ts",
-    "backfill:elevation": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/backfill-elevation-profiles.ts"
+    "backfill:elevation": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/backfill-elevation-profiles.ts",
+    "prepare": "husky"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
@@ -43,7 +51,6 @@
     "@payloadcms/next": "3.90.1",
     "@payloadcms/ui": "3.90.1",
     "clsx": "^2.1.1",
-    "drizzle-orm": "0.45.2",
     "graphql": "^16.14.2",
     "lucide-react": "^1.17.0",
     "mapbox-gl": "^3.24.0",
@@ -58,7 +65,7 @@
     "terra-draw-mapbox-gl-adapter": "^1.4.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.16",
+    "@biomejs/biome": "^2.5.14",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.9.1",
@@ -73,6 +80,7 @@
     "fake-indexeddb": "^6.2.5",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "knip": "^6.37.0",
     "lint-staged": "^17.0.7",
     "postcss": "^8.5.28",
     "sharp": "^0.35.4",

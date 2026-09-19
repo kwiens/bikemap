@@ -11,14 +11,14 @@ describe('shouldRunMigrations', () => {
     ).toBe(true);
   });
 
-  it.each([
-    'preview',
-    'development',
-  ])('does not migrate the shared database from a %s Vercel build', (VERCEL_ENV) => {
-    expect(
-      shouldRunMigrations({ DATABASE_URL: 'postgres://pooled', VERCEL_ENV }),
-    ).toBe(false);
-  });
+  it.each(['preview', 'development'])(
+    'does not migrate the shared database from a %s Vercel build',
+    (VERCEL_ENV) => {
+      expect(
+        shouldRunMigrations({ DATABASE_URL: 'postgres://pooled', VERCEL_ENV }),
+      ).toBe(false);
+    },
+  );
 
   it('keeps migrate-then-build behavior on non-Vercel hosts', () => {
     expect(shouldRunMigrations({ DATABASE_URL: 'postgres://local' })).toBe(

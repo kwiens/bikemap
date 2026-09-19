@@ -33,66 +33,7 @@
     "lineWidth": 80,
     "attributePosition": "auto"
   },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "a11y": {
-        "useHtmlLang": "warn",
-        "noHeaderScope": "warn",
-        "useValidAriaRole": {
-          "level": "warn",
-          "options": {
-            "ignoreNonDom": false,
-            "allowInvalidRoles": ["none", "text"]
-          }
-        },
-        "useSemanticElements": "off",
-        "noSvgWithoutTitle": "off",
-        "useMediaCaption": "off",
-        "noAutofocus": "off",
-        "noStaticElementInteractions": "warn",
-        "useKeyWithClickEvents": "off",
-        "useValidAutocomplete": "warn"
-      },
-      "complexity": {
-        "noUselessStringConcat": "warn",
-        "noForEach": "off",
-        "noUselessSwitchCase": "off",
-        "noUselessThisAlias": "off",
-        "noUselessContinue": "off"
-      },
-      "correctness": {
-        "noUnusedImports": "warn",
-        "useJsxKeyInIterable": "off",
-        "useExhaustiveDependencies": "off",
-        "noInvalidBuiltinInstantiation": "warn"
-      },
-      "security": {
-        "noDangerouslySetInnerHtml": "off",
-        "noBlankTarget": "off"
-      },
-      "style": {
-        "useFragmentSyntax": "warn",
-        "noYodaExpression": "warn",
-        "useDefaultParameterLast": "warn",
-        "useExponentiationOperator": "off",
-        "noUnusedTemplateLiteral": "off",
-        "noUselessElse": "off",
-        "useBlockStatements": "off",
-        "useArrayLiterals": "warn"
-      },
-      "suspicious": {
-        "noExplicitAny": "off",
-        "noHeadImportInDocument": "warn",
-        "noDocumentImportInPage": "warn",
-        "noDuplicateElseIf": "warn",
-        "noIrregularWhitespace": "warn",
-        "noDocumentCookie": "off"
-      },
-      "nursery": {}
-    }
-  },
+  "linter": { "enabled": false },
   "javascript": {
     "jsxRuntime": "reactClassic",
     "formatter": {
@@ -121,27 +62,5 @@
     "formatter": { "enabled": false },
     "linter": { "enabled": false }
   },
-  "assist": { "actions": { "source": { "organizeImports": "off" } } },
-  "overrides": [
-    {
-      "includes": ["**/playwright/**"],
-      "linter": {
-        "rules": {
-          "correctness": {
-            "noEmptyPattern": "off"
-          }
-        }
-      }
-    },
-    {
-      "includes": ["**/*.test.ts", "**/*.test.tsx"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noNonNullAssertion": "off"
-          }
-        }
-      }
-    }
-  ]
+  "assist": { "actions": { "source": { "organizeImports": "off" } } }
 }
