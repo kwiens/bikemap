@@ -28,6 +28,12 @@ export const STYLE_OWNED_ROUTE_TILESET_IDS = [
 // Orphan layers baked into the style that no city manages — hidden for all.
 export const STYLE_STRAY_LAYER_IDS = ['Chatt_TPL_Trails-public'];
 
+// The dedicated TPL tileset behind the orphan layer above. PR #100 moved the
+// curated regional trails to Payload/GeoJSON, and this separate paved-greenway
+// snapshot is not used by any city. Remove it from the composite source before
+// Mapbox starts requesting tiles; the Godsey Ridge tileset remains in place.
+export const STYLE_STRAY_TILESET_IDS = ['swuller.cvsl09xq'];
+
 /**
  * Style-owned route layers the given city must hide: everything the style
  * bakes in except the city's own routes.

@@ -16,6 +16,8 @@ import {
   highlightMtnBikeArea,
   initMtnBikeColors,
   hideStrayStyleLayers,
+  removeStrayTrailDataFromStyle,
+  loadOptimizedMapStyle,
   detectTrailAtPoint,
   toLngLatBounds,
   loadCuratedGeojson,
@@ -23,7 +25,6 @@ import {
   BIKE_ROUTE_LAYER_ID,
   BIKE_ROUTE_CASING_LAYER_ID,
   removeStyleOwnedBikeRoutes,
-  loadBikeRouteOptimizedStyle,
   queryNearbyLineFeatures,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
@@ -43,6 +44,8 @@ import { TRAIL_METADATA, RATING_COLORS } from '@/data/trail-metadata';
 import {
   STYLE_OWNED_ROUTE_LAYER_IDS,
   STYLE_OWNED_ROUTE_TILESET_IDS,
+  STYLE_STRAY_LAYER_IDS,
+  STYLE_STRAY_TILESET_IDS,
 } from '@/data/mapbox-style';
 import type { IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import type mapboxgl from 'mapbox-gl';
@@ -1515,6 +1518,95 @@ describe('hideStrayStyleLayers', () => {
   });
 });
 
+describe('optimized Studio trail cleanup', () => {
+  it('removes only orphan trail data from the composite style', () => {
+    const style = {
+      version: 8,
+      sources: {
+        composite: {
+          type: 'vector',
+          url: `mapbox://mapbox.mapbox-streets-v8,swuller.a2odh3pm,${STYLE_STRAY_TILESET_IDS[0]},swuller.cz2gq1fn?style=test`,
+        },
+      },
+      layers: [
+        {
+          id: STYLE_STRAY_LAYER_IDS[0],
+          type: 'line',
+          source: 'composite',
+          'source-layer': 'tpl-trails',
+        },
+        {
+          id: 'Godsey Ridge Trails',
+          type: 'line',
+          source: 'composite',
+          'source-layer': 'LineStrings',
+        },
+        {
+          id: 'riverwalk-loop-v3-public',
+          type: 'line',
+          source: 'composite',
+          'source-layer': 'route',
+        },
+      ],
+    } satisfies mapboxgl.StyleSpecification;
+
+    const result = removeStrayTrailDataFromStyle(style);
+    const composite = result.sources.composite as { url: string };
+
+    expect(result.layers.map((layer) => layer.id)).toEqual([
+      'Godsey Ridge Trails',
+      'riverwalk-loop-v3-public',
+    ]);
+    expect(composite.url).not.toContain(STYLE_STRAY_TILESET_IDS[0]);
+    expect(composite.url).toContain('swuller.cz2gq1fn');
+    expect(composite.url).toContain('swuller.a2odh3pm');
+    expect(composite.url).toContain('?style=test');
+    expect(style.layers).toHaveLength(3);
+  });
+
+  it('fetches the optimized style and prunes it before map creation', async () => {
+    const previousFetch = global.fetch;
+    const style = {
+      version: 8,
+      sources: {
+        composite: {
+          type: 'vector',
+          url: `mapbox://mapbox.mapbox-streets-v8,${STYLE_STRAY_TILESET_IDS[0]}`,
+        },
+      },
+      layers: [
+        {
+          id: STYLE_STRAY_LAYER_IDS[0],
+          type: 'line',
+          source: 'composite',
+        },
+      ],
+    } satisfies mapboxgl.StyleSpecification;
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => style,
+    });
+    global.fetch = fetchMock;
+
+    try {
+      const result = (await loadOptimizedMapStyle(
+        'mapbox://styles/example/style?optimize=true',
+        'test-token',
+        false,
+      )) as mapboxgl.StyleSpecification;
+      const request = fetchMock.mock.calls[0][0] as URL;
+
+      expect(request.origin).toBe('https://api.mapbox.com');
+      expect(request.pathname).toBe('/styles/v1/example/style');
+      expect(request.searchParams.get('optimize')).toBe('true');
+      expect(request.searchParams.get('access_token')).toBe('test-token');
+      expect(result.layers).toEqual([]);
+    } finally {
+      global.fetch = previousFetch;
+    }
+  });
+});
+
 describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
   it('reverse-maps display name to raw feature value for metadata layers', () => {
     const allLayers = new Set([
@@ -1699,21 +1791,50 @@ describe('removeStyleOwnedBikeRoutes', () => {
     expect(style.layers).toHaveLength(2);
   });
 
-  it('leaves Studio-owned routes intact for cities without runtime GeoJSON', async () => {
+  it('keeps Studio routes while pruning orphan trails for Studio-route cities', async () => {
     const previousFetch = global.fetch;
-    const fetchMock = vi.fn();
+    const routeTileset = STYLE_OWNED_ROUTE_TILESET_IDS[0];
+    const strayTileset = STYLE_STRAY_TILESET_IDS[0];
+    const style = {
+      version: 8,
+      sources: {
+        composite: {
+          type: 'vector',
+          url: `mapbox://mapbox.mapbox-streets-v8,${routeTileset},${strayTileset}`,
+        },
+      },
+      layers: [
+        {
+          id: STYLE_OWNED_ROUTE_LAYER_IDS[0],
+          type: 'line',
+          source: 'composite',
+        },
+        {
+          id: STYLE_STRAY_LAYER_IDS[0],
+          type: 'line',
+          source: 'composite',
+        },
+      ],
+    } satisfies mapboxgl.StyleSpecification;
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => style,
+    });
     global.fetch = fetchMock;
 
     try {
-      const styleUrl = 'mapbox://styles/example/style?optimize=true';
-      const result = await loadBikeRouteOptimizedStyle(
-        styleUrl,
+      const result = (await loadOptimizedMapStyle(
+        'mapbox://styles/example/style?optimize=true',
         'test-token',
         false,
-      );
+      )) as mapboxgl.StyleSpecification;
+      const composite = result.sources.composite as { url: string };
 
-      expect(result).toBe(styleUrl);
-      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.layers.map((layer) => layer.id)).toEqual([
+        STYLE_OWNED_ROUTE_LAYER_IDS[0],
+      ]);
+      expect(composite.url).toContain(routeTileset);
+      expect(composite.url).not.toContain(strayTileset);
     } finally {
       global.fetch = previousFetch;
     }
@@ -1746,7 +1867,7 @@ describe('removeStyleOwnedBikeRoutes', () => {
     const controller = new AbortController();
 
     try {
-      const result = (await loadBikeRouteOptimizedStyle(
+      const result = (await loadOptimizedMapStyle(
         'mapbox://styles/example/style?optimize=true',
         'test-token',
         true,
@@ -1780,7 +1901,7 @@ describe('removeStyleOwnedBikeRoutes', () => {
 
     try {
       await expect(
-        loadBikeRouteOptimizedStyle(
+        loadOptimizedMapStyle(
           'mapbox://styles/example/style?optimize=true',
           'test-token',
           true,
