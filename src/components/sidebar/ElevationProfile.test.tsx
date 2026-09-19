@@ -151,6 +151,22 @@ describe('computeGrades', () => {
     expect(grades[2]).toBeCloseTo(-10, 5);
   });
 
+  it('does not smooth across repeated-distance ride segment breaks', () => {
+    const segmentedRide: [number, number, number, number][] = [
+      [0, 100, -85, 35],
+      [100, 110, -85.1, 35],
+      [200, 120, -85.2, 35],
+      [200, 200, -86, 36],
+      [300, 190, -86.1, 36],
+      [400, 180, -86.2, 36],
+    ];
+
+    const grades = computeGrades(segmentedRide);
+
+    expect(grades[2]).toBeCloseTo(10, 5);
+    expect(grades[3]).toBeCloseTo(-10, 5);
+  });
+
   it('returns one grade per point and handles degenerate profiles', () => {
     expect(computeGrades(climb)).toHaveLength(climb.length);
     expect(computeGrades([[0, 100, -85, 35]])).toEqual([0]);

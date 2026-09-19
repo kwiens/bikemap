@@ -128,15 +128,16 @@ export function computeGrades(
   for (let i = 1; i < points.length; i++) {
     const previous = points[i - 1];
     const current = points[i];
+    const run = current[0] - previous[0];
     if (
+      run <= 0 ||
       gapEdges.has(
         profileEdgeKey(previous[2], previous[3], current[2], current[3]),
       )
     ) {
       segmentStarts.add(i);
     }
-    const run = points[i][0] - points[i - 1][0];
-    const rise = points[i][1] - points[i - 1][1];
+    const rise = current[1] - previous[1];
     runs.push(run > 0 ? run : 0);
     rises.push(run > 0 ? rise : 0);
   }
