@@ -159,34 +159,24 @@ function profileAcrossParts(
   meters: number,
   totals: ElevationTotals,
 ): ElevationProfile | null {
-  const combined = pointsToElevationProfile(sampled.flat(), name, {
+  // Mark every new part instead of building a separate profile per part.
+  // `pointsToElevationProfile` needs five points overall, but some legitimate
+  // connector parts are shorter than five terrain samples. Measuring each
+  // part independently dropped those short pieces from the chart and GPX even
+  // though their distance was included in the headline total.
+  const segmented = sampled.flatMap((part, partIndex) =>
+    part.map((point, pointIndex) =>
+      partIndex > 0 && pointIndex === 0
+        ? { ...point, segmentStart: true }
+        : point,
+    ),
+  );
+
+  return pointsToElevationProfile(segmented, name, {
     distance: meters,
     elevationGain: totals.gain,
     elevationLoss: totals.loss,
     elevationMax: totals.max,
     elevationMin: totals.min,
   });
-
-  if (!combined || sampled.length === 1) {
-    return combined;
-  }
-
-  // The distance axis accumulates point to point, so a concatenated series
-  // charges the hop between two parts to the trail. Rebuilding it per part and
-  // resuming from where the last part ended leaves the axis ending where
-  // `distance` says the trail does.
-  const points: ElevationProfile['profile'] = [];
-  let offsetFt = 0;
-  for (const part of sampled) {
-    const partProfile = pointsToElevationProfile(part, name);
-    if (!partProfile) {
-      continue;
-    }
-    for (const [distanceFt, altitudeFt, lng, lat] of partProfile.profile) {
-      points.push([offsetFt + distanceFt, altitudeFt, lng, lat]);
-    }
-    offsetFt += partProfile.profile[partProfile.profile.length - 1][0];
-  }
-
-  return points.length > 0 ? { ...combined, profile: points } : combined;
 }

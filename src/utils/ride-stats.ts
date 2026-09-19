@@ -385,10 +385,15 @@ export function pointsToElevationProfile(
 
   const smoothed = smoothAltitudes(points);
   const profile: [number, number, number, number][] = [];
+  const segmentStarts: number[] = [];
   let cumDistFt = 0;
+  let pendingSegmentStart = false;
 
   for (let i = 0; i < points.length; i++) {
-    if (Number.isNaN(smoothed[i])) continue;
+    if (Number.isNaN(smoothed[i])) {
+      pendingSegmentStart ||= points[i].segmentStart === true;
+      continue;
+    }
 
     if (i > 0 && !points[i].segmentStart) {
       const seg = haversineDistance(
@@ -400,6 +405,10 @@ export function pointsToElevationProfile(
       cumDistFt += seg * FEET_PER_METER;
     }
 
+    if ((pendingSegmentStart || points[i].segmentStart) && profile.length > 0) {
+      segmentStarts.push(profile.length);
+    }
+    pendingSegmentStart = false;
     profile.push([
       cumDistFt,
       smoothed[i] * FEET_PER_METER,
@@ -441,5 +450,6 @@ export function pointsToElevationProfile(
     min,
     max,
     profile,
+    ...(segmentStarts.length > 0 && { segmentStarts }),
   };
 }

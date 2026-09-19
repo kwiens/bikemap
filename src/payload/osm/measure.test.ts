@@ -68,6 +68,10 @@ const EAST: [number, number][] = [
   [-120.5, 44.9],
   [-120.49, 44.9],
 ];
+const SHORT: [number, number][] = [
+  [-121.4, 44.0],
+  [-121.3999, 44.0],
+];
 
 beforeEach(() => {
   clearTileCache();
@@ -131,6 +135,20 @@ describe('measureParts', () => {
       measured.distance,
       1,
     );
+  });
+
+  it('keeps a short disconnected part and its break in the profile', async () => {
+    const measured = await measureParts([SHORT, EAST], 'Split Trail', {
+      mapboxToken: TOKEN,
+    });
+    const coordinates = new Set(
+      measured.profile?.profile.map(([, , lng, lat]) => `${lng},${lat}`),
+    );
+
+    expect(measured.profile).not.toBeNull();
+    expect(measured.profile?.segmentStarts).toHaveLength(1);
+    expect(coordinates.has(`${SHORT[0][0]},${SHORT[0][1]}`)).toBe(true);
+    expect(coordinates.has(`${SHORT[1][0]},${SHORT[1][1]}`)).toBe(true);
   });
 
   it('warns rather than storing a flat line when no terrain can be read', async () => {

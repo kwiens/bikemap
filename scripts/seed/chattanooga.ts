@@ -17,6 +17,9 @@
  *   - Geometry comes from public/data/chattanooga/trails.geojson, generated
  *     from the permitted regional-trails shapefile by
  *     scripts/prepare_chattanooga_trails.py and matched by raw `Trail` name.
+ *     Summary measurements and static profiles are regenerated from those
+ *     exact lines by scripts/prepare_chattanooga_measurements.ts, and the seed
+ *     imports the profile with the line so no legacy measurement can leak in.
  *
  * These import as `geometrySource: 'imported'`, so the OSM rebuild hook leaves
  * the archived line alone. Once a trail has been matched to way ids, set its
@@ -28,6 +31,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chattanoogaData } from '../../src/data/cities/chattanooga';
+import {
+  type ElevationProfile,
+  slugForTrail,
+} from '../../src/data/mountain-bike-trails';
 import {
   connect,
   parseArgs,
@@ -42,6 +49,7 @@ import {
 } from './shared';
 
 const GEOJSON = 'public/data/chattanooga/trails.geojson';
+const PROFILE_DIR = 'public/data/elevation/chattanooga';
 
 /** Raw `Trail` value -> imported MultiLineString. */
 async function loadGeometry(): Promise<Map<string, MultiLineString>> {
@@ -65,14 +73,34 @@ async function loadGeometry(): Promise<Map<string, MultiLineString>> {
   return byName;
 }
 
+async function loadProfile(slug: string): Promise<ElevationProfile> {
+  const filename = path.join(repoRoot, PROFILE_DIR, `${slug}.json`);
+  const raw = await readFile(filename, 'utf8');
+  const profile = JSON.parse(raw) as ElevationProfile;
+  if (!Array.isArray(profile.profile) || profile.profile.length === 0) {
+    throw new Error(`Invalid Chattanooga elevation profile: ${filename}`);
+  }
+  return profile;
+}
+
 run(async () => {
   const { dryRun } = parseArgs(process.argv.slice(2));
   const payload = await connect();
 
   const geometry = await loadGeometry();
   const trails = chattanoogaData.mountainBikeTrails;
+  const profiles = new Map(
+    await Promise.all(
+      trails
+        .filter((trail) => geometry.has(trail.trailName))
+        .map(
+          async (trail) =>
+            [trail.trailName, await loadProfile(slugForTrail(trail))] as const,
+        ),
+    ),
+  );
   payload.logger.info(
-    `chattanooga: importing ${trails.length} trails (${geometry.size} geometries in ${GEOJSON})`,
+    `chattanooga: importing ${trails.length} trails (${geometry.size} source geometries; ${profiles.size} curated trails have measured profiles)`,
   );
 
   // Areas are created on first mention; the cache keeps that to one
@@ -112,6 +140,7 @@ run(async () => {
       areaId,
       vocabulary,
       city: 'chattanooga',
+      elevationProfile: profiles.get(trail.trailName) ?? null,
       geom,
       geometrySource: 'imported',
       trail,

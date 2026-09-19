@@ -373,6 +373,7 @@ One script per city, because their pipelines genuinely differ:
 |---|---|---|
 | Trails | 182 | 224 |
 | Geometry | `public/data/bend/trails.geojson`, by slug | `public/data/chattanooga/trails.geojson`, by raw `Trail` name |
+| Prepared profile | none — run the backfill | imported from `public/data/elevation/chattanooga`, measured from the same GIS line |
 | `osmIds` | yes | none |
 | `geometrySource` | `osm` — rebuildable from OSM | `imported` — the rebuild hook skips it |
 
@@ -655,10 +656,10 @@ Three reasons, in order of how much they cost:
 3. **They come from a different pipeline** — see below.
 
 So a trail with no database row falls back to its checked-in file rather than
-losing its chart. Chattanooga's seed now supplies imported GIS geometry, but
-its existing static elevation profiles remain the fallback until
-`pnpm backfill:elevation` measures those rows. Deployments with no database keep
-the offline profiles they have always had.
+losing its chart. Chattanooga's generated profiles are measured from the same
+GIS geometry as the static map fallback, and the seed imports that profile with
+the line. Deployments with or without the database therefore show the same
+path, distance, and elevation statistics.
 
 `pnpm backfill:elevation` measures every trail that has geometry but no profile.
 It samples terrain only — the geometry is already in the row — so it needs no

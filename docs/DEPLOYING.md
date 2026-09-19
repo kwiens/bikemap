@@ -90,15 +90,20 @@ the reprojection and grouping:
 
 ```bash
 python scripts/prepare_chattanooga_trails.py /path/to/Chattanooga_Regional_Trails_4.shp
+pnpm prepare:chattanooga-measurements
 pnpm db:seed:chattanooga
 ```
 
+The measurement step requires `NEXT_PUBLIC_MAPBOX_TOKEN`. It uses the same
+measurement code as Payload and regenerates both the checked-in summaries and
+static elevation profiles before the seed imports them with the geometry.
+
 ## 7. Trail elevation pipeline (optional)
 
-Only if you have mountain bike trails. The legacy Chattanooga script generates
-per-trail elevation profiles and bounds from the historical vector tileset plus
-Mapbox Terrain-RGB; new database-backed imports can instead use
-`pnpm backfill:elevation` after seeding.
+Only if you have mountain bike trails. `pnpm backfill:elevation` measures a
+database trail that has geometry but no stored profile. Chattanooga's prepared
+seed already includes profiles; the legacy Python script remains available for
+the historical Mapbox-vector-tile workflow.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate

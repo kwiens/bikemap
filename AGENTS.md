@@ -158,6 +158,7 @@ from NAD83 / UTM zone 16N to WGS84 GeoJSON by
 python -m venv .venv && source .venv/bin/activate
 pip install -r scripts/requirements.txt
 python scripts/prepare_chattanooga_trails.py /path/to/Chattanooga_Regional_Trails_4.shp
+pnpm prepare:chattanooga-measurements
 pnpm db:seed:chattanooga
 ```
 
@@ -166,7 +167,11 @@ pieces into one `MultiLineString` per raw `Trail` value. The seed matches those
 names against the 224 curated rows and stores geometry as
 `geometrySource: 'imported'`; 218 match. The six Godsey Ridge trails remain in
 the separate `Godsey Ridge Trails` style layer because that geometry was not in
-the regional shapefile.
+the regional shapefile. `prepare:chattanooga-measurements` uses the same
+`measureParts` implementation as Payload to regenerate summary metadata and
+the city-scoped static profiles from those exact 218 lines. The seed imports
+the prepared profile alongside each line; never seed after changing the
+GeoJSON without regenerating these artifacts first.
 
 `ensureMtnBikeSource(map)` attaches `MTN_BIKE_SOURCE_ID` as GeoJSON, reads
 `/api/map/trails?city=chattanooga`, and falls back to the checked-in GeoJSON if
@@ -455,9 +460,10 @@ Things to know before touching it:
   The pane fetches `/api/map/elevation/<slug>?city=<city>`, serving the profile
   measured on the trail's last save. A miss falls back to
   `public/data/elevation/<city>/<slug>.json`, which keeps charts working for
-  unseeded Chattanooga deployments and installations without a CMS. Keep the city in
-  both lookups so same-named trails cannot collide. `pnpm backfill:elevation`
-  measures trails that have geometry but no profile, without touching Overpass.
+  unseeded Chattanooga deployments and installations without a CMS. Keep the
+  city in both lookups so same-named trails cannot collide. Chattanooga's seed
+  imports its prepared profiles directly; `pnpm backfill:elevation` measures
+  any trail that still has geometry but no profile, without touching Overpass.
 - **`computeElevation`'s spike filter needs a run cap.** It replaces readings
   further than `ELEVATION_SPIKE_THRESHOLD` (25 m) from a running EMA. On a
   sustained climb the EMA lags by about `step * (1-alpha)/alpha`, and on a ~30%

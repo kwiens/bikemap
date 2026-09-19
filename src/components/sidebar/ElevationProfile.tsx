@@ -120,33 +120,55 @@ export function gradeToColor(grade: number): string {
 
 export function computeGradeColors(
   points: [number, number, number, number][],
+  segmentStarts: number[] = [],
 ): string[] {
   if (points.length < 2) return points.map(() => gradeToColor(0));
 
-  const rawGrades: number[] = [0];
-  for (let i = 1; i < points.length; i++) {
-    const dx = points[i][0] - points[i - 1][0];
-    const dy = points[i][1] - points[i - 1][1];
-    rawGrades.push(dx > 0 ? (dy / dx) * 100 : 0);
-  }
-
-  const smoothed: number[] = [];
+  const rawGrades = new Array<number>(points.length).fill(0);
+  const smoothed = new Array<number>(points.length).fill(0);
   const WINDOW = 2;
-  for (let i = 0; i < rawGrades.length; i++) {
-    let sum = 0;
-    let count = 0;
-    for (
-      let j = Math.max(0, i - WINDOW);
-      j <= Math.min(rawGrades.length - 1, i + WINDOW);
-      j++
-    ) {
-      sum += rawGrades[j];
-      count++;
+  for (const [start, end] of profileSegmentRanges(
+    points.length,
+    segmentStarts,
+  )) {
+    for (let i = start + 1; i < end; i++) {
+      const dx = points[i][0] - points[i - 1][0];
+      const dy = points[i][1] - points[i - 1][1];
+      rawGrades[i] = dx > 0 ? (dy / dx) * 100 : 0;
     }
-    smoothed.push(sum / count);
+    for (let i = start; i < end; i++) {
+      let sum = 0;
+      let count = 0;
+      for (
+        let j = Math.max(start, i - WINDOW);
+        j <= Math.min(end - 1, i + WINDOW);
+        j++
+      ) {
+        sum += rawGrades[j];
+        count++;
+      }
+      smoothed[i] = sum / count;
+    }
   }
 
   return smoothed.map((g) => gradeToColor(g));
+}
+
+function profileSegmentRanges(
+  pointCount: number,
+  segmentStarts: number[] = [],
+): [number, number][] {
+  if (pointCount === 0) return [];
+  const starts = [
+    0,
+    ...new Set(
+      segmentStarts.filter(
+        (start) => Number.isInteger(start) && start > 0 && start < pointCount,
+      ),
+    ),
+    pointCount,
+  ].sort((a, b) => a - b);
+  return starts.slice(0, -1).map((start, index) => [start, starts[index + 1]]);
 }
 
 // Force strictly increasing offsets. Consecutive profile points can share a
@@ -194,7 +216,11 @@ export function downsampleStops(
 const profileCache = new Map<string, ElevationProfileData>();
 
 function downloadGpx(profile: ElevationProfileData): void {
-  const gpx = buildProfileGpx(profile.trail, profile.profile);
+  const gpx = buildProfileGpx(
+    profile.trail,
+    profile.profile,
+    profile.segmentStarts,
+  );
   downloadFile(gpx, `${slugify(profile.trail)}.gpx`, 'application/gpx+xml');
 }
 
@@ -573,7 +599,8 @@ export function ElevationProfile() {
   }, []);
 
   const gradeColors = useMemo(
-    () => (profile ? computeGradeColors(profile.profile) : []),
+    () =>
+      profile ? computeGradeColors(profile.profile, profile.segmentStarts) : [],
     [profile],
   );
 
@@ -790,14 +817,31 @@ const ElevationSvg = React.memo(function ElevationSvg({
     PLOT_HEIGHT -
     ((e - profile.min) / yRange) * PLOT_HEIGHT;
 
-  const linePath = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? 'M' : 'L'}${xScale(p[0]).toFixed(1)} ${yScale(p[1]).toFixed(1)}`,
+  const baseline = CHART_HEIGHT - CHART_PADDING_BOTTOM;
+  const ranges = profileSegmentRanges(points.length, profile.segmentStarts);
+  const linePath = ranges
+    .map(([start, end]) =>
+      points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' '),
     )
     .join(' ');
-
-  const areaPath = `${linePath} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
+  const areaPath = ranges
+    .map(([start, end]) => {
+      const segmentLine = points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' ');
+      return `${segmentLine} L${xScale(points[end - 1][0]).toFixed(1)} ${baseline} L${xScale(points[start][0]).toFixed(1)} ${baseline} Z`;
+    })
+    .join(' ');
 
   const gradientStops = downsampleStops(points, gradeColors, maxDist);
 

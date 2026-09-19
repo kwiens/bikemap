@@ -49,6 +49,9 @@ export interface ElevationProfile {
   min: number;
   max: number;
   profile: [number, number, number, number][]; // [distance_ft, elevation_ft, lng, lat]
+  // Zero-based indexes into `profile` where a disconnected line/recording
+  // segment begins. Optional so historical checked-in profiles still load.
+  segmentStarts?: number[];
   // OSM trails only: a tiny tag summary shown beneath the pane header. Curated
   // trails and recorded rides leave this undefined.
   osm?: OsmTrailDetails;

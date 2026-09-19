@@ -107,12 +107,26 @@ ${trksegs}
 export function buildProfileGpx(
   name: string,
   points: [number, number, number, number][],
+  segmentStarts: number[] = [],
 ): string {
-  const trkpts = points
-    .map(
-      ([, elev, lng, lat]) =>
-        `      <trkpt lat="${lat}" lon="${lng}"><ele>${(elev / FEET_PER_METER).toFixed(1)}</ele></trkpt>`,
-    )
+  const starts = new Set(segmentStarts);
+  const segments: [number, number, number, number][][] = [];
+  for (let index = 0; index < points.length; index++) {
+    if (segments.length === 0 || starts.has(index)) {
+      segments.push([]);
+    }
+    segments[segments.length - 1].push(points[index]);
+  }
+  const trksegs = segments
+    .map((segment) => {
+      const trkpts = segment
+        .map(
+          ([, elev, lng, lat]) =>
+            `      <trkpt lat="${lat}" lon="${lng}"><ele>${(elev / FEET_PER_METER).toFixed(1)}</ele></trkpt>`,
+        )
+        .join('\n');
+      return `    <trkseg>\n${trkpts}\n    </trkseg>`;
+    })
     .join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -126,9 +140,7 @@ export function buildProfileGpx(
   </metadata>
   <trk>
     <name>${escapeXml(name)}</name>
-    <trkseg>
-${trkpts}
-    </trkseg>
+${trksegs}
   </trk>
 </gpx>`;
 }

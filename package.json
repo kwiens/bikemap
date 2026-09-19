@@ -22,6 +22,7 @@
     "db:migrate:create": "payload migrate:create",
     "db:seed:bend": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/bend.ts",
     "db:seed:chattanooga": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/chattanooga.ts",
+    "prepare:chattanooga-measurements": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/prepare_chattanooga_measurements.ts",
     "backfill:elevation": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/backfill-elevation-profiles.ts"
   },
   "dependencies": {
