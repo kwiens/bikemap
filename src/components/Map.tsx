@@ -13,12 +13,12 @@ import {
   bikeRoutes,
   mapFeatures,
   bikeResources,
-  mountainBikeTrails,
   hiddenStyleLayerIds,
   trailMetadata,
   bikeNetworkUrl,
   bikeRoutesUrl,
 } from '@/data/geo_data';
+import { getMountainBikeTrails } from '@/data/trail-source';
 import {
   createLocationMarker,
   updateAccuracyCircle,
@@ -456,7 +456,9 @@ const MapboxMap = memo(function MapboxMap() {
       if (!map.current) return;
 
       const { trailName, autoDetected } = event.detail;
-      const trail = mountainBikeTrails.find((t) => t.trailName === trailName);
+      const trail = getMountainBikeTrails().find(
+        (t) => t.trailName === trailName,
+      );
 
       // Manual selection during recording disables auto-detect and clears
       // any prior auto-detected trail so stop doesn't deselect the manual pick.
@@ -533,7 +535,7 @@ const MapboxMap = memo(function MapboxMap() {
       if (!map.current) return;
 
       const { areaName } = event.detail;
-      const bounds = getAreaBounds(mountainBikeTrails, areaName);
+      const bounds = getAreaBounds(getMountainBikeTrails(), areaName);
 
       showToast(areaName);
 
@@ -542,7 +544,7 @@ const MapboxMap = memo(function MapboxMap() {
         selected: 0.1,
         unselected: 0.1,
       });
-      highlightMtnBikeArea(map.current, mountainBikeTrails, areaName);
+      highlightMtnBikeArea(map.current, getMountainBikeTrails(), areaName);
 
       if (bounds) {
         pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
@@ -1219,7 +1221,7 @@ const MapboxMap = memo(function MapboxMap() {
             setBikeNetworkVisible(newMap, true);
           }
           if (showTrails) {
-            initTrailBoundsFromDefaults(mountainBikeTrails);
+            initTrailBoundsFromDefaults(getMountainBikeTrails());
 
             // Apply unselected defaults (opacity/width) through the shared
             // helper so deselect and init stay in sync — see updateMtnBikeOpacity.

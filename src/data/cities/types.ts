@@ -14,6 +14,12 @@ export interface CuratedTrailLayerConfig {
   sourceId?: string;
   tilesetUrl?: string;
   geojsonUrl?: string;
+  // Static GeoJSON to draw when `geojsonUrl` is unreachable or answers with no
+  // features — set it whenever `geojsonUrl` points at the database-backed API,
+  // which can be down, unconfigured, or unseeded. With it set, the map fetches
+  // the primary URL itself rather than handing it to Mapbox, which has no
+  // answer to a failure. See `loadCuratedGeojson`.
+  geojsonFallbackUrl?: string;
   metadata?: Record<string, TrailMeta>;
   // How a curated trail entry maps to features in this layer:
   //  - 'name'  (default): match trailProp against the trail's name

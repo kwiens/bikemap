@@ -7,11 +7,9 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import {
-  elevationBasePath,
-  mountainBikeTrails,
-  type ElevationProfile as ElevationProfileData,
-} from '@/data/geo_data';
+import type { CityId } from '@/data/cities/types';
+import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
+import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
 import { downloadFile } from '@/utils/format';
@@ -28,6 +26,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { getSetting } from '@/utils/settings';
+import { activeCityId } from '@/config/map.config';
 import { useEmbed } from '@/components/EmbedContext';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
 
@@ -39,8 +38,59 @@ const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 const GRADE_YELLOW = 12;
 const GRADE_RED = 25;
 
+/**
+ * One profile fetch. Rejects on a non-200 — a trail with no stored profile is
+ * a 404, which the caller treats as "no chart" rather than an error.
+ */
+async function fetchProfile(
+  url: string,
+  signal: AbortSignal,
+): Promise<ElevationProfileData> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * A trail's profile: the database first, the checked-in file second.
+ *
+ * The stored profile wins whenever there is one. It is remeasured every time a
+ * trail is saved, so it is the copy that agrees with the distance and climb the
+ * sidebar shows; a static file cannot update itself and would keep drawing an
+ * old line beside new numbers.
+ *
+ * The files are still the only source for a trail whose database row has no
+ * measured profile, and a deployment with no DATABASE_URL has no rows at all,
+ * so a miss falls through to
+ * `/data/elevation/<city>/<slug>.json` rather than leaving the pane blank.
+ *
+ * An abort is not a miss: it means the selection changed, and refetching the
+ * file for a trail nobody is looking at any more would be pointless.
+ */
+export async function loadProfile(
+  slug: string,
+  city: CityId,
+  signal: AbortSignal,
+): Promise<ElevationProfileData> {
+  try {
+    return await fetchProfile(
+      `/api/map/elevation/${slug}?city=${encodeURIComponent(city)}`,
+      signal,
+    );
+  } catch (error) {
+    if ((error as Error).name === 'AbortError') {
+      throw error;
+    }
+    return fetchProfile(`/data/elevation/${city}/${slug}.json`, signal);
+  }
+}
+
 function profileSlug(trailName: string): string {
-  const trail = mountainBikeTrails.find((item) => item.trailName === trailName);
+  const trail = getMountainBikeTrails().find(
+    (item) => item.trailName === trailName,
+  );
   return trail ? slugForTrail(trail) : slugify(trailName);
 }
 const MAX_GRADIENT_STOPS = 200;
@@ -147,6 +197,33 @@ function profileEdgeKey(
   return `${fromLng},${fromLat}:${toLng},${toLat}`;
 }
 
+function profileSegmentRanges(
+  points: [number, number, number, number][],
+  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
+): [number, number][] {
+  if (points.length === 0) return [];
+  const gapEdges = new Set(
+    gapDetails.map(({ from, to }) =>
+      profileEdgeKey(from[0], from[1], to[0], to[1]),
+    ),
+  );
+  const starts = [0];
+  for (let index = 1; index < points.length; index++) {
+    const previous = points[index - 1];
+    const current = points[index];
+    if (
+      current[0] <= previous[0] ||
+      gapEdges.has(
+        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
+      )
+    ) {
+      starts.push(index);
+    }
+  }
+  starts.push(points.length);
+  return starts.slice(0, -1).map((start, index) => [start, starts[index + 1]]);
+}
+
 // Force strictly increasing offsets. Consecutive profile points can share a
 // distance (multi-segment trails repeat distance at a seam), which would yield
 // duplicate gradient offsets — invalid as React keys and pointless zero-width
@@ -192,7 +269,11 @@ export function downsampleStops(
 const profileCache = new Map<string, ElevationProfileData>();
 
 function downloadGpx(profile: ElevationProfileData): void {
-  const gpx = buildProfileGpx(profile.trail, profile.profile);
+  const gpx = buildProfileGpx(
+    profile.trail,
+    profile.profile,
+    profile.geometryGapDetails,
+  );
   downloadFile(gpx, `${slugify(profile.trail)}.gpx`, 'application/gpx+xml');
 }
 
@@ -272,7 +353,7 @@ export function ElevationProfile() {
     // OSM trails ship a ready-built profile (no curated JSON to load by name),
     // and aren't restorable by slug on reload, so no URL state is written.
     // Seed the cache so the trailName effect takes its cache-hit path instead of
-    // fetching a non-existent /data/elevation/<slug>.json and clearing us.
+    // fetching a non-existent /data/elevation/<city>/<slug>.json and clearing us.
     const handleOsmTrailSelect = (e: Event) => {
       const { profile: osmProfile } = (e as CustomEvent).detail as {
         profile: ElevationProfileData;
@@ -486,11 +567,11 @@ export function ElevationProfile() {
 
     const controller = new AbortController();
     const slug = encodeURIComponent(profileSlug(trailName));
-    fetch(`${elevationBasePath}/${slug}.json`, { signal: controller.signal })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
+
+    // `activeCityId` is the browser's own resolution (this runs on the client,
+    // so it sees window.location) — the API needs it because slugs are unique
+    // per city, not globally.
+    loadProfile(slug, activeCityId, controller.signal)
       .then((data: ElevationProfileData) => {
         profileCache.set(`trail:${trailName}`, data);
         setProfile(data);
@@ -805,14 +886,31 @@ const ElevationSvg = React.memo(function ElevationSvg({
     PLOT_HEIGHT -
     ((e - profile.min) / yRange) * PLOT_HEIGHT;
 
-  const linePath = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? 'M' : 'L'}${xScale(p[0]).toFixed(1)} ${yScale(p[1]).toFixed(1)}`,
+  const baseline = CHART_HEIGHT - CHART_PADDING_BOTTOM;
+  const ranges = profileSegmentRanges(points, profile.geometryGapDetails);
+  const linePath = ranges
+    .map(([start, end]) =>
+      points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' '),
     )
     .join(' ');
-
-  const areaPath = `${linePath} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
+  const areaPath = ranges
+    .map(([start, end]) => {
+      const segmentLine = points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' ');
+      return `${segmentLine} L${xScale(points[end - 1][0]).toFixed(1)} ${baseline} L${xScale(points[start][0]).toFixed(1)} ${baseline} Z`;
+    })
+    .join(' ');
 
   const gradientStops = downsampleStops(points, gradeColors, maxDist);
 

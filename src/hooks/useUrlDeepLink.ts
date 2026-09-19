@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { mountainBikeTrails, bikeRoutes } from '@/data/geo_data';
+import { bikeRoutes } from '@/data/geo_data';
+import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
 import { MAP_EVENTS } from '@/events';
@@ -38,7 +39,7 @@ export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
 
     const selectFromUrl = () => {
       if (trailSlug) {
-        const found = mountainBikeTrails.find(
+        const found = getMountainBikeTrails().find(
           (t) => slugForTrail(t) === trailSlug,
         );
         if (found) {

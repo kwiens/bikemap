@@ -4,8 +4,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MountainBikeTrails } from './MountainBikeTrails';
 import type { MountainBikeTrailsProps } from './types';
 
-vi.mock('@/data/geo_data', () => ({
-  mountainBikeTrails: [
+// Trails now reach the component through the trail-source store, which the
+// server populates from Payload; regionFor is still plain config.
+vi.mock('@/data/trail-source', () => ({
+  getMountainBikeTrails: () => [
     {
       trailName: 'Trail A',
       displayName: 'Trail A',
@@ -43,6 +45,9 @@ vi.mock('@/data/geo_data', () => ({
       icon: {},
     },
   ],
+}));
+
+vi.mock('@/data/geo_data', () => ({
   regionFor: (recArea: string) => {
     if (recArea === 'Area 1' || recArea === 'Area 2') return 'Region 1';
     return 'Region 2';
