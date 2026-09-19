@@ -1,5 +1,7 @@
 // SVG generation from GeoJSON features using Mercator projection
 
+import type * as GeoJSON from 'geojson';
+
 function mercatorX(lng: number): number {
   return ((lng + 180) / 360) * 256;
 }

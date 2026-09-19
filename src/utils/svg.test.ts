@@ -1,3 +1,4 @@
+import type * as GeoJSON from 'geojson';
 import { describe, it, expect } from 'vitest';
 import { buildSvg } from './svg';
 
