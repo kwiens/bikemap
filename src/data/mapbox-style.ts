@@ -25,8 +25,12 @@ export const STYLE_OWNED_ROUTE_TILESET_IDS = [
   'swuller.6mn7meup',
 ];
 
-// Orphan layers baked into the style that no city manages — hidden for all.
-export const STYLE_STRAY_LAYER_IDS = ['Chatt_TPL_Trails-public'];
+// Orphan and superseded layers baked into the style that no city manages.
+// Keep these hidden until they are deleted from the shared Studio style.
+export const STYLE_STRAY_LAYER_IDS = [
+  'Chatt_TPL_Trails-public',
+  'Godsey Ridge Trails',
+];
 
 /**
  * Style-owned route layers the given city must hide: everything the style
