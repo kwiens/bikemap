@@ -93,10 +93,12 @@ under `public/` or committed to Git. The database row keeps the existing
 `BikeRoute.id`, so route selection and styling continue to use the same public
 identifier.
 
-The public map reads `/api/map/routes?city=chattanooga`. Payload is the sole
-Riverwalk geometry source: the same-named Studio layer stays disabled whether
-the endpoint returns geometry, is empty, or is unavailable. Run the migration
-and import before relying on the route in an environment.
+The public map reads its route list from Payload. Riverwalk geometry comes from
+`/api/map/routes?city=chattanooga`: the same-named Studio layer stays disabled
+whether the endpoint returns geometry, is empty, or is unavailable. The five
+routes awaiting a verified current import also have Payload records, but each
+explicitly selects its known Studio layer as the geometry source. Run the
+migration and Riverwalk import before relying on Riverwalk in an environment.
 
 Multipart route direction is normalized by `scripts/fix_route_directions.py`.
 When two parts form alternate paths between the same junctions, the paths must

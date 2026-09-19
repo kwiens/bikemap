@@ -58,4 +58,7 @@ export const chattanoogaData: CityData = {
   // any additional published Route (including a linked Trail) joins the same
   // runtime source without needing a new city config entry.
   bikeRoutesUrl: '/api/map/routes?city=chattanooga',
+  // Riverwalk is runtime-owned even before its manual import, so a missing or
+  // unavailable database never exposes the older same-named Studio line.
+  inlineBikeRouteIds: ['riverwalk-loop-v3-public'],
 };

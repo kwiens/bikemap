@@ -21,6 +21,7 @@ pnpm db:up              # Start local Postgres via docker compose
 pnpm db:migrate         # Apply migrations
 pnpm db:seed:bend       # Import Bend's trails and Casual routes
 pnpm db:seed:bend-routes # Sync only Bend's 8 Casual routes (also runs on deploy)
+pnpm db:seed:chattanooga-routes # Sync 5 legacy Studio-backed route rows
 pnpm generate:types     # Regenerate src/payload-types.ts after a collection change
 pnpm generate:importmap # Regenerate the admin import map after adding a component
 ```
@@ -144,7 +145,7 @@ The app uses custom DOM events (`window.dispatchEvent`) for component communicat
 
 ### Map Styling
 
-Route display metadata is keyed by stable layer IDs such as `riverwalk-loop-v3-public`. Geometry may come from Mapbox Studio or the configured city GeoJSON/API. Chattanooga's imported Riverwalk geometry comes only from Payload; its same-named Studio layer must stay disabled even when the database is unavailable or unseeded.
+Route display metadata comes from Payload and is keyed by stable layer IDs such as `riverwalk-loop-v3-public`. Each Route explicitly chooses imported geometry, a linked Trail, or a legacy Mapbox Studio layer. Chattanooga's imported Riverwalk geometry comes only from Payload; its same-named Studio layer must stay disabled even when the database is unavailable or unseeded.
 
 ### Mountain Bike Trails
 
@@ -445,9 +446,10 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
 - `src/payload/read/trails.ts` — reads trails back out for the public map
 - `src/payload/collections/Routes.ts` + `src/payload/read/routes.ts` — Casual
   route records and the public map read path. A route either owns imported
-  geometry or selects a same-city Trail and reuses that trail's current
-  geometry, distance, and bounds. Casual reads Routes only; linking a Trail is
-  how a curator exposes it there without duplicating its line. Use
+  geometry, selects a same-city Trail and reuses its current measurements, or
+  explicitly names a legacy Mapbox Studio layer that has not been migrated.
+  Casual reads Routes only; linking a Trail is how a curator exposes it there
+  without duplicating its line. Use
   `pnpm db:import:chattanooga-routes` rather than committing generated route
   GeoJSON. Bend's seed derives its eight imported routes directly from the
   committed bike-network source.

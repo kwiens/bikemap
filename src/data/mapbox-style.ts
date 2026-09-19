@@ -1,4 +1,7 @@
-import { bikeRoutes as chattanoogaBikeRoutes } from '@/data/bike-routes';
+import {
+  bikeRoutes as chattanoogaBikeRoutes,
+  type BikeRoute,
+} from '@/data/bike-routes';
 import type { CityData } from './cities/types';
 
 // What the shared Mapbox Studio style bakes in, declared once per style.
@@ -14,8 +17,7 @@ export const STYLE_OWNED_ROUTE_LAYER_IDS = chattanoogaBikeRoutes.map(
 );
 
 // Dedicated Chattanooga route tilesets baked into the shared Studio style.
-// Every city's complete curated route set now comes from runtime GeoJSON, so
-// these can be removed from the downloaded composite style.
+// They can be removed when every route for the active city is runtime-owned.
 export const STYLE_OWNED_ROUTE_TILESET_IDS = [
   'swuller.a2odh3pm',
   'swuller.b0vlobi3',
@@ -28,15 +30,25 @@ export const STYLE_OWNED_ROUTE_TILESET_IDS = [
 // Orphan layers baked into the style that no city manages — hidden for all.
 export const STYLE_STRAY_LAYER_IDS = ['Chatt_TPL_Trails-public'];
 
-/** Hide foreign routes and routes whose geometry is owned by a runtime source. */
+/** Hide route layers the active city's static style manifest does not own. */
 export function hiddenStyleLayerIdsFor(city: CityData): string[] {
   const ownRouteIds = new Set(city.bikeRoutes.map((route) => route.id));
-  const runtimeRouteIds = new Set(
-    city.bikeRoutesUrl
-      ? (city.inlineBikeRouteIds ?? city.bikeRoutes.map((route) => route.id))
-      : [],
+  return STYLE_OWNED_ROUTE_LAYER_IDS.filter((id) => !ownRouteIds.has(id));
+}
+
+/** Hide every known style route except published Routes that explicitly use it. */
+export function inactiveStyleRouteLayerIds(
+  routes: BikeRoute[],
+  runtimeIds: string[],
+): string[] {
+  const runtime = new Set(runtimeIds);
+  const visibleStudioIds = new Set(
+    routes.flatMap((route) =>
+      route.geometrySource === 'studio' ||
+      (!route.geometrySource && !runtime.has(route.id))
+        ? [route.id]
+        : [],
+    ),
   );
-  return STYLE_OWNED_ROUTE_LAYER_IDS.filter(
-    (id) => !ownRouteIds.has(id) || runtimeRouteIds.has(id),
-  );
+  return STYLE_OWNED_ROUTE_LAYER_IDS.filter((id) => !visibleStudioIds.has(id));
 }

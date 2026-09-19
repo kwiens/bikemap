@@ -1,5 +1,9 @@
 import { faRoute } from '@fortawesome/free-solid-svg-icons';
-import type { BikeRoute, RouteKind } from '@/data/bike-routes';
+import type {
+  BikeRoute,
+  RouteGeometrySource,
+  RouteKind,
+} from '@/data/bike-routes';
 
 export interface StoredRoute {
   bounds?: null | unknown;
@@ -8,7 +12,7 @@ export interface StoredRoute {
   description?: null | string;
   distance?: null | number;
   geom?: null | unknown;
-  geometrySource?: null | 'imported' | 'trail';
+  geometrySource?: null | RouteGeometrySource;
   hideArrows?: null | boolean;
   kind?: null | RouteKind;
   name?: null | string;
@@ -68,7 +72,11 @@ export function publicBikeRoutes(
   sourceTrails: ReadonlyMap<string, StoredRouteTrail> = new Map(),
 ): BikeRoute[] {
   return routes.flatMap((route) => {
-    if (!route.routeId || !route.name || !geometryFor(route, sourceTrails)) {
+    if (
+      !route.routeId ||
+      !route.name ||
+      (route.geometrySource !== 'studio' && !geometryFor(route, sourceTrails))
+    ) {
       return [];
     }
     const trail = trailFor(route, sourceTrails);
@@ -82,6 +90,7 @@ export function publicBikeRoutes(
         defaultWidth: route.defaultWidth ?? 8,
         opacity: route.opacity ?? 1,
         distance: trail?.distance ?? route.distance ?? 0,
+        geometrySource: route.geometrySource ?? 'imported',
         ...(route.kind ? { kind: route.kind } : {}),
         ...(route.hideArrows ? { hideArrows: true } : {}),
         ...(route.reverseDirection ? { reverseDirection: true } : {}),
@@ -124,7 +133,9 @@ function geometryFor(
 ): unknown | null {
   return route.geometrySource === 'trail'
     ? (trailFor(route, sourceTrails)?.geom ?? null)
-    : (route.geom ?? null);
+    : route.geometrySource === 'studio'
+      ? null
+      : (route.geom ?? null);
 }
 
 function boundsFor(

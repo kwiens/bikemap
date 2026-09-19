@@ -18,9 +18,11 @@ export interface BikeRoute {
   defaultBounds?: [number, number, number, number]; // [swLng, swLat, neLng, neLat] fallback
   bounds?: mapboxgl.LngLatBounds; // Runtime-calculated bounds
   kind?: RouteKind; // Editorial classification; does not change map behavior
+  geometrySource?: RouteGeometrySource; // Public geometry authority selected in Payload
 }
 
 export type RouteKind = 'ride' | 'greenway' | 'path' | 'trail';
+export type RouteGeometrySource = 'imported' | 'studio' | 'trail';
 
 export const bikeRoutes: BikeRoute[] = [
   {

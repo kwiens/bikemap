@@ -1,4 +1,29 @@
+import type { BikeRoute } from '@/data/bike-routes';
+
 const ROUTE_FETCH_TIMEOUT_MS = 5_000;
+
+/** Route ids whose geometry comes from the configured runtime GeoJSON source. */
+export function runtimeRouteIds(
+  routes: BikeRoute[],
+  configuredIds?: string[],
+): string[] {
+  if (!configuredIds) {
+    return routes
+      .filter((route) => route.geometrySource !== 'studio')
+      .map((route) => route.id);
+  }
+
+  // Static city configs use this list as the complete inline subset. Database
+  // route rows additionally declare their own source, so newly linked Trails
+  // must join the configured ids without a code change.
+  const ids = new Set(configuredIds);
+  for (const route of routes) {
+    if (route.geometrySource && route.geometrySource !== 'studio') {
+      ids.add(route.id);
+    }
+  }
+  return [...ids];
+}
 
 /** Fetch route GeoJSON without letting a slow database block indefinitely. */
 export async function fetchRouteCollection(

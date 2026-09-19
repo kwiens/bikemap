@@ -27,7 +27,7 @@ const publishedTrailsForRouteCity: FilterOptions = ({ data }) =>
       }
     : true;
 
-/** Curated road and greenway routes whose rendered geometry Payload owns. */
+/** Curated road, greenway, and trail routes shown in Casual mode. */
 export const Routes: CollectionConfig = {
   slug: 'routes',
   indexes: [{ fields: ['city', 'routeId'], unique: true }],
@@ -35,7 +35,7 @@ export const Routes: CollectionConfig = {
     useAsTitle: 'name',
     defaultColumns: ['name', 'city', 'kind', 'geometrySource', 'updatedAt'],
     description:
-      'Every published Route appears in Casual mode. A Route may use imported geometry or reuse an existing Trail.',
+      'Every published Route appears in Casual mode. Its geometry may come from an import, an existing Trail, or a current Mapbox Studio layer.',
     group: 'Map content',
     listSearchableFields: ['name', 'routeId'],
   },
@@ -113,11 +113,12 @@ export const Routes: CollectionConfig = {
           options: [
             { label: 'Imported geometry', value: 'imported' },
             { label: 'Existing trail', value: 'trail' },
+            { label: 'Mapbox Studio layer', value: 'studio' },
           ],
           admin: {
             width: '25%',
             description:
-              'An existing trail stays linked; edits to that trail automatically update this route.',
+              'Imported and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.',
           },
         },
         {
@@ -177,7 +178,7 @@ export const Routes: CollectionConfig = {
             width: '25%',
             condition: (_, siblingData) =>
               siblingData.geometrySource !== 'trail',
-            description: 'Imported route distance in miles.',
+            description: 'Route distance in miles.',
           },
         },
       ],
@@ -205,7 +206,7 @@ export const Routes: CollectionConfig = {
             readOnly: true,
             condition: (_, siblingData) =>
               siblingData.geometrySource !== 'trail',
-            description: 'Imported [west, south, east, north] bounds.',
+            description: '[west, south, east, north] bounds.',
           },
         },
         {
@@ -223,9 +224,10 @@ export const Routes: CollectionConfig = {
       name: 'geom',
       type: 'json',
       admin: {
-        condition: (_, siblingData) => siblingData.geometrySource !== 'trail',
+        condition: (_, siblingData) =>
+          siblingData.geometrySource === 'imported',
         description:
-          'Normalized WGS84 route geometry. Import tooling owns this value.',
+          'Normalized WGS84 route geometry. Import tooling owns this value when the source is Imported geometry.',
         readOnly: true,
       },
       validate: validateRouteGeometry,
@@ -235,7 +237,8 @@ export const Routes: CollectionConfig = {
       label: 'Import provenance',
       admin: {
         initCollapsed: true,
-        condition: (_, siblingData) => siblingData.geometrySource !== 'trail',
+        condition: (_, siblingData) =>
+          siblingData.geometrySource === 'imported',
       },
       fields: [
         {
@@ -263,7 +266,8 @@ export function validateRouteGeometry(
   value: unknown,
   options: { siblingData?: Record<string, unknown> } = {},
 ): string | true {
-  if (options.siblingData?.geometrySource === 'trail') {
+  const source = options.siblingData?.geometrySource ?? 'imported';
+  if (source !== 'imported') {
     return true;
   }
   const parsed = parseTrailGeometry(value);

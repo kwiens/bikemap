@@ -132,7 +132,7 @@ export interface UserAuthOperations {
   };
 }
 /**
- * Every published Route appears in Casual mode. A Route may use imported geometry or reuse an existing Trail.
+ * Every published Route appears in Casual mode. Its geometry may come from an import, an existing Trail, or a current Mapbox Studio layer.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "routes".
@@ -150,9 +150,9 @@ export interface Route {
   routeId?: string | null;
   kind?: ('ride' | 'greenway' | 'path' | 'trail') | null;
   /**
-   * An existing trail stays linked; edits to that trail automatically update this route.
+   * Imported and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.
    */
-  geometrySource: 'imported' | 'trail';
+  geometrySource: 'imported' | 'trail' | 'studio';
   /**
    * Select a curated trail to expose it in the Casual routes tab.
    */
@@ -165,13 +165,13 @@ export interface Route {
   defaultWidth: number;
   opacity: number;
   /**
-   * Imported route distance in miles.
+   * Route distance in miles.
    */
   distance?: number | null;
   hideArrows?: boolean | null;
   reverseDirection?: boolean | null;
   /**
-   * Imported [west, south, east, north] bounds.
+   * [west, south, east, north] bounds.
    */
   bounds?:
     | {
@@ -195,7 +195,7 @@ export interface Route {
     | boolean
     | null;
   /**
-   * Normalized WGS84 route geometry. Import tooling owns this value.
+   * Normalized WGS84 route geometry. Import tooling owns this value when the source is Imported geometry.
    */
   geom?:
     | {

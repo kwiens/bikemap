@@ -4,11 +4,32 @@ import { resolveRouteSource } from './resolveRouteSource';
 
 type HookArgs = Parameters<typeof resolveRouteSource>[0];
 
+const GEOMETRY = {
+  coordinates: [
+    [
+      [-121.4, 44],
+      [-121.39, 44.01],
+    ],
+  ],
+  type: 'MultiLineString',
+};
+
+interface TrailFixture {
+  _status: string;
+  city: string;
+  displayName: string;
+  geom: unknown;
+  id: number;
+  slug: string;
+  trailName: string;
+}
+
 function run(
   data: Record<string, unknown>,
-  trail = {
+  trail: TrailFixture = {
     city: 'bend',
     displayName: 'Deschutes River Trail',
+    geom: GEOMETRY,
     id: 42,
     slug: 'deschutes-river-trail',
     trailName: 'Deschutes River Trail',
@@ -58,6 +79,7 @@ describe('resolveRouteSource', () => {
       {
         city: 'bend',
         displayName: 'Deschutes River Trail',
+        geom: GEOMETRY,
         id: 42,
         slug: 'deschutes-river-trail',
         trailName: 'Deschutes River Trail',
@@ -70,6 +92,69 @@ describe('resolveRouteSource', () => {
     expect(failed).toBeInstanceOf(ValidationError);
     expect((failed as ValidationError).data.errors[0]).toEqual(
       expect.objectContaining({ path: 'sourceTrail' }),
+    );
+  });
+
+  it('rejects a linked trail without drawable geometry', async () => {
+    const { result } = run(
+      {
+        _status: 'published',
+        city: 'bend',
+        geometrySource: 'trail',
+        sourceTrail: 42,
+      },
+      {
+        city: 'bend',
+        displayName: 'Deschutes River Trail',
+        geom: null,
+        id: 42,
+        slug: 'deschutes-river-trail',
+        trailName: 'Deschutes River Trail',
+        _status: 'published',
+      },
+    );
+    const failed = await result.catch(
+      (error: unknown) => error as ValidationError,
+    );
+    expect(failed).toBeInstanceOf(ValidationError);
+    expect((failed as ValidationError).data.errors[0]).toEqual(
+      expect.objectContaining({ path: 'sourceTrail' }),
+    );
+  });
+
+  it('accepts an explicit Studio layer without database geometry', async () => {
+    const { findByID, result } = run({
+      _status: 'published',
+      city: 'chattanooga',
+      geometrySource: 'studio',
+      name: 'Zoo Loop',
+      routeId: 'zoo-loop-v2-full-public',
+    });
+
+    await expect(result).resolves.toEqual(
+      expect.objectContaining({
+        geometrySource: 'studio',
+        sourceTrail: null,
+      }),
+    );
+    expect(findByID).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Studio layer that the city style does not own', async () => {
+    const { result } = run({
+      _status: 'published',
+      city: 'bend',
+      geometrySource: 'studio',
+      name: 'Missing layer',
+      routeId: 'not-a-layer',
+    });
+    const failed = await result.catch(
+      (error: unknown) => error as ValidationError,
+    );
+
+    expect(failed).toBeInstanceOf(ValidationError);
+    expect((failed as ValidationError).data.errors[0]).toEqual(
+      expect.objectContaining({ path: 'routeId' }),
     );
   });
 

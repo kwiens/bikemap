@@ -32,4 +32,12 @@ describe('validateRouteGeometry', () => {
       }),
     ).toBe(true);
   });
+
+  it('allows geometry to come from an explicit Studio layer', () => {
+    expect(
+      validateRouteGeometry(undefined, {
+        siblingData: { geometrySource: 'studio' },
+      }),
+    ).toBe(true);
+  });
 });

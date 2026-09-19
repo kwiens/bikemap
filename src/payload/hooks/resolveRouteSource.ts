@@ -1,6 +1,7 @@
 import { ValidationError, type CollectionBeforeValidateHook } from 'payload';
 import { isCityId } from '@/config/map.config';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
+import { STYLE_OWNED_ROUTE_LAYER_IDS } from '@/data/mapbox-style';
 import { slugify } from '@/utils/string';
 
 type RouteData = Record<string, unknown>;
@@ -76,6 +77,7 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
       select: {
         city: true,
         displayName: true,
+        geom: true,
         slug: true,
         trailName: true,
         _status: true,
@@ -94,6 +96,15 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
       );
     }
 
+    const parsed = parseTrailGeometry(trail.geom);
+    if (isPublishing && (!parsed.ok || parsed.parts.length === 0)) {
+      error(
+        req,
+        'sourceTrail',
+        'The selected trail must have drawable geometry before this route can be published.',
+      );
+    }
+
     const name = trail.displayName || trail.trailName || 'Trail route';
     if (!valueOf(current, stored, 'name')) {
       current.name = name;
@@ -105,11 +116,11 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
     return current;
   }
 
-  if (source !== 'imported') {
+  if (source !== 'imported' && source !== 'studio') {
     error(
       req,
       'geometrySource',
-      'Choose imported geometry or an existing trail.',
+      'Choose imported geometry, an existing trail, or a Mapbox Studio layer.',
     );
   }
 
@@ -124,6 +135,23 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
   }
   if (!valueOf(current, stored, 'routeId')) {
     error(req, 'routeId', 'Give this route a stable public identifier.');
+  }
+
+  if (source === 'studio') {
+    const city = valueOf(current, stored, 'city');
+    const routeId = valueOf(current, stored, 'routeId');
+    if (
+      city !== 'chattanooga' ||
+      typeof routeId !== 'string' ||
+      !STYLE_OWNED_ROUTE_LAYER_IDS.includes(routeId)
+    ) {
+      error(
+        req,
+        'routeId',
+        'The route id must name a known Studio route layer for this city.',
+      );
+    }
+    return current;
   }
 
   const parsed = parseTrailGeometry(valueOf(current, stored, 'geom'));

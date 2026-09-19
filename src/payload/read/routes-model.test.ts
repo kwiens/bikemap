@@ -84,4 +84,21 @@ describe('routeFeatureCollection', () => {
     expect(routeFeatureCollection([route]).features).toEqual([]);
     expect(publicBikeRoutes([route])).toEqual([]);
   });
+
+  it('keeps an explicit Studio route out of GeoJSON but in Casual mode', () => {
+    const route = {
+      geometrySource: 'studio' as const,
+      name: 'Zoo Loop',
+      routeId: 'zoo-loop-v2-full-public',
+    };
+
+    expect(routeFeatureCollection([route]).features).toEqual([]);
+    expect(publicBikeRoutes([route])).toEqual([
+      expect.objectContaining({
+        geometrySource: 'studio',
+        id: 'zoo-loop-v2-full-public',
+        name: 'Zoo Loop',
+      }),
+    ]);
+  });
 });

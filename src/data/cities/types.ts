@@ -51,8 +51,8 @@ export interface CityData {
   // GeoJSON URL for curated routes attached at runtime and keyed by route id.
   // It may be a static file or a database-backed map API.
   bikeRoutesUrl?: string;
-  // Optional subset expected from bikeRoutesUrl. Omit when the source contains
-  // every configured route. These route ids are owned exclusively by the
-  // runtime source; they never fall back to same-named Studio layers.
+  // Route ids permanently owned by bikeRoutesUrl, including while its database
+  // row is absent. Published DB routes with imported or Trail geometry join
+  // this set automatically; none fall back to same-named Studio layers.
   inlineBikeRouteIds?: string[];
 }

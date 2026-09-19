@@ -1,6 +1,6 @@
 import type mapboxgl from 'mapbox-gl';
 import type { BikeRoute } from '@/data/geo_data';
-import { fetchRouteCollection } from './route-source';
+import { fetchRouteCollection, runtimeRouteIds } from './route-source';
 
 export interface RouteFeatures {
   routeId: string;
@@ -20,9 +20,7 @@ export async function loadRouteFeatures(
 ): Promise<RouteFeatures[]> {
   const { bikeRoutesUrl, inlineBikeRouteIds } = options;
   const inlineIds = new Set(
-    bikeRoutesUrl
-      ? (inlineBikeRouteIds ?? routes.map((route) => route.id))
-      : [],
+    bikeRoutesUrl ? runtimeRouteIds(routes, inlineBikeRouteIds) : [],
   );
   const inlineFeatures = new Map<string, GeoJSON.Feature>();
 

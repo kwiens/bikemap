@@ -3,9 +3,9 @@ import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
 export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
    CREATE TYPE "public"."enum_routes_kind" AS ENUM('ride', 'greenway', 'path', 'trail');
-  CREATE TYPE "public"."enum_routes_geometry_source" AS ENUM('imported', 'trail');
+  CREATE TYPE "public"."enum_routes_geometry_source" AS ENUM('imported', 'trail', 'studio');
   CREATE TYPE "public"."enum__routes_v_version_kind" AS ENUM('ride', 'greenway', 'path', 'trail');
-  CREATE TYPE "public"."enum__routes_v_version_geometry_source" AS ENUM('imported', 'trail');
+  CREATE TYPE "public"."enum__routes_v_version_geometry_source" AS ENUM('imported', 'trail', 'studio');
   ALTER TABLE "routes" ADD COLUMN "kind" "enum_routes_kind" DEFAULT 'ride';
   ALTER TABLE "routes" ADD COLUMN "geometry_source" "enum_routes_geometry_source" DEFAULT 'imported';
   ALTER TABLE "routes" ADD COLUMN "source_trail_id" integer;

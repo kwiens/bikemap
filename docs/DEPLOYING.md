@@ -78,10 +78,11 @@ contract of `BikeRoute`, `MountainBikeTrail`, `BikeResource`, `MapFeature`, and
 ## 6. Routes and curated trails
 
 - **Routes** — publish Route records in Payload; Casual mode reads them from
-  `/api/map/routes?city=<city>` with no Studio fallback. Imported routes store
-  normalized geometry plus provenance. To reuse an existing curated trail,
-  choose “Existing trail” as the geometry source and select a same-city Trail;
-  its current line, distance, and bounds then drive the route automatically.
+  `/api/map/routes?city=<city>`. Imported routes store normalized geometry plus
+  provenance. To reuse an existing curated trail, choose “Existing trail” and
+  select a same-city Trail; its current line, distance, and bounds then drive
+  the route automatically. “Mapbox Studio layer” is an explicit transitional
+  source for a known layer, not a fallback when database geometry fails.
 - **Trails** — prepare a WGS84 GeoJSON file with one `MultiLineString` feature
   per curated trail, seed it into Payload, and configure the city layer with
   `/api/map/trails?city=<city>` plus the static file as
@@ -225,11 +226,12 @@ pnpm db:seed:chattanooga
 pnpm db:seed:bend
 ```
 
-Production builds also run `pnpm db:seed:bend-routes` after migrations. It
-derives only those eight rows from the committed bike network and skips rows
-whose geometry and metadata are already current; it also preserves rows a
-curator has switched to a Trail source. Chattanooga route imports remain
-manual because their verified GIS archive is not committed.
+Production builds also run `pnpm db:seed:bend-routes` and
+`pnpm db:seed:chattanooga-routes` after migrations. The former derives Bend's
+eight rows from the committed bike network. The latter ensures Chattanooga's
+five not-yet-migrated Studio routes have Payload records. Both preserve a row
+whose geometry source was deliberately migrated. Chattanooga's Riverwalk
+import remains manual because its verified GIS archive is not committed.
 
 Any Node host also works: set the same variables, run `pnpm run ci`, then
 `pnpm start`.

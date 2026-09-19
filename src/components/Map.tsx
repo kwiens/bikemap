@@ -19,6 +19,7 @@ import {
   inlineBikeRouteIds,
 } from '@/data/geo_data';
 import { getBikeRoutes } from '@/data/route-source';
+import { inactiveStyleRouteLayerIds } from '@/data/mapbox-style';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import {
   createLocationMarker,
@@ -77,7 +78,7 @@ import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
 import { clearMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
-import { fetchRouteCollection } from '@/utils/route-source';
+import { fetchRouteCollection, runtimeRouteIds } from '@/utils/route-source';
 
 // Ride recording is unreachable in embed mode, and its subtree (history, GPX,
 // ride stats and storage) is a sizeable chunk to make a partner's page
@@ -983,11 +984,23 @@ const MapboxMap = memo(function MapboxMap() {
           // Expose map for console debugging (e.g. querying tileset features)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__map = null;
+          const configuredInlineRouteIds = runtimeRouteIds(
+            bikeRoutes,
+            inlineBikeRouteIds,
+          );
+          const routesDeclareSources = bikeRoutes.every(
+            (route) => route.geometrySource,
+          );
+          const canPruneStudioRoutes =
+            Boolean(bikeRoutesUrl) &&
+            (routesDeclareSources
+              ? bikeRoutes.every((route) => route.geometrySource !== 'studio')
+              : !inlineBikeRouteIds);
           const [mapStyle, routeCollection] = await Promise.all([
             loadBikeRouteOptimizedStyle(
               mapConfig.mapbox.styleUrl,
               mapConfig.mapbox.accessToken,
-              Boolean(bikeRoutesUrl && !inlineBikeRouteIds),
+              canPruneStudioRoutes,
               styleRequestController.signal,
             ),
             bikeRoutesUrl
@@ -1058,13 +1071,14 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
-          hideStyleLayers(newMap, hiddenStyleLayerIds);
+          hideStyleLayers(newMap, [
+            ...hiddenStyleLayerIds,
+            ...inactiveStyleRouteLayerIds(bikeRoutes, configuredInlineRouteIds),
+          ]);
 
           // Runtime-owned routes never fall back to same-named Studio layers.
           // If the database has no usable geometry, that route remains absent.
-          const configuredInlineIds = new Set(
-            inlineBikeRouteIds ?? bikeRoutes.map((route) => route.id),
-          );
+          const configuredInlineIds = new Set(configuredInlineRouteIds);
           const configuredInlineRoutes = bikeRoutes.filter((route) =>
             configuredInlineIds.has(route.id),
           );

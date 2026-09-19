@@ -29,9 +29,11 @@ The MTB trail array lives in its own `mountain-bike-trails.data.ts` so the
 
 The TypeScript arrays are import metadata, not the public Casual list. Published
 Route records supply both display metadata and geometry through
-`/api/map/routes?city=<city>`; they have no Studio or checked-in route-GeoJSON
-fallback. A Route may instead select a same-city Trail, in which case the read
-path uses that Trail's current geometry, distance, and bounds.
+`/api/map/routes?city=<city>`. Imported and Trail-backed routes have no Studio
+or checked-in route-GeoJSON fallback. A Route may select a same-city Trail, in
+which case the read path uses that Trail's current geometry, distance, and
+bounds. Chattanooga's five not-yet-migrated routes explicitly select their
+existing Studio layers; their cards still come from Payload.
 
 | Field | Type | Notes |
 |---|---|---|

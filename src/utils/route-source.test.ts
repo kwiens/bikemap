@@ -1,10 +1,26 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchRouteCollection } from './route-source';
+import type { BikeRoute } from '@/data/bike-routes';
+import { fetchRouteCollection, runtimeRouteIds } from './route-source';
 
 describe('route source', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it('keeps explicit Studio routes out of the runtime geometry source', () => {
+    const routes = [
+      { id: 'imported', geometrySource: 'imported' },
+      { id: 'studio', geometrySource: 'studio' },
+      { id: 'trail', geometrySource: 'trail' },
+    ] as BikeRoute[];
+
+    expect(runtimeRouteIds(routes)).toEqual(['imported', 'trail']);
+    expect(runtimeRouteIds(routes, ['configured'])).toEqual([
+      'configured',
+      'imported',
+      'trail',
+    ]);
   });
 
   it('returns a non-empty FeatureCollection', async () => {

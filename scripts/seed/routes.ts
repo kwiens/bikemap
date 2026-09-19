@@ -14,11 +14,18 @@ export interface ImportedRoute {
   sourceSha256: string;
 }
 
+export interface StudioRoute {
+  city: CityId;
+  route: BikeRoute;
+}
+
+export type RouteSyncResult = 'created' | 'preserved' | 'unchanged' | 'updated';
+
 /** Upsert one database-owned imported route by its stable city + route id. */
 export async function upsertImportedRoute(
   payload: Payload,
   input: ImportedRoute,
-): Promise<'created' | 'preserved' | 'unchanged' | 'updated'> {
+): Promise<RouteSyncResult> {
   const { city, geom, route } = input;
   const data = {
     _status: 'published' as const,
@@ -72,6 +79,72 @@ export async function upsertImportedRoute(
 
   await payload.create({ collection: 'routes', data });
   return 'created';
+}
+
+/** Ensure one legacy Studio-backed route has a database-owned public record. */
+export async function upsertStudioRoute(
+  payload: Payload,
+  { city, route }: StudioRoute,
+): Promise<RouteSyncResult> {
+  const data = {
+    _status: 'published' as const,
+    bounds: route.defaultBounds,
+    city,
+    color: route.color,
+    defaultWidth: route.defaultWidth,
+    description: route.description,
+    distance: route.distance,
+    geom: null,
+    geometrySource: 'studio' as const,
+    hideArrows: route.hideArrows ?? false,
+    kind: route.kind ?? 'ride',
+    name: route.name,
+    opacity: route.opacity,
+    reverseArrowBounds: route.reverseArrowBounds,
+    reverseDirection: route.reverseDirection ?? false,
+    routeId: route.id,
+    sourceFeatureCount: null,
+    sourcePath: null,
+    sourceSha256: null,
+    sourceTrail: null,
+  };
+  const existing = await findRoute(payload, city, route.id);
+
+  if (existing) {
+    // Imported and trail-linked geometry are deliberate migrations away from
+    // Studio. A deploy must never switch either one back. An imported row with
+    // no geometry is not a usable migration, so repair that partial state.
+    const hasImportedGeometry =
+      existing.geometrySource === 'imported' && existing.geom != null;
+    if (existing.geometrySource === 'trail' || hasImportedGeometry) {
+      return 'preserved';
+    }
+    if (isCurrent(existing, data)) {
+      return 'unchanged';
+    }
+    await payload.update({ collection: 'routes', id: existing.id, data });
+    return 'updated';
+  }
+
+  await payload.create({ collection: 'routes', data });
+  return 'created';
+}
+
+async function findRoute(
+  payload: Payload,
+  city: CityId,
+  routeId: string,
+): Promise<Route | undefined> {
+  const existing = await payload.find({
+    collection: 'routes',
+    depth: 0,
+    limit: 1,
+    pagination: false,
+    where: {
+      and: [{ city: { equals: city } }, { routeId: { equals: routeId } }],
+    },
+  });
+  return existing.docs[0];
 }
 
 function isCurrent(

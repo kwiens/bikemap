@@ -3139,7 +3139,8 @@
       "schema": "public",
       "values": [
         "imported",
-        "trail"
+        "trail",
+        "studio"
       ]
     },
     "public.enum_routes_status": {
@@ -3173,7 +3174,8 @@
       "schema": "public",
       "values": [
         "imported",
-        "trail"
+        "trail",
+        "studio"
       ]
     },
     "public.enum__routes_v_version_status": {

@@ -92,6 +92,52 @@ describe('loadRouteFeatures', () => {
     expect(map.querySourceFeatures).not.toHaveBeenCalled();
   });
 
+  it('uses an explicit Studio source when database routes are mixed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ type: 'FeatureCollection', features: [] }),
+      }),
+    );
+    const studioFeature = {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [2, 2],
+          [3, 3],
+        ],
+      },
+    } as GeoJSON.Feature;
+    const mixedRoutes = [
+      { id: 'inline-route', geometrySource: 'imported' },
+      { id: 'studio-route', geometrySource: 'studio' },
+    ] as BikeRoute[];
+    const map = {
+      getStyle: vi.fn().mockReturnValue({
+        layers: [
+          {
+            id: 'studio-route',
+            type: 'line',
+            source: 'composite',
+            'source-layer': 'studio-routes',
+          },
+        ],
+      }),
+      querySourceFeatures: vi.fn().mockReturnValue([studioFeature]),
+    } as unknown as mapboxgl.Map;
+
+    await expect(
+      loadRouteFeatures(map, mixedRoutes, {
+        bikeRoutesUrl: '/api/map/routes?city=chattanooga',
+      }),
+    ).resolves.toEqual([
+      { routeId: 'studio-route', features: [studioFeature] },
+    ]);
+  });
+
   it('does not export Studio geometry for a database-owned route', async () => {
     vi.stubGlobal(
       'fetch',
