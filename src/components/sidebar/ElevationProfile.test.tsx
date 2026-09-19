@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ElevationProfile,
   gradeToColor,
-  computeGradeColors,
   computeGrades,
   downsampleStops,
   formatGrade,
@@ -50,42 +49,6 @@ describe('gradeToColor', () => {
 
   it('clamps grades above 25 to the max color', () => {
     expect(gradeToColor(50)).toBe(gradeToColor(25));
-  });
-});
-
-describe('computeGradeColors', () => {
-  it('returns empty array for 0 points', () => {
-    expect(computeGradeColors([])).toEqual([]);
-  });
-
-  it('returns single green entry for 1 point', () => {
-    const result = computeGradeColors([[0, 100, -85, 35]]);
-    expect(result).toHaveLength(1);
-    expect(result[0]).toBe('rgb(34,197,94)');
-  });
-
-  it('returns array same length as input', () => {
-    const points: [number, number, number, number][] = [
-      [0, 100, -85, 35],
-      [100, 110, -85.001, 35.001],
-      [200, 130, -85.002, 35.002],
-      [300, 120, -85.003, 35.003],
-      [400, 150, -85.004, 35.004],
-    ];
-    const result = computeGradeColors(points);
-    expect(result).toHaveLength(points.length);
-  });
-
-  it('returns all valid rgb() strings', () => {
-    const points: [number, number, number, number][] = [
-      [0, 100, -85, 35],
-      [100, 120, -85.001, 35.001],
-      [200, 110, -85.002, 35.002],
-    ];
-    const result = computeGradeColors(points);
-    for (const color of result) {
-      expect(color).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
-    }
   });
 });
 
@@ -342,7 +305,7 @@ describe('ElevationProfile selection source', () => {
     const grade = screen.getByText('+10.0%');
     expect(grade).toHaveClass('text-gray-700');
     expect(grade.querySelector('[aria-hidden="true"]')).toHaveStyle({
-      backgroundColor: computeGradeColors(profile.profile)[2],
+      backgroundColor: gradeToColor(computeGrades(profile.profile)[2]),
     });
   });
 

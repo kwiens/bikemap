@@ -68,37 +68,6 @@ export function gradeToColor(grade: number): string {
   return `rgb(${r},${green},${b})`;
 }
 
-export function computeGradeColors(
-  points: [number, number, number, number][],
-): string[] {
-  if (points.length < 2) return points.map(() => gradeToColor(0));
-
-  const rawGrades: number[] = [0];
-  for (let i = 1; i < points.length; i++) {
-    const dx = points[i][0] - points[i - 1][0];
-    const dy = points[i][1] - points[i - 1][1];
-    rawGrades.push(dx > 0 ? (dy / dx) * 100 : 0);
-  }
-
-  const smoothed: number[] = [];
-  const WINDOW = 2;
-  for (let i = 0; i < rawGrades.length; i++) {
-    let sum = 0;
-    let count = 0;
-    for (
-      let j = Math.max(0, i - WINDOW);
-      j <= Math.min(rawGrades.length - 1, i + WINDOW);
-      j++
-    ) {
-      sum += rawGrades[j];
-      count++;
-    }
-    smoothed.push(sum / count);
-  }
-
-  return smoothed.map((grade) => gradeToColor(grade));
-}
-
 /** Format signed grade for the hover readout. */
 export function formatGrade(grade: number | undefined): string {
   if (grade === undefined || !Number.isFinite(grade)) {
@@ -607,8 +576,8 @@ export function ElevationProfile() {
     [profile],
   );
   const gradeColors = useMemo(
-    () => (profile ? computeGradeColors(profile.profile) : []),
-    [profile],
+    () => grades.map((grade) => gradeToColor(grade)),
+    [grades],
   );
 
   const hasProfile =
