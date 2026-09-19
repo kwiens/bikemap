@@ -64,9 +64,7 @@ jobs:
       - name: Cache static analysis
         uses: actions/cache@v6
         with:
-          path: |
-            .cache
-            tsconfig.tsbuildinfo
+          path: .cache
           key: ${{ runner.os }}-static-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-static-${{ hashFiles('pnpm-lock.yaml') }}-
@@ -74,8 +72,10 @@ jobs:
       - name: Run tests
         run: pnpm test:run
 
-      - name: Run static checks
-        run: pnpm check
+      # The parallel Build Check job runs the full TypeScript check as part of
+      # `next build`, so avoid doing the same work twice in CI.
+      - name: Run remaining static checks
+        run: pnpm lint && pnpm format && pnpm knip
 
   python-tests:
     name: Python Script Tests
@@ -127,5 +127,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
 
-      - name: Build project
-        run: pnpm build
+      - name: Build project and check dependency deduplication
+        run: |
+          set +e
+          pnpm build &
+          build_pid=$!
+          pnpm dedupe:check &
+          dedupe_pid=$!
+
+          wait "$build_pid"
+          build_status=$?
+          wait "$dedupe_pid"
+          dedupe_status=$?
+
+          if ((build_status != 0 || dedupe_status != 0)); then
+            exit 1
+          fi
