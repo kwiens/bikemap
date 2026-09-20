@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   cityConfigs,
+  cityIdForQuery,
   cityIdForHostname,
   cityIds,
   isCityId,
@@ -154,6 +155,32 @@ describe('map.config', () => {
       expect(cityIdForHostname('ridebend.org', hostMap)).toBe('bend');
       expect(cityIdForHostname('www.ridebend.org', hostMap)).toBe('bend');
       expect(cityIdForHostname('bikechatt.com', hostMap)).toBe('chattanooga');
+    });
+
+    it('uses a valid query parameter before the hostname', () => {
+      expect(resolveActiveCityId('bikechatt.com', 'bend')).toBe('bend');
+      expect(resolveActiveCityId('ridebend.org', 'chattanooga')).toBe(
+        'chattanooga',
+      );
+    });
+
+    it('uses the first repeated city query value', () => {
+      expect(cityIdForQuery(['bend', 'chattanooga'])).toBe('bend');
+      expect(
+        resolveActiveCityId('bikechatt.com', ['bend', 'chattanooga']),
+      ).toBe('bend');
+    });
+
+    it('ignores an invalid query parameter and falls back to the hostname', () => {
+      const previousHostMap = process.env.NEXT_PUBLIC_CITY_HOST_MAP;
+      process.env.NEXT_PUBLIC_CITY_HOST_MAP = hostMap;
+
+      try {
+        expect(resolveActiveCityId('ridebend.org', 'not-a-city')).toBe('bend');
+        expect(resolveActiveCityId('bikechatt.com', '')).toBe('chattanooga');
+      } finally {
+        restoreEnv('NEXT_PUBLIC_CITY_HOST_MAP', previousHostMap);
+      }
     });
 
     it('normalizes hostnames before lookup', () => {

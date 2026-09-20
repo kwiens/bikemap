@@ -66,7 +66,7 @@ export const Trails: CollectionConfig = {
   admin: {
     useAsTitle: 'displayName',
     defaultColumns: ['displayName', 'city', 'area', 'rating', 'distance'],
-    group: 'Trails',
+    group: 'Map content',
     listSearchableFields: ['displayName', 'trailName'],
   },
   // Published trails are public; everything else needs a login.

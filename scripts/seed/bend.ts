@@ -36,12 +36,14 @@ import {
   upsertTrail,
   type MultiLineString,
 } from './shared';
+import { upsertImportedRoute } from './routes';
+import { loadBendRoutes } from './bend-route-data';
 
-const GEOJSON = 'public/data/bend/trails.geojson';
+const TRAILS_GEOJSON = 'public/data/bend/trails.geojson';
 
 /** slug -> MultiLineString, read once from the generated GeoJSON. */
 async function loadGeometry(): Promise<Map<string, MultiLineString>> {
-  const raw = await readFile(path.join(repoRoot, GEOJSON), 'utf8');
+  const raw = await readFile(path.join(repoRoot, TRAILS_GEOJSON), 'utf8');
   const collection = JSON.parse(raw) as {
     features: {
       geometry: MultiLineString;
@@ -66,6 +68,7 @@ run(async () => {
   const payload = await connect();
 
   const geometry = await loadGeometry();
+  const routes = await loadBendRoutes();
   const trails = bendData.mountainBikeTrails;
   // There are 182 local files. Read them concurrently once rather than adding
   // one filesystem round trip to every database upsert below.
@@ -78,7 +81,7 @@ run(async () => {
     ),
   );
   payload.logger.info(
-    `bend: importing ${trails.length} trails (${geometry.size} geometries; ${profiles.size} measured profiles)`,
+    `bend: importing ${trails.length} trails (${geometry.size} geometries in ${TRAILS_GEOJSON}; ${profiles.size} measured profiles) and ${routes.length} routes`,
   );
 
   // Areas are created on first mention; the cache keeps that to one
@@ -134,16 +137,42 @@ run(async () => {
     }
   }
 
+  let routesCreated = 0;
+  let routesUpdated = 0;
+  let routesUnchanged = 0;
+  let routesPreserved = 0;
+  if (!dryRun) {
+    const routeResults = await Promise.all(
+      routes.map((route) => upsertImportedRoute(payload, route)),
+    );
+    routesCreated = routeResults.filter(
+      (result) => result === 'created',
+    ).length;
+    routesUpdated = routeResults.filter(
+      (result) => result === 'updated',
+    ).length;
+    routesPreserved = routeResults.filter(
+      (result) => result === 'preserved',
+    ).length;
+    routesUnchanged =
+      routeResults.length - routesCreated - routesUpdated - routesPreserved;
+  }
+
   report(
     payload,
     'bend',
     { created, preserved, updated, withGeometry },
     dryRun,
   );
+  if (!dryRun) {
+    payload.logger.info(
+      `bend routes: created ${routesCreated}, updated ${routesUpdated}, unchanged ${routesUnchanged}, kept ${routesPreserved} trail-linked.`,
+    );
+  }
 
   if (missingGeometry.length > 0) {
     payload.logger.warn(
-      `bend: ${missingGeometry.length} trails had no geometry in ${GEOJSON}: ${missingGeometry
+      `bend: ${missingGeometry.length} trails had no geometry in ${TRAILS_GEOJSON}: ${missingGeometry
         .slice(0, 10)
         .join(', ')}${missingGeometry.length > 10 ? ', …' : ''}`,
     );

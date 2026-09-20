@@ -25,6 +25,12 @@ pnpm dev                       # http://localhost:3000
 The map will be blank until you add a Mapbox token (next step) — the browser
 console says so explicitly.
 
+For a multi-city checkout, `?city=<id>` overrides hostname and
+`NEXT_PUBLIC_CITY_ID` selection on public pages. For example, use
+`http://localhost:3000/?city=bend` to test Bend without restarting the dev
+server. Invalid city ids are ignored and fall back to the normal hostname/env
+resolution.
+
 ## 2. Mapbox setup
 
 1. In [Mapbox Studio](https://studio.mapbox.com/), create (or duplicate) a map
@@ -77,8 +83,12 @@ contract of `BikeRoute`, `MountainBikeTrail`, `BikeResource`, `MapFeature`, and
 
 ## 6. Routes and curated trails
 
-- **Routes** — draw/upload each route as a line layer in your style, then set
-  each `BikeRoute.id` in `bike-routes.ts` to that layer's ID.
+- **Routes** — publish Route records in Payload; Casual mode reads them from
+  `/api/map/routes?city=<city>`. Imported routes store normalized geometry plus
+  provenance. To reuse an existing curated trail, choose “Existing trail” and
+  select a same-city Trail; its current line, distance, and bounds then drive
+  the route automatically. “Mapbox Studio layer” is an explicit transitional
+  source for a known layer, not a fallback when database geometry fails.
 - **Trails** — prepare a WGS84 GeoJSON file with one `MultiLineString` feature
   per curated trail, seed it into Payload, and configure the city layer with
   `/api/map/trails?city=<city>` plus the static file as
@@ -217,13 +227,20 @@ A database-free fork skips migrations and still builds the checked-in fallback
 map.
 
 Seed every city into the same fresh database after the initial migration. Both
-commands are idempotent and match existing rows on `(trailName, city)`:
+commands are idempotent; Bend's command also seeds its eight Casual routes:
 
 ```bash
 pnpm db:migrate
 pnpm db:seed:chattanooga
 pnpm db:seed:bend
 ```
+
+Production builds also run `pnpm db:seed:bend-routes` and
+`pnpm db:seed:chattanooga-routes` after migrations. The former derives Bend's
+eight rows from the committed bike network. The latter ensures Chattanooga's
+five not-yet-migrated Studio routes have Payload records. Both preserve a row
+whose geometry source was deliberately migrated. Chattanooga's Riverwalk
+import remains manual because its verified GIS archive is not committed.
 
 Any Node host also works: set the same variables, run `pnpm run ci`, then
 `pnpm start`.

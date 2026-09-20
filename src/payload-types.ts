@@ -67,6 +67,7 @@ export interface Config {
   };
   blocks: {};
   collections: {
+    routes: Route;
     trails: Trail;
     'trail-areas': TrailArea;
     'trail-ratings': TrailRating;
@@ -80,6 +81,7 @@ export interface Config {
   };
   collectionsJoins: {};
   collectionsSelect: {
+    routes: RoutesSelect<false> | RoutesSelect<true>;
     trails: TrailsSelect<false> | TrailsSelect<true>;
     'trail-areas': TrailAreasSelect<false> | TrailAreasSelect<true>;
     'trail-ratings': TrailRatingsSelect<false> | TrailRatingsSelect<true>;
@@ -128,6 +130,88 @@ export interface UserAuthOperations {
     email: string;
     password: string;
   };
+}
+/**
+ * Every published Route appears in Casual mode. Its geometry may come from an import, an existing Trail, or a current Mapbox Studio layer.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "routes".
+ */
+export interface Route {
+  id: number;
+  /**
+   * Leave blank on a new trail-backed route to use the trail name.
+   */
+  name?: string | null;
+  city: 'chattanooga' | 'bend';
+  /**
+   * Stable public identifier used by map selection and exports. Leave blank on a new trail-backed route to use the trail slug.
+   */
+  routeId?: string | null;
+  kind?: ('ride' | 'greenway' | 'path' | 'trail') | null;
+  /**
+   * Imported and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.
+   */
+  geometrySource: 'imported' | 'trail' | 'studio';
+  /**
+   * Select a curated trail to expose it in the Casual routes tab.
+   */
+  sourceTrail?: (number | null) | Trail;
+  /**
+   * Short description shown under the route in Casual mode.
+   */
+  description?: string | null;
+  color: string;
+  defaultWidth: number;
+  opacity: number;
+  /**
+   * Route distance in miles.
+   */
+  distance?: number | null;
+  hideArrows?: boolean | null;
+  reverseDirection?: boolean | null;
+  /**
+   * [west, south, east, north] bounds.
+   */
+  bounds?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Optional bounds where route arrows need their direction flipped.
+   */
+  reverseArrowBounds?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Normalized WGS84 route geometry. Import tooling owns this value when the source is Imported geometry.
+   */
+  geom?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  sourcePath?: string | null;
+  sourceSha256?: string | null;
+  sourceFeatureCount?: number | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -429,6 +513,10 @@ export interface PayloadLockedDocument {
   id: number;
   document?:
     | ({
+        relationTo: 'routes';
+        value: number | Route;
+      } | null)
+    | ({
         relationTo: 'trails';
         value: number | Trail;
       } | null)
@@ -493,6 +581,34 @@ export interface PayloadMigration {
   batch?: number | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "routes_select".
+ */
+export interface RoutesSelect<T extends boolean = true> {
+  name?: T;
+  city?: T;
+  routeId?: T;
+  kind?: T;
+  geometrySource?: T;
+  sourceTrail?: T;
+  description?: T;
+  color?: T;
+  defaultWidth?: T;
+  opacity?: T;
+  distance?: T;
+  hideArrows?: T;
+  reverseDirection?: T;
+  bounds?: T;
+  reverseArrowBounds?: T;
+  geom?: T;
+  sourcePath?: T;
+  sourceSha256?: T;
+  sourceFeatureCount?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

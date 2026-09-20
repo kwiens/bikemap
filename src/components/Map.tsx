@@ -10,13 +10,15 @@ import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { useEmbed } from '@/components/EmbedContext';
 
 import {
-  bikeRoutes,
   mapFeatures,
   bikeResources,
   hiddenStyleLayerIds,
   bikeNetworkUrl,
   bikeRoutesUrl,
+  inlineBikeRouteIds,
 } from '@/data/geo_data';
+import { getBikeRoutes } from '@/data/route-source';
+import { inactiveStyleRouteLayerIds } from '@/data/mapbox-style';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import {
   createLocationMarker,
@@ -75,6 +77,7 @@ import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
 import { clearMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
+import { fetchRouteCollection, runtimeRouteIds } from '@/utils/route-source';
 
 // Ride recording is unreachable in embed mode, and its subtree (history, GPX,
 // ride stats and storage) is a sizeable chunk to make a partner's page
@@ -108,6 +111,7 @@ if (!hasMapboxToken) {
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
+  const bikeRoutes = getBikeRoutes();
   const { isEmbed, options: embedOptions } = useEmbed();
   // Embed mode is fixed for the lifetime of the tree, but the init effect runs
   // once on mount and must not list it as a dependency.
@@ -175,30 +179,33 @@ const MapboxMap = memo(function MapboxMap() {
   useWakeLock(watchingLocation || recordingActive);
 
   // Handle ride select — show ride on map
-  const handleRideSelect = useCallback(async (event: CustomEvent) => {
-    if (!map.current) return;
-    const { rideId } = event.detail;
-    const ride = await loadRide(rideId);
-    if (!ride) return;
+  const handleRideSelect = useCallback(
+    async (event: CustomEvent) => {
+      if (!map.current) return;
+      const { rideId } = event.detail;
+      const ride = await loadRide(rideId);
+      if (!ride) return;
 
-    const segments = splitRideSegments(ride.points).map((segment) =>
-      segment.map((p) => [p.lng, p.lat] as [number, number]),
-    );
-    addRideLayer(map.current, segments);
+      const segments = splitRideSegments(ride.points).map((segment) =>
+        segment.map((p) => [p.lng, p.lat] as [number, number]),
+      );
+      addRideLayer(map.current, segments);
 
-    // Dim other routes/trails
-    updateRouteOpacity(map.current, bikeRoutes, null, {
-      selected: 0.1,
-      unselected: 0.1,
-    });
-    updateMtnBikeOpacity(map.current, null);
+      // Dim other routes/trails
+      updateRouteOpacity(map.current, bikeRoutes, null, {
+        selected: 0.1,
+        unselected: 0.1,
+      });
+      updateMtnBikeOpacity(map.current, null);
 
-    // Fly to ride bounds
-    const [swLng, swLat, neLng, neLat] = ride.bounds;
-    const bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
-    pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-    flyToBounds(map.current, bounds);
-  }, []);
+      // Fly to ride bounds
+      const [swLng, swLat, neLng, neLat] = ride.bounds;
+      const bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+      pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
+      flyToBounds(map.current, bounds);
+    },
+    [bikeRoutes],
+  );
 
   // Handle ride deselect — remove ride from map
   const handleRideDeselect = useCallback(() => {
@@ -209,7 +216,7 @@ const MapboxMap = memo(function MapboxMap() {
       unselected: 1,
     });
     updateMtnBikeOpacity(map.current, null);
-  }, []);
+  }, [bikeRoutes]);
 
   // Set up ride select/deselect event listeners
   useEffect(() => {
@@ -449,7 +456,7 @@ const MapboxMap = memo(function MapboxMap() {
         flyToBounds(map.current, bounds);
       }
     },
-    [showToast],
+    [bikeRoutes, showToast],
   );
 
   // Handle trail selection events
@@ -496,7 +503,7 @@ const MapboxMap = memo(function MapboxMap() {
         flyToBounds(map.current, bounds);
       }
     },
-    [showToast],
+    [bikeRoutes, showToast],
   );
 
   // Routes' resting opacity: dimmed while any marker layer is shown so the
@@ -514,7 +521,7 @@ const MapboxMap = memo(function MapboxMap() {
   const handleRouteDeselect = useCallback(() => {
     if (!map.current) return;
     updateRouteOpacity(map.current, bikeRoutes, null, restingRouteOpacity());
-  }, [restingRouteOpacity]);
+  }, [bikeRoutes, restingRouteOpacity]);
 
   const handleTrailDeselect = useCallback(() => {
     if (!map.current) return;
@@ -529,7 +536,7 @@ const MapboxMap = memo(function MapboxMap() {
       detectCandidateRef.current = null;
       detectConfirmCountRef.current = 0;
     }
-  }, [restingRouteOpacity]);
+  }, [bikeRoutes, restingRouteOpacity]);
 
   // Handle area (rec area heading) selection — zoom to area bounds
   const handleAreaSelect = useCallback(
@@ -553,7 +560,7 @@ const MapboxMap = memo(function MapboxMap() {
         flyToBounds(map.current, bounds);
       }
     },
-    [showToast],
+    [bikeRoutes, showToast],
   );
 
   // Handle layer toggle events
@@ -674,7 +681,7 @@ const MapboxMap = memo(function MapboxMap() {
         }
       }
     },
-    [restingRouteOpacity],
+    [bikeRoutes, restingRouteOpacity],
   );
 
   // Handler for centering on a specific location
@@ -976,12 +983,32 @@ const MapboxMap = memo(function MapboxMap() {
           // Expose map for console debugging (e.g. querying tileset features)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__map = null;
-          const mapStyle = await loadBikeRouteOptimizedStyle(
-            mapConfig.mapbox.styleUrl,
-            mapConfig.mapbox.accessToken,
-            Boolean(bikeRoutesUrl),
-            styleRequestController.signal,
+          const configuredInlineRouteIds = runtimeRouteIds(
+            bikeRoutes,
+            inlineBikeRouteIds,
           );
+          const routesDeclareSources = bikeRoutes.every(
+            (route) => route.geometrySource,
+          );
+          const canPruneStudioRoutes =
+            Boolean(bikeRoutesUrl) &&
+            (routesDeclareSources
+              ? bikeRoutes.every((route) => route.geometrySource !== 'studio')
+              : !inlineBikeRouteIds);
+          const [mapStyle, routeCollection] = await Promise.all([
+            loadBikeRouteOptimizedStyle(
+              mapConfig.mapbox.styleUrl,
+              mapConfig.mapbox.accessToken,
+              canPruneStudioRoutes,
+              styleRequestController.signal,
+            ),
+            bikeRoutesUrl
+              ? fetchRouteCollection(
+                  bikeRoutesUrl,
+                  styleRequestController.signal,
+                )
+              : Promise.resolve(null),
+          ]);
           const container = mapContainer.current;
           if (cancelled || !container) return;
 
@@ -1043,70 +1070,78 @@ const MapboxMap = memo(function MapboxMap() {
             }
           }
 
-          hideStyleLayers(newMap, hiddenStyleLayerIds);
+          hideStyleLayers(newMap, [
+            ...hiddenStyleLayerIds,
+            ...inactiveStyleRouteLayerIds(bikeRoutes, configuredInlineRouteIds),
+          ]);
 
-          // Attach curated routes whose geometry ships as GeoJSON (not Studio
-          // layers) before route styling and click handling below.
+          // Runtime-owned routes never fall back to same-named Studio layers.
+          // If the database has no usable geometry, that route remains absent.
+          const configuredInlineIds = new Set(configuredInlineRouteIds);
+          const configuredInlineRoutes = bikeRoutes.filter((route) =>
+            configuredInlineIds.has(route.id),
+          );
           if (bikeRoutesUrl) {
-            ensureInlineRoutes(newMap, bikeRoutesUrl, bikeRoutes);
+            ensureInlineRoutes(newMap, routeCollection, configuredInlineRoutes);
           }
+          const inlineRouteIds = configuredInlineIds;
 
           const combinedRouteLayer = newMap.getLayer(BIKE_ROUTE_LAYER_ID);
 
           // Cities can still rely on route layers baked into the Studio style
           // while they migrate to the shared GeoJSON source. Preserve that
-          // path, but avoid creating extra per-route layers for migrated cities.
-          if (!combinedRouteLayer) {
-            for (const route of bikeRoutes) {
-              const layer = newMap.getLayer(route.id);
-              if (layer?.type !== 'line' || !('source' in layer)) {
-                continue;
-              }
+          // path. A city can migrate one route at a time, so style every route
+          // not supplied by the shared GeoJSON layer.
+          for (const route of bikeRoutes) {
+            if (inlineRouteIds.has(route.id)) {
+              continue;
+            }
+            const layer = newMap.getLayer(route.id);
+            if (layer?.type !== 'line' || !('source' in layer)) {
+              continue;
+            }
 
-              newMap.setPaintProperty(
-                layer.id,
-                'line-width',
-                route.defaultWidth,
-              );
-              newMap.setPaintProperty(layer.id, 'line-color', route.color);
-              newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
-              newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
-              newMap.setLayoutProperty(layer.id, 'line-join', 'round');
-              newMap.setLayoutProperty(layer.id, 'visibility', 'visible');
+            newMap.setPaintProperty(layer.id, 'line-width', route.defaultWidth);
+            newMap.setPaintProperty(layer.id, 'line-color', route.color);
+            newMap.setPaintProperty(layer.id, 'line-opacity', 0.2);
+            newMap.setLayoutProperty(layer.id, 'line-cap', 'round');
+            newMap.setLayoutProperty(layer.id, 'line-join', 'round');
+            newMap.setLayoutProperty(layer.id, 'visibility', 'visible');
 
-              if (firstLabelId) newMap.moveLayer(layer.id, firstLabelId);
+            if (firstLabelId) newMap.moveLayer(layer.id, firstLabelId);
 
-              const casingId = `${layer.id}-casing`;
-              if (!newMap.getLayer(casingId)) {
-                newMap.addLayer(
-                  {
-                    id: casingId,
-                    type: 'line',
-                    source: layer.source,
-                    ...('source-layer' in layer && layer['source-layer']
-                      ? { 'source-layer': layer['source-layer'] }
-                      : {}),
-                    layout: { 'line-cap': 'round', 'line-join': 'round' },
-                    paint: {
-                      'line-color': '#ffffff',
-                      'line-width': route.defaultWidth + 2,
-                      'line-opacity': 0.3,
-                    },
-                    ...('filter' in layer && layer.filter
-                      ? { filter: layer.filter }
-                      : {}),
+            const casingId = `${layer.id}-casing`;
+            if (!newMap.getLayer(casingId)) {
+              newMap.addLayer(
+                {
+                  id: casingId,
+                  type: 'line',
+                  source: layer.source,
+                  ...('source-layer' in layer && layer['source-layer']
+                    ? { 'source-layer': layer['source-layer'] }
+                    : {}),
+                  layout: { 'line-cap': 'round', 'line-join': 'round' },
+                  paint: {
+                    'line-color': '#ffffff',
+                    'line-width': route.defaultWidth + 2,
+                    'line-opacity': 0.3,
                   },
-                  layer.id,
-                );
-              }
+                  ...('filter' in layer && layer.filter
+                    ? { filter: layer.filter }
+                    : {}),
+                },
+                layer.id,
+              );
             }
           }
 
-          const routeLayerIds = combinedRouteLayer
-            ? [BIKE_ROUTE_LAYER_ID]
-            : bikeRoutes
-                .map((route) => route.id)
-                .filter((layerId) => newMap.getLayer(layerId));
+          const routeLayerIds = [
+            ...(combinedRouteLayer ? [BIKE_ROUTE_LAYER_ID] : []),
+            ...bikeRoutes
+              .filter((route) => !inlineRouteIds.has(route.id))
+              .map((route) => route.id)
+              .filter((layerId) => newMap.getLayer(layerId)),
+          ];
 
           const syncRouteArrows = () => {
             const currentLayers = newMap.getStyle().layers;
@@ -1114,9 +1149,9 @@ const MapboxMap = memo(function MapboxMap() {
               (candidate) => candidate.id === BIKE_ROUTE_LAYER_ID,
             );
             for (const route of bikeRoutes) {
-              const layer =
-                sharedLayer ??
-                currentLayers?.find((candidate) => candidate.id === route.id);
+              const layer = inlineRouteIds.has(route.id)
+                ? sharedLayer
+                : currentLayers?.find((candidate) => candidate.id === route.id);
               if (layer?.type === 'line') {
                 syncRouteArrowLayer(newMap, route, layer, firstLabelId);
               }
@@ -1211,9 +1246,10 @@ const MapboxMap = memo(function MapboxMap() {
               routeLayerIds,
             )[0];
             if (routeFeature) {
-              const routeId = combinedRouteLayer
-                ? routeFeature.properties?.id
-                : routeFeature.layer?.id;
+              const routeId =
+                routeFeature.layer?.id === BIKE_ROUTE_LAYER_ID
+                  ? routeFeature.properties?.id
+                  : routeFeature.layer?.id;
               if (bikeRoutes.some((route) => route.id === routeId)) {
                 e.preventDefault();
                 window.dispatchEvent(

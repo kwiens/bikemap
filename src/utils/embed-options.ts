@@ -1,5 +1,6 @@
 // What the snippet builder needs to know about a city, resolved on the server
-// from the request hostname.
+// from the request hostname. The route choices are passed from Payload so a
+// newly published Route is immediately available to embeds too.
 //
 // The builder must NOT import `@/data/geo_data`: that barrel binds the active
 // city at module load, and on the server there is no `window`, so it resolves
@@ -8,7 +9,8 @@
 // the HTML and then hydrated to Bend's. Passing this down as a prop also keeps
 // both cities' trail datasets out of the page's client bundle.
 
-import { cityDataById } from '@/data/cities';
+import { cityDataById, type CityId } from '@/data/cities';
+import type { BikeRoute } from '@/data/bike-routes';
 import { resolveActiveCityId, cityConfigs } from '@/config/map.config';
 import { slugify } from '@/utils/string';
 import { MARKER_LAYERS, type EmbedLayer } from '@/utils/embed';
@@ -20,6 +22,7 @@ export interface EmbedRouteOption {
 }
 
 export interface EmbedBuilderConfig {
+  cityId: CityId;
   routes: EmbedRouteOption[];
   /** Layers this city can actually render, in `MARKER_LAYERS` order. */
   availableLayers: EmbedLayer[];
@@ -34,8 +37,10 @@ export interface EmbedBuilderConfig {
  */
 export function embedBuilderConfig(
   hostname: string | undefined,
+  routes: BikeRoute[],
+  cityQuery?: unknown,
 ): EmbedBuilderConfig {
-  const cityId = resolveActiveCityId(hostname);
+  const cityId = resolveActiveCityId(hostname, cityQuery);
   const city = cityDataById[cityId];
 
   const canShow: Record<EmbedLayer, boolean> = {
@@ -46,7 +51,8 @@ export function embedBuilderConfig(
   };
 
   return {
-    routes: city.bikeRoutes.map((route) => ({
+    cityId,
+    routes: routes.map((route) => ({
       id: route.id,
       name: route.name,
       slug: slugify(route.name),

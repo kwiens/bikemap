@@ -38,7 +38,8 @@ What it buys:
 ```bash
 docker compose up -d      # Postgres on :5432
 pnpm db:migrate           # create the schema
-pnpm db:seed:bend         # import Bend's 182 trails
+pnpm db:seed:bend         # import Bend's 182 trails and 8 Casual routes
+pnpm db:seed:bend-routes  # sync only the 8 routes
 pnpm dev                  # /admin — first visit creates the admin user
 ```
 
@@ -354,11 +355,11 @@ The map at `/` is a **server component**. It reads Payload through the Local API
 as props:
 
 ```
-app/(frontend)/page.tsx   getCityTrails(cityId)         ← Local API, per request
+app/(frontend)/page.tsx   getCityTrails + getCityRoutes ← Local API, per request
         ↓ props
-HomeClient.tsx            setMountainBikeTrails(trails) ← during render
+HomeClient.tsx            set trails + routes           ← during render
         ↓
-data/trail-source.ts      getMountainBikeTrails()       ← what every consumer reads
+data/{trail,route}-source.ts                            ← what consumers read
 ```
 
 Consumers call `getMountainBikeTrails()` rather than importing an array, because
@@ -370,6 +371,18 @@ Geometry follows the same path: both cities point their regional curated layer
 at `/api/map/trails?city=<city>` and keep the GeoJSON used by the seed as a
 static fallback.
 
+Casual mode always reads Route records. A Route can either own imported
+geometry or select an existing same-city Trail; the latter resolves the trail's
+current geometry, distance, and bounds at read time. This keeps the two sidebar
+concepts distinct while making “show this trail in Casual” a single Route admin
+record instead of a second copy of the line.
+
+Migration-capable builds run `db:seed:bend-routes` immediately after schema
+migrations. The sync skips unchanged rows and preserves any row a curator has
+switched to a Trail, so routine deploys neither add route versions nor undo an
+editorial link. Chattanooga's route import remains manual because its source
+GIS is external to the repository.
+
 ### Seeding
 
 One script per city, because their pipelines genuinely differ:
@@ -377,6 +390,7 @@ One script per city, because their pipelines genuinely differ:
 | | `pnpm db:seed:bend` | `pnpm db:seed:chattanooga` |
 |---|---|---|
 | Trails | 182 | 224 |
+| Casual routes | 8, derived from `bike-network.geojson` | imported separately with `pnpm db:import:chattanooga-routes` |
 | Geometry | `public/data/bend/trails.geojson`, by slug | `public/data/chattanooga/trails.geojson`, by raw `Trail` name |
 | Prepared profile | imported from `public/data/elevation/bend`, generated from the same OSM line | imported from `public/data/elevation/chattanooga`, measured from the same GIS line |
 | `osmIds` | yes | none |

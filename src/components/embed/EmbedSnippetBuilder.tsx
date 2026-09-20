@@ -33,7 +33,7 @@ export function EmbedSnippetBuilder({
   baseUrl,
   config,
 }: EmbedSnippetBuilderProps): ReactElement {
-  const { routes, availableLayers } = config;
+  const { cityId, routes, availableLayers } = config;
   const fieldId = useId();
   const markerLayers = availableLayers.filter((l) => l !== 'bikeNetwork');
   const hasBikeNetwork = availableLayers.includes('bikeNetwork');
@@ -69,8 +69,9 @@ export function EmbedSnippetBuilder({
     layers,
   };
 
-  const search = buildEmbedSearch(options);
-  const iframeSrc = search ? `/embed?${search}` : '/embed';
+  const search = new URLSearchParams(buildEmbedSearch(options));
+  search.set('city', cityId);
+  const iframeSrc = `/embed?${search.toString()}`;
   const absoluteSrc = `${baseUrl}${iframeSrc}`;
 
   const snippet = [
