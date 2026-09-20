@@ -13,7 +13,6 @@ import {
   mapFeatures,
   bikeResources,
   hiddenStyleLayerIds,
-  trailMetadata,
   bikeNetworkUrl,
   bikeRoutesUrl,
   inlineBikeRouteIds,
@@ -1281,8 +1280,7 @@ const MapboxMap = memo(function MapboxMap() {
                 cfg && rawName !== undefined
                   ? cfg.matchBy === 'osmId'
                     ? trailNameForOsmId(rawName)
-                    : (trailMetadata[String(rawName)]?.displayName ??
-                      String(rawName))
+                    : String(rawName)
                   : null;
               if (trailName) {
                 e.preventDefault();

@@ -10,7 +10,6 @@ export type {
   ElevationProfile,
 } from './mountain-bike-trails';
 export const mountainBikeConfig = activeCityData.mountainBike;
-export const trailMetadata = activeCityData.trailMetadata;
 // Style-owned layers the active city doesn't manage (see mapbox-style.ts).
 export const hiddenStyleLayerIds = hiddenStyleLayerIdsFor(activeCityData);
 export const regionFor = activeCityData.regionFor;

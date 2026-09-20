@@ -1,7 +1,7 @@
 import type * as GeoJSON from 'geojson';
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
-import { mountainBikeConfig, trailMetadata } from '@/data/geo_data';
+import { mountainBikeConfig } from '@/data/geo_data';
 import { regionOf } from '@/data/trail-region';
 import {
   getMountainBikeTrails,
@@ -732,10 +732,6 @@ interface TrailLayerConfig {
   // Maps the raw feature-property value (e.g. tileset 'Trail' name) to the
   // line color. Falls back to UNRATED_COLOR for anything unlisted.
   colorMap: Record<string, string>;
-  // Maps the user-facing displayName to the raw feature value used for
-  // selection/highlight match expressions. Identity for layers whose tileset
-  // trail names already match our displayNames.
-  toRawName: (displayName: string) => string;
 }
 
 // These two lookups are derived from the trail list, which now arrives from the
@@ -814,7 +810,7 @@ function trailMatchExpr(
     const ids = (trailByName().get(trailName)?.osmIds ?? []).map(String);
     return ['in', ['to-string', ['get', 'OSM_ID']], ['literal', ids]];
   }
-  return ['==', ['get', cfg.trailProp], cfg.toRawName(trailName)];
+  return ['==', ['get', cfg.trailProp], trailName];
 }
 
 // Reverse lookup for osmId-matched layers: which curated trail owns this way?
@@ -833,8 +829,8 @@ function areaMatchExpr(
     const ids = trails.flatMap((t) => t.osmIds ?? []).map(String);
     return ['in', ['to-string', ['get', 'OSM_ID']], ['literal', ids]];
   }
-  const rawNames = trails.map((t) => cfg.toRawName(t.trailName));
-  return ['in', ['get', cfg.trailProp], ['literal', rawNames]];
+  const names = trails.map((trail) => trail.trailName);
+  return ['in', ['get', cfg.trailProp], ['literal', names]];
 }
 
 function buildColorExpression(
@@ -852,37 +848,21 @@ function buildColorExpression(
 
 function buildTrailLayerConfig(): TrailLayerConfig[] {
   return mountainBikeConfig.layers.map((layer) => {
-    const metadata = layer.metadata ?? {};
-    const hasMetadata = Object.keys(metadata).length > 0;
     let colorMap: Record<string, string>;
     if (layer.matchBy === 'osmId') {
       // Color keyed by OSM_ID, using the deterministic per-way owner so a
       // shared way is colored as the same trail a click would select.
       colorMap = {};
       for (const [id, trail] of osmIdOwner()) colorMap[id] = trail.color;
-    } else if (hasMetadata) {
-      colorMap = Object.fromEntries(
-        Object.entries(metadata).map(([rawName, meta]) => [
-          rawName,
-          RATING_COLORS[meta.rating] ?? UNRATED_COLOR,
-        ]),
-      );
     } else {
       colorMap = Object.fromEntries(
         getMountainBikeTrails().map((trail) => [trail.trailName, trail.color]),
       );
     }
-    const displayToRaw = Object.fromEntries(
-      Object.entries(metadata).map(([rawName, meta]) => [
-        meta.displayName,
-        rawName,
-      ]),
-    );
 
     return {
       ...layer,
       colorMap,
-      toRawName: (name: string) => displayToRaw[name] ?? name,
     };
   });
 }
@@ -1663,8 +1643,8 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
         ['literal', curatedIds],
       ];
     } else {
-      const curatedNames = getMountainBikeTrails().map((trail) =>
-        cfg.toRawName(trail.trailName),
+      const curatedNames = getMountainBikeTrails().map(
+        (trail) => trail.trailName,
       );
       const curatedFilter: mapboxgl.FilterSpecification = [
         'in',
@@ -1900,10 +1880,7 @@ export function detectTrailAtPoint(
     return trailNameForOsmId(rawName);
   }
 
-  // Map through city metadata for display names when a tileset uses raw GIS
-  // values (e.g. Godsey Ridge in Chattanooga).
-  const meta = trailMetadata[rawName];
-  return meta?.displayName ?? rawName;
+  return rawName;
 }
 
 // Geocoding utility

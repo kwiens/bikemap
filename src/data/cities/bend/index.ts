@@ -55,7 +55,6 @@ export const bendData: CityData = {
     },
   ],
   mountainBikeTrails: bendMountainBikeTrails,
-  trailMetadata: {},
   regionFor: (recArea: string) => REGION_MAP[recArea] ?? 'Central Oregon',
   mountainBike: {
     layers: [

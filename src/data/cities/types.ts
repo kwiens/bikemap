@@ -3,7 +3,6 @@ import type { BikeRoute } from '@/data/bike-routes';
 import type { LocalResource } from '@/data/local-resources';
 import type { MapFeature } from '@/data/map-features';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
-import type { TrailMeta } from '@/data/trail-metadata';
 
 export type CityId = 'chattanooga' | 'bend';
 
@@ -20,7 +19,6 @@ export interface CuratedTrailLayerConfig {
   // the primary URL itself rather than handing it to Mapbox, which has no
   // answer to a failure. See `loadCuratedGeojson`.
   geojsonFallbackUrl?: string;
-  metadata?: Record<string, TrailMeta>;
   // How a curated trail entry maps to features in this layer:
   //  - 'name'  (default): match trailProp against the trail's name
   //  - 'osmId': match the OSM_ID property against the trail's `osmIds` set.
@@ -42,7 +40,6 @@ export interface CityData {
   bikeResources: BikeResource[];
   localResources: LocalResource[];
   mountainBikeTrails: MountainBikeTrail[];
-  trailMetadata: Record<string, TrailMeta>;
   mountainBike: MountainBikeCityConfig;
   regionFor: (recArea: string) => string;
   // Static GeoJSON URL for the classified bike-network overlay (Casual mode).
