@@ -2,6 +2,7 @@ import * as migration_20260807_044718_initial_schema from './20260807_044718_ini
 import * as migration_20260807_202004_trail_conditions from './20260807_202004_trail_conditions';
 import * as migration_20260807_213812_condition_report_locks from './20260807_213812_condition_report_locks';
 import * as migration_20260807_234413_condition_marks_closed from './20260807_234413_condition_marks_closed';
+import * as migration_20260919_194419 from './20260919_194419';
 
 export const migrations = [
   {
@@ -22,6 +23,11 @@ export const migrations = [
   {
     up: migration_20260807_234413_condition_marks_closed.up,
     down: migration_20260807_234413_condition_marks_closed.down,
-    name: '20260807_234413_condition_marks_closed'
+    name: '20260807_234413_condition_marks_closed',
+  },
+  {
+    up: migration_20260919_194419.up,
+    down: migration_20260919_194419.down,
+    name: '20260919_194419',
   },
 ];

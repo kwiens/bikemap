@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "public/register-sw.js",
+    "public/sw.js",
+    // Run manually when source icons change.
+    "scripts/generate-icons.mjs"
+  ],
+  // Do not report a helper that is exported for tests and also used by the
+  // production module that defines it.
+  "ignoreExportsUsedInFile": true
+}

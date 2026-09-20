@@ -9,3 +9,5 @@
 requests>=2.31      # Mapbox vector-tile + Terrain-RGB HTTP fetches
 urllib3>=2.0        # Retry adapter used directly by add_trail_elevation.py
 Pillow>=10.0        # decodes Terrain-RGB PNG tiles for elevation sampling
+pyshp>=2.3,<3       # reads the source Chattanooga shapefile export
+pyproj>=3.7,<4      # reprojects source GIS coordinates to WGS84 GeoJSON

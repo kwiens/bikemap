@@ -385,9 +385,16 @@ export function pointsToElevationProfile(
 
   const smoothed = smoothAltitudes(points);
   const profile: [number, number, number, number][] = [];
+  const geometryGapDetails: NonNullable<
+    ElevationProfile['geometryGapDetails']
+  > = [];
   let cumDistFt = 0;
+  let pendingSegmentBreak = false;
 
   for (let i = 0; i < points.length; i++) {
+    if (points[i].segmentStart && profile.length > 0) {
+      pendingSegmentBreak = true;
+    }
     if (Number.isNaN(smoothed[i])) continue;
 
     if (i > 0 && !points[i].segmentStart) {
@@ -400,12 +407,29 @@ export function pointsToElevationProfile(
       cumDistFt += seg * FEET_PER_METER;
     }
 
-    profile.push([
+    const profilePoint: [number, number, number, number] = [
       cumDistFt,
       smoothed[i] * FEET_PER_METER,
       points[i].lng,
       points[i].lat,
-    ]);
+    ];
+    const previousProfilePoint = profile[profile.length - 1];
+    if (pendingSegmentBreak && previousProfilePoint) {
+      geometryGapDetails.push({
+        feet: Math.round(
+          haversineDistance(
+            previousProfilePoint[3],
+            previousProfilePoint[2],
+            profilePoint[3],
+            profilePoint[2],
+          ) * FEET_PER_METER,
+        ),
+        from: [previousProfilePoint[2], previousProfilePoint[3]],
+        to: [profilePoint[2], profilePoint[3]],
+      });
+      pendingSegmentBreak = false;
+    }
+    profile.push(profilePoint);
   }
 
   if (profile.length < 5) return null;
@@ -441,5 +465,6 @@ export function pointsToElevationProfile(
     min,
     max,
     profile,
+    ...(geometryGapDetails.length > 0 && { geometryGapDetails }),
   };
 }

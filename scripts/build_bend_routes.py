@@ -28,7 +28,9 @@ OUT_GEOJSON = os.path.join(ROOT, "public", "data", "bend", "routes.geojson")
 OUT_TS = os.path.join(ROOT, "src", "data", "cities", "bend", "bike-routes.data.ts")
 
 # Curated greenway routes: OSM name -> (display name, color, description).
-# Names match the `name` tag on OSM ways (collected across all segments).
+# Names match the `name` tag on OSM ways (collected across all segments). These
+# are bidirectional networks assembled from independently digitized OSM ways,
+# so they have no canonical traversal direction and must not render arrows.
 ROUTES = [
     ("Deschutes River Trail", "Deschutes River Trail", "#2563EB",
      "Bend's signature riverside path — mostly paved, linking the Old Mill, "
@@ -127,6 +129,7 @@ def write_ts(entries):
             "    icon: faRoute,",
             f"    defaultWidth: {DEFAULT_WIDTH},",
             "    opacity: 1.0,",
+            "    hideArrows: true,",
             f"    distance: {e['distance']},",
             f"    defaultBounds: [{b}],",
             "  },",

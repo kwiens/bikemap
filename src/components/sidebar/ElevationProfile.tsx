@@ -63,9 +63,9 @@ async function fetchProfile(
  * sidebar shows; a static file cannot update itself and would keep drawing an
  * old line beside new numbers.
  *
- * The files are still the only source for a trail whose geometry isn't in a row
- * — Chattanooga's ~220 trails ride on a Mapbox tileset, and a deployment with
- * no DATABASE_URL has no rows at all — so a miss falls through to
+ * The files are still the only source for a trail whose database row has no
+ * measured profile, and a deployment with no DATABASE_URL has no rows at all,
+ * so a miss falls through to
  * `/data/elevation/<city>/<slug>.json` rather than leaving the pane blank.
  *
  * An abort is not a miss: it means the selection changed, and refetching the
@@ -142,28 +142,11 @@ export function gradeToColor(grade: number): string {
   return `rgb(${r},${green},${b})`;
 }
 
-/**
- * Samples either side of a point averaged into its grade.
- *
- * Some smoothing is needed: Terrain-RGB elevation is quantised, so a raw
- * sample-to-sample grade over a short step is mostly noise and the chart comes
- * out as confetti. But every sample folded in also flattens the short steep
- * pitches that are the interesting part of a trail. 1 (a 3-sample average) is
- * the compromise; 0 is raw, 2 was the old default.
- */
-export const GRADE_SMOOTHING_WINDOW = 1;
-
-/**
- * A grade for the hover readout — signed, one decimal.
- *
- * The sign is the point: 8% up and 8% down are the same colour on the chart
- * (`gradeToColor` takes the absolute value) and very different to ride.
- */
+/** Format signed grade for the hover readout. */
 export function formatGrade(grade: number | undefined): string {
   if (grade === undefined || !Number.isFinite(grade)) {
     return '—';
   }
-  // Rounds to nothing either way, so don't dress it up with a sign.
   if (Math.abs(grade) < 0.05) {
     return '0.0%';
   }
@@ -173,41 +156,96 @@ export function formatGrade(grade: number | undefined): string {
 /** Percent grade at each point, smoothed. Positive is uphill. */
 export function computeGrades(
   points: [number, number, number, number][],
+  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
 ): number[] {
   if (points.length < 2) return points.map(() => 0);
 
-  const rawGrades: number[] = [0];
+  const gapEdges = new Set(
+    gapDetails.map(({ from, to }) =>
+      profileEdgeKey(from[0], from[1], to[0], to[1]),
+    ),
+  );
+  const segmentStarts = new Set<number>();
+  const rises: number[] = [0];
+  const runs: number[] = [0];
   for (let i = 1; i < points.length; i++) {
-    const dx = points[i][0] - points[i - 1][0];
-    const dy = points[i][1] - points[i - 1][1];
-    rawGrades.push(dx > 0 ? (dy / dx) * 100 : 0);
+    const previous = points[i - 1];
+    const current = points[i];
+    const run = current[0] - previous[0];
+    if (
+      run <= 0 ||
+      gapEdges.has(
+        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
+      )
+    ) {
+      segmentStarts.add(i);
+    }
+    const rise = current[1] - previous[1];
+    runs.push(run > 0 ? run : 0);
+    rises.push(run > 0 ? rise : 0);
   }
 
-  if (GRADE_SMOOTHING_WINDOW <= 0) return rawGrades;
-
-  const smoothed: number[] = [];
-  for (let i = 0; i < rawGrades.length; i++) {
-    let sum = 0;
-    let count = 0;
-    for (
-      let j = Math.max(0, i - GRADE_SMOOTHING_WINDOW);
-      j <= Math.min(rawGrades.length - 1, i + GRADE_SMOOTHING_WINDOW);
-      j++
-    ) {
-      sum += rawGrades[j];
-      count++;
+  const smoothed = points.map(() => 0);
+  const WINDOW = 2;
+  let segmentStart = 0;
+  for (let segmentEnd = 1; segmentEnd <= points.length; segmentEnd++) {
+    if (segmentEnd < points.length && !segmentStarts.has(segmentEnd)) {
+      continue;
     }
-    smoothed.push(sum / count);
+
+    for (let i = segmentStart; i < segmentEnd; i++) {
+      let totalRise = 0;
+      let totalRun = 0;
+      for (
+        let j = Math.max(segmentStart + 1, i - WINDOW);
+        j <= Math.min(segmentEnd - 1, i + WINDOW);
+        j++
+      ) {
+        totalRise += rises[j];
+        totalRun += runs[j];
+      }
+      smoothed[i] = totalRun > 0 ? (totalRise / totalRun) * 100 : 0;
+    }
+    segmentStart = segmentEnd;
   }
 
   return smoothed;
 }
 
-export function computeGradeColors(
+function profileEdgeKey(
+  fromLng: number,
+  fromLat: number,
+  toLng: number,
+  toLat: number,
+): string {
+  return `${fromLng},${fromLat}:${toLng},${toLat}`;
+}
+
+function profileSegmentRanges(
   points: [number, number, number, number][],
-): string[] {
-  if (points.length < 2) return points.map(() => gradeToColor(0));
-  return computeGrades(points).map((g) => gradeToColor(g));
+  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
+): [number, number][] {
+  if (points.length === 0) return [];
+  const gapEdges = new Set(
+    gapDetails.map(({ from, to }) =>
+      profileEdgeKey(from[0], from[1], to[0], to[1]),
+    ),
+  );
+  const starts = [0];
+  for (let index = 1; index < points.length; index++) {
+    const previous = points[index - 1];
+    const current = points[index];
+    if (
+      current[0] <= previous[0] ||
+      gapEdges.has(
+        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
+      )
+    ) {
+      starts.push(index);
+    }
+  }
+  starts.push(points.length);
+  return starts.slice(0, -1).map((start, index) => [start, starts[index + 1]]);
 }
 
 // Force strictly increasing offsets. Consecutive profile points can share a
@@ -255,7 +293,11 @@ export function downsampleStops(
 const profileCache = new Map<string, ElevationProfileData>();
 
 function downloadGpx(profile: ElevationProfileData): void {
-  const gpx = buildProfileGpx(profile.trail, profile.profile);
+  const gpx = buildProfileGpx(
+    profile.trail,
+    profile.profile,
+    profile.geometryGapDetails,
+  );
   downloadFile(gpx, `${slugify(profile.trail)}.gpx`, 'application/gpx+xml');
 }
 
@@ -646,11 +688,12 @@ export function ElevationProfile() {
   }, []);
 
   const grades = useMemo(
-    () => (profile ? computeGrades(profile.profile) : []),
+    () =>
+      profile ? computeGrades(profile.profile, profile.geometryGapDetails) : [],
     [profile],
   );
   const gradeColors = useMemo(
-    () => grades.map((g) => gradeToColor(g)),
+    () => grades.map((grade) => gradeToColor(grade)),
     [grades],
   );
 
@@ -859,9 +902,12 @@ export function ElevationProfile() {
           {hoverIndex !== null ? (
             <>
               {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
-              {/* Coloured to match the chart under the cursor, so the number
-                  and the band it came from are visibly the same reading. */}
-              <span style={{ color: gradeColors[hoverIndex] }}>
+              <span className="inline-flex items-center gap-1 text-gray-700">
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-2 w-2 rounded-full border border-black/10"
+                  style={{ backgroundColor: gradeColors[hoverIndex] }}
+                />
                 {formatGrade(grades[hoverIndex])}
               </span>
             </>
@@ -907,14 +953,31 @@ const ElevationSvg = React.memo(function ElevationSvg({
     PLOT_HEIGHT -
     ((e - profile.min) / yRange) * PLOT_HEIGHT;
 
-  const linePath = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? 'M' : 'L'}${xScale(p[0]).toFixed(1)} ${yScale(p[1]).toFixed(1)}`,
+  const baseline = CHART_HEIGHT - CHART_PADDING_BOTTOM;
+  const ranges = profileSegmentRanges(points, profile.geometryGapDetails);
+  const linePath = ranges
+    .map(([start, end]) =>
+      points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' '),
     )
     .join(' ');
-
-  const areaPath = `${linePath} L${chartWidth} ${CHART_HEIGHT - CHART_PADDING_BOTTOM} L0 ${CHART_HEIGHT - CHART_PADDING_BOTTOM} Z`;
+  const areaPath = ranges
+    .map(([start, end]) => {
+      const segmentLine = points
+        .slice(start, end)
+        .map(
+          (point, index) =>
+            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+        )
+        .join(' ');
+      return `${segmentLine} L${xScale(points[end - 1][0]).toFixed(1)} ${baseline} L${xScale(points[start][0]).toFixed(1)} ${baseline} Z`;
+    })
+    .join(' ');
 
   const gradientStops = downsampleStops(points, gradeColors, maxDist);
 

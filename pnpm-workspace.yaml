@@ -1,0 +1,16 @@
+# pnpm 11 requires an explicit decision for dependency build scripts.
+overrides:
+  'brace-expansion@1': 1.1.18
+  'dompurify@3': 3.4.13
+  'js-yaml@4': 4.3.2
+  'postcss-selector-parser@6': 6.1.3
+  'undici@7': 7.29.0
+
+allowBuilds:
+  # Biome and Sharp are direct development dependencies with native binaries.
+  '@biomejs/biome': true
+  sharp: true
+  # Both packages publish platform-specific binaries, so their install scripts
+  # are unnecessary for this project.
+  esbuild: false
+  unrs-resolver: false

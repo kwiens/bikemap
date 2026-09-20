@@ -1,28 +1,54 @@
 /**
- * What the admin opens on.
- *
- * A server component, rendered above Payload's collection cards through
- * `admin.components.beforeDashboard`. Additive rather than a replacement
- * dashboard view: the cards are a perfectly good way to reach a collection, and
- * they keep working if this ever fails to render.
- *
- * Styled entirely from Payload's own CSS variables, so it follows the theme —
- * including whatever the Theme global has been set to, and dark mode — without
- * knowing anything about either.
+ * A per-city health summary above Payload's default collection cards. This is
+ * a server component: each city query starts together, and only small counts
+ * and links are rendered into the admin page.
  */
 import Link from 'next/link';
-import { cityConfigs } from '@/config/map.config';
+import { cityConfigs, cityIds } from '@/config/map.config';
+import type { CityId } from '@/data/cities/types';
 import { getTrailSummary } from '@/payload/read/summary';
+import type { TrailSummary } from '@/payload/read/summary-model';
 
-/** Cards that mean "something needs doing" get a tone; plain counts don't. */
 type Tone = 'attention' | 'plain';
+type QueryOperator = 'equals' | 'exists' | 'not_equals';
+
+interface TrailFilter {
+  field: string;
+  operator: QueryOperator;
+  value: string;
+}
+
+const FILTERS = {
+  drafts: [{ field: '_status', operator: 'not_equals', value: 'published' }],
+  missingGeometry: [
+    { field: '_status', operator: 'equals', value: 'published' },
+    { field: 'geom', operator: 'exists', value: 'false' },
+  ],
+  missingProfile: [
+    { field: '_status', operator: 'equals', value: 'published' },
+    { field: 'geom', operator: 'exists', value: 'true' },
+    { field: 'elevationProfile', operator: 'exists', value: 'false' },
+  ],
+  published: [{ field: '_status', operator: 'equals', value: 'published' }],
+} satisfies Record<string, TrailFilter[]>;
 
 export async function DashboardSummary() {
-  const summary = await getTrailSummary();
-  const cityName = cityConfigs[summary.city]?.region?.name ?? summary.city;
+  const summaries = await Promise.all(cityIds.map(getTrailSummary));
 
   return (
     <section style={{ marginBottom: 'var(--base, 1.5rem)' }}>
+      {summaries.map((summary) => (
+        <CitySummary key={summary.city} summary={summary} />
+      ))}
+    </section>
+  );
+}
+
+function CitySummary({ summary }: { summary: TrailSummary }) {
+  const cityName = cityConfigs[summary.city].region.displayName;
+
+  return (
+    <article style={{ marginBottom: '2rem' }}>
       <header style={{ marginBottom: '1rem' }}>
         <h2 style={{ margin: 0 }}>{cityName}</h2>
         <p
@@ -33,7 +59,7 @@ export async function DashboardSummary() {
         >
           {summary.unavailable
             ? 'The trail database is unreachable, so these counts are unavailable. The admin still works; the public map is falling back to its checked-in data.'
-            : 'Trails this deployment is serving, and anything that needs a look.'}
+            : 'Trails in the shared database, scoped to this city.'}
         </p>
       </header>
 
@@ -45,33 +71,33 @@ export async function DashboardSummary() {
         }}
       >
         <Stat
-          href="/admin/collections/trails?where[_status][equals]=published"
+          href={trailListHref(summary.city, FILTERS.published)}
           label="Published"
           note="live on the map"
           value={summary.published}
         />
         <Stat
-          href="/admin/collections/trails?where[_status][not_equals]=published"
+          href={trailListHref(summary.city, FILTERS.drafts)}
           label="Drafts"
           note="not yet public"
           value={summary.drafts}
         />
         <Stat
-          href="/admin/collections/trails"
+          href={trailListHref(summary.city, FILTERS.missingGeometry)}
           label="No line"
           note="draw nothing on the map"
           tone={summary.missingGeometry ? 'attention' : 'plain'}
           value={summary.missingGeometry}
         />
         <Stat
-          href="/admin/collections/trails"
+          href={trailListHref(summary.city, FILTERS.missingProfile)}
           label="No elevation"
           note="chart is empty"
           tone={summary.missingProfile ? 'attention' : 'plain'}
           value={summary.missingProfile}
         />
         <Stat
-          href="/admin/collections/trails"
+          href={trailListHref(summary.city)}
           label="Build warnings"
           note="gaps or missing ways"
           tone={summary.withWarnings ? 'attention' : 'plain'}
@@ -80,14 +106,14 @@ export async function DashboardSummary() {
         {/* Plain, never 'attention': riders reporting conditions is the system
             working. It is here so a sudden spike is visible, not as a chore. */}
         <Stat
-          href="/admin/collections/trail-conditions"
+          href={`/admin/collections/trail-conditions?where[city][equals]=${summary.city}`}
           label="Reports"
           note="filed in the last 7 days"
           value={summary.reportsThisWeek}
         />
       </div>
 
-      {summary.recent.length > 0 && (
+      {summary.recent.length > 0 ? (
         <div style={{ marginTop: '1.25rem' }}>
           <h3
             style={{
@@ -131,8 +157,8 @@ export async function DashboardSummary() {
             ))}
           </ul>
         </div>
-      )}
-    </section>
+      ) : null}
+    </article>
   );
 }
 
@@ -178,7 +204,6 @@ function Stat({
           lineHeight: 1.1,
         }}
       >
-        {/* An unreachable database is not zero, and showing 0 would be a lie. */}
         {value === null ? '—' : value.toLocaleString()}
       </div>
       <div style={{ fontWeight: 500, marginTop: '0.35rem' }}>{label}</div>
@@ -193,4 +218,13 @@ function Stat({
       </div>
     </Link>
   );
+}
+
+function trailListHref(city: CityId, filters: TrailFilter[] = []): string {
+  const search = new URLSearchParams();
+  search.set('where[city][equals]', city);
+  for (const filter of filters) {
+    search.set(`where[${filter.field}][${filter.operator}]`, filter.value);
+  }
+  return `/admin/collections/trails?${search.toString()}`;
 }

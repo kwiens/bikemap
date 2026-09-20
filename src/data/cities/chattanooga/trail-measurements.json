@@ -1,0 +1,1746 @@
+{
+  "4 Tons": {
+    "defaultBounds": [-85.4233117, 34.8740964, -85.4164411, 34.8783534],
+    "distance": 1.61,
+    "elevationGain": 264,
+    "elevationLoss": 80,
+    "elevationMax": 1814,
+    "elevationMin": 1568
+  },
+  "5 Points Expressway": {
+    "defaultBounds": [-85.4227814, 34.8619012, -85.4208356, 34.86744],
+    "distance": 0.66,
+    "elevationGain": 0,
+    "elevationLoss": 32,
+    "elevationMax": 1906,
+    "elevationMin": 1864
+  },
+  "Access Road / Old RR Grade": {
+    "defaultBounds": [-85.3863366, 34.9179667, -85.3701599, 34.9342501],
+    "distance": 1.93,
+    "elevationGain": 30,
+    "elevationLoss": 305,
+    "elevationMax": 1509,
+    "elevationMin": 1253
+  },
+  "ADA Accessible Trail": {
+    "defaultBounds": [-85.1097581, 35.0825544, -85.1052411, 35.0892083],
+    "distance": 1.08,
+    "elevationGain": 63,
+    "elevationLoss": 53,
+    "elevationMax": 1039,
+    "elevationMin": 967
+  },
+  "Atlas": {
+    "defaultBounds": [-85.1246955, 35.0741133, -85.1074655, 35.0825433],
+    "distance": 5.6,
+    "elevationGain": 385,
+    "elevationLoss": 390,
+    "elevationMax": 1010,
+    "elevationMin": 879
+  },
+  "Atlatl": {
+    "defaultBounds": [-85.4629538, 34.8208562, -85.4555361, 34.825785],
+    "distance": 1.37,
+    "elevationGain": 166,
+    "elevationLoss": 83,
+    "elevationMax": 1780,
+    "elevationMin": 1651
+  },
+  "Back End": {
+    "defaultBounds": [-85.440841, 34.84628, -85.4292777, 34.8507593],
+    "distance": 0.88,
+    "elevationGain": 246,
+    "elevationLoss": 10,
+    "elevationMax": 2250,
+    "elevationMin": 2001
+  },
+  "Bankhead": {
+    "defaultBounds": [-85.4290937, 34.8503479, -85.4240216, 34.8509565],
+    "distance": 0.42,
+    "elevationGain": 0,
+    "elevationLoss": 71,
+    "elevationMax": 1992,
+    "elevationMin": 1914
+  },
+  "Barkeater": {
+    "defaultBounds": [-85.4552915, 34.8249863, -85.4407035, 34.8354084],
+    "distance": 2.74,
+    "elevationGain": 134,
+    "elevationLoss": 237,
+    "elevationMax": 1880,
+    "elevationMin": 1636
+  },
+  "Barkeater Spur": {
+    "defaultBounds": [-85.4445597, 34.8317421, -85.4429145, 34.8330089],
+    "distance": 0.14,
+    "elevationGain": 0,
+    "elevationLoss": 55,
+    "elevationMax": 1874,
+    "elevationMin": 1812
+  },
+  "Barred Owl": {
+    "defaultBounds": [-85.0637855, 35.0410333, -85.0586055, 35.0451633],
+    "distance": 0.78,
+    "elevationGain": 55,
+    "elevationLoss": 82,
+    "elevationMax": 1029,
+    "elevationMin": 969
+  },
+  "Bathtub Gin": {
+    "defaultBounds": [-85.3887839, 34.9306689, -85.3839576, 34.9331587],
+    "distance": 0.55,
+    "elevationGain": 44,
+    "elevationLoss": 51,
+    "elevationMax": 1550,
+    "elevationMin": 1482
+  },
+  "BAY POINT LOOP TRAIL": {
+    "defaultBounds": [-85.1240054, 35.155751, -85.1146284, 35.1682234],
+    "distance": 4.35,
+    "elevationGain": 61,
+    "elevationLoss": 71,
+    "elevationMax": 714,
+    "elevationMin": 683
+  },
+  "Bella's Run": {
+    "defaultBounds": [-85.438704, 34.845121, -85.4304219, 34.850128],
+    "distance": 0.84,
+    "elevationGain": 92,
+    "elevationLoss": 20,
+    "elevationMax": 2178,
+    "elevationMin": 2100
+  },
+  "Bicycles/Pedestrians": {
+    "defaultBounds": [-85.1163509, 35.0843688, -85.0964359, 35.0970648],
+    "distance": 5.31,
+    "elevationGain": 414,
+    "elevationLoss": 310,
+    "elevationMax": 1002,
+    "elevationMin": 827
+  },
+  "Big Forest": {
+    "defaultBounds": [-85.041023, 35.0388526, -85.037895, 35.0453996],
+    "distance": 0.74,
+    "elevationGain": 44,
+    "elevationLoss": 86,
+    "elevationMax": 1067,
+    "elevationMin": 979
+  },
+  "Big Red": {
+    "defaultBounds": [-85.0642587, 35.0415444, -85.056764, 35.0440629],
+    "distance": 1.34,
+    "elevationGain": 282,
+    "elevationLoss": 124,
+    "elevationMax": 1146,
+    "elevationMin": 880
+  },
+  "Biscuits & Gravy": {
+    "defaultBounds": [-85.3141722, 35.1380075, -85.3106103, 35.1396297],
+    "distance": 0.68,
+    "elevationGain": 0,
+    "elevationLoss": 296,
+    "elevationMax": 1396,
+    "elevationMin": 1095
+  },
+  "Black Bear": {
+    "defaultBounds": [-85.0598199, 35.0498297, -85.0575, 35.0510677],
+    "distance": 0.19,
+    "elevationGain": 0,
+    "elevationLoss": 43,
+    "elevationMax": 958,
+    "elevationMin": 912
+  },
+  "Black Forest Bike Trail": {
+    "defaultBounds": [-85.119461, 35.07826, -85.1085178, 35.0845991],
+    "distance": 3.08,
+    "elevationGain": 251,
+    "elevationLoss": 206,
+    "elevationMax": 1023,
+    "elevationMin": 886
+  },
+  "BLUE Trail": {
+    "defaultBounds": [-85.2738342, 34.8954675, -85.2278657, 34.9418983],
+    "distance": 3.28,
+    "elevationGain": 72,
+    "elevationLoss": 102,
+    "elevationMax": 795,
+    "elevationMin": 690
+  },
+  "Bluff Road": {
+    "defaultBounds": [-85.3781468, 34.9129327, -85.369072, 34.9331357],
+    "distance": 1.78,
+    "elevationGain": 456,
+    "elevationLoss": 64,
+    "elevationMax": 1730,
+    "elevationMin": 1291
+  },
+  "Boat Ramp Connector": {
+    "defaultBounds": [-85.4192753, 35.0573125, -85.4152553, 35.0597947],
+    "distance": 0.31,
+    "elevationGain": 21,
+    "elevationLoss": 20,
+    "elevationMax": 680,
+    "elevationMin": 657
+  },
+  "Bobcat": {
+    "defaultBounds": [-85.0642355, 35.0410933, -85.0590055, 35.0421933],
+    "distance": 0.51,
+    "elevationGain": 32,
+    "elevationLoss": 0,
+    "elevationMax": 1033,
+    "elevationMin": 992
+  },
+  "Boulder Point Trail": {
+    "defaultBounds": [-85.1134985, 35.0902502, -85.1041065, 35.094028],
+    "distance": 1.3,
+    "elevationGain": 118,
+    "elevationLoss": 117,
+    "elevationMax": 1018,
+    "elevationMin": 950
+  },
+  "Box Turtle": {
+    "defaultBounds": [-85.0412755, 35.0313333, -85.0338355, 35.0427433],
+    "distance": 4.28,
+    "elevationGain": 269,
+    "elevationLoss": 278,
+    "elevationMax": 1040,
+    "elevationMin": 817
+  },
+  "Brainard Levee Trail": {
+    "defaultBounds": [-85.2156985, 35.0593881, -85.2112961, 35.0678638],
+    "distance": 0.84,
+    "elevationGain": 0,
+    "elevationLoss": 77,
+    "elevationMax": 735,
+    "elevationMin": 644
+  },
+  "Bread & Butter": {
+    "defaultBounds": [-85.3107791, 35.1363399, -85.3075176, 35.1381536],
+    "distance": 0.46,
+    "elevationGain": 0,
+    "elevationLoss": 257,
+    "elevationMax": 1082,
+    "elevationMin": 817
+  },
+  "Bullwinkle": {
+    "defaultBounds": [-85.3101357, 35.1371069, -85.3078791, 35.1399647],
+    "distance": 0.32,
+    "elevationGain": 0,
+    "elevationLoss": 218,
+    "elevationMax": 1072,
+    "elevationMin": 844
+  },
+  "Camp Jordan Loop": {
+    "defaultBounds": [-85.2187503, 34.9975396, -85.1911955, 35.0442874],
+    "distance": 5.65,
+    "elevationGain": 43,
+    "elevationLoss": 31,
+    "elevationMax": 683,
+    "elevationMin": 653
+  },
+  "Caprock": {
+    "defaultBounds": [-85.444486, 34.8403406, -85.439954, 34.846488],
+    "distance": 1.15,
+    "elevationGain": 30,
+    "elevationLoss": 215,
+    "elevationMax": 2084,
+    "elevationMin": 1895
+  },
+  "Caprock Cut Through": {
+    "defaultBounds": [-85.4411999, 34.842641, -85.4394751, 34.8441687],
+    "distance": 0.15,
+    "elevationGain": 21,
+    "elevationLoss": 20,
+    "elevationMax": 1978,
+    "elevationMin": 1955
+  },
+  "CCT": {
+    "defaultBounds": [-85.3881879, 34.9205506, -85.3773376, 34.957276],
+    "distance": 4.2,
+    "elevationGain": 668,
+    "elevationLoss": 211,
+    "elevationMax": 1982,
+    "elevationMin": 1408
+  },
+  "Chalkeye": {
+    "defaultBounds": [-85.4226764, 34.8658475, -85.4174857, 34.8741129],
+    "distance": 1.37,
+    "elevationGain": 48,
+    "elevationLoss": 88,
+    "elevationMax": 1848,
+    "elevationMin": 1753
+  },
+  "Cherokee Trail": {
+    "defaultBounds": [-85.3185096, 35.0711287, -85.311946, 35.078549],
+    "distance": 1.17,
+    "elevationGain": 239,
+    "elevationLoss": 63,
+    "elevationMax": 1033,
+    "elevationMin": 778
+  },
+  "Chief Richard Taylor Natural trail": {
+    "defaultBounds": [-85.1135734, 34.9082984, -85.1041827, 34.9110805],
+    "distance": 0.59,
+    "elevationGain": 0,
+    "elevationLoss": 0,
+    "elevationMax": 739,
+    "elevationMin": 737
+  },
+  "Chief Richard Taylor Nature Trail": {
+    "defaultBounds": [-85.1181071, 34.9110805, -85.1108555, 34.9144985],
+    "distance": 1,
+    "elevationGain": 20,
+    "elevationLoss": 11,
+    "elevationMax": 758,
+    "elevationMin": 737
+  },
+  "Choo Choo": {
+    "defaultBounds": [-85.3153765, 35.0714003, -85.314434, 35.0727688],
+    "distance": 0.24,
+    "elevationGain": 41,
+    "elevationLoss": 31,
+    "elevationMax": 921,
+    "elevationMin": 881
+  },
+  "Choo Choo Connector": {
+    "defaultBounds": [-85.3148473, 35.0713925, -85.3142552, 35.0725475],
+    "distance": 0.11,
+    "elevationGain": 10,
+    "elevationLoss": 21,
+    "elevationMax": 905,
+    "elevationMin": 879
+  },
+  "Christmas Top": {
+    "defaultBounds": [-85.066582, 35.0420401, -85.0564656, 35.0430582],
+    "distance": 0.71,
+    "elevationGain": 160,
+    "elevationLoss": 171,
+    "elevationMax": 1215,
+    "elevationMin": 885
+  },
+  "Chunky": {
+    "defaultBounds": [-85.3842909, 35.0481304, -85.3809126, 35.0519062],
+    "distance": 1.23,
+    "elevationGain": 305,
+    "elevationLoss": 97,
+    "elevationMax": 1841,
+    "elevationMin": 1719
+  },
+  "Clear Eyes": {
+    "defaultBounds": [-85.3157309, 35.1372647, -85.315155, 35.1376184],
+    "distance": 0.06,
+    "elevationGain": 0,
+    "elevationLoss": 34,
+    "elevationMax": 1443,
+    "elevationMin": 1399
+  },
+  "CLOSED Road": {
+    "defaultBounds": [-85.2715633, 34.9292509, -85.2682369, 34.9303369],
+    "distance": 0.21,
+    "elevationGain": 22,
+    "elevationLoss": 0,
+    "elevationMax": 823,
+    "elevationMin": 800
+  },
+  "Cloudland Canyon Connector": {
+    "defaultBounds": [-85.4801969, 34.8171127, -85.4131963, 34.8625931],
+    "distance": 8.22,
+    "elevationGain": 323,
+    "elevationLoss": 865,
+    "elevationMax": 2002,
+    "elevationMin": 1623
+  },
+  "Collegedale Greenway": {
+    "defaultBounds": [-85.0713112, 35.0529432, -85.0494074, 35.0626812],
+    "distance": 2.38,
+    "elevationGain": 20,
+    "elevationLoss": 10,
+    "elevationMax": 783,
+    "elevationMin": 759
+  },
+  "Copperhead Trail": {
+    "defaultBounds": [-85.0608955, 35.0541633, -85.0591655, 35.0560533],
+    "distance": 0.22,
+    "elevationGain": 0,
+    "elevationLoss": 84,
+    "elevationMax": 1153,
+    "elevationMin": 1068
+  },
+  "Coyote": {
+    "defaultBounds": [-85.0612255, 35.0457333, -85.0557055, 35.0492933],
+    "distance": 1.05,
+    "elevationGain": 94,
+    "elevationLoss": 96,
+    "elevationMax": 1037,
+    "elevationMin": 978
+  },
+  "Crabtree Farm Trail Connection": {
+    "defaultBounds": [-85.3096882, 35.0084388, -85.2991541, 35.0122235],
+    "distance": 1.12,
+    "elevationGain": 21,
+    "elevationLoss": 52,
+    "elevationMax": 667,
+    "elevationMin": 638
+  },
+  "Crabtree Farms / East Lake Connector": {
+    "defaultBounds": [-85.3000175, 35.0014674, -85.278583, 35.0095352],
+    "distance": 1.65,
+    "elevationGain": 62,
+    "elevationLoss": 30,
+    "elevationMax": 699,
+    "elevationMin": 652
+  },
+  "Crashing Creek": {
+    "defaultBounds": [-85.038305, 35.0206222, -85.0313592, 35.0218807],
+    "distance": 0.42,
+    "elevationGain": 0,
+    "elevationLoss": 42,
+    "elevationMax": 865,
+    "elevationMin": 820
+  },
+  "Cravens Terrace Road": {
+    "defaultBounds": [-85.34442, 35.0142202, -85.3352351, 35.0170926],
+    "distance": 0.78,
+    "elevationGain": 0,
+    "elevationLoss": 441,
+    "elevationMax": 1447,
+    "elevationMin": 994
+  },
+  "Cross Cut": {
+    "defaultBounds": [-85.440891, 34.846529, -85.4292803, 34.850876],
+    "distance": 1.3,
+    "elevationGain": 102,
+    "elevationLoss": 326,
+    "elevationMax": 2249,
+    "elevationMin": 1981
+  },
+  "Cut Thru": {
+    "defaultBounds": [-85.4226505, 34.8722327, -85.4186184, 34.8737279],
+    "distance": 0.17,
+    "elevationGain": 0,
+    "elevationLoss": 0,
+    "elevationMax": 1828,
+    "elevationMin": 1776
+  },
+  "Dale Bermhardt": {
+    "defaultBounds": [-85.3133805, 35.1397048, -85.3096815, 35.1411633],
+    "distance": 0.57,
+    "elevationGain": 0,
+    "elevationLoss": 293,
+    "elevationMax": 1393,
+    "elevationMin": 1094
+  },
+  "DC&C": {
+    "defaultBounds": [-85.4321719, 34.8587298, -85.4185104, 34.87139],
+    "distance": 1.86,
+    "elevationGain": 113,
+    "elevationLoss": 78,
+    "elevationMax": 1891,
+    "elevationMin": 1791
+  },
+  "Deer Hollow Trail": {
+    "defaultBounds": [-85.1117195, 35.0851993, -85.1083332, 35.091449],
+    "distance": 0.58,
+    "elevationGain": 53,
+    "elevationLoss": 43,
+    "elevationMax": 993,
+    "elevationMin": 928
+  },
+  "DeVito": {
+    "defaultBounds": [-85.3139478, 35.1410384, -85.3133842, 35.1411621],
+    "distance": 0.04,
+    "elevationGain": 0,
+    "elevationLoss": 33,
+    "elevationMax": 1440,
+    "elevationMin": 1407
+  },
+  "Dingey": {
+    "defaultBounds": [-85.4323379, 34.8661691, -85.4306296, 34.8683826],
+    "distance": 0.29,
+    "elevationGain": 10,
+    "elevationLoss": 0,
+    "elevationMax": 1827,
+    "elevationMin": 1811
+  },
+  "Dinkey": {
+    "defaultBounds": [-85.4256297, 34.8706047, -85.4225609, 34.8741795],
+    "distance": 0.57,
+    "elevationGain": 11,
+    "elevationLoss": 22,
+    "elevationMax": 1793,
+    "elevationMin": 1764
+  },
+  "Dogwood": {
+    "defaultBounds": [-85.0614268, 35.0428456, -85.0543345, 35.0502634],
+    "distance": 1.13,
+    "elevationGain": 99,
+    "elevationLoss": 121,
+    "elevationMax": 981,
+    "elevationMin": 865
+  },
+  "Dogwood Ridge Trail": {
+    "defaultBounds": [-85.1151302, 35.0898056, -85.1061185, 35.096678],
+    "distance": 1.27,
+    "elevationGain": 63,
+    "elevationLoss": 133,
+    "elevationMax": 991,
+    "elevationMin": 879
+  },
+  "Double J": {
+    "defaultBounds": [-85.3145939, 35.0755209, -85.3090965, 35.0809199],
+    "distance": 1.28,
+    "elevationGain": 258,
+    "elevationLoss": 287,
+    "elevationMax": 1012,
+    "elevationMin": 865
+  },
+  "East Fugett": {
+    "defaultBounds": [-85.4220244, 34.8727085, -85.4181804, 34.8752846],
+    "distance": 0.53,
+    "elevationGain": 215,
+    "elevationLoss": 0,
+    "elevationMax": 1794,
+    "elevationMin": 1573
+  },
+  "East Rim": {
+    "defaultBounds": [-85.3853316, 35.0424744, -85.3786668, 35.0518835],
+    "distance": 1.17,
+    "elevationGain": 167,
+    "elevationLoss": 42,
+    "elevationMax": 1864,
+    "elevationMin": 1714
+  },
+  "Electric Avenue": {
+    "defaultBounds": [-85.4193649, 35.0387982, -85.3854006, 35.0479882],
+    "distance": 3.22,
+    "elevationGain": 341,
+    "elevationLoss": 170,
+    "elevationMax": 1784,
+    "elevationMin": 1540
+  },
+  "Escalator": {
+    "defaultBounds": [-85.3164481, 35.1326538, -85.3069953, 35.1378923],
+    "distance": 2.53,
+    "elevationGain": 0,
+    "elevationLoss": 731,
+    "elevationMax": 1479,
+    "elevationMin": 746
+  },
+  "F4": {
+    "defaultBounds": [-85.3868629, 34.9024378, -85.3810155, 34.9151704],
+    "distance": 1.1,
+    "elevationGain": 227,
+    "elevationLoss": 214,
+    "elevationMax": 1473,
+    "elevationMin": 1331
+  },
+  "Falls Connector": {
+    "defaultBounds": [-85.3139416, 35.1417035, -85.3129214, 35.1432835],
+    "distance": 0.14,
+    "elevationGain": 0,
+    "elevationLoss": 37,
+    "elevationMax": 1457,
+    "elevationMin": 1413
+  },
+  "Firewater": {
+    "defaultBounds": [-85.3894686, 34.9265198, -85.3838748, 34.9334522],
+    "distance": 1.97,
+    "elevationGain": 160,
+    "elevationLoss": 223,
+    "elevationMax": 1571,
+    "elevationMin": 1415
+  },
+  "Fletcher Park": {
+    "defaultBounds": [-84.9046418, 35.1764225, -84.8996572, 35.1838216],
+    "distance": 1.81,
+    "elevationGain": 51,
+    "elevationLoss": 51,
+    "elevationMax": 771,
+    "elevationMin": 718
+  },
+  "Foot Wall": {
+    "defaultBounds": [-85.4299914, 34.851, -85.4281141, 34.861787],
+    "distance": 0.95,
+    "elevationGain": 221,
+    "elevationLoss": 207,
+    "elevationMax": 2030,
+    "elevationMin": 1963
+  },
+  "Forest": {
+    "defaultBounds": [-85.0669941, 35.0360113, -85.0598118, 35.0407021],
+    "distance": 0.73,
+    "elevationGain": 150,
+    "elevationLoss": 83,
+    "elevationMax": 1151,
+    "elevationMin": 1007
+  },
+  "Forest Lane": {
+    "defaultBounds": [-85.0432447, 35.0423122, -85.0395939, 35.0454727],
+    "distance": 0.82,
+    "elevationGain": 205,
+    "elevationLoss": 10,
+    "elevationMax": 1083,
+    "elevationMin": 883
+  },
+  "Fuggett Lift": {
+    "defaultBounds": [-85.4274631, 34.8601158, -85.4252404, 34.8621721],
+    "distance": 0.41,
+    "elevationGain": 131,
+    "elevationLoss": 10,
+    "elevationMax": 2103,
+    "elevationMin": 1963
+  },
+  "Gambler": {
+    "defaultBounds": [-85.3147711, 35.1374154, -85.3109098, 35.1383183],
+    "distance": 0.43,
+    "elevationGain": 0,
+    "elevationLoss": 285,
+    "elevationMax": 1383,
+    "elevationMin": 1093
+  },
+  "Gig City": {
+    "defaultBounds": [-85.3171697, 35.0727667, -85.313551, 35.0754592],
+    "distance": 0.58,
+    "elevationGain": 149,
+    "elevationLoss": 93,
+    "elevationMax": 1002,
+    "elevationMin": 867
+  },
+  "Gig City/Cherokee Trail": {
+    "defaultBounds": [-85.3143473, 35.073974, -85.3136633, 35.0754682],
+    "distance": 0.11,
+    "elevationGain": 0,
+    "elevationLoss": 20,
+    "elevationMax": 920,
+    "elevationMin": 893
+  },
+  "Give Me A Break": {
+    "defaultBounds": [-85.0635122, 35.0483042, -85.0611569, 35.0488271],
+    "distance": 0.14,
+    "elevationGain": 224,
+    "elevationLoss": 0,
+    "elevationMax": 1218,
+    "elevationMin": 993
+  },
+  "Grindstone Ridge": {
+    "defaultBounds": [-85.4054185, 35.0561751, -85.3886238, 35.0577344],
+    "distance": 1.7,
+    "elevationGain": 208,
+    "elevationLoss": 178,
+    "elevationMax": 1851,
+    "elevationMin": 1641
+  },
+  "Guild Trail": {
+    "defaultBounds": [-85.3546547, 35.0041594, -85.331749, 35.0207415],
+    "distance": 2.6,
+    "elevationGain": 417,
+    "elevationLoss": 0,
+    "elevationMax": 1306,
+    "elevationMin": 865
+  },
+  "Guild-Hardy Connector": {
+    "defaultBounds": [-85.3351748, 35.0112898, -85.3282182, 35.0158777],
+    "distance": 0.8,
+    "elevationGain": 10,
+    "elevationLoss": 280,
+    "elevationMax": 965,
+    "elevationMin": 686
+  },
+  "Hanging Wall": {
+    "defaultBounds": [-85.428948, 34.8571256, -85.427456, 34.8616405],
+    "distance": 0.43,
+    "elevationGain": 172,
+    "elevationLoss": 82,
+    "elevationMax": 2121,
+    "elevationMin": 2010
+  },
+  "Hardy Trail": {
+    "defaultBounds": [-85.3442308, 34.9959209, -85.3402735, 35.0161],
+    "distance": 1.53,
+    "elevationGain": 232,
+    "elevationLoss": 0,
+    "elevationMax": 1714,
+    "elevationMin": 1455
+  },
+  "Hawks Ridge": {
+    "defaultBounds": [-85.1209313, 35.0880143, -85.1060972, 35.0991794],
+    "distance": 3.02,
+    "elevationGain": 462,
+    "elevationLoss": 304,
+    "elevationMax": 988,
+    "elevationMin": 858
+  },
+  "Hidden Lake Overlook": {
+    "defaultBounds": [-85.112392, 35.0901144, -85.10966, 35.0915108],
+    "distance": 0.22,
+    "elevationGain": 10,
+    "elevationLoss": 44,
+    "elevationMax": 1002,
+    "elevationMin": 956
+  },
+  "Hidden Lake Trail": {
+    "defaultBounds": [-85.1153253, 35.0877401, -85.1091459, 35.0922272],
+    "distance": 0.68,
+    "elevationGain": 112,
+    "elevationLoss": 77,
+    "elevationMax": 1019,
+    "elevationMin": 902
+  },
+  "High Voltage": {
+    "defaultBounds": [-85.42432, 35.040934, -85.4153443, 35.0572771],
+    "distance": 3.49,
+    "elevationGain": 171,
+    "elevationLoss": 1025,
+    "elevationMax": 1502,
+    "elevationMin": 640
+  },
+  "Hill City": {
+    "defaultBounds": [-85.3139657, 35.073974, -85.3080636, 35.0800905],
+    "distance": 1.59,
+    "elevationGain": 324,
+    "elevationLoss": 256,
+    "elevationMax": 954,
+    "elevationMin": 759
+  },
+  "Houston Valley ORV 181": {
+    "defaultBounds": [-85.1339263, 34.7686757, -85.1226286, 34.7898601],
+    "distance": 2.27,
+    "elevationGain": 169,
+    "elevationLoss": 119,
+    "elevationMax": 1112,
+    "elevationMin": 959
+  },
+  "Houston Valley ORV 181A": {
+    "defaultBounds": [-85.1326591, 34.7889437, -85.1294444, 34.7900499],
+    "distance": 0.22,
+    "elevationGain": 96,
+    "elevationLoss": 0,
+    "elevationMax": 1084,
+    "elevationMin": 981
+  },
+  "Houston Valley ORV 181B": {
+    "defaultBounds": [-85.1311162, 34.7857699, -85.1305713, 34.7889437],
+    "distance": 0.24,
+    "elevationGain": 11,
+    "elevationLoss": 11,
+    "elevationMax": 993,
+    "elevationMin": 970
+  },
+  "Houston Valley ORV 181C": {
+    "defaultBounds": [-85.1364037, 34.789961, -85.1316347, 34.7936564],
+    "distance": 1.03,
+    "elevationGain": 151,
+    "elevationLoss": 161,
+    "elevationMax": 1199,
+    "elevationMin": 1036
+  },
+  "Houston Valley ORV 181D": {
+    "defaultBounds": [-85.1367972, 34.7920073, -85.1325648, 34.7949248],
+    "distance": 0.62,
+    "elevationGain": 99,
+    "elevationLoss": 54,
+    "elevationMax": 1164,
+    "elevationMin": 1053
+  },
+  "Houston Valley ORV 181E": {
+    "defaultBounds": [-85.1374118, 34.7868979, -85.1327469, 34.7921146],
+    "distance": 1.27,
+    "elevationGain": 289,
+    "elevationLoss": 266,
+    "elevationMax": 1189,
+    "elevationMin": 1008
+  },
+  "Houston Valley ORV 181F": {
+    "defaultBounds": [-85.1394994, 34.7730713, -85.1327974, 34.7870523],
+    "distance": 2.09,
+    "elevationGain": 383,
+    "elevationLoss": 399,
+    "elevationMax": 1205,
+    "elevationMin": 968
+  },
+  "Houston Valley ORV 181G": {
+    "defaultBounds": [-85.1337667, 34.7846694, -85.1311154, 34.7860878],
+    "distance": 0.23,
+    "elevationGain": 97,
+    "elevationLoss": 0,
+    "elevationMax": 1094,
+    "elevationMin": 988
+  },
+  "Houston Valley ORV 181H": {
+    "defaultBounds": [-85.136494, 34.7727032, -85.1330133, 34.7743276],
+    "distance": 0.37,
+    "elevationGain": 94,
+    "elevationLoss": 0,
+    "elevationMax": 1087,
+    "elevationMin": 992
+  },
+  "Houston Valley ORV 181J": {
+    "defaultBounds": [-85.1435343, 34.7629353, -85.1339201, 34.7727151],
+    "distance": 2.15,
+    "elevationGain": 291,
+    "elevationLoss": 102,
+    "elevationMax": 1195,
+    "elevationMin": 1002
+  },
+  "Houston Valley ORV 181K": {
+    "defaultBounds": [-85.1406661, 34.761157, -85.1355192, 34.7641045],
+    "distance": 0.46,
+    "elevationGain": 79,
+    "elevationLoss": 93,
+    "elevationMax": 1156,
+    "elevationMin": 1083
+  },
+  "Houston Valley ORV 181L": {
+    "defaultBounds": [-85.1421489, 34.7608816, -85.1169286, 34.7672845],
+    "distance": 4.18,
+    "elevationGain": 480,
+    "elevationLoss": 646,
+    "elevationMax": 1407,
+    "elevationMin": 1052
+  },
+  "Houston Valley ORV 181M": {
+    "defaultBounds": [-85.1289524, 34.7650975, -85.1211276, 34.7686823],
+    "distance": 0.98,
+    "elevationGain": 214,
+    "elevationLoss": 0,
+    "elevationMax": 1346,
+    "elevationMin": 1124
+  },
+  "Houston Valley ORV 181N": {
+    "defaultBounds": [-85.1229293, 34.7716009, -85.1111904, 34.7786147],
+    "distance": 1.77,
+    "elevationGain": 129,
+    "elevationLoss": 140,
+    "elevationMax": 1065,
+    "elevationMin": 940
+  },
+  "Houston Valley ORV 181O": {
+    "defaultBounds": [-85.1251915, 34.773738, -85.1226794, 34.7746608],
+    "distance": 0.18,
+    "elevationGain": 0,
+    "elevationLoss": 110,
+    "elevationMax": 1123,
+    "elevationMin": 1005
+  },
+  "Houston Valley ORV 181P": {
+    "defaultBounds": [-85.1265946, 34.7719099, -85.1106606, 34.7847061],
+    "distance": 2,
+    "elevationGain": 298,
+    "elevationLoss": 672,
+    "elevationMax": 1365,
+    "elevationMin": 947
+  },
+  "Houston Valley ORV 181Q": {
+    "defaultBounds": [-85.1318848, 34.7704301, -85.1265946, 34.7762036],
+    "distance": 0.7,
+    "elevationGain": 379,
+    "elevationLoss": 21,
+    "elevationMax": 1329,
+    "elevationMin": 963
+  },
+  "Houston Valley ORV 181R": {
+    "defaultBounds": [-85.1332751, 34.7762036, -85.1281949, 34.7779163],
+    "distance": 0.38,
+    "elevationGain": 22,
+    "elevationLoss": 54,
+    "elevationMax": 1008,
+    "elevationMin": 953
+  },
+  "Houston Valley ORV 181S": {
+    "defaultBounds": [-85.1289201, 34.777907, -85.126071, 34.7816597],
+    "distance": 0.73,
+    "elevationGain": 53,
+    "elevationLoss": 65,
+    "elevationMax": 1022,
+    "elevationMin": 947
+  },
+  "Houston Valley ORV 181T": {
+    "defaultBounds": [-85.1326477, 34.7770817, -85.1278839, 34.788124],
+    "distance": 1.04,
+    "elevationGain": 52,
+    "elevationLoss": 52,
+    "elevationMax": 982,
+    "elevationMin": 942
+  },
+  "Houston Valley ORV 181U": {
+    "defaultBounds": [-85.1308484, 34.7854216, -85.1303239, 34.7857699],
+    "distance": 0.04,
+    "elevationGain": 0,
+    "elevationLoss": 0,
+    "elevationMax": 979,
+    "elevationMin": 976
+  },
+  "Hudon Loop": {
+    "defaultBounds": [-85.121159, 34.787443, -85.1200115, 34.7889321],
+    "distance": 0.29,
+    "elevationGain": 21,
+    "elevationLoss": 30,
+    "elevationMax": 973,
+    "elevationMin": 940
+  },
+  "Hudon Spur": {
+    "defaultBounds": [-85.1294123, 34.7873376, -85.1203347, 34.7884671],
+    "distance": 0.59,
+    "elevationGain": 31,
+    "elevationLoss": 42,
+    "elevationMax": 974,
+    "elevationMin": 926
+  },
+  "Inner Loop 1": {
+    "defaultBounds": [-85.1773275, 35.1142921, -85.1728187, 35.11891],
+    "distance": 1.02,
+    "elevationGain": 114,
+    "elevationLoss": 134,
+    "elevationMax": 796,
+    "elevationMin": 698
+  },
+  "Inner Loop 2": {
+    "defaultBounds": [-85.1752842, 35.1167611, -85.1692533, 35.124037],
+    "distance": 2.04,
+    "elevationGain": 127,
+    "elevationLoss": 133,
+    "elevationMax": 772,
+    "elevationMin": 694
+  },
+  "Jackson Gap Trail": {
+    "defaultBounds": [-85.385076, 34.957547, -85.3768304, 34.9701612],
+    "distance": 2.56,
+    "elevationGain": 477,
+    "elevationLoss": 520,
+    "elevationMax": 1956,
+    "elevationMin": 1298
+  },
+  "Jedi Trail": {
+    "defaultBounds": [-85.3767696, 34.9204726, -85.3697327, 34.9313952],
+    "distance": 0.95,
+    "elevationGain": 30,
+    "elevationLoss": 134,
+    "elevationMax": 1606,
+    "elevationMin": 1464
+  },
+  "John Henry": {
+    "defaultBounds": [-85.4236802, 34.8658475, -85.4189319, 34.8704641],
+    "distance": 0.52,
+    "elevationGain": 32,
+    "elevationLoss": 0,
+    "elevationMax": 1847,
+    "elevationMin": 1807
+  },
+  "Kettle Bottom": {
+    "defaultBounds": [-85.432657, 34.8507588, -85.4287356, 34.8620603],
+    "distance": 2.26,
+    "elevationGain": 167,
+    "elevationLoss": 178,
+    "elevationMax": 1997,
+    "elevationMin": 1893
+  },
+  "Kinder Garden": {
+    "defaultBounds": [-85.4508055, 34.8298613, -85.4477751, 34.8311622],
+    "distance": 0.53,
+    "elevationGain": 0,
+    "elevationLoss": 94,
+    "elevationMax": 1873,
+    "elevationMin": 1768
+  },
+  "Krebs Cycle": {
+    "defaultBounds": [-85.0613581, 35.0442466, -85.0564375, 35.0512775],
+    "distance": 1.16,
+    "elevationGain": 169,
+    "elevationLoss": 65,
+    "elevationMax": 1073,
+    "elevationMin": 902
+  },
+  "Laurel Point": {
+    "defaultBounds": [-85.419606, 35.0405156, -85.4039435, 35.045712],
+    "distance": 2.68,
+    "elevationGain": 257,
+    "elevationLoss": 211,
+    "elevationMax": 1631,
+    "elevationMin": 1511
+  },
+  "Live Wire 1": {
+    "defaultBounds": [-85.3852164, 35.0518414, -85.3783101, 35.0625185],
+    "distance": 1.84,
+    "elevationGain": 638,
+    "elevationLoss": 67,
+    "elevationMax": 1834,
+    "elevationMin": 1254
+  },
+  "Live Wire 2": {
+    "defaultBounds": [-85.4192882, 35.054938, -85.385231, 35.0634763],
+    "distance": 3.04,
+    "elevationGain": 742,
+    "elevationLoss": 146,
+    "elevationMax": 1261,
+    "elevationMin": 662
+  },
+  "Log Rhythm Bike Trail": {
+    "defaultBounds": [-85.1085617, 35.0915411, -85.0963936, 35.0998161],
+    "distance": 2.83,
+    "elevationGain": 207,
+    "elevationLoss": 197,
+    "elevationMax": 968,
+    "elevationMin": 829
+  },
+  "Long Branch Trail": {
+    "defaultBounds": [-85.4136232, 34.8551718, -85.3910609, 34.8976997],
+    "distance": 5.64,
+    "elevationGain": 913,
+    "elevationLoss": 480,
+    "elevationMax": 1964,
+    "elevationMin": 1439
+  },
+  "Long Branch Trail Horse Ford": {
+    "defaultBounds": [-85.3957577, 34.8755451, -85.3953601, 34.8765847],
+    "distance": 0.09,
+    "elevationGain": 0,
+    "elevationLoss": 0,
+    "elevationMax": 1642,
+    "elevationMin": 1634
+  },
+  "Lower Chunky": {
+    "defaultBounds": [-85.3862525, 35.0520539, -85.3805856, 35.0567544],
+    "distance": 0.66,
+    "elevationGain": 204,
+    "elevationLoss": 63,
+    "elevationMax": 1805,
+    "elevationMin": 1628
+  },
+  "Lower Lift Ticket": {
+    "defaultBounds": [-85.3094283, 35.1368849, -85.3068847, 35.1429805],
+    "distance": 1.18,
+    "elevationGain": 255,
+    "elevationLoss": 0,
+    "elevationMax": 1087,
+    "elevationMin": 802
+  },
+  "Lower Truck Trail": {
+    "defaultBounds": [-85.3881231, 34.9694561, -85.3721902, 34.9973161],
+    "distance": 2.34,
+    "elevationGain": 92,
+    "elevationLoss": 105,
+    "elevationMax": 695,
+    "elevationMin": 647
+  },
+  "Magnolia": {
+    "defaultBounds": [-85.0645955, 35.0392871, -85.0643896, 35.0402964],
+    "distance": 0.08,
+    "elevationGain": 0,
+    "elevationLoss": 35,
+    "elevationMax": 1108,
+    "elevationMin": 1069
+  },
+  "Marion 21": {
+    "defaultBounds": [-85.42906, 34.8660627, -85.4200546, 34.8694798],
+    "distance": 2.15,
+    "elevationGain": 109,
+    "elevationLoss": 121,
+    "elevationMax": 1932,
+    "elevationMin": 1831
+  },
+  "Megawatt": {
+    "defaultBounds": [-85.4132465, 35.0482368, -85.4052521, 35.056925],
+    "distance": 2.58,
+    "elevationGain": 430,
+    "elevationLoss": 633,
+    "elevationMax": 1682,
+    "elevationMin": 1429
+  },
+  "Mick's Trail": {
+    "defaultBounds": [-85.444486, 34.8439504, -85.4293129, 34.8504339],
+    "distance": 1.27,
+    "elevationGain": 119,
+    "elevationLoss": 193,
+    "elevationMax": 2123,
+    "elevationMin": 2017
+  },
+  "Mid Ridge": {
+    "defaultBounds": [-85.0669937, 35.0385723, -85.0595957, 35.0516271],
+    "distance": 1.23,
+    "elevationGain": 99,
+    "elevationLoss": 10,
+    "elevationMax": 1096,
+    "elevationMin": 978
+  },
+  "Middle Trail": {
+    "defaultBounds": [-85.3835492, 34.9129728, -85.3694418, 34.9314294],
+    "distance": 2.17,
+    "elevationGain": 234,
+    "elevationLoss": 299,
+    "elevationMax": 1499,
+    "elevationMin": 1330
+  },
+  "Middle Traverse": {
+    "defaultBounds": [-85.3117921, 35.1369082, -85.3092754, 35.1417774],
+    "distance": 0.43,
+    "elevationGain": 53,
+    "elevationLoss": 41,
+    "elevationMax": 1117,
+    "elevationMin": 1082
+  },
+  "Mindbender": {
+    "defaultBounds": [-85.0424455, 35.0428833, -85.0390155, 35.0456733],
+    "distance": 0.64,
+    "elevationGain": 0,
+    "elevationLoss": 164,
+    "elevationMax": 1071,
+    "elevationMin": 897
+  },
+  "Moccassin Bend Greenway": {
+    "defaultBounds": [-85.3134728, 35.0563964, -85.3066001, 35.0627526],
+    "distance": 1.15,
+    "elevationGain": 53,
+    "elevationLoss": 31,
+    "elevationMax": 675,
+    "elevationMin": 634
+  },
+  "Mouse Creek Greenway Phase 1": {
+    "defaultBounds": [-84.8769816, 35.1751432, -84.8729125, 35.1820825],
+    "distance": 0.53,
+    "elevationGain": 0,
+    "elevationLoss": 0,
+    "elevationMax": 801,
+    "elevationMin": 796
+  },
+  "Mouse Creek Greenway Phase 2": {
+    "defaultBounds": [-84.8729125, 35.1820825, -84.8651641, 35.1917697],
+    "distance": 0.83,
+    "elevationGain": 0,
+    "elevationLoss": 0,
+    "elevationMax": 799,
+    "elevationMin": 790
+  },
+  "Mouse Creek Greenway Phase 3": {
+    "defaultBounds": [-84.8798434, 35.1665636, -84.8769816, 35.1751432],
+    "distance": 0.77,
+    "elevationGain": 22,
+    "elevationLoss": 42,
+    "elevationMax": 872,
+    "elevationMin": 803
+  },
+  "Mouse Creek Greenway Phase 4": {
+    "defaultBounds": [-84.855418, 35.2008821, -84.8517531, 35.2118884],
+    "distance": 0.93,
+    "elevationGain": 0,
+    "elevationLoss": 0,
+    "elevationMax": 770,
+    "elevationMin": 757
+  },
+  "Mouse Creek Greenway Phase 5": {
+    "defaultBounds": [-84.8651641, 35.1917697, -84.8525906, 35.2017243],
+    "distance": 1.32,
+    "elevationGain": 20,
+    "elevationLoss": 10,
+    "elevationMax": 824,
+    "elevationMin": 762
+  },
+  "Mouse Creek Greenway Phase 6": {
+    "defaultBounds": [-84.88279, 35.1624581, -84.8798425, 35.1681874],
+    "distance": 0.57,
+    "elevationGain": 21,
+    "elevationLoss": 0,
+    "elevationMax": 838,
+    "elevationMin": 812
+  },
+  "Murky Marsh": {
+    "defaultBounds": [-85.0406851, 35.0182756, -85.0351062, 35.0348508],
+    "distance": 3.32,
+    "elevationGain": 159,
+    "elevationLoss": 230,
+    "elevationMax": 1020,
+    "elevationMin": 838
+  },
+  "North Chickamauga Creek Greenway": {
+    "defaultBounds": [-85.2288542, 35.1108324, -85.214613, 35.1532866],
+    "distance": 3.76,
+    "elevationGain": 202,
+    "elevationLoss": 278,
+    "elevationMax": 742,
+    "elevationMin": 639
+  },
+  "North Hogsback": {
+    "defaultBounds": [-85.4304605, 34.8458653, -85.424684, 34.851113],
+    "distance": 1.18,
+    "elevationGain": 62,
+    "elevationLoss": 20,
+    "elevationMax": 1964,
+    "elevationMin": 1905
+  },
+  "North Nuthatch": {
+    "defaultBounds": [-85.0602292, 35.0396146, -85.0592557, 35.0410605],
+    "distance": 0.14,
+    "elevationGain": 0,
+    "elevationLoss": 10,
+    "elevationMax": 967,
+    "elevationMin": 951
+  },
+  "North Side Climb Trail": {
+    "defaultBounds": [-85.0576255, 35.0501333, -85.0537955, 35.0547533],
+    "distance": 1.08,
+    "elevationGain": 291,
+    "elevationLoss": 0,
+    "elevationMax": 1100,
+    "elevationMin": 801
+  },
+  "North Tower Fire Road": {
+    "defaultBounds": [-85.0596355, 35.0508133, -85.0560255, 35.0517033],
+    "distance": 0.26,
+    "elevationGain": 22,
+    "elevationLoss": 120,
+    "elevationMax": 1102,
+    "elevationMin": 977
+  },
+  "Nutty Buddy (lower)": {
+    "defaultBounds": [-85.0595855, 35.0512933, -85.0571955, 35.0550833],
+    "distance": 0.47,
+    "elevationGain": 0,
+    "elevationLoss": 167,
+    "elevationMax": 974,
+    "elevationMin": 803
+  },
+  "Nutty Buddy (Upper)": {
+    "defaultBounds": [-85.0594455, 35.0507733, -85.0557555, 35.0523533],
+    "distance": 0.43,
+    "elevationGain": 0,
+    "elevationLoss": 122,
+    "elevationMax": 1114,
+    "elevationMin": 986
+  },
+  "Oak Hole Lane": {
+    "defaultBounds": [-85.0417751, 35.0393915, -85.038296, 35.0451203],
+    "distance": 1,
+    "elevationGain": 91,
+    "elevationLoss": 83,
+    "elevationMax": 1089,
+    "elevationMin": 1019
+  },
+  "Ollie": {
+    "defaultBounds": [-85.3095778, 35.1395119, -85.3074048, 35.1412634],
+    "distance": 0.43,
+    "elevationGain": 0,
+    "elevationLoss": 247,
+    "elevationMax": 1112,
+    "elevationMin": 861
+  },
+  "Outer Bike Trail": {
+    "defaultBounds": [-85.1785691, 35.1122189, -85.1670204, 35.1243424],
+    "distance": 3.59,
+    "elevationGain": 304,
+    "elevationLoss": 388,
+    "elevationMax": 811,
+    "elevationMin": 683
+  },
+  "Ovenbird Trail": {
+    "defaultBounds": [-85.3796173, 34.9180426, -85.3767755, 34.9203588],
+    "distance": 0.26,
+    "elevationGain": 0,
+    "elevationLoss": 82,
+    "elevationMax": 1581,
+    "elevationMin": 1498
+  },
+  "Parking Loop": {
+    "defaultBounds": [-85.3814795, 34.9218142, -85.3791676, 34.9236723],
+    "distance": 0.23,
+    "elevationGain": 0,
+    "elevationLoss": 20,
+    "elevationMax": 1340,
+    "elevationMin": 1313
+  },
+  "Pathkiller": {
+    "defaultBounds": [-85.4826633, 34.8182211, -85.4793789, 34.8234059],
+    "distance": 1.01,
+    "elevationGain": 21,
+    "elevationLoss": 20,
+    "elevationMax": 1898,
+    "elevationMin": 1867
+  },
+  "Peace Can": {
+    "defaultBounds": [-85.426152, 34.851312, -85.4227, 34.8605649],
+    "distance": 1.14,
+    "elevationGain": 83,
+    "elevationLoss": 82,
+    "elevationMax": 1952,
+    "elevationMin": 1898
+  },
+  "Picnic": {
+    "defaultBounds": [-85.0589613, 35.0460214, -85.0574221, 35.0475215],
+    "distance": 0.15,
+    "elevationGain": 36,
+    "elevationLoss": 23,
+    "elevationMax": 1092,
+    "elevationMin": 1055
+  },
+  "Pine": {
+    "defaultBounds": [-85.0649344, 35.0409563, -85.0558498, 35.0430772],
+    "distance": 1.15,
+    "elevationGain": 171,
+    "elevationLoss": 0,
+    "elevationMax": 1049,
+    "elevationMin": 873
+  },
+  "Plug": {
+    "defaultBounds": [-85.4242494, 34.8690993, -85.4222858, 34.8733486],
+    "distance": 0.51,
+    "elevationGain": 44,
+    "elevationLoss": 0,
+    "elevationMax": 1824,
+    "elevationMin": 1774
+  },
+  "Pocket Rockets": {
+    "defaultBounds": [-85.311403, 35.1360847, -85.3075881, 35.137278],
+    "distance": 0.46,
+    "elevationGain": 0,
+    "elevationLoss": 254,
+    "elevationMax": 1082,
+    "elevationMin": 822
+  },
+  "Poe Run Overlook": {
+    "defaultBounds": [-85.1159594, 35.0846992, -85.1117195, 35.0869598],
+    "distance": 0.6,
+    "elevationGain": 42,
+    "elevationLoss": 89,
+    "elevationMax": 987,
+    "elevationMin": 894
+  },
+  "Pogo's Place": {
+    "defaultBounds": [-85.0413885, 35.0233837, -85.0382516, 35.0292685],
+    "distance": 0.93,
+    "elevationGain": 42,
+    "elevationLoss": 44,
+    "elevationMax": 1061,
+    "elevationMin": 1004
+  },
+  "Points Unknown": {
+    "defaultBounds": [-85.067951, 35.0388772, -85.0591656, 35.0553596],
+    "distance": 1.59,
+    "elevationGain": 90,
+    "elevationLoss": 231,
+    "elevationMax": 1193,
+    "elevationMin": 1036
+  },
+  "Pony Boy Spur": {
+    "defaultBounds": [-85.4492394, 34.8287641, -85.4477005, 34.8300808],
+    "distance": 0.16,
+    "elevationGain": 83,
+    "elevationLoss": 0,
+    "elevationMax": 1865,
+    "elevationMin": 1781
+  },
+  "Prince Albert": {
+    "defaultBounds": [-85.4801703, 34.8187396, -85.466792, 34.8214657],
+    "distance": 0.75,
+    "elevationGain": 31,
+    "elevationLoss": 40,
+    "elevationMax": 1897,
+    "elevationMin": 1800
+  },
+  "RED Trail": {
+    "defaultBounds": [-85.2783349, 34.9088474, -85.2345111, 34.9390879],
+    "distance": 8.34,
+    "elevationGain": 442,
+    "elevationLoss": 395,
+    "elevationMax": 914,
+    "elevationMin": 706
+  },
+  "Rolling Green": {
+    "defaultBounds": [-85.0629636, 35.0430392, -85.056161, 35.0483465],
+    "distance": 1.78,
+    "elevationGain": 123,
+    "elevationLoss": 290,
+    "elevationMax": 1031,
+    "elevationMin": 874
+  },
+  "Rolling Ridge": {
+    "defaultBounds": [-85.0424809, 35.0292992, -85.0368209, 35.0394002],
+    "distance": 1.21,
+    "elevationGain": 152,
+    "elevationLoss": 175,
+    "elevationMax": 1049,
+    "elevationMin": 916
+  },
+  "Shale Flats": {
+    "defaultBounds": [-85.4401122, 34.8399841, -85.430071, 34.8471685],
+    "distance": 1.08,
+    "elevationGain": 31,
+    "elevationLoss": 64,
+    "elevationMax": 1965,
+    "elevationMin": 1922
+  },
+  "Slickenside": {
+    "defaultBounds": [-85.4292777, 34.8507554, -85.4254105, 34.86174],
+    "distance": 0.86,
+    "elevationGain": 74,
+    "elevationLoss": 85,
+    "elevationMax": 2028,
+    "elevationMin": 1975
+  },
+  "Small Intestine Loop": {
+    "defaultBounds": [-85.3916525, 35.0568034, -85.384476, 35.0613254],
+    "distance": 2.93,
+    "elevationGain": 302,
+    "elevationLoss": 325,
+    "elevationMax": 1663,
+    "elevationMin": 1529
+  },
+  "South Creek": {
+    "defaultBounds": [-85.3838457, 34.9146332, -85.3801117, 34.9202395],
+    "distance": 0.84,
+    "elevationGain": 128,
+    "elevationLoss": 0,
+    "elevationMax": 1457,
+    "elevationMin": 1323
+  },
+  "South Hogsback": {
+    "defaultBounds": [-85.4406972, 34.8389135, -85.4385456, 34.8400907],
+    "distance": 0.33,
+    "elevationGain": 10,
+    "elevationLoss": 42,
+    "elevationMax": 1923,
+    "elevationMin": 1883
+  },
+  "South Nuthatch": {
+    "defaultBounds": [-85.0616694, 35.0374784, -85.0596753, 35.0385709],
+    "distance": 0.18,
+    "elevationGain": 26,
+    "elevationLoss": 28,
+    "elevationMax": 1040,
+    "elevationMin": 999
+  },
+  "Southend Trail": {
+    "defaultBounds": [-85.3941266, 34.9629336, -85.3880879, 34.9694561],
+    "distance": 0.63,
+    "elevationGain": 119,
+    "elevationLoss": 154,
+    "elevationMax": 714,
+    "elevationMin": 642
+  },
+  "Southern Mission": {
+    "defaultBounds": [-85.0650538, 35.0359961, -85.0591101, 35.0412308],
+    "distance": 2.03,
+    "elevationGain": 210,
+    "elevationLoss": 191,
+    "elevationMax": 1125,
+    "elevationMin": 1015
+  },
+  "Spears Ave": {
+    "defaultBounds": [-85.3089134, 35.0785147, -85.3080428, 35.0793321],
+    "distance": 0.08,
+    "elevationGain": 22,
+    "elevationLoss": 0,
+    "elevationMax": 838,
+    "elevationMin": 814
+  },
+  "Split Rock": {
+    "defaultBounds": [-85.4155501, 35.0422285, -85.4138471, 35.0440351],
+    "distance": 0.41,
+    "elevationGain": 30,
+    "elevationLoss": 40,
+    "elevationMax": 1549,
+    "elevationMin": 1502
+  },
+  "Spur and Connector Trails": {
+    "defaultBounds": [-85.3810591, 34.9200648, -85.3711632, 34.9331299],
+    "distance": 0.49,
+    "elevationGain": 154,
+    "elevationLoss": 119,
+    "elevationMax": 1594,
+    "elevationMin": 1140
+  },
+  "Steam Shovel": {
+    "defaultBounds": [-85.4318746, 34.8632624, -85.4190434, 34.8701048],
+    "distance": 1.55,
+    "elevationGain": 21,
+    "elevationLoss": 51,
+    "elevationMax": 1857,
+    "elevationMin": 1806
+  },
+  "Stone Mason": {
+    "defaultBounds": [-85.3161133, 35.1375896, -85.314774, 35.1382325],
+    "distance": 0.11,
+    "elevationGain": 0,
+    "elevationLoss": 95,
+    "elevationMax": 1499,
+    "elevationMin": 1395
+  },
+  "Stringers Ridge": {
+    "defaultBounds": [-85.3146664, 35.0760238, -85.3130502, 35.0791355],
+    "distance": 0.32,
+    "elevationGain": 46,
+    "elevationLoss": 81,
+    "elevationMax": 963,
+    "elevationMin": 865
+  },
+  "Strut": {
+    "defaultBounds": [-85.3121453, 35.0785231, -85.3090351, 35.0801024],
+    "distance": 0.46,
+    "elevationGain": 32,
+    "elevationLoss": 54,
+    "elevationMax": 990,
+    "elevationMin": 931
+  },
+  "Summer": {
+    "defaultBounds": [-85.0630971, 35.0374229, -85.0597898, 35.0388891],
+    "distance": 0.22,
+    "elevationGain": 0,
+    "elevationLoss": 45,
+    "elevationMax": 1020,
+    "elevationMin": 972
+  },
+  "Switchyard Connector": {
+    "defaultBounds": [-85.3896138, 35.0516632, -85.3798656, 35.0585824],
+    "distance": 1.43,
+    "elevationGain": 51,
+    "elevationLoss": 188,
+    "elevationMax": 1840,
+    "elevationMin": 1661
+  },
+  "Tailings Run": {
+    "defaultBounds": [-85.4252404, 34.851113, -85.420939, 34.8617632],
+    "distance": 1.56,
+    "elevationGain": 112,
+    "elevationLoss": 143,
+    "elevationMax": 1956,
+    "elevationMin": 1853
+  },
+  "Tennessee River Gorge": {
+    "defaultBounds": [-85.420019, 35.0444189, -85.4079517, 35.0485018],
+    "distance": 1.44,
+    "elevationGain": 193,
+    "elevationLoss": 127,
+    "elevationMax": 1602,
+    "elevationMin": 1484
+  },
+  "The Fall": {
+    "defaultBounds": [-85.0598506, 35.0449917, -85.0594035, 35.0475745],
+    "distance": 0.21,
+    "elevationGain": 104,
+    "elevationLoss": 0,
+    "elevationMax": 1020,
+    "elevationMin": 916
+  },
+  "Thrasher": {
+    "defaultBounds": [-85.3127635, 35.1408779, -85.3096005, 35.1420285],
+    "distance": 0.39,
+    "elevationGain": 0,
+    "elevationLoss": 258,
+    "elevationMax": 1381,
+    "elevationMin": 1120
+  },
+  "TNT Bike Trail": {
+    "defaultBounds": [-85.1091556, 35.0830565, -85.0991377, 35.092709],
+    "distance": 4.29,
+    "elevationGain": 455,
+    "elevationLoss": 199,
+    "elevationMax": 1049,
+    "elevationMin": 837
+  },
+  "Torino Hill": {
+    "defaultBounds": [-85.442524, 34.844955, -85.4387024, 34.847575],
+    "distance": 0.51,
+    "elevationGain": 0,
+    "elevationLoss": 106,
+    "elevationMax": 2223,
+    "elevationMin": 2115
+  },
+  "Tower": {
+    "defaultBounds": [-85.0595972, 35.0494848, -85.0551919, 35.0512793],
+    "distance": 0.44,
+    "elevationGain": 21,
+    "elevationLoss": 79,
+    "elevationMax": 1000,
+    "elevationMin": 909
+  },
+  "Trail A": {
+    "defaultBounds": [-85.3778371, 34.9265918, -85.3733652, 34.9309374],
+    "distance": 0.53,
+    "elevationGain": 88,
+    "elevationLoss": 73,
+    "elevationMax": 1349,
+    "elevationMin": 1294
+  },
+  "Trail C": {
+    "defaultBounds": [-85.3841819, 34.9195692, -85.3811786, 34.9219037],
+    "distance": 0.37,
+    "elevationGain": 0,
+    "elevationLoss": 76,
+    "elevationMax": 1403,
+    "elevationMin": 1321
+  },
+  "Turkey Trail": {
+    "defaultBounds": [-85.3775113, 34.9164299, -85.37502, 34.9272019],
+    "distance": 0.86,
+    "elevationGain": 0,
+    "elevationLoss": 299,
+    "elevationMax": 1707,
+    "elevationMin": 1396
+  },
+  "Upper Copperhead": {
+    "defaultBounds": [-85.0599655, 35.0512833, -85.0591655, 35.0552833],
+    "distance": 0.29,
+    "elevationGain": 0,
+    "elevationLoss": 35,
+    "elevationMax": 1016,
+    "elevationMin": 973
+  },
+  "Upper Lift Ticket": {
+    "defaultBounds": [-85.3126754, 35.1417774, -85.3093625, 35.1440113],
+    "distance": 0.83,
+    "elevationGain": 11,
+    "elevationLoss": 283,
+    "elevationMax": 1383,
+    "elevationMin": 1103
+  },
+  "Upper Traverse": {
+    "defaultBounds": [-85.3154645, 35.1369441, -85.3126493, 35.1419975],
+    "distance": 0.43,
+    "elevationGain": 31,
+    "elevationLoss": 30,
+    "elevationMax": 1410,
+    "elevationMin": 1384
+  },
+  "Upper Truck Trail": {
+    "defaultBounds": [-85.3842857, 34.9655922, -85.34442, 35.015965],
+    "distance": 4.58,
+    "elevationGain": 437,
+    "elevationLoss": 298,
+    "elevationMax": 1449,
+    "elevationMin": 1226
+  },
+  "Virginia Ave Greenway": {
+    "defaultBounds": [-85.330519, 34.9883333, -85.3278419, 35.0090045],
+    "distance": 1.44,
+    "elevationGain": 43,
+    "elevationLoss": 42,
+    "elevationMax": 735,
+    "elevationMin": 688
+  },
+  "W Trail": {
+    "defaultBounds": [-85.3168498, 35.1373666, -85.3129575, 35.1417035],
+    "distance": 0.5,
+    "elevationGain": 10,
+    "elevationLoss": 106,
+    "elevationMax": 1517,
+    "elevationMin": 1397
+  },
+  "Walden Falls": {
+    "defaultBounds": [-85.3129257, 35.1432835, -85.3115298, 35.1453998],
+    "distance": 0.29,
+    "elevationGain": 75,
+    "elevationLoss": 69,
+    "elevationMax": 1392,
+    "elevationMin": 1305
+  },
+  "Waldens Godsey Connector": {
+    "defaultBounds": [-85.3069702, 35.1235883, -85.300156, 35.1360754],
+    "distance": 1.35,
+    "elevationGain": 52,
+    "elevationLoss": 93,
+    "elevationMax": 802,
+    "elevationMin": 700
+  },
+  "West Fugett": {
+    "defaultBounds": [-85.4326258, 34.8664062, -85.4227903, 34.8762866],
+    "distance": 1.34,
+    "elevationGain": 13,
+    "elevationLoss": 277,
+    "elevationMax": 1809,
+    "elevationMin": 1541
+  },
+  "White Lightning": {
+    "defaultBounds": [-85.3829322, 34.9247177, -85.3777707, 34.9390061],
+    "distance": 1.44,
+    "elevationGain": 32,
+    "elevationLoss": 295,
+    "elevationMax": 1689,
+    "elevationMin": 1399
+  },
+  "White Oak Connector to Stringer's Ridge": {
+    "defaultBounds": [-85.3144028, 35.0793299, -85.30811, 35.08696],
+    "distance": 0.84,
+    "elevationGain": 169,
+    "elevationLoss": 0,
+    "elevationMax": 884,
+    "elevationMin": 716
+  },
+  "White Oak Park Trail": {
+    "defaultBounds": [-85.3080773, 35.0856505, -85.3014226, 35.0873179],
+    "distance": 0.57,
+    "elevationGain": 92,
+    "elevationLoss": 11,
+    "elevationMax": 797,
+    "elevationMin": 709
+  },
+  "White Oak Ridge": {
+    "defaultBounds": [-85.067956, 35.0388895, -85.0608872, 35.054183],
+    "distance": 1.28,
+    "elevationGain": 187,
+    "elevationLoss": 125,
+    "elevationMax": 1248,
+    "elevationMin": 1134
+  },
+  "WHITE Trail": {
+    "defaultBounds": [-85.2599041, 34.9093963, -85.2542565, 34.9329842],
+    "distance": 1.7,
+    "elevationGain": 10,
+    "elevationLoss": 40,
+    "elevationMax": 790,
+    "elevationMin": 740
+  },
+  "Wildflower Trail": {
+    "defaultBounds": [-85.2275677, 35.1239328, -85.2184753, 35.1288848],
+    "distance": 1.51,
+    "elevationGain": 11,
+    "elevationLoss": 31,
+    "elevationMax": 674,
+    "elevationMin": 640
+  },
+  "Williams Cut": {
+    "defaultBounds": [-85.4320885, 34.8629449, -85.427863, 34.8668706],
+    "distance": 0.94,
+    "elevationGain": 99,
+    "elevationLoss": 11,
+    "elevationMax": 1908,
+    "elevationMin": 1808
+  },
+  "Windy Shot": {
+    "defaultBounds": [-85.4293309, 34.8507588, -85.4272034, 34.8621595],
+    "distance": 0.84,
+    "elevationGain": 63,
+    "elevationLoss": 131,
+    "elevationMax": 2146,
+    "elevationMin": 2000
+  },
+  "Wolftever Creek Greenway Phase 3": {
+    "defaultBounds": [-85.0496284, 35.0533825, -85.0464818, 35.0537845],
+    "distance": 0.19,
+    "elevationGain": 10,
+    "elevationLoss": 0,
+    "elevationMax": 792,
+    "elevationMin": 780
+  },
+  "Wolftever Creek Greenway Phase 4": {
+    "defaultBounds": [-85.0453357, 35.0536889, -85.0393967, 35.0622045],
+    "distance": 0.96,
+    "elevationGain": 132,
+    "elevationLoss": 21,
+    "elevationMax": 923,
+    "elevationMin": 779
+  },
+  "Wolftever Creek Greenway Phase 5": {
+    "defaultBounds": [-85.0607489, 35.0580676, -85.0576887, 35.0619657],
+    "distance": 0.34,
+    "elevationGain": 10,
+    "elevationLoss": 21,
+    "elevationMax": 823,
+    "elevationMin": 789
+  },
+  "Wolftever Greenway": {
+    "defaultBounds": [-85.0695521, 35.0623134, -85.0686227, 35.063584],
+    "distance": 0.26,
+    "elevationGain": 0,
+    "elevationLoss": 0,
+    "elevationMax": 760,
+    "elevationMin": 759
+  }
+}
