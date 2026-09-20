@@ -3,6 +3,7 @@ import { resolveTrailGeometry } from '@/payload/hooks/resolveTrailGeometry';
 import { cityOptions, isCityId } from '@/config/map.config';
 import { DEFAULT_KIND_VALUE, UNRATED_VALUE } from '@/data/trail-vocabulary';
 import { recalculateTrailElevation } from '@/payload/endpoints/recalculate-trail-elevation';
+import { previewTrailGeometry } from '@/payload/endpoints/preview-trail-geometry';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { validateOsmIds } from '@/payload/osm/ids';
 import { slugify } from '@/utils/string';
@@ -86,6 +87,11 @@ export const Trails: CollectionConfig = {
     beforeChange: [resolveTrailGeometry],
   },
   endpoints: [
+    {
+      handler: previewTrailGeometry,
+      method: 'post',
+      path: '/preview-osm-geometry',
+    },
     {
       handler: recalculateTrailElevation,
       method: 'post',
@@ -307,12 +313,21 @@ export const Trails: CollectionConfig = {
             {
               name: 'rebuildGeometry',
               type: 'checkbox',
-              label: 'Refresh the saved trail line on the next save',
               defaultValue: false,
               admin: {
-                condition: (data) => data?.geometrySource !== 'imported',
-                description:
-                  'Use this if the line or its measurements look out of date. OpenStreetMap lines are fetched again; drawn lines are measured again.',
+                hidden: true,
+              },
+            },
+            {
+              name: 'rebuildElevation',
+              type: 'checkbox',
+              defaultValue: false,
+              // Form-only intent: the save hook recomputes the preview instead
+              // of accepting derived measurements from the browser.
+              virtual: true,
+              admin: {
+                hidden: true,
+                readOnly: false,
               },
             },
             {
@@ -330,7 +345,7 @@ export const Trails: CollectionConfig = {
       ],
     },
 
-    // These values stay in form state for the public map and elevation action,
+    // These values stay in form state for the public map and elevation preview,
     // but the chart below is their one curator-facing surface. Showing raw
     // read-only numbers in a third tab made them look independently editable.
     derivedMeasurement('distance'),
@@ -363,9 +378,8 @@ export const Trails: CollectionConfig = {
       },
     },
 
-    // Keep the chart and its refresh action visible beneath every tab. The
-    // elevation endpoint saves independently, so hiding this in Measurements
-    // made the result—and the fact that it was already persisted—easy to miss.
+    // Keep the chart and its calculation action visible beneath every tab. The
+    // preview stays visible while a curator reviews it before saving.
     {
       name: 'elevationProfileAdmin',
       type: 'ui',
@@ -377,9 +391,9 @@ export const Trails: CollectionConfig = {
       },
     },
 
-    // Sidebar, so it stays on screen whichever tab is open: it decides what the
-    // Geometry tab will do on the next save, and checking that should not mean
-    // navigating away from the map.
+    // Sidebar, so it stays on screen whichever tab is open: it explains which
+    // source owns the line, and reading that should not require navigating away
+    // from the map.
     {
       name: 'geometrySource',
       type: 'select',

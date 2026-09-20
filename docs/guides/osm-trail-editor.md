@@ -13,23 +13,23 @@ without one — see [Reading trails on the public map](#reading-trails-on-the-pu
 
 ## The idea
 
-**A trail does not own its geometry — it references it.**
+**An OSM-backed trail references upstream ways and stores their resolved line.**
 
 ```ts
 { displayName: 'Cole Loop', recArea: 'Bend Area', rating: 'intermediate',
   osmIds: [438938540, 438942588, 692052468] }
 ```
 
-Everything else is derived. That's the whole design, and it follows what
-`scripts/build_bend_trails.py` already established for Bend: geometry comes from
-OSM, we curate the names, ratings, and groupings on top.
+Its measurements are derived from that line. Imported and hand-edited trails
+are also supported; those own their stored line rather than rebuilding it from
+OSM. Nothing in the editor writes back to OpenStreetMap.
 
 What it buys:
 
 | | Owning the geometry | Referencing OSM |
 |---|---|---|
 | Add a trail | draw the whole line | click the ways |
-| Trail gets rerouted | redraw it | tick "rebuild" and save |
+| Trail gets rerouted | redraw it | refresh, review, and save |
 | Fix a wrong line | edit your copy | fix it in OSM — everyone benefits |
 | Storage | a source of truth to protect | a cache you can rebuild |
 
@@ -50,16 +50,18 @@ without it a trail still gets geometry and distance, just no climb figures.
 ## How a save works
 
 `resolveTrailGeometry` (`src/payload/hooks/resolveTrailGeometry.ts`) runs
-`beforeChange` on every trail, and takes one of two paths depending on
-`geometrySource`:
+`beforeChange` on every trail. Imported snapshots are left as supplied; the
+other two paths depend on `geometrySource`:
 
 ```
-osm     osmIds ──> fetchWaysByIds ──> assembleWays ──┐
-                   (Overpass)         (join + gaps)  │
-                                                     ├─> measureParts ──> stored fields
-edited  the line as drawn in the geometry editor ────┘   (Terrain-RGB)    geom, distance,
-                                                                          elevation*, bounds,
-                                                                          osmReport
+preview  osmIds ──> fetchWaysByIds ──> assembleWays ──> reviewed line in form
+                    (Overpass)         (join + gaps)
+
+save     reviewed OSM preview ──────────────┐
+         line drawn in the geometry editor ├─> measureParts ──> stored fields
+                                            ┘   (Terrain-RGB)    geom, distance,
+                                                                 elevation*, elevationProfile,
+                                                                 bounds, osmReport
 ```
 
 | Module | Job |
@@ -76,10 +78,10 @@ but every stored number is computed here, not accepted from the browser. An
 edited trail and an OSM-built one are measured by the same `measureParts`, so
 their distances are comparable.
 
-Neither path does any work when nothing changed — Overpass is only called when
-the ways change, and the DEM is only sampled when the line moves (or when
-**Rebuild geometry** is ticked). An unrelated edit — fixing a typo in the name —
-re-saves in ~30 ms instead of ~8 s.
+Unrelated metadata edits do not refetch OSM or resample terrain. The explicit
+refresh action fetches OSM before saving, and the save hook rejects a changed
+way selection that has no matching preview. A normal save remains authoritative
+for stored measurements without making a second Overpass request.
 
 ### Collection hooks run *before* field validation
 
@@ -99,16 +101,15 @@ boundaries, so what gets *stored* comes from Overpass. This is the same choice
 
 ## What the editor sees
 
-- **Trail geometry** — one map with three modes (below). The whole authoring
-  surface.
-- **Measurements** — the build report plus a rendered elevation profile with
-  distance, climb, descent, and range. The raw derived fields stay hidden and
-  read-only because hand edits would be overwritten on the next measurement.
-- **Recalculate / repopulate elevation** — measures the last saved line again
-  without refetching OSM. For a style-owned trail with no CMS line, it restores
-  the checked-in profile instead. Unsaved edits must be saved first, and a
-  failed terrain or profile request leaves existing values untouched.
-- **Rebuild geometry** — force a refresh when a trail changed upstream.
+- **Trail line** — one map with three modes (below), plus the saved-line report.
+- **Elevation profile** — visible below both tabs, with the stored chart and
+  formatted measurements. Raw derived fields stay hidden and read-only.
+- **Calculate elevation** — measures the line currently in the form without
+  refetching OSM, then shows an unsaved preview. For a style-owned trail with no
+  CMS line, it previews the checked-in profile instead. A failed terrain or
+  profile request leaves existing values untouched.
+- **Refresh line from OpenStreetMap** — fetches upstream changes into an
+  unsaved map preview. The curator reviews the result before saving it.
 
 The build report is the important one, because referencing OSM has real failure
 modes and they are silent unless surfaced:
@@ -122,14 +123,14 @@ modes and they are silent unless surfaced:
 ## The map
 
 `TrailMapEditor` (`src/payload/components/TrailMapEditor.tsx`) is the **Trail
-geometry** field, and it is the only map in the editor. Three modes over the
+line** field, and it is the only map in the editor. Three modes over the
 same view:
 
 | Mode | What it does |
 |---|---|
-| **Pick ways** | Click an OSM trail to add it, click again to remove. The default. |
-| **Move points** | Click the line to select it, then drag a point, drag a midpoint to insert one, or choose **Remove point** and click a point. Right-click also removes a point. `Delete` removes the whole selected piece. |
-| **Draw** | Click along the trail to extend it; Enter finishes a piece, Escape cancels. How a trail that isn't in OSM gets geometry. |
+| **Choose from OpenStreetMap** | Click an OSM trail to add it, click again to remove. The default. |
+| **Adjust line** | Click the line to select it, then drag a point, drag a midpoint to insert one, or choose **Remove point** and click a point. Right-click also removes a point. `Delete` removes the whole selected piece. |
+| **Draw line** | Click along the trail to extend it; Enter finishes a piece, Escape cancels. How a trail that isn't in OSM gets geometry. |
 
 One map rather than one per field, because picking a way and adjusting the
 result are the same task at two different distances — two maps meant losing your
@@ -143,7 +144,7 @@ place on every switch.
   with `Delete`, which Terra Draw cannot do on its own — see below.
 - **Removing a stray piece** is what `Delete` is for. A trail assembled from OSM
   ways sometimes picks up a section that belongs to a neighbouring trail; select
-  that piece and press `Delete`. Removing the offending way in **Pick ways** and
+  that piece and press `Delete`. Removing the offending way in **Choose from OpenStreetMap** and
   saving is the better fix where it applies, because the line then stays
   maintained upstream.
 - **Satellite** toggles the basemap, which is what you want when checking a line
@@ -260,24 +261,17 @@ trail geometry in the admin.
 #### Points only appear on a *selected* feature
 
 Select mode draws coordinate and midpoint handles for the selected feature only,
-so entering **Move points** auto-selects the line when there is exactly one
+so entering **Adjust line** auto-selects the line when there is exactly one
 piece. With several, which piece to edit is the editor's call and they click it.
 
 #### Picking a way does not add it to the line
 
-This is the trap the editor keeps setting. Pick a way, switch to **Move points**,
-and there is nothing to grab on it — because the line is assembled from Overpass
-**server-side on save**, and until then the way you picked is just a rendered
-tileset feature. Nothing about it looks any different from a way that *is* part
-of the line.
-
-So the editor tracks which ways the line on screen was built from and says when
-they diverge:
-
-- ways changed, source `osm` → *save to rebuild the line, then edit it*
-- ways changed, source `edited` → *saving will not rebuild it; discard the edits
-  first if you want the new ways applied*
-- no line at all → *pick some ways and save, or switch to Draw*
+A picked way is initially a rendered tileset feature, not an editable line.
+**Refresh line from OpenStreetMap** resolves the full geometry into an unsaved
+preview. The editor tracks the IDs used to build the visible line and prompts
+for another refresh when the selection changes. An existing custom line stays
+visible until that refresh, allowing the curator to inspect its replacement
+before saving. With no selected ways, **Draw line** is the alternative.
 
 #### Committing on a `change` event is not the same as committing on an edit
 
@@ -322,9 +316,10 @@ Both were bugs, and both are invisible until you put a real pointer on it:
 ### Editing takes the trail out of OSM's hands
 
 **The first change flips `geometrySource` to `edited`**, and from then on the
-hook stops rebuilding that trail from Overpass. It has to: otherwise the next
-save would refetch the ways and silently discard the edit. The way ids stay on
-the record, so **Discard edits and rebuild from OSM** can put it back.
+stored line is curator-owned. It has to: otherwise the save hook would restore
+the last reviewed OSM line and silently discard the point edit. The way ids stay
+on the record, so selecting and refreshing OpenStreetMap segments can preview a
+replacement. The curator must save to keep that replacement.
 
 Gaps are still reported for an edited line, the same as for a picked one —
 dragging an endpoint away from its neighbour opens a break just as surely as
@@ -406,9 +401,11 @@ geometry is an imported snapshot, not an OSM reference, so edits are maintained
 in Payload until those trails can be matched to OSM ways. That OSM alignment is
 still the open question in ADR-0001.
 
-Both take `--dry-run`, and both pass `context.skipOsmRebuild` — without it the
-`beforeChange` hook fires one Overpass request per row and gets the machine
-rate-limited. Re-running either is safe: rows match on `(trailName, city)`.
+Both take `--dry-run`, and both pass `context.skipOsmRebuild` so their prepared
+OSM geometry and measurements can be imported directly without an interactive
+preview. Rows match on `(trailName, city)`, so reruns do not duplicate them, but
+they do replace metadata and publish imported trails. An `edited` row keeps its
+geometry and measurements. Review the importer before reseeding live data.
 
 ### It degrades rather than breaks
 
@@ -501,17 +498,19 @@ page. The markup mirrors `DefaultNavClient` in `@payloadcms/next`.
 | **Lists** | Trail complexes, ratings, kinds, stewards — everything that exists only to populate a dropdown on a trail. Named for what a curator does with them rather than what they are; "Vocabulary" and "Taxonomy" are terms for people who build CMSes, not people who maintain trails. |
 | **Settings** | Theme, users. |
 
-**The trail form** is three unnamed tabs:
+**The trail form** has two unnamed tabs:
 
 | Tab | Holds |
 |---|---|
 | **Details** | Trail name, complex, steward, rating, kind — plus an **Advanced** section, collapsed, for the fields that fill themselves in |
-| **Geometry** | The map editor, the picked ways, the rebuild checkbox |
-| **Measurements** | Elevation chart, formatted totals, rebuild action, and the read-only build report |
+| **Trail line** | The map editor, selected OSM segments, preview refresh action, and trail-line report |
+
+The elevation chart, formatted measurements, and calculation action sit below
+the tabs so they remain visible from either one.
 
 `geometrySource` sits in the **sidebar** rather than in a tab, because it
-decides what the Geometry tab will do on the next save and reading it should not
-mean navigating away from the map.
+explains who owns the line, and reading it should not mean navigating away from
+the map.
 
 Details is ordered by what a curator does rather than by what the fields are.
 `trailName` is first because it is the only name anyone types — `displayName`
@@ -653,8 +652,9 @@ configured city.
 
 `/api/map/elevation/<slug>?city=<id>` first, and the checked-in
 `public/data/elevation/<city>/<slug>.json` when that has nothing. The API serves the
-`elevationProfile` measured when the trail was last saved, recalculated whenever
-its ways change or its line is redrawn.
+`elevationProfile` measured when the trail was last saved. OSM-backed trails are
+recalculated after a refreshed line is previewed and saved; drawn lines are
+recalculated when their coordinates change.
 
 The profile was never missing — `measureParts` samples the terrain on every save
 to *produce* the distance and elevation totals, and used to discard the
@@ -699,13 +699,13 @@ geometry.
 It samples terrain only — the geometry is already in the row — so it needs no
 Overpass and is safe to run over every trail at once, and safe to re-run.
 
-For one trail, the **Measurements** tab shows the stored profile directly. With
-saved geometry, **Recalculate elevation** runs the same `measureParts` pipeline
-against that line, then updates the distance, bounds, elevation totals, and
-per-point profile together. Without geometry, **Repopulate elevation** restores
-the checked-in city-scoped profile and derives the same summary fields from it.
-Both preserve a trail's draft or published status and use normal Payload update
-access; neither publishes a draft or bypasses city scoping.
+For one trail, the **Elevation profile** panel below both tabs shows the stored
+profile. **Calculate elevation** runs `measureParts` on the line currently in
+the form and loads distance, bounds, elevation totals, and chart points into an
+unsaved preview. The ordinary Save draft or Publish action recomputes those
+derived fields server-side and persists them. For imported records without a
+line, **Preview bundled profile** loads the city-scoped bundled data if
+available; it is likewise saved only with the trail form.
 
 ### The two pipelines do not agree, and the Python one is wrong about mountains
 

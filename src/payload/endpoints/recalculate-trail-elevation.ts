@@ -1,11 +1,9 @@
-import { revalidatePath } from 'next/cache';
 import { APIError, type PayloadHandler } from 'payload';
 import { isCityId } from '@/config/map.config';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { measureParts } from '@/payload/osm/measure';
 import { getBundledElevationProfile } from '@/payload/read/bundled-elevation';
-import type { Trail } from '@/payload-types';
 import { measurementsFromElevationProfile } from '@/utils/elevation-profile';
 
 export interface RecalculateTrailElevationResponse {
@@ -19,24 +17,21 @@ export interface RecalculateTrailElevationResponse {
     elevationMin: number;
   };
   profile: ElevationProfile;
-  updatedAt: string;
+}
+
+interface PreviewRequest {
+  geometry?: unknown;
+  name?: unknown;
 }
 
 interface ErrorResponse {
   message: string;
 }
 
-/**
- * Updates one trail's elevation from the best server-owned source available.
- *
- * A trail with CMS geometry is measured through the same `measureParts` path
- * used by the save hook. A style-owned trail without a stored line restores
- * its checked-in profile from the city's canonical public assets. Neither path
- * refetches OSM or accepts geometry or measurements from the browser.
- */
+/** Calculates a reviewable elevation profile without changing the trail. */
 export const recalculateTrailElevation: PayloadHandler = async (req) => {
   if (!req.user) {
-    return errorResponse('Sign in to update trail elevation.', 401);
+    return errorResponse('Sign in to calculate trail elevation.', 401);
   }
 
   const id = readTrailId(req.routeParams?.id);
@@ -45,9 +40,6 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
   }
 
   try {
-    // `draft: true` reads the latest saved version. The matching flag on the
-    // update below preserves that version's status instead of publishing a
-    // draft or quietly turning a published trail into one.
     const trail = await req.payload.findByID({
       collection: 'trails',
       depth: 0,
@@ -56,11 +48,15 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
       overrideAccess: false,
       req,
     });
-    const parsed = parseTrailGeometry(trail.geom);
+    const body = (await req.json?.()) as PreviewRequest | undefined;
+    const geometry =
+      body && Object.hasOwn(body, 'geometry') ? body.geometry : trail.geom;
+    const parsed = parseTrailGeometry(geometry);
 
     if (!parsed.ok) {
       return errorResponse(parsed.error, 422);
     }
+
     let message: string;
     let measurements: RecalculateTrailElevationResponse['measurements'];
     let profile: ElevationProfile;
@@ -68,7 +64,7 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
     if (parsed.parts.length === 0) {
       if (!isCityId(trail.city) || !trail.slug) {
         return errorResponse(
-          'This trail has no saved geometry or bundled elevation profile to restore.',
+          'This trail has no line or bundled elevation profile to preview.',
           422,
         );
       }
@@ -76,14 +72,15 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
       const bundled = await getBundledElevationProfile(trail.city, trail.slug);
       if (!bundled) {
         return errorResponse(
-          'This trail has no saved geometry or bundled elevation profile to restore.',
+          'This trail has no line or bundled elevation profile to preview.',
           422,
         );
       }
 
       profile = bundled;
       measurements = measurementsFromElevationProfile(bundled);
-      message = 'Bundled elevation profile repopulated and saved.';
+      message =
+        'Bundled elevation profile preview is ready. Save this trail to keep it.';
     } else {
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
       if (!mapboxToken) {
@@ -93,15 +90,12 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
         );
       }
 
-      const measured = await measureParts(
-        parsed.parts,
-        trail.displayName || trail.trailName || 'Trail',
-        { mapboxToken },
-      );
+      const name =
+        typeof body?.name === 'string' && body.name.trim()
+          ? body.name.trim()
+          : trail.displayName || trail.trailName || 'Trail';
+      const measured = await measureParts(parsed.parts, name, { mapboxToken });
 
-      // A transient tile failure must not erase a profile that is already good.
-      // `measureParts` can still return an accurate distance in this case, but
-      // this endpoint exists specifically to refresh elevation as one unit.
       if (
         !measured.profile ||
         measured.elevationGain === null ||
@@ -110,8 +104,7 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
         measured.elevationMin === null
       ) {
         return errorResponse(
-          measured.warnings[0] ??
-            'No elevation samples were returned. The existing measurements were left unchanged.',
+          measured.warnings[0] ?? 'No elevation samples were returned.',
           502,
         );
       }
@@ -125,43 +118,13 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
         elevationMax: measured.elevationMax,
         elevationMin: measured.elevationMin,
       };
-      message = 'Elevation profile recalculated and saved.';
-    }
-
-    const updated = await req.payload.update({
-      collection: 'trails',
-      context: { skipOsmRebuild: true },
-      data: {
-        ...measurements,
-        elevationProfile: profile as unknown as Trail['elevationProfile'],
-      },
-      draft: trail._status === 'draft',
-      id,
-      overrideAccess: false,
-      overrideLock: false,
-      req,
-    });
-
-    // The public elevation route is otherwise allowed to serve a stale profile
-    // while it revalidates. Cache invalidation is best-effort: the database
-    // update has already succeeded, so a cache problem must not report the
-    // recalculation itself as failed or tempt a curator into retrying the write.
-    if (trail.slug) {
-      try {
-        revalidatePath(`/api/map/elevation/${encodeURIComponent(trail.slug)}`);
-      } catch (error) {
-        req.payload.logger.warn({
-          err: error,
-          msg: `Trail ${String(id)} elevation was updated, but its public cache could not be invalidated.`,
-        });
-      }
+      message = 'Elevation preview recalculated. Save this trail to keep it.';
     }
 
     return Response.json({
       measurements,
       message,
       profile,
-      updatedAt: updated.updatedAt,
     } satisfies RecalculateTrailElevationResponse);
   } catch (error) {
     const clientError = payloadErrorResponse(error);
@@ -170,12 +133,9 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
     }
     req.payload.logger.error({
       err: error,
-      msg: `Could not update elevation for trail ${String(id)}.`,
+      msg: `Could not calculate elevation for trail ${String(id)}.`,
     });
-    return errorResponse(
-      'Elevation could not be updated. The existing measurements were left unchanged.',
-      500,
-    );
+    return errorResponse('Elevation could not be calculated.', 500);
   }
 };
 
@@ -204,24 +164,16 @@ function payloadErrorResponse(error: unknown): Response | null {
 
   if (error.status === 401 || error.status === 403) {
     return errorResponse(
-      'You do not have permission to update this trail elevation.',
+      'You do not have permission to read this trail.',
       error.status,
     );
   }
   if (error.status === 404) {
     return errorResponse('This trail no longer exists.', 404);
   }
-  if (error.status === 409 || error.status === 423) {
-    return errorResponse(
-      'This trail is locked by another editor. Try again after they finish.',
-      error.status,
-    );
-  }
 
   return errorResponse(
-    error.isPublic
-      ? error.message
-      : 'The trail could not be updated. Its measurements were left unchanged.',
+    error.isPublic ? error.message : 'Elevation could not be calculated.',
     error.status,
   );
 }

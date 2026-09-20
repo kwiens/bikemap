@@ -3,9 +3,9 @@
  *
  * Geometry reaches a trail two ways, and this hook owns both:
  *
- *   osm      the line is rebuilt from the OSM ways the trail references. This
- *            is the default and the one to prefer — the geometry stays
- *            maintained upstream, so community fixes flow in for free.
+ *   osm      the editor previews a line built from the referenced OSM ways.
+ *            Saving validates that the preview matches those ids and measures
+ *            that exact reviewed line without another Overpass request.
  *   edited   the line was adjusted by hand in the geometry editor. It is left
  *            exactly as drawn, but distance, elevation, and bounds are
  *            re-measured from it so they never drift from the line on screen.
@@ -13,12 +13,13 @@
  * ('imported' is the third case — geometry that came from somewhere else
  * entirely, such as an archived GIS snapshot. It is left completely alone.)
  *
- * Both paths are server-authoritative: the admin can supply ways or a line, but
- * every derived number is computed here, never accepted from the client.
+ * Both paths are server-authoritative for measurements: the admin supplies the
+ * reviewed line, but every derived number is computed here, never accepted
+ * from the client.
  */
 import { ValidationError, type CollectionBeforeChangeHook } from 'payload';
+import { isCityId } from '@/config/map.config';
 import { gapsBetweenParts, NOTABLE_GAP_M } from '@/payload/osm/assemble';
-import { buildTrailFromOsm } from '@/payload/osm/build';
 import {
   parseTrailGeometry,
   samePartsAs,
@@ -26,6 +27,8 @@ import {
 } from '@/payload/osm/geometry';
 import { parseOsmIds } from '@/payload/osm/ids';
 import { measureParts } from '@/payload/osm/measure';
+import { getBundledElevationProfile } from '@/payload/read/bundled-elevation';
+import { measurementsFromElevationProfile } from '@/utils/elevation-profile';
 
 /** Reads an osmIds value that may arrive as an array, a JSON string, or null. */
 function readOsmIds(value: unknown): number[] {
@@ -68,6 +71,8 @@ const CLEARED_GEOMETRY = {
   elevationProfile: null,
   geom: null,
   osmReport: null,
+  rebuildElevation: false,
+  rebuildGeometry: false,
 };
 
 /**
@@ -122,7 +127,9 @@ export const resolveTrailGeometry: CollectionBeforeChangeHook = async (
   // not maintained here, so leave what they arrived with alone.
   const source = data.geometrySource ?? originalDoc?.geometrySource;
   if (source === 'imported') {
-    return data;
+    return data.rebuildElevation === true
+      ? refreshElevationFromCurrentLine(args)
+      : data;
   }
 
   return source === 'edited'
@@ -164,7 +171,7 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
   if (parts.length === 0) {
     // Deleting every vertex clears the measurements too, rather than leaving a
     // distance attached to a trail that no longer has a line.
-    return { ...data, ...CLEARED_GEOMETRY, rebuildGeometry: false };
+    return { ...data, ...CLEARED_GEOMETRY };
   }
 
   const previous = parseTrailGeometry(originalDoc?.geom).parts ?? [];
@@ -175,7 +182,8 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
   if (
     samePartsAs(parts, previous) &&
     typeof originalDoc?.distance === 'number' &&
-    data.rebuildGeometry !== true
+    data.rebuildGeometry !== true &&
+    data.rebuildElevation !== true
   ) {
     // The stored measurements still describe this line — the submitted ones are
     // client input and carry no authority, so they don't survive the save. The
@@ -184,6 +192,7 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
       ...data,
       ...storedGeometry(originalDoc),
       geom,
+      rebuildElevation: false,
       rebuildGeometry: false,
     };
   }
@@ -192,6 +201,11 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
     const measured = await measureParts(parts, name, {
       mapboxToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
     });
+    if (data.rebuildElevation === true && !measured.profile) {
+      throw new Error(
+        measured.warnings[0] ?? 'No elevation samples were returned.',
+      );
+    }
 
     const gaps = gapsBetweenParts(parts);
     const warnings = [...measured.warnings];
@@ -227,12 +241,16 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
         source: 'edited',
         warnings,
       },
+      rebuildElevation: false,
       rebuildGeometry: false,
     };
   } catch (error) {
     // Losing an edit because a terrain tile 500'd would be the worst possible
     // outcome here. Keep the line; the numbers refresh on the next save.
     const message = error instanceof Error ? error.message : String(error);
+    if (data.rebuildElevation === true) {
+      throw elevationValidationError(message, req);
+    }
     req.payload.logger.error(
       `Trail "${name}": could not measure edited geometry — ${message}`,
     );
@@ -248,6 +266,7 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
           `The line was saved, but it could not be measured: ${message}. Save again to retry.`,
         ],
       },
+      rebuildElevation: false,
       rebuildGeometry: false,
     };
   }
@@ -274,11 +293,29 @@ async function rebuildFromOsmWays({
     // never had ways has nothing to clear, but it has no line either, so it
     // cannot carry measurements — an 'imported' trail, whose geometry is
     // maintained elsewhere, has already returned before this point.
-    return { ...data, ...CLEARED_GEOMETRY, rebuildGeometry: false };
+    return { ...data, ...CLEARED_GEOMETRY };
   }
 
-  // Overpass is a shared community endpoint and terrain sampling is not free —
-  // only rebuild when the ways actually changed, or when explicitly asked.
+  // The admin's refresh action already fetched and displayed this exact line.
+  // Saving must keep the reviewed preview, not make a second Overpass request
+  // that could return a different revision or fail after the curator approved
+  // what was on screen. Measurements are still recomputed server-side.
+  if (data.rebuildGeometry === true && isOsmPreviewReport(data.osmReport)) {
+    return saveOsmPreview({ data, originalDoc, req }, osmIds);
+  }
+
+  if (
+    operation === 'update' &&
+    sameIds(osmIds, previousIds) &&
+    Boolean(originalDoc?.geom) &&
+    data.rebuildElevation === true &&
+    data.rebuildGeometry !== true
+  ) {
+    return refreshElevationFromCurrentLine({ data, originalDoc, req });
+  }
+
+  // A routine save never contacts Overpass. Curators first build a preview,
+  // inspect it on the map, and then save that exact reviewed line.
   const unchanged =
     operation === 'update' &&
     sameIds(osmIds, previousIds) &&
@@ -288,91 +325,220 @@ async function rebuildFromOsmWays({
   if (unchanged) {
     // Nothing was rebuilt, so nothing derived may change: the line and its
     // measurements come back off the stored document, not out of the request.
-    return { ...data, ...storedGeometry(originalDoc), rebuildGeometry: false };
+    return {
+      ...data,
+      ...storedGeometry(originalDoc),
+      rebuildElevation: false,
+      rebuildGeometry: false,
+    };
   }
 
-  const name = nameOf(data, originalDoc);
+  throw new ValidationError({
+    collection: 'trails',
+    errors: [
+      {
+        message:
+          'Refresh the selected OpenStreetMap ways and review the preview before saving.',
+        path: 'geom',
+      },
+    ],
+    req,
+  });
+}
 
-  try {
-    const built = await buildTrailFromOsm(osmIds, name, {
-      mapboxToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
-    });
-
-    if (!built.geometry) {
-      // Ways were asked for and none resolved, so this rebuild produced nothing
-      // to store. Emptying the trail would take a published line off the map on
-      // the strength of an upstream deletion, so the stored line and its
-      // measurements stay as they were and the report says why they are stale.
-      req.payload.logger.warn(
-        `Trail "${name}": no geometry resolved from ${osmIds.length} OSM way(s).`,
-      );
-
-      return {
-        ...data,
-        ...storedGeometry(originalDoc),
-        osmIds,
-        osmReport: {
-          builtAt: new Date().toISOString(),
-          gaps: built.report.gaps,
-          missingIds: built.report.missingIds,
-          resolvedIds: built.report.resolvedIds,
-          source: 'osm',
-          warnings: [
-            ...built.report.warnings,
-            `None of the ${osmIds.length} referenced OSM way(s) resolved to a line, so the previous geometry was kept — re-pick the trail on the map.`,
-          ],
+async function saveOsmPreview(
+  { data, originalDoc, req }: Pick<HookArgs, 'data' | 'originalDoc' | 'req'>,
+  osmIds: number[],
+) {
+  const parsed = parseTrailGeometry(data.geom);
+  if (!parsed.ok || parsed.parts.length === 0) {
+    throw new ValidationError({
+      collection: 'trails',
+      errors: [
+        {
+          message: parsed.ok
+            ? 'Refresh the OpenStreetMap line again before saving.'
+            : parsed.error,
+          path: 'geom',
         },
-        rebuildGeometry: false,
-      };
+      ],
+      req,
+    });
+  }
+
+  const measured = await measureParts(parsed.parts, nameOf(data, originalDoc), {
+    mapboxToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
+  });
+  if (data.rebuildElevation === true && !measured.profile) {
+    throw elevationValidationError(
+      measured.warnings[0] ?? 'No elevation samples were returned.',
+      req,
+    );
+  }
+  const report = previewReport(data.osmReport);
+  const reportedIds = [...report.resolvedIds, ...report.missingIds];
+  if (!sameIdSet(osmIds, reportedIds)) {
+    throw new ValidationError({
+      collection: 'trails',
+      errors: [
+        {
+          message:
+            'The selected OpenStreetMap ways changed after this preview. Refresh the line again before saving.',
+          path: 'geom',
+        },
+      ],
+      req,
+    });
+  }
+  const gaps = gapsBetweenParts(parsed.parts);
+  const warnings = [...new Set([...report.warnings, ...measured.warnings])];
+
+  return {
+    ...data,
+    bounds: measured.bounds,
+    distance: measured.distance,
+    elevationGain: measured.elevationGain,
+    elevationLoss: measured.elevationLoss,
+    elevationMax: measured.elevationMax,
+    elevationMin: measured.elevationMin,
+    elevationProfile: measured.profile,
+    geom: toTrailGeometry(parsed.parts),
+    osmIds,
+    osmReport: {
+      builtAt: new Date().toISOString(),
+      gaps,
+      missingIds: report.missingIds,
+      resolvedIds: report.resolvedIds,
+      source: 'osm',
+      warnings,
+    },
+    rebuildElevation: false,
+    rebuildGeometry: false,
+  };
+}
+
+function isOsmPreviewReport(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'isPreview' in value &&
+    value.isPreview === true
+  );
+}
+
+function previewReport(value: unknown): {
+  missingIds: number[];
+  resolvedIds: number[];
+  warnings: string[];
+} {
+  if (!value || typeof value !== 'object') {
+    return { missingIds: [], resolvedIds: [], warnings: [] };
+  }
+  const report = value as {
+    missingIds?: unknown;
+    resolvedIds?: unknown;
+    warnings?: unknown;
+  };
+  return {
+    missingIds: validOsmIds(report.missingIds),
+    resolvedIds: validOsmIds(report.resolvedIds),
+    warnings: Array.isArray(report.warnings)
+      ? report.warnings.filter(
+          (warning): warning is string => typeof warning === 'string',
+        )
+      : [],
+  };
+}
+
+function validOsmIds(value: unknown): number[] {
+  return Array.isArray(value)
+    ? value.filter(
+        (id): id is number =>
+          typeof id === 'number' && Number.isInteger(id) && id > 0,
+      )
+    : [];
+}
+
+function sameIdSet(a: number[], b: number[]): boolean {
+  const left = new Set(a);
+  const right = new Set(b);
+  return left.size === right.size && [...left].every((id) => right.has(id));
+}
+
+/** Re-samples the current line while leaving its source and coordinates alone. */
+async function refreshElevationFromCurrentLine({
+  data,
+  originalDoc,
+  req,
+}: Pick<HookArgs, 'data' | 'originalDoc' | 'req'>) {
+  const geometry = 'geom' in data ? data.geom : originalDoc?.geom;
+  const parsed = parseTrailGeometry(geometry);
+  if (!parsed.ok) {
+    throw new ValidationError({
+      collection: 'trails',
+      errors: [{ message: parsed.error, path: 'geom' }],
+      req,
+    });
+  }
+
+  if (parsed.parts.length === 0) {
+    const city = data.city ?? originalDoc?.city;
+    const slug = data.slug ?? originalDoc?.slug;
+    const bundled =
+      isCityId(city) && typeof slug === 'string'
+        ? await getBundledElevationProfile(city, slug)
+        : null;
+    if (!bundled) {
+      throw elevationValidationError(
+        'This trail has no line or bundled elevation profile to save.',
+        req,
+      );
     }
 
     return {
       ...data,
-      bounds: built.bounds,
-      // Measured values overwrite whatever was in the form: they're derived,
-      // and letting a stale form value win would silently desync them.
-      distance: built.distance,
-      elevationGain: built.elevationGain,
-      elevationLoss: built.elevationLoss,
-      elevationMax: built.elevationMax,
-      elevationMin: built.elevationMin,
-      // See the note in the edited path: the pane's chart comes from here for
-      // any trail that isn't in the checked-in data.
-      elevationProfile: built.profile,
-      geom: built.geometry,
-      osmIds,
-      osmReport: {
-        builtAt: new Date().toISOString(),
-        gaps: built.report.gaps,
-        missingIds: built.report.missingIds,
-        resolvedIds: built.report.resolvedIds,
-        source: 'osm',
-        warnings: built.report.warnings,
-      },
-      rebuildGeometry: false,
-    };
-  } catch (error) {
-    // A save must not be lost because Overpass was rate-limiting. Keep whatever
-    // geometry the trail already had and record why it didn't refresh.
-    const message = error instanceof Error ? error.message : String(error);
-    req.payload.logger.error(
-      `Trail "${name}": OSM rebuild failed — ${message}`,
-    );
-
-    return {
-      ...data,
-      ...storedGeometry(originalDoc),
-      osmReport: {
-        builtAt: originalDoc?.osmReport?.builtAt ?? null,
-        gaps: originalDoc?.osmReport?.gaps ?? [],
-        missingIds: originalDoc?.osmReport?.missingIds ?? [],
-        resolvedIds: originalDoc?.osmReport?.resolvedIds ?? [],
-        source: 'osm',
-        warnings: [
-          `Could not rebuild from OSM: ${message}. The previous geometry was kept — save again to retry.`,
-        ],
-      },
+      ...measurementsFromElevationProfile(bundled),
+      elevationProfile: bundled,
+      rebuildElevation: false,
       rebuildGeometry: false,
     };
   }
+
+  const measured = await measureParts(parsed.parts, nameOf(data, originalDoc), {
+    mapboxToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
+  });
+  if (
+    !measured.profile ||
+    measured.elevationGain === null ||
+    measured.elevationLoss === null ||
+    measured.elevationMax === null ||
+    measured.elevationMin === null
+  ) {
+    throw elevationValidationError(
+      measured.warnings[0] ?? 'No elevation samples were returned.',
+      req,
+    );
+  }
+
+  return {
+    ...data,
+    bounds: measured.bounds,
+    distance: measured.distance,
+    elevationGain: measured.elevationGain,
+    elevationLoss: measured.elevationLoss,
+    elevationMax: measured.elevationMax,
+    elevationMin: measured.elevationMin,
+    elevationProfile: measured.profile,
+    geom: toTrailGeometry(parsed.parts),
+    rebuildElevation: false,
+    rebuildGeometry: false,
+  };
+}
+
+function elevationValidationError(message: string, req: HookArgs['req']) {
+  return new ValidationError({
+    collection: 'trails',
+    errors: [{ message, path: 'elevationProfileAdmin' }],
+    req,
+  });
 }

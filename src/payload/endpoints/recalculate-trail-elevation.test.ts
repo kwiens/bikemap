@@ -1,4 +1,3 @@
-import { revalidatePath } from 'next/cache';
 import { APIError, type PayloadRequest } from 'payload';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
@@ -14,10 +13,6 @@ vi.mock('@/payload/read/bundled-elevation', () => ({
   getBundledElevationProfile: vi.fn(),
 }));
 
-vi.mock('next/cache', () => ({
-  revalidatePath: vi.fn(),
-}));
-
 const PROFILE: ElevationProfile = {
   distance: 5280,
   gain: 240,
@@ -29,6 +24,16 @@ const PROFILE: ElevationProfile = {
     [5280, 1240, -85.29, 35.11],
   ],
   trail: 'Test Trail',
+};
+
+const GEOMETRY = {
+  coordinates: [
+    [
+      [-85.3, 35.1],
+      [-85.29, 35.11],
+    ],
+  ],
+  type: 'MultiLineString',
 };
 
 const MEASURED = {
@@ -67,98 +72,75 @@ describe('recalculateTrailElevation', () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({
-      message: 'Sign in to update trail elevation.',
+      message: 'Sign in to calculate trail elevation.',
     });
     expect(findByID).not.toHaveBeenCalled();
   });
 
-  it('measures the saved line and updates only derived fields', async () => {
+  it('previews measurements without updating the trail', async () => {
     const { req, update } = request();
 
     const response = await recalculateTrailElevation(req);
 
     expect(response.status).toBe(200);
     expect(measureParts).toHaveBeenCalledWith(
-      [
-        [
-          [-85.3, 35.1],
-          [-85.29, 35.11],
-        ],
-      ],
-      'Test Trail',
+      GEOMETRY.coordinates,
+      'Preview name',
       { mapboxToken: 'test-token' },
     );
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        collection: 'trails',
-        context: { skipOsmRebuild: true },
-        data: {
-          bounds: MEASURED.bounds,
-          distance: 1,
-          elevationGain: 240,
-          elevationLoss: 180,
-          elevationMax: 1240,
-          elevationMin: 1000,
-          elevationProfile: PROFILE,
-        },
-        draft: false,
-        id: '42',
-        overrideAccess: false,
-        overrideLock: false,
-      }),
-    );
-    expect(revalidatePath).toHaveBeenCalledWith(
-      '/api/map/elevation/test-trail',
-    );
-    expect(await response.json()).toEqual(
-      expect.objectContaining({
-        message: 'Elevation profile recalculated and saved.',
-        measurements: expect.objectContaining({ elevationLoss: 180 }),
-        profile: PROFILE,
-        updatedAt: '2026-09-19T12:00:00.000Z',
-      }),
-    );
+    expect(update).not.toHaveBeenCalled();
+    expect(await response.json()).toEqual({
+      measurements: {
+        bounds: MEASURED.bounds,
+        distance: 1,
+        elevationGain: 240,
+        elevationLoss: 180,
+        elevationMax: 1240,
+        elevationMin: 1000,
+      },
+      message: 'Elevation preview recalculated. Save this trail to keep it.',
+      profile: PROFILE,
+    });
   });
 
-  it('preserves a draft as a draft', async () => {
-    const { req, update } = request({ status: 'draft' });
+  it('uses unsaved geometry supplied by the form', async () => {
+    const previewGeometry = {
+      coordinates: [
+        [
+          [-85.4, 35.2],
+          [-85.39, 35.21],
+        ],
+      ],
+      type: 'MultiLineString',
+    };
+    const { req } = request({
+      body: { geometry: previewGeometry, name: 'Unsaved line' },
+    });
 
     await recalculateTrailElevation(req);
 
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ draft: true }),
+    expect(measureParts).toHaveBeenCalledWith(
+      previewGeometry.coordinates,
+      'Unsaved line',
+      { mapboxToken: 'test-token' },
     );
   });
 
-  it('preserves Payload permission errors instead of reporting a server failure', async () => {
-    const { req, findByID, update } = request();
+  it('preserves Payload permission errors as client errors', async () => {
+    const { req, findByID } = request();
     findByID.mockRejectedValueOnce(new APIError('Forbidden', 403, null, false));
 
     const response = await recalculateTrailElevation(req);
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      message: 'You do not have permission to update this trail elevation.',
+      message: 'You do not have permission to read this trail.',
     });
-    expect(update).not.toHaveBeenCalled();
   });
 
-  it('does not report a successful database write as failed when cache invalidation fails', async () => {
-    const { req, logger } = request();
-    vi.mocked(revalidatePath).mockImplementationOnce(() => {
-      throw new Error('cache unavailable');
-    });
-
-    const response = await recalculateTrailElevation(req);
-
-    expect(response.status).toBe(200);
-    expect(logger.warn).toHaveBeenCalledOnce();
-  });
-
-  it('repopulates a bundled profile when the trail has no saved geometry', async () => {
-    const { req, findByID, update } = request();
+  it('previews a bundled profile when the trail has no CMS geometry', async () => {
+    const { req, findByID, update } = request({ body: { geometry: null } });
     findByID.mockResolvedValueOnce({
-      _status: 'published',
       city: 'chattanooga',
       displayName: 'Test Trail',
       geom: null,
@@ -175,31 +157,19 @@ describe('recalculateTrailElevation', () => {
       'test-trail',
     );
     expect(measureParts).not.toHaveBeenCalled();
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: {
-          bounds: [-85.3, 35.1, -85.29, 35.11],
-          distance: 1,
-          elevationGain: 240,
-          elevationLoss: 180,
-          elevationMax: 1240,
-          elevationMin: 1000,
-          elevationProfile: PROFILE,
-        },
-      }),
-    );
+    expect(update).not.toHaveBeenCalled();
     expect(await response.json()).toEqual(
       expect.objectContaining({
-        message: 'Bundled elevation profile repopulated and saved.',
+        message:
+          'Bundled elevation profile preview is ready. Save this trail to keep it.',
         profile: PROFILE,
       }),
     );
   });
 
-  it('does not write without saved geometry or a bundled profile', async () => {
-    const { req, findByID, update } = request();
+  it('does not produce a preview without geometry or a bundled profile', async () => {
+    const { req, findByID, update } = request({ body: { geometry: null } });
     findByID.mockResolvedValueOnce({
-      _status: 'published',
       city: 'chattanooga',
       displayName: 'Test Trail',
       geom: null,
@@ -212,13 +182,12 @@ describe('recalculateTrailElevation', () => {
     expect(response.status).toBe(422);
     expect(await response.json()).toEqual({
       message:
-        'This trail has no saved geometry or bundled elevation profile to restore.',
+        'This trail has no line or bundled elevation profile to preview.',
     });
-    expect(measureParts).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
   });
 
-  it('keeps the existing data when terrain sampling returns no profile', async () => {
+  it('rejects a preview when terrain sampling returns no profile', async () => {
     const { req, update } = request();
     vi.mocked(measureParts).mockResolvedValueOnce({
       ...MEASURED,
@@ -241,37 +210,24 @@ describe('recalculateTrailElevation', () => {
 });
 
 function request({
-  status = 'published',
+  body = { geometry: GEOMETRY, name: 'Preview name' },
   user = { id: 1, role: 'admin' },
 }: {
-  status?: 'draft' | 'published';
+  body?: Record<string, unknown>;
   user?: null | { id: number; role: string };
 } = {}) {
   const findByID = vi.fn().mockResolvedValue({
-    _status: status,
+    city: 'chattanooga',
     displayName: 'Test Trail',
-    geom: {
-      coordinates: [
-        [
-          [-85.3, 35.1],
-          [-85.29, 35.11],
-        ],
-      ],
-      type: 'MultiLineString',
-    },
+    geom: GEOMETRY,
     slug: 'test-trail',
     trailName: 'Test Trail',
   });
-  const update = vi.fn().mockResolvedValue({
-    updatedAt: '2026-09-19T12:00:00.000Z',
-  });
+  const update = vi.fn();
   const logger = { error: vi.fn(), warn: vi.fn() };
   const req = {
-    payload: {
-      findByID,
-      logger,
-      update,
-    },
+    json: vi.fn().mockResolvedValue(body),
+    payload: { findByID, logger, update },
     routeParams: { id: '42' },
     user,
   } as unknown as PayloadRequest;

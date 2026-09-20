@@ -26,6 +26,7 @@ interface BuildReport {
   resolvedIds?: number[];
   /** Which path produced the line — see resolveTrailGeometry. */
   source?: 'edited' | 'osm' | null;
+  isPreview?: boolean;
   warnings?: string[];
 }
 
@@ -66,7 +67,7 @@ export function OsmBuildReport({ path }: { path: string }) {
             className="m-0 text-sm font-semibold leading-tight"
             id={headingId}
           >
-            Saved trail line
+            Trail line status
           </h3>
           <p className="mb-0 mt-1 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.45]">
             {status.description}
@@ -105,6 +106,14 @@ function buildStatus(
   hasStoredLine: boolean,
   wayCount: number,
 ): BuildStatus {
+  if (report?.isPreview) {
+    const resolvedCount = report.resolvedIds?.length ?? wayCount;
+    return {
+      description: `Previewed after joining ${resolvedCount} OpenStreetMap ${resolvedCount === 1 ? 'segment' : 'segments'}. Review the map, then save the trail to keep this line.`,
+      label: 'Unsaved preview',
+    };
+  }
+
   if (report?.builtAt) {
     const builtAt = new Date(report.builtAt).toLocaleString();
     if (report.source === 'edited' || source === 'edited') {
@@ -115,7 +124,7 @@ function buildStatus(
     }
     const resolvedCount = report.resolvedIds?.length ?? wayCount;
     return {
-      description: `Stored ${builtAt} after joining ${resolvedCount} OpenStreetMap ${resolvedCount === 1 ? 'segment' : 'segments'}. Future saves refresh it from those segments.`,
+      description: `Stored ${builtAt} after joining ${resolvedCount} OpenStreetMap ${resolvedCount === 1 ? 'segment' : 'segments'}. It stays unchanged until you preview and save another refresh.`,
       label: 'Stored with trail',
     };
   }

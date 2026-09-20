@@ -45,19 +45,6 @@ function multiLine(...parts: [number, number][][]) {
   return { coordinates: parts, type: 'MultiLineString' };
 }
 
-/** Answers the one Overpass call a rebuild makes, with the given elements. */
-function overpassReturns(elements: unknown[]) {
-  globalThis.fetch = (() => {
-    fetched += 1;
-    return Promise.resolve({
-      json: () => Promise.resolve({ elements }),
-      ok: true,
-      status: 200,
-      text: () => Promise.resolve(''),
-    });
-  }) as unknown as typeof fetch;
-}
-
 beforeEach(() => {
   fetched = 0;
   // Any network call from a path that shouldn't make one is a test failure, not
@@ -207,8 +194,8 @@ describe('other sources', () => {
   });
 
   it('leaves a bulk import alone', async () => {
-    // Without this, seeding a few hundred trails fires one Overpass request per
-    // row and gets the machine rate-limited.
+    // Prepared geometry bypasses the interactive preview contract used by the
+    // admin, so imports explicitly skip the save hook's ownership decisions.
     const data = { geometrySource: 'osm', osmIds: [1, 2, 3] };
     expect(
       await run({ context: { skipOsmRebuild: true }, data, originalDoc: {} }),
@@ -224,6 +211,57 @@ describe('other sources', () => {
 
     expect(fetched).toBe(0);
     expect(result.rebuildGeometry).toBe(false);
+  });
+
+  it('saves the exact OSM preview without fetching the ways again', async () => {
+    const preview = multiLine([A, B, C]);
+    const result = await run({
+      data: {
+        geom: preview,
+        geometrySource: 'osm',
+        osmIds: [1, 2],
+        osmReport: {
+          isPreview: true,
+          resolvedIds: [1, 2],
+          warnings: [],
+        },
+        rebuildGeometry: true,
+      },
+      originalDoc: { geom: multiLine([A, B]), osmIds: [1, 2] },
+    });
+
+    expect(fetched).toBe(0);
+    expect(result.geom).toEqual(preview);
+    expect(result.distance).toBeGreaterThan(0);
+    expect(result.rebuildGeometry).toBe(false);
+    expect(result.osmReport).not.toHaveProperty('isPreview');
+  });
+
+  it('rejects an OSM preview made for a different way selection', async () => {
+    const failed = await run({
+      data: {
+        geom: multiLine([A, B, C]),
+        geometrySource: 'osm',
+        osmIds: [1, 3],
+        osmReport: {
+          isPreview: true,
+          missingIds: [],
+          resolvedIds: [1, 2],
+          warnings: [],
+        },
+        rebuildGeometry: true,
+      },
+      originalDoc: { geom: multiLine([A, B]), osmIds: [1, 2] },
+    }).catch((error: unknown) => error as ValidationError);
+
+    expect(fetched).toBe(0);
+    expect(failed).toBeInstanceOf(ValidationError);
+    expect((failed as ValidationError).data.errors).toEqual([
+      {
+        message: expect.stringMatching(/changed after this preview/i),
+        path: 'geom',
+      },
+    ]);
   });
 
   it.each([
@@ -329,13 +367,8 @@ describe('other sources', () => {
     }
   });
 
-  it('keeps the stored line when a rebuild resolves nothing', async () => {
-    // Every way deleted or renumbered upstream. Emptying the trail would take a
-    // published line off the map on the strength of an upstream edit, so the
-    // line and its numbers stay together and the report says they are stale.
-    overpassReturns([]);
-
-    const result = await run({
+  it('requires a reviewed preview instead of rebuilding during save', async () => {
+    const failed = await run({
       data: { geometrySource: 'osm', osmIds: [7], rebuildGeometry: true },
       originalDoc: {
         bounds: [-121.4, 44.0, -121.39, 44.01],
@@ -344,19 +377,35 @@ describe('other sources', () => {
         geom: multiLine([A, B]),
         osmIds: [7],
       },
-    });
+    }).catch((error: unknown) => error as ValidationError);
 
-    expect(fetched).toBe(1);
-    expect(result.geom).toEqual(multiLine([A, B]));
-    expect(result.distance).toBe(4.2);
-    expect(result.elevationGain).toBe(300);
-    expect(result.bounds).toEqual([-121.4, 44.0, -121.39, 44.01]);
+    expect(fetched).toBe(0);
+    expect(failed).toBeInstanceOf(ValidationError);
+    expect((failed as ValidationError).data.errors).toEqual([
+      {
+        message: expect.stringMatching(/review the preview before saving/i),
+        path: 'geom',
+      },
+    ]);
+  });
 
-    const report = result.osmReport as {
-      missingIds: number[];
-      warnings: string[];
-    };
-    expect(report.missingIds).toEqual([7]);
-    expect(report.warnings.join(' ')).toMatch(/re-pick the trail/);
+  it('does not silently rebuild when the selected ways change', async () => {
+    const failed = await run({
+      data: { geometrySource: 'osm', osmIds: [1, 3] },
+      originalDoc: {
+        geom: multiLine([A, B]),
+        geometrySource: 'osm',
+        osmIds: [1, 2],
+      },
+    }).catch((error: unknown) => error as ValidationError);
+
+    expect(fetched).toBe(0);
+    expect(failed).toBeInstanceOf(ValidationError);
+    expect((failed as ValidationError).data.errors).toEqual([
+      {
+        message: expect.stringMatching(/review the preview before saving/i),
+        path: 'geom',
+      },
+    ]);
   });
 });
