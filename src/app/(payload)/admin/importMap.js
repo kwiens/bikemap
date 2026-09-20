@@ -5,6 +5,7 @@ import { OsmIdsStatus as OsmIdsStatus_64d213b90b66f23f58f792e60808cb22 } from '@
 import { OsmBuildReport as OsmBuildReport_7fae1a551cc8eca6bdac5f4c01e2bf46 } from '@/payload/components/OsmBuildReport'
 import { DerivedMeasurementField as DerivedMeasurementField_042381939ca4647870a8e8cdbf375ba4 } from '@/payload/components/ElevationProfileAdmin'
 import { ElevationProfileAdmin as ElevationProfileAdmin_042381939ca4647870a8e8cdbf375ba4 } from '@/payload/components/ElevationProfileAdmin'
+import { GeometrySourceField as GeometrySourceField_a49a1ab63145cd656d8d5d4b425ef25b } from '@/payload/components/GeometrySourceField'
 import { ColorField as ColorField_9867b71f70a870a7cadc249fe18ef53e } from '@/payload/components/ColorField'
 import { DashboardSummary as DashboardSummary_7002eb233364b9ff475024992de73882 } from '@/payload/components/DashboardSummary'
 import { AdminNavLinks as AdminNavLinks_8d087cb194ffed5de144ee14c449f56b } from '@/payload/components/AdminNavLinks'
@@ -19,6 +20,7 @@ export const importMap = {
   "@/payload/components/OsmBuildReport#OsmBuildReport": OsmBuildReport_7fae1a551cc8eca6bdac5f4c01e2bf46,
   "@/payload/components/ElevationProfileAdmin#DerivedMeasurementField": DerivedMeasurementField_042381939ca4647870a8e8cdbf375ba4,
   "@/payload/components/ElevationProfileAdmin#ElevationProfileAdmin": ElevationProfileAdmin_042381939ca4647870a8e8cdbf375ba4,
+  "@/payload/components/GeometrySourceField#GeometrySourceField": GeometrySourceField_a49a1ab63145cd656d8d5d4b425ef25b,
   "@/payload/components/ColorField#ColorField": ColorField_9867b71f70a870a7cadc249fe18ef53e,
   "@/payload/components/DashboardSummary#DashboardSummary": DashboardSummary_7002eb233364b9ff475024992de73882,
   "@/payload/components/AdminNavLinks#AdminNavLinks": AdminNavLinks_8d087cb194ffed5de144ee14c449f56b,

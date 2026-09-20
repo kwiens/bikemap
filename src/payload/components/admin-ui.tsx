@@ -127,26 +127,3 @@ export function inputStyle(mono = false): CSSProperties {
     width: '100%',
   };
 }
-
-/**
- * A button that reads as a link — "remove", "discard edits".
- *
- * Inline actions inside a field, where a real button would carry more weight
- * than the action deserves.
- */
-export function linkButtonStyle(
-  tone: 'danger' | 'default' = 'default',
-): CSSProperties {
-  return {
-    background: 'none',
-    border: 'none',
-    color:
-      tone === 'danger'
-        ? 'var(--theme-error-500, #c00)'
-        : 'var(--theme-elevation-600)',
-    cursor: 'pointer',
-    font: 'inherit',
-    padding: 0,
-    textDecoration: 'underline',
-  };
-}

@@ -51,6 +51,7 @@ interface MeasurementFormFields {
   elevationMin?: AdminFormField;
   elevationProfile?: AdminFormField;
   geom?: AdminFormField;
+  geometrySource?: AdminFormField;
 }
 
 /**
@@ -88,6 +89,7 @@ export function ElevationProfileAdmin() {
   const elevationMinField = useAdminFormField('elevationMin');
   const elevationProfileField = useAdminFormField('elevationProfile');
   const geometryField = useAdminFormField('geom');
+  const geometrySourceField = useAdminFormField('geometrySource');
   const dispatchFields = useFormFields(([, dispatch]) => dispatch);
   const [result, setResult] = useState<MeasurementSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +123,7 @@ export function ElevationProfileAdmin() {
       elevationMin: elevationMinField,
       elevationProfile: elevationProfileField,
       geom: geometryField,
+      geometrySource: geometrySourceField,
     }),
     [
       boundsField,
@@ -131,6 +134,7 @@ export function ElevationProfileAdmin() {
       elevationMinField,
       elevationProfileField,
       geometryField,
+      geometrySourceField,
     ],
   );
   const formSnapshot = useMemo(
@@ -141,9 +145,13 @@ export function ElevationProfileAdmin() {
   const geometry = fieldValue(formFields, data, 'geom');
   const parsedGeometry = parseTrailGeometry(geometry);
   const hasGeometry = parsedGeometry.ok && parsedGeometry.parts.length > 0;
+  const geometrySource = fieldValue(formFields, data, 'geometrySource');
+  const canImportBundledProfile = !hasGeometry && geometrySource === 'imported';
+  const hasElevationSource = hasGeometry || canImportBundledProfile;
   const canUpdateElevation =
     Boolean(id && isEditing) &&
     hasSavePermission !== false &&
+    hasElevationSource &&
     !isModified &&
     !isFormProcessing &&
     !isCalculating;
@@ -220,6 +228,7 @@ export function ElevationProfileAdmin() {
     isEditing,
     isFormProcessing,
     isModified,
+    hasElevationSource,
   });
 
   return (
@@ -242,6 +251,7 @@ export function ElevationProfileAdmin() {
         </div>
         {snapshot.profile && (
           <span className="shrink-0 rounded-full bg-[var(--theme-elevation-100)] px-[0.55rem] py-1 text-xs text-[color:var(--theme-elevation-650,var(--theme-elevation-600))]">
+            Stored with trail ·{' '}
             {snapshot.profile.profile.length.toLocaleString()} samples
           </span>
         )}
@@ -252,8 +262,10 @@ export function ElevationProfileAdmin() {
       ) : (
         <Banner>
           {hasGeometry
-            ? 'No elevation profile is stored yet. Recalculate to populate it from the saved line.'
-            : 'No elevation profile is stored yet. Repopulate to restore the bundled profile for this trail.'}
+            ? 'No elevation profile is stored yet. Use “Calculate and save elevation” below to create it from the saved trail line.'
+            : canImportBundledProfile
+              ? 'No elevation profile is stored with this trail yet. Use “Import and save bundled profile” below to copy in the existing rider profile.'
+              : 'No elevation profile is stored yet. Save a trail line first, then calculate and save its elevation.'}
         </Banner>
       )}
 
@@ -273,17 +285,17 @@ export function ElevationProfileAdmin() {
           type="button"
         >
           {isCalculating
-            ? hasGeometry
-              ? 'Calculating…'
-              : 'Repopulating…'
-            : hasGeometry
-              ? 'Recalculate elevation'
-              : 'Repopulate elevation'}
+            ? canImportBundledProfile
+              ? 'Importing and saving…'
+              : 'Calculating and saving…'
+            : canImportBundledProfile
+              ? 'Import and save bundled profile'
+              : 'Calculate and save elevation'}
         </Button>
         <span className="text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.4]">
-          {hasGeometry
-            ? 'Saves immediately—no separate draft save is needed. Replaces the derived distance, climb, descent, range, bounds, and chart points.'
-            : 'Saves immediately—no separate draft save is needed. Restores the checked-in profile and its derived measurements without requiring CMS geometry.'}
+          {canImportBundledProfile
+            ? 'This stores the bundled profile with the trail immediately—no separate Save draft is needed. It does not require an editable trail line here.'
+            : 'This stores the profile with the trail immediately—no separate Save draft is needed. It replaces the distance, climb, descent, range, bounds, and chart points.'}
         </span>
       </div>
     </section>
@@ -609,12 +621,14 @@ function actionUnavailableReason({
   isEditing,
   isFormProcessing,
   isModified,
+  hasElevationSource,
 }: {
   hasSavePermission: boolean | undefined;
   id: number | string | undefined;
   isEditing: boolean | undefined;
   isFormProcessing: boolean;
   isModified: boolean;
+  hasElevationSource: boolean;
 }): string | null {
   if (!id || !isEditing) {
     return 'Save this trail once before calculating its elevation.';
@@ -627,6 +641,9 @@ function actionUnavailableReason({
   }
   if (isModified) {
     return 'Save the trail first so the profile follows the latest geometry.';
+  }
+  if (!hasElevationSource) {
+    return 'Save a trail line first, then calculate its elevation here.';
   }
   return null;
 }

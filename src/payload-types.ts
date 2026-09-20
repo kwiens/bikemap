@@ -186,7 +186,7 @@ export interface Trail {
     | boolean
     | null;
   /**
-   * Re-derive on the next save even if nothing changed. For an OSM trail that refetches the ways; for an edited one it just re-measures the line.
+   * Use this if the line or its measurements look out of date. OpenStreetMap lines are fetched again; drawn lines are measured again.
    */
   rebuildGeometry?: boolean | null;
   osmReport?:
@@ -242,9 +242,6 @@ export interface Trail {
     | number
     | boolean
     | null;
-  /**
-   * OSM trails rebuild their line from the picked ways on every save. Edited trails keep the line as drawn — the map sets this for you the first time you move a point. Imported trails are left alone entirely.
-   */
   geometrySource: 'osm' | 'edited' | 'imported';
   updatedAt: string;
   createdAt: string;

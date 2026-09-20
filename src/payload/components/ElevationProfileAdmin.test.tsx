@@ -93,6 +93,7 @@ beforeEach(() => {
     elevationMin: { value: 1000 },
     elevationProfile: { value: PROFILE },
     geom: { value: GEOMETRY },
+    geometrySource: { value: 'osm' },
   };
   ui.documentInfo.data = {};
   ui.documentInfo.hasSavePermission = true;
@@ -125,7 +126,10 @@ describe('ElevationProfileAdmin', () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/saves immediately—no separate draft save is needed/i),
+      screen.getByText(/no separate save draft is needed/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/stored with trail · 3 samples/i),
     ).toBeInTheDocument();
   });
 
@@ -159,7 +163,7 @@ describe('ElevationProfileAdmin', () => {
 
     fireEvent.click(
       render(<ElevationProfileAdmin />).getByRole('button', {
-        name: /recalculate elevation/i,
+        name: /calculate and save elevation/i,
       }),
     );
 
@@ -195,6 +199,7 @@ describe('ElevationProfileAdmin', () => {
 
   it('repopulates a bundled profile when the trail has no CMS geometry', async () => {
     ui.fields.geom = { value: null };
+    ui.fields.geometrySource = { value: 'imported' };
     delete ui.fields.elevationProfile;
     globalThis.fetch = vi.fn(async () =>
       Response.json({
@@ -214,12 +219,12 @@ describe('ElevationProfileAdmin', () => {
 
     const view = render(<ElevationProfileAdmin />);
     const action = view.getByRole('button', {
-      name: /repopulate elevation/i,
+      name: /import and save bundled profile/i,
     });
 
     expect(action).toBeEnabled();
     expect(
-      screen.getByText(/restore the bundled profile/i),
+      screen.getByText(/copy in the existing rider profile/i),
     ).toBeInTheDocument();
     fireEvent.click(action);
 
@@ -240,9 +245,20 @@ describe('ElevationProfileAdmin', () => {
     render(<ElevationProfileAdmin />);
 
     expect(
-      screen.getByRole('button', { name: /recalculate elevation/i }),
+      screen.getByRole('button', { name: /calculate and save elevation/i }),
     ).toBeDisabled();
     expect(screen.getByText(/save the trail first/i)).toBeInTheDocument();
+  });
+
+  it('requires a saved trail line when there is no imported profile source', () => {
+    ui.fields.geom = { value: null };
+
+    render(<ElevationProfileAdmin />);
+
+    expect(
+      screen.getByRole('button', { name: /calculate and save elevation/i }),
+    ).toBeDisabled();
+    expect(screen.getByText(/save a trail line first/i)).toBeInTheDocument();
   });
 
   it('does not run alongside a form save', () => {
@@ -251,7 +267,7 @@ describe('ElevationProfileAdmin', () => {
     render(<ElevationProfileAdmin />);
 
     expect(
-      screen.getByRole('button', { name: /recalculate elevation/i }),
+      screen.getByRole('button', { name: /calculate and save elevation/i }),
     ).toBeDisabled();
     expect(screen.getByText(/wait for the current save/i)).toBeInTheDocument();
   });
@@ -268,7 +284,7 @@ describe('ElevationProfileAdmin', () => {
 
     fireEvent.click(
       render(<ElevationProfileAdmin />).getByRole('button', {
-        name: /recalculate elevation/i,
+        name: /calculate and save elevation/i,
       }),
     );
 
@@ -291,7 +307,7 @@ describe('ElevationProfileAdmin', () => {
     const view = render(<ElevationProfileAdmin />);
 
     fireEvent.click(
-      view.getByRole('button', { name: /recalculate elevation/i }),
+      view.getByRole('button', { name: /calculate and save elevation/i }),
     );
     ui.documentInfo.id = 43;
     view.rerender(<ElevationProfileAdmin />);

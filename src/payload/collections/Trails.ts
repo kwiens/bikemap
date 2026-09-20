@@ -103,8 +103,8 @@ export const Trails: CollectionConfig = {
      * were.
      *
      * `geometrySource` is deliberately not in here. It sits in the sidebar,
-     * where it stays visible from every tab — it decides what the Geometry tab
-     * will do on save, and reading it should not require going to look.
+     * where it stays visible from every tab — it decides what the Trail line
+     * tab will do on save, and reading it should not require going to look.
      */
     {
       type: 'tabs',
@@ -269,9 +269,9 @@ export const Trails: CollectionConfig = {
           ],
         },
         {
-          label: 'Geometry',
+          label: 'Trail line',
           description:
-            'Where the trail runs. Pick the OSM ways it rides on, or adjust the line by hand.',
+            'Choose where the trail appears on the map. Use OpenStreetMap, adjust an existing line, or draw one here.',
           fields: [
             // --- The authoring surface --------------------------------------------
             // One map, three modes: pick OSM ways, move the line's points, or draw it.
@@ -281,7 +281,7 @@ export const Trails: CollectionConfig = {
             {
               name: 'geom',
               type: 'json',
-              label: 'Trail geometry',
+              label: 'Trail line',
               admin: {
                 components: {
                   Field: '@/payload/components/TrailMapEditor#TrailMapEditor',
@@ -307,20 +307,14 @@ export const Trails: CollectionConfig = {
             {
               name: 'rebuildGeometry',
               type: 'checkbox',
+              label: 'Refresh the saved trail line on the next save',
               defaultValue: false,
               admin: {
                 condition: (data) => data?.geometrySource !== 'imported',
                 description:
-                  'Re-derive on the next save even if nothing changed. For an OSM trail that refetches the ways; for an edited one it just re-measures the line.',
+                  'Use this if the line or its measurements look out of date. OpenStreetMap lines are fetched again; drawn lines are measured again.',
               },
             },
-          ],
-        },
-        {
-          label: 'Measurements',
-          description:
-            'Measured from the line on every save. Read-only — a hand edit here would be overwritten by the next one.',
-          fields: [
             {
               name: 'osmReport',
               type: 'json',
@@ -331,38 +325,42 @@ export const Trails: CollectionConfig = {
                 readOnly: true,
               },
             },
-            derivedMeasurement('distance'),
-            derivedMeasurement('elevationGain'),
-            derivedMeasurement('elevationLoss'),
-            derivedMeasurement('elevationMin'),
-            derivedMeasurement('elevationMax'),
-            {
-              name: 'bounds',
-              type: 'json',
-              admin: {
-                components: {
-                  Field:
-                    '@/payload/components/ElevationProfileAdmin#DerivedMeasurementField',
-                },
-                description: '[swLng, swLat, neLng, neLat], for zoom-to-fit.',
-                readOnly: true,
-              },
-            },
-            {
-              name: 'elevationProfile',
-              type: 'json',
-              admin: {
-                description:
-                  'The per-point elevation chart, imported with seeded geometry or sampled whenever geometry is rebuilt or edited.',
-                readOnly: true,
-                // Hundreds of [distance, elevation, lng, lat] rows — nothing a
-                // curator can act on, and it makes the form unreadable.
-                hidden: true,
-              },
-            },
           ],
         },
       ],
+    },
+
+    // These values stay in form state for the public map and elevation action,
+    // but the chart below is their one curator-facing surface. Showing raw
+    // read-only numbers in a third tab made them look independently editable.
+    derivedMeasurement('distance'),
+    derivedMeasurement('elevationGain'),
+    derivedMeasurement('elevationLoss'),
+    derivedMeasurement('elevationMin'),
+    derivedMeasurement('elevationMax'),
+    {
+      name: 'bounds',
+      type: 'json',
+      admin: {
+        components: {
+          Field:
+            '@/payload/components/ElevationProfileAdmin#DerivedMeasurementField',
+        },
+        description: '[swLng, swLat, neLng, neLat], for zoom-to-fit.',
+        readOnly: true,
+      },
+    },
+    {
+      name: 'elevationProfile',
+      type: 'json',
+      admin: {
+        description:
+          'The per-point elevation chart, imported with seeded geometry or sampled whenever geometry is rebuilt or edited.',
+        readOnly: true,
+        // Hundreds of [distance, elevation, lng, lat] rows — nothing a
+        // curator can act on, and it makes the form unreadable.
+        hidden: true,
+      },
     },
 
     // Keep the chart and its refresh action visible beneath every tab. The
@@ -393,8 +391,9 @@ export const Trails: CollectionConfig = {
         { label: 'Imported — not maintained here', value: 'imported' },
       ],
       admin: {
-        description:
-          'OSM trails rebuild their line from the picked ways on every save. Edited trails keep the line as drawn — the map sets this for you the first time you move a point. Imported trails are left alone entirely.',
+        components: {
+          Field: '@/payload/components/GeometrySourceField#GeometrySourceField',
+        },
         position: 'sidebar',
       },
     },
