@@ -14,14 +14,14 @@
  *     here can be rebuilt from OSM. Whether they *can* be matched is the open
  *     question in ADR-0001 — `scripts/align_bend_geometry.py` against Tennessee
  *     is the experiment that would answer it.
- *   - Geometry comes from public/data/chattanooga/trails.geojson, generated
- *     from the permitted regional-trails shapefile by
+ *   - Geometry currently comes from the deprecated transition artifact at
+ *     public/data/chattanooga/trails.geojson, generated from the permitted
+ *     regional-trails shapefile by
  *     scripts/prepare_chattanooga_trails.py and matched by raw `Trail` name.
- *     Summary measurements and static profiles are regenerated from those
- *     exact lines by scripts/prepare_chattanooga_measurements.ts, and the seed
- *     imports the profile with the line so no legacy measurement can leak in.
- *     The six Godsey Ridge trails still have their checked-in profiles even
- *     though their style-owned geometry is not available to store here.
+ *     A checked-in supplemental GeoJSON supplies permitted lines missing from
+ *     that shapefile. Summary measurements and static profiles are regenerated
+ *     from the combined lines by scripts/prepare_chattanooga_measurements.ts,
+ *     and the seed imports each profile with its line.
  *
  * These import as `geometrySource: 'imported'`, so the OSM rebuild hook leaves
  * the archived line alone. Once a trail has been matched to way ids, set its
@@ -48,6 +48,8 @@ import {
   type MultiLineString,
 } from './shared';
 
+// Staged for removal with the static fallback once fresh databases have a
+// database-native bootstrap path.
 const GEOJSON = 'public/data/chattanooga/trails.geojson';
 /** Raw `Trail` value -> imported MultiLineString. */
 async function loadGeometry(): Promise<Map<string, MultiLineString>> {

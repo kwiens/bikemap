@@ -1,6 +1,14 @@
+import json
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from prepare_chattanooga_trails import build_feature_collection
+from prepare_chattanooga_trails import (
+    DEPRECATED_DATASET_META,
+    build_feature_collection,
+    load_supplemental_features,
+    merge_supplemental_features,
+)
 
 
 class BuildFeatureCollectionTest(unittest.TestCase):
@@ -29,6 +37,7 @@ class BuildFeatureCollectionTest(unittest.TestCase):
 
         collection, report = build_feature_collection(rows, lambda x, y: (x, y))
 
+        self.assertEqual(collection["_meta"], DEPRECATED_DATASET_META)
         self.assertEqual(report, {
             "blank_records": 1,
             "parts": 2,
@@ -67,6 +76,34 @@ class BuildFeatureCollectionTest(unittest.TestCase):
         self.assertEqual(
             collection["features"][0]["geometry"]["coordinates"],
             [[[1.0, 2.0], [3.0, 4.0]]],
+        )
+
+    def test_loads_and_merges_supplemental_lines(self):
+        with TemporaryDirectory() as directory:
+            supplemental_path = Path(directory) / "supplemental.geojson"
+            supplemental_path.write_text(json.dumps({
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "properties": {"Trail": "Trail B"},
+                    "geometry": {
+                        "type": "MultiLineString",
+                        "coordinates": [[[1, 2], [3, 4]]],
+                    },
+                }],
+            }))
+            features = load_supplemental_features(supplemental_path)
+
+        collection, _ = build_feature_collection(
+            [{"properties": {"Trail": "Trail A"}, "parts": [[(5, 6), (7, 8)]]}],
+            lambda x, y: (x, y),
+        )
+        parts = merge_supplemental_features(collection, features)
+
+        self.assertEqual(parts, 1)
+        self.assertEqual(
+            [feature["properties"]["Trail"] for feature in collection["features"]],
+            ["Trail A", "Trail B"],
         )
 
 

@@ -168,15 +168,31 @@ pnpm db:seed:chattanooga
 ```
 
 The converter writes `public/data/chattanooga/trails.geojson`, grouping source
-pieces into one `MultiLineString` per raw `Trail` value. The seed matches those
-names against the 224 curated rows and stores geometry as
-`geometrySource: 'imported'`; 218 match. The six Godsey Ridge trails remain in
-the separate `Godsey Ridge Trails` style layer because that geometry was not in
-the regional shapefile. `prepare:chattanooga-measurements` uses the same
-`measureParts` implementation as Payload to regenerate summary metadata and
-the city-scoped static profiles from those exact 218 lines. The seed imports
-the prepared profile alongside each line; never seed after changing the
-GeoJSON without regenerating these artifacts first.
+pieces into one `MultiLineString` per raw `Trail` value and merging
+`public/data/chattanooga/trails-supplemental.geojson`. That data-only supplement
+contains the six permitted Godsey Ridge lines absent from the regional
+shapefile; their coordinates came from the checked-in elevation profiles that
+were originally sampled from the legacy Mapbox layer. The seed matches all 224
+curated rows and stores geometry as `geometrySource: 'imported'`.
+`prepare:chattanooga-measurements` uses the same `measureParts` implementation
+as Payload to regenerate summary metadata and the city-scoped static profiles
+from those exact 224 lines. The seed imports the prepared profile alongside
+each line; never seed after changing the GeoJSON without regenerating these
+artifacts first.
+
+Both public GeoJSON files are **deprecated transition artifacts staged for
+removal**. Payload is authoritative. Keep them only while they provide the
+fresh-database seed input and runtime outage/unseeded fallback. Remove them,
+their converter plumbing, and `geojsonFallbackUrl` together once a
+database-native bootstrap replaces the seed input and the map has an explicit
+database-outage experience.
+
+Production deploys run committed Payload migrations before the new code goes
+live. Migration `20260919_223908_backfill_chattanooga_supplemental_trails`
+backfills the six supplemental lines and profiles into existing Chattanooga
+rows and their latest Payload versions. It preserves both records if either
+copy's geometry source is already `edited`. The city seed remains the
+repeatable full import for a new or rebuilt database.
 
 `ensureMtnBikeSource(map)` attaches `MTN_BIKE_SOURCE_ID` as GeoJSON, reads
 `/api/map/trails?city=chattanooga`, and falls back to the checked-in GeoJSON if
@@ -184,9 +200,10 @@ the database is unavailable or unseeded. `initMtnBikeLayers` filters every
 name-based source to the curated trail list, so retired/non-MTB source features
 cannot appear as unselectable gray lines.
 
-The Godsey Ridge layer (`Godsey Ridge Trails`, source-layer `LineStrings`) is
-still baked into the Mapbox Studio style, so only its casing/glow/hit sublayers
-are added at runtime.
+The legacy Godsey Ridge layer (`Godsey Ridge Trails`, source-layer
+`LineStrings`) is still baked into the Mapbox Studio style, but is hidden at
+runtime because those six trails now render from the database-backed GeoJSON
+with the rest of Chattanooga's trails.
 
 To inspect the database-backed layer in Chrome DevTools:
 

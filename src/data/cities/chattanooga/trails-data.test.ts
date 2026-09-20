@@ -18,12 +18,33 @@ interface TrailFeature {
   type: 'Feature';
 }
 
+interface TrailCollection {
+  _meta: {
+    deprecated: boolean;
+    reason: string;
+    removeWhen: string;
+    status: string;
+  };
+  features: TrailFeature[];
+  type: 'FeatureCollection';
+}
+
 const collection = JSON.parse(
   readFileSync(
     path.join(process.cwd(), 'public/data/chattanooga/trails.geojson'),
     'utf8',
   ),
-) as { features: TrailFeature[]; type: 'FeatureCollection' };
+) as TrailCollection;
+
+const supplementalCollection = JSON.parse(
+  readFileSync(
+    path.join(
+      process.cwd(),
+      'public/data/chattanooga/trails-supplemental.geojson',
+    ),
+    'utf8',
+  ),
+) as TrailCollection;
 
 const mountainBikeTrails = chattanoogaData.mountainBikeTrails;
 
@@ -62,7 +83,19 @@ describe('Chattanooga trail import geometry', () => {
     expect(mountainBikeTrails).toHaveLength(224);
   });
 
-  it('provides valid WGS84 MultiLineStrings for 218 curated trails', () => {
+  it('marks both static datasets as deprecated and staged for removal', () => {
+    for (const dataset of [collection, supplementalCollection]) {
+      expect(dataset._meta).toEqual({
+        deprecated: true,
+        reason: 'Payload is the authoritative trail source.',
+        removeWhen:
+          'Fresh databases bootstrap without this file and the runtime static fallback has been removed.',
+        status: 'staged-for-removal',
+      });
+    }
+  });
+
+  it('provides valid WGS84 MultiLineStrings for all 224 curated trails', () => {
     const byName = new Map(
       collection.features.map((feature) => [feature.properties.Trail, feature]),
     );
@@ -75,22 +108,15 @@ describe('Chattanooga trail import geometry', () => {
       .sort();
 
     expect(collection.type).toBe('FeatureCollection');
-    expect(collection.features).toHaveLength(224);
+    expect(collection.features).toHaveLength(230);
     expect(
       collection.features.reduce(
         (count, feature) => count + feature.geometry.coordinates.length,
         0,
       ),
-    ).toBe(397);
-    expect(matched).toHaveLength(218);
-    expect(missing).toEqual([
-      'Godsey Ridge Blue 1',
-      'Godsey Ridge Blue 2',
-      'Godsey Ridge Expert 1',
-      'Godsey Ridge Expert 2',
-      'Godsey Ridge Expert Spur',
-      'Godsey Ridge Green',
-    ]);
+    ).toBe(403);
+    expect(matched).toHaveLength(224);
+    expect(missing).toEqual([]);
 
     const invalidGeometry: string[] = [];
     const invalidCoordinates: {
@@ -130,6 +156,18 @@ describe('Chattanooga trail import geometry', () => {
     expect(invalidCoordinates).toEqual([]);
   });
 
+  it('keeps supplemental source features in the combined import', () => {
+    const combinedByName = new Map(
+      collection.features.map((feature) => [feature.properties.Trail, feature]),
+    );
+
+    expect(supplementalCollection.type).toBe('FeatureCollection');
+    expect(supplementalCollection.features.length).toBeGreaterThan(0);
+    for (const feature of supplementalCollection.features) {
+      expect(combinedByName.get(feature.properties.Trail)).toEqual(feature);
+    }
+  });
+
   it('keeps imported geometry, summaries, and static profiles in sync', () => {
     const byName = new Map(
       collection.features.map((feature) => [feature.properties.Trail, feature]),
@@ -138,7 +176,7 @@ describe('Chattanooga trail import geometry', () => {
       byName.has(trail.trailName),
     );
 
-    expect(matched).toHaveLength(218);
+    expect(matched).toHaveLength(224);
     for (const trail of matched) {
       const measurement = getChattanoogaMeasurement(trail.trailName);
       expect(measurement).toBeDefined();
