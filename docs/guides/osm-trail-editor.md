@@ -128,7 +128,7 @@ same view:
 | Mode | What it does |
 |---|---|
 | **Pick ways** | Click an OSM trail to add it, click again to remove. The default. |
-| **Move points** | Click the line to select it, then drag a point, drag a midpoint to insert one, or **right-click** a point to remove it. `Delete` removes the whole selected piece. |
+| **Move points** | Click the line to select it, then drag a point, drag a midpoint to insert one, or choose **Remove point** and click a point. Right-click also removes a point. `Delete` removes the whole selected piece. |
 | **Draw** | Click along the trail to extend it; Enter finishes a piece, Escape cancels. How a trail that isn't in OSM gets geometry. |
 
 One map rather than one per field, because picking a way and adjusting the
@@ -223,6 +223,7 @@ comparable:
 
 | Gesture | Removes | Undoable by Terra Draw |
 |---|---|---|
+| **Remove point**, then click a point | that one point | yes |
 | **Right-click** a point | that one point | yes |
 | **`Delete`** | the whole selected piece | **no** |
 
@@ -232,10 +233,12 @@ Two traps here, both of which this editor fell into:
    removes the entire piece — the click is irrelevant, `Delete` acts on the
    selected *feature*. The hint used to describe exactly this as the way to
    remove a point, so following the on-screen instructions destroyed a section
-   of trail. Deleting a single coordinate is `onRightClick` in Terra Draw's
-   select mode, gated on the `coordinates.deletable` flag; the base adapter
-   registers a `contextmenu` listener and `preventDefault`s it, so the browser
-   menu stays shut and right-click is safe to use here.
+   of trail. The editor's explicit **Remove point** tool updates the clicked
+   coordinate through Terra Draw's geometry API, including on touch devices.
+   The right-click shortcut uses `onRightClick` in Terra Draw's select mode,
+   gated on the `coordinates.deletable` flag; the base adapter registers a
+   `contextmenu` listener and `preventDefault`s it, so the browser menu stays
+   shut and right-click is safe to use here.
 2. **Terra Draw cannot undo deleting a feature, and does not admit it.** After
    `Delete`, `canUndo()` returns true and `undo()` returns true — and the piece
    stays gone. Its history records coordinate edits, not the store's feature

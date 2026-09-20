@@ -83,6 +83,7 @@ import { METERS_TO_MILES } from '@/payload/osm/units';
 import { OSM_BIKE_TRAIL_FILTER } from '@/utils/map';
 import { cn } from '@/lib/utils';
 import { Banner } from './admin-ui';
+import { removeSelectedLinePointAt } from './terra-draw-point-removal';
 
 type Parts = [number, number][][];
 type Mode = 'draw' | 'move' | 'pick';
@@ -163,6 +164,8 @@ export function TrailMapEditor({
   const [basemap, setBasemap] = useState<StyleKey>('streets');
   const [names, setNames] = useState<Record<number, string>>({});
   const [history, setHistory] = useState({ canRedo: false, canUndo: false });
+  const [isRemovingPoint, setIsRemovingPoint] = useState(false);
+  const [pointRemovalNote, setPointRemovalNote] = useState<string | null>(null);
   /**
    * The ways the line currently on screen was built from.
    *
@@ -184,6 +187,7 @@ export function TrailMapEditor({
   const modeRef = useRef(mode);
   const basemapRef = useRef<StyleKey>('streets');
   const readOnlyRef = useRef(Boolean(readOnly));
+  const isRemovingPointRef = useRef(false);
   const sourceRef = useRef(geometrySource);
   const setGeomRef = useRef(setGeom);
   const setOsmIdsRef = useRef(setOsmIds);
@@ -191,6 +195,7 @@ export function TrailMapEditor({
   idsRef.current = ids;
   modeRef.current = mode;
   readOnlyRef.current = Boolean(readOnly);
+  isRemovingPointRef.current = isRemovingPoint;
   sourceRef.current = geometrySource;
   setGeomRef.current = setGeom;
   setOsmIdsRef.current = setOsmIds;
@@ -469,6 +474,33 @@ export function TrailMapEditor({
       map.getCanvas().style.cursor = '';
     });
 
+    map.on('click', (event) => {
+      const draw = drawRef.current;
+      if (
+        !draw ||
+        readOnlyRef.current ||
+        modeRef.current !== 'move' ||
+        !isRemovingPointRef.current
+      ) {
+        return;
+      }
+
+      const result = removeSelectedLinePointAt(
+        draw,
+        event.lngLat,
+        POINTER_DISTANCE,
+      );
+      if (result === 'minimum-points') {
+        setPointRemovalNote(
+          'A line piece needs at least two points. Press Delete to remove the whole selected piece.',
+        );
+      } else if (result === 'miss') {
+        setPointRemovalNote('Click directly on a visible point to remove it.');
+      } else {
+        setPointRemovalNote(null);
+      }
+    });
+
     const draw = new TerraDraw({
       adapter: new TerraDrawMapboxGLAdapter({ map }),
       modes: [
@@ -575,6 +607,13 @@ export function TrailMapEditor({
     }
     applyWayStyle(map, ids, mode);
   }, [autoSelect, editable, ids, mode, ready]);
+
+  useEffect(() => {
+    if (mode !== 'move' || !editable) {
+      setIsRemovingPoint(false);
+      setPointRemovalNote(null);
+    }
+  }, [editable, mode]);
 
   // Basemap switching. Satellite is what you want when checking a line against
   // the singletrack visible on the ground. `style.load` fires again afterwards,
@@ -723,6 +762,15 @@ export function TrailMapEditor({
             onClick={redo}
           />
           <ModeButton
+            active={isRemovingPoint}
+            disabled={!editable || mode !== 'move' || !hasLine}
+            label="Remove point"
+            onClick={() => {
+              setIsRemovingPoint((current) => !current);
+              setPointRemovalNote(null);
+            }}
+          />
+          <ModeButton
             active={basemap === 'satellite'}
             disabled={false}
             label="Satellite"
@@ -769,8 +817,24 @@ export function TrailMapEditor({
       </div>
 
       <p className="mb-2 mt-0 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.45]">
-        {hintFor(mode, geometrySource, hasLine, ids.length > 0, parts.length)}
+        {hintFor(
+          mode,
+          geometrySource,
+          hasLine,
+          ids.length > 0,
+          parts.length,
+          isRemovingPoint,
+        )}
       </p>
+
+      {pointRemovalNote && (
+        <p
+          aria-live="polite"
+          className="mb-2 mt-0 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-error-500,#c00)]"
+        >
+          {pointRemovalNote}
+        </p>
+      )}
 
       {mode === 'pick' && (
         <div className="mt-1">
@@ -868,6 +932,7 @@ function hintFor(
   hasLine: boolean,
   hasWays: boolean,
   pieces: number,
+  isRemovingPoint: boolean,
 ): string {
   if (mode === 'pick') {
     if (source === 'edited') {
@@ -904,12 +969,16 @@ function hintFor(
       ? `This trail is in ${pieces} pieces — click one to select it, then `
       : '';
 
+  if (isRemovingPoint) {
+    return `${selecting}click a visible point to remove it. Choose Remove point again when you are done. Each removal can be undone.${takesOwnership}`;
+  }
+
   // The two deletions are wildly different in blast radius and only one pixel
   // apart on screen, so they are spelled out separately. An earlier version of
   // this sentence said "click a point and press Delete to remove it", which is
   // the gesture that removes the *whole piece* — following it lost a section of
   // trail, and Terra Draw cannot undo that on its own.
-  return `${selecting}drag a point to move it, drag a midpoint to add one, or right-click a point to remove it. Press Delete to remove the whole selected piece; Undo brings it back. Distance updates as you drag. Use Calculate and save elevation below after the line is saved.${takesOwnership}`;
+  return `${selecting}drag a point to move it, drag a midpoint to add one, or choose Remove point and click a point. You can also right-click a point to remove it. Press Delete to remove the whole selected piece; Undo brings it back. Distance updates as you drag. Use Calculate and save elevation below after the line is saved.${takesOwnership}`;
 }
 
 function ModeButton({
