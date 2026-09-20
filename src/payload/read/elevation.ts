@@ -22,6 +22,7 @@ import { getPayload } from 'payload';
 import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
+import { parseElevationProfile } from '@/utils/elevation-profile';
 
 /**
  * A stored profile for `slug` in `city`, or null.
@@ -62,7 +63,7 @@ export async function getTrailElevation(
     });
 
     const profile = result.docs[0]?.elevationProfile;
-    return isProfile(profile) ? profile : null;
+    return parseElevationProfile(profile);
   } catch (error) {
     console.error(
       `Could not read the elevation profile for "${slug}" from Payload.`,
@@ -70,16 +71,4 @@ export async function getTrailElevation(
     );
     return null;
   }
-}
-
-/**
- * `elevationProfile` is untyped `jsonb`, and the pane indexes straight into
- * `profile[i][0]`. A half-written row must not become a runtime error there.
- */
-function isProfile(value: unknown): value is ElevationProfile {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-  const points = (value as ElevationProfile).profile;
-  return Array.isArray(points) && points.length > 0 && Array.isArray(points[0]);
 }

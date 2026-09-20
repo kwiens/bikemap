@@ -199,15 +199,24 @@ export interface Trail {
     | boolean
     | null;
   /**
-   * Miles, measured from the OSM geometry.
+   * Miles, measured from the saved geometry.
    */
   distance?: number | null;
   /**
    * Feet, sampled from Mapbox Terrain-RGB.
    */
   elevationGain?: number | null;
+  /**
+   * Feet, sampled from Mapbox Terrain-RGB.
+   */
   elevationLoss?: number | null;
+  /**
+   * Feet, sampled from Mapbox Terrain-RGB.
+   */
   elevationMin?: number | null;
+  /**
+   * Feet, sampled from Mapbox Terrain-RGB.
+   */
   elevationMax?: number | null;
   /**
    * [swLng, swLat, neLng, neLat], for zoom-to-fit.
@@ -222,7 +231,7 @@ export interface Trail {
     | boolean
     | null;
   /**
-   * The per-point elevation chart, sampled on save. Trails in the checked-in data are served from public/data/elevation instead; this is what a trail created here draws from.
+   * The per-point elevation chart, imported with seeded geometry or sampled whenever geometry is rebuilt or edited.
    */
   elevationProfile?:
     | {

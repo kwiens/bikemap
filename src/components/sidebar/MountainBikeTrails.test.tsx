@@ -19,6 +19,7 @@ vi.mock('@/data/trail-source', () => ({
       icon: {},
       distance: 1.5,
       elevationGain: 200,
+      elevationLoss: 125,
     },
     {
       trailName: 'Trail B',
@@ -37,6 +38,9 @@ vi.mock('@/data/trail-source', () => ({
       rating: 'advanced',
       color: '#374151',
       icon: {},
+      distance: 0.68,
+      elevationGain: 0,
+      elevationLoss: 296,
     },
     {
       trailName: 'Trail D',
@@ -128,6 +132,31 @@ describe('MountainBikeTrails', () => {
     expect(screen.getByText('Trail A')).toBeInTheDocument();
     expect(screen.queryByText('Trail B')).not.toBeInTheDocument();
     expect(screen.queryByText('Trail C')).not.toBeInTheDocument();
+  });
+
+  it('shows both climbing and descent', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Search trails...'), {
+      target: { value: 'Trail A' },
+    });
+
+    const trail = screen.getByRole('button', { name: /Trail A/ });
+    expect(trail).toHaveTextContent('1.5 mi · Climb ↑200 ft · Descent ↓125 ft');
+    expect(trail).toHaveAccessibleName(/Climb 200 ft.*Descent 125 ft/);
+  });
+
+  it('shows descent when climbing is zero', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Search trails...'), {
+      target: { value: 'Trail C' },
+    });
+
+    const trail = screen.getByRole('button', { name: /Trail C/ });
+    expect(trail).toHaveTextContent('0.68 mi · Descent ↓296 ft');
+    expect(trail).toHaveAccessibleName(/Descent 296 ft/);
+    expect(trail).not.toHaveAccessibleName(/Climb/);
   });
 
   it('search is case insensitive', () => {

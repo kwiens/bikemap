@@ -1,7 +1,8 @@
-import type { Access, CollectionConfig, FilterOptions } from 'payload';
+import type { Access, CollectionConfig, Field, FilterOptions } from 'payload';
 import { resolveTrailGeometry } from '@/payload/hooks/resolveTrailGeometry';
 import { cityOptions, isCityId } from '@/config/map.config';
 import { DEFAULT_KIND_VALUE, UNRATED_VALUE } from '@/data/trail-vocabulary';
+import { recalculateTrailElevation } from '@/payload/endpoints/recalculate-trail-elevation';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { validateOsmIds } from '@/payload/osm/ids';
 import { slugify } from '@/utils/string';
@@ -84,6 +85,13 @@ export const Trails: CollectionConfig = {
   hooks: {
     beforeChange: [resolveTrailGeometry],
   },
+  endpoints: [
+    {
+      handler: recalculateTrailElevation,
+      method: 'post',
+      path: '/:id/recalculate-elevation',
+    },
+  ],
   fields: [
     /**
      * Tabs, and specifically **unnamed** ones.
@@ -324,52 +332,28 @@ export const Trails: CollectionConfig = {
               },
             },
             {
-              type: 'row',
-              fields: [
-                {
-                  name: 'distance',
-                  type: 'number',
-                  admin: {
-                    description: 'Miles, measured from the OSM geometry.',
-                    readOnly: true,
-                    width: '50%',
-                  },
+              name: 'elevationProfileAdmin',
+              type: 'ui',
+              admin: {
+                components: {
+                  Field:
+                    '@/payload/components/ElevationProfileAdmin#ElevationProfileAdmin',
                 },
-                {
-                  name: 'elevationGain',
-                  type: 'number',
-                  admin: {
-                    description: 'Feet, sampled from Mapbox Terrain-RGB.',
-                    readOnly: true,
-                    width: '50%',
-                  },
-                },
-              ],
+              },
             },
-            {
-              type: 'row',
-              fields: [
-                {
-                  name: 'elevationLoss',
-                  type: 'number',
-                  admin: { readOnly: true, width: '33%' },
-                },
-                {
-                  name: 'elevationMin',
-                  type: 'number',
-                  admin: { readOnly: true, width: '33%' },
-                },
-                {
-                  name: 'elevationMax',
-                  type: 'number',
-                  admin: { readOnly: true, width: '33%' },
-                },
-              ],
-            },
+            derivedMeasurement('distance'),
+            derivedMeasurement('elevationGain'),
+            derivedMeasurement('elevationLoss'),
+            derivedMeasurement('elevationMin'),
+            derivedMeasurement('elevationMax'),
             {
               name: 'bounds',
               type: 'json',
               admin: {
+                components: {
+                  Field:
+                    '@/payload/components/ElevationProfileAdmin#DerivedMeasurementField',
+                },
                 description: '[swLng, swLat, neLng, neLat], for zoom-to-fit.',
                 readOnly: true,
               },
@@ -379,7 +363,7 @@ export const Trails: CollectionConfig = {
               type: 'json',
               admin: {
                 description:
-                  'The per-point elevation chart, sampled on save. Trails in the checked-in data are served from public/data/elevation instead; this is what a trail created here draws from.',
+                  'The per-point elevation chart, imported with seeded geometry or sampled whenever geometry is rebuilt or edited.',
                 readOnly: true,
                 // Hundreds of [distance, elevation, lng, lat] rows — nothing a
                 // curator can act on, and it makes the form unreadable.
@@ -412,6 +396,32 @@ export const Trails: CollectionConfig = {
     },
   ],
 };
+
+/** Stored in the form and available to list columns, rendered by the chart. */
+function derivedMeasurement(
+  name:
+    | 'distance'
+    | 'elevationGain'
+    | 'elevationLoss'
+    | 'elevationMax'
+    | 'elevationMin',
+): Field {
+  return {
+    name,
+    type: 'number',
+    admin: {
+      components: {
+        Field:
+          '@/payload/components/ElevationProfileAdmin#DerivedMeasurementField',
+      },
+      description:
+        name === 'distance'
+          ? 'Miles, measured from the saved geometry.'
+          : 'Feet, sampled from Mapbox Terrain-RGB.',
+      readOnly: true,
+    },
+  };
+}
 
 export interface DerivedFromArgs {
   data?: Record<string, unknown>;

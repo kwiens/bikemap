@@ -92,6 +92,10 @@ function TrailRow({
   selectedTrail: string | null;
   onTrailSelect: (name: string) => void;
 }) {
+  const hasDistance = (trail.distance ?? 0) > 0;
+  const hasElevationGain = (trail.elevationGain ?? 0) > 0;
+  const hasElevationLoss = (trail.elevationLoss ?? 0) > 0;
+
   return (
     <div
       {...pressableProps(() => onTrailSelect(trail.trailName))}
@@ -113,12 +117,15 @@ function TrailRow({
           style={{ backgroundColor: trail.color }}
         />
         <span className="font-medium text-[13px]">{trail.displayName}</span>
-        {trail.distance || trail.elevationGain ? (
+        {hasDistance || hasElevationGain || hasElevationLoss ? (
           <span className="text-[11px] text-gray-500 ml-auto shrink-0">
-            {trail.distance ? `${trail.distance} mi` : ''}
-            {trail.distance && trail.elevationGain ? ' \u00B7 ' : ''}
-            {trail.elevationGain ? (
+            {hasDistance ? `${trail.distance} mi` : ''}
+            {hasDistance && (hasElevationGain || hasElevationLoss)
+              ? ' \u00B7 '
+              : ''}
+            {hasElevationGain ? (
               <>
+                <span className="sr-only">Climb</span>{' '}
                 <span
                   aria-hidden="true"
                   className="inline-block text-[14px] leading-none align-[-1px]"
@@ -126,6 +133,19 @@ function TrailRow({
                   {'\u2191'}
                 </span>
                 {trail.elevationGain} ft
+              </>
+            ) : null}
+            {hasElevationGain && hasElevationLoss ? ' \u00B7 ' : ''}
+            {hasElevationLoss ? (
+              <>
+                <span className="sr-only">Descent</span>{' '}
+                <span
+                  aria-hidden="true"
+                  className="inline-block text-[14px] leading-none align-[-1px]"
+                >
+                  {'\u2193'}
+                </span>
+                {trail.elevationLoss} ft
               </>
             ) : null}
           </span>

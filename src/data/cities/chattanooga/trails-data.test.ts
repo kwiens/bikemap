@@ -5,6 +5,7 @@ import {
   type ElevationProfile,
   slugForTrail,
 } from '@/data/mountain-bike-trails';
+import { parseElevationProfile } from '@/utils/elevation-profile';
 import { chattanoogaData } from './index';
 import { getChattanoogaMeasurement } from './measurements';
 
@@ -27,6 +28,40 @@ const collection = JSON.parse(
 const mountainBikeTrails = chattanoogaData.mountainBikeTrails;
 
 describe('Chattanooga trail import geometry', () => {
+  it('provides an importable static elevation profile for every curated trail', () => {
+    const missing: string[] = [];
+
+    for (const trail of mountainBikeTrails) {
+      const file = path.join(
+        process.cwd(),
+        'public/data/elevation/chattanooga',
+        `${slugForTrail(trail)}.json`,
+      );
+      let profile: ElevationProfile | null;
+      try {
+        profile = parseElevationProfile(JSON.parse(readFileSync(file, 'utf8')));
+      } catch {
+        missing.push(trail.trailName);
+        continue;
+      }
+
+      if (!profile) {
+        missing.push(trail.trailName);
+        continue;
+      }
+
+      expect(profile.profile.length, trail.trailName).toBeGreaterThan(1);
+      expect(profile.distance, trail.trailName).toBeGreaterThan(0);
+      expect(Number.isFinite(profile.gain), trail.trailName).toBe(true);
+      expect(Number.isFinite(profile.loss), trail.trailName).toBe(true);
+      expect(Number.isFinite(profile.min), trail.trailName).toBe(true);
+      expect(Number.isFinite(profile.max), trail.trailName).toBe(true);
+    }
+
+    expect(missing).toEqual([]);
+    expect(mountainBikeTrails).toHaveLength(224);
+  });
+
   it('provides valid WGS84 MultiLineStrings for 218 curated trails', () => {
     const byName = new Map(
       collection.features.map((feature) => [feature.properties.Trail, feature]),
@@ -109,18 +144,24 @@ describe('Chattanooga trail import geometry', () => {
       expect(measurement).toBeDefined();
       expect(trail).toEqual(expect.objectContaining(measurement));
 
-      const profile = JSON.parse(
-        readFileSync(
-          path.join(
-            process.cwd(),
-            'public/data/elevation/chattanooga',
-            `${slugForTrail(trail)}.json`,
+      const profile = parseElevationProfile(
+        JSON.parse(
+          readFileSync(
+            path.join(
+              process.cwd(),
+              'public/data/elevation/chattanooga',
+              `${slugForTrail(trail)}.json`,
+            ),
+            'utf8',
           ),
-          'utf8',
         ),
-      ) as ElevationProfile;
+      );
 
       const feature = byName.get(trail.trailName);
+      expect(profile, trail.trailName).not.toBeNull();
+      if (!profile) {
+        continue;
+      }
       expect(profile.profile.length).toBeGreaterThan(1);
       expect(profile.geometryGapDetails ?? []).toHaveLength(
         Math.max(0, (feature?.geometry.coordinates.length ?? 0) - 1),

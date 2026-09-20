@@ -12,7 +12,9 @@
  *
  * Geometry comes from public/data/bend/trails.geojson, matched by slug. That
  * file is the same one the map used to read directly, so seeding from it means
- * the database starts out rendering exactly what the static file did.
+ * the database starts out rendering exactly what the static file did. The
+ * profile generated from that same line is imported with it, so the CMS is the
+ * primary elevation source from the first seed.
  *
  * Re-running is safe: rows match on (trailName, city) and update, and a trail
  * whose line was drawn in the admin keeps it — see `upsertTrail`.
@@ -28,6 +30,7 @@ import {
   repoRoot,
   run,
   emptyVocabulary,
+  loadElevationProfile,
   loadVocabulary,
   upsertArea,
   upsertTrail,
@@ -64,8 +67,18 @@ run(async () => {
 
   const geometry = await loadGeometry();
   const trails = bendData.mountainBikeTrails;
+  // There are 182 local files. Read them concurrently once rather than adding
+  // one filesystem round trip to every database upsert below.
+  const profiles = new Map(
+    await Promise.all(
+      trails.map(async (trail) => {
+        const slug = slugForTrail(trail);
+        return [slug, await loadElevationProfile('bend', slug)] as const;
+      }),
+    ),
+  );
   payload.logger.info(
-    `bend: importing ${trails.length} trails (${geometry.size} geometries in ${GEOJSON})`,
+    `bend: importing ${trails.length} trails (${geometry.size} geometries; ${profiles.size} measured profiles)`,
   );
 
   // Areas are created on first mention; the cache keeps that to one
@@ -105,6 +118,7 @@ run(async () => {
       areaId,
       vocabulary,
       city: 'bend',
+      elevationProfile: profiles.get(slugForTrail(trail)) ?? null,
       geom,
       // Only trails that actually reference OSM ways can be rebuilt from them.
       geometrySource: trail.osmIds?.length ? 'osm' : 'imported',
