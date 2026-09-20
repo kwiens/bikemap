@@ -11,7 +11,9 @@ import {
 const ui = vi.hoisted(() => ({
   dispatch: vi.fn(),
   documentInfo: {
-    apiURL: '/api',
+    // Payload supplies the current document URL here, not the API root. Keeping
+    // its real shape catches accidental path appends after the draft query.
+    apiURL: '/api/trails/42?draft=true',
     data: {} as Record<string, unknown>,
     hasSavePermission: true,
     id: 42 as number | string | undefined,
@@ -44,6 +46,9 @@ vi.mock('@payloadcms/ui', () => ({
     </button>
   ),
   toast: ui.toast,
+  useConfig: () => ({
+    config: { routes: { api: '/api' }, serverURL: '' },
+  }),
   useDocumentInfo: () => ui.documentInfo,
   useFormBackgroundProcessing: () => ui.isBackgroundProcessing,
   useFormFields: (selector: (form: unknown) => unknown) =>

@@ -5,6 +5,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Button,
   toast,
+  useConfig,
   useDocumentInfo,
   useFormBackgroundProcessing,
   useFormFields,
@@ -12,6 +13,7 @@ import {
   useFormProcessing,
 } from '@payloadcms/ui';
 import { RefreshCw } from 'lucide-react';
+import { formatAdminURL } from 'payload/shared';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
 import type { RecalculateTrailElevationResponse } from '@/payload/endpoints/recalculate-trail-elevation';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
@@ -61,7 +63,6 @@ interface MeasurementFormFields {
  */
 export function ElevationProfileAdmin() {
   const {
-    apiURL = '/api',
     data,
     hasSavePermission,
     id,
@@ -70,6 +71,12 @@ export function ElevationProfileAdmin() {
     setData,
     setLastUpdateTime,
   } = useDocumentInfo();
+  const {
+    config: {
+      routes: { api: apiRoute },
+      serverURL,
+    },
+  } = useConfig();
   const isModified = useFormModified();
   const isProcessing = useFormProcessing();
   const isBackgroundProcessing = useFormBackgroundProcessing();
@@ -153,14 +160,16 @@ export function ElevationProfileAdmin() {
     requestRef.current = controller;
 
     try {
-      const response = await fetch(
-        `${apiURL}/trails/${encodeURIComponent(String(id))}/recalculate-elevation`,
-        {
-          credentials: 'same-origin',
-          method: 'POST',
-          signal: controller.signal,
-        },
-      );
+      const endpoint = formatAdminURL({
+        apiRoute,
+        path: `/trails/${encodeURIComponent(String(id))}/recalculate-elevation`,
+        serverURL,
+      });
+      const response = await fetch(endpoint, {
+        credentials: 'same-origin',
+        method: 'POST',
+        signal: controller.signal,
+      });
       const body: unknown = await response.json();
 
       if (controller.signal.aborted) {
