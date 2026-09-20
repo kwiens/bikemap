@@ -64,6 +64,40 @@ interface HeaderConfig {
 }
 
 /**
+ * Full application CSP. Inline styles are required by Payload's theme and
+ * Mapbox, while Next's static-header CSP mode requires inline framework
+ * scripts. External script execution and inline event attributes stay blocked.
+ */
+export function buildContentSecurityPolicy(
+  frameAncestors: string,
+  isDevelopment = process.env.NODE_ENV === 'development',
+): string {
+  const directives = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDevelopment ? " 'unsafe-eval'" : ''}`,
+    "script-src-attr 'none'",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "font-src 'self' data: https://cdn.jsdelivr.net",
+    "img-src 'self' data: blob: https://api.mapbox.com",
+    "connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://tiles.openstreetmap.us https://chattanooga.publicbikesystem.net https://cluster-prod.veoride.com",
+    "worker-src 'self' blob:",
+    "child-src 'self' blob:",
+    "frame-src 'self'",
+    "manifest-src 'self'",
+    frameAncestors,
+  ];
+
+  if (!isDevelopment) {
+    directives.push('upgrade-insecure-requests');
+  }
+
+  return directives.join('; ');
+}
+
+/**
  * Next.js `headers()` config for framing policy. Emits two mutually exclusive
  * rules — Next appends the headers of *every* matching rule, and browsers
  * intersect multiple CSPs, so an overlap would silently apply the stricter
@@ -83,19 +117,23 @@ interface HeaderConfig {
  */
 export function embedHeaders(
   allowedOrigins: string | undefined,
+  isDevelopment = process.env.NODE_ENV === 'development',
 ): HeaderConfig[] {
   const embedDirective = buildFrameAncestors(allowedOrigins);
+  const embedPolicy = buildContentSecurityPolicy(embedDirective, isDevelopment);
+  const applicationPolicy = buildContentSecurityPolicy(
+    "frame-ancestors 'self'",
+    isDevelopment,
+  );
 
   return [
     {
       source: '/embed',
-      headers: [{ key: 'Content-Security-Policy', value: embedDirective }],
+      headers: [{ key: 'Content-Security-Policy', value: embedPolicy }],
     },
     {
       source: '/((?!embed(?:/)?$).*)',
-      headers: [
-        { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
-      ],
+      headers: [{ key: 'Content-Security-Policy', value: applicationPolicy }],
     },
   ];
 }

@@ -1,5 +1,53 @@
-import type { CollectionConfig } from 'payload';
+import {
+  APIError,
+  type Access,
+  type CollectionBeforeDeleteHook,
+  type CollectionConfig,
+} from 'payload';
 import { cityOptions } from '@/config/map.config';
+
+/** Admins may remove other accounts, but never the account in active use. */
+export const canDeleteUser: Access = ({ id, req }) => {
+  if (req.user?.role !== 'admin') {
+    return false;
+  }
+
+  if (id !== undefined && String(id) === String(req.user.id)) {
+    return false;
+  }
+
+  return { id: { not_equals: req.user.id } };
+};
+
+/** Defense in depth for internal calls that bypass collection access. */
+export const preventDeletingLastAdmin: CollectionBeforeDeleteHook = async ({
+  id,
+  req,
+}) => {
+  const [user, { totalDocs }] = await Promise.all([
+    req.payload.findByID({
+      collection: 'users',
+      id,
+      overrideAccess: true,
+      req,
+    }),
+    req.payload.count({
+      collection: 'users',
+      overrideAccess: true,
+      req,
+      where: { role: { equals: 'admin' } },
+    }),
+  ]);
+
+  if (user.role === 'admin' && totalDocs <= 1) {
+    throw new APIError(
+      'The last administrator cannot be deleted. Create another administrator first.',
+      409,
+      null,
+      true,
+    );
+  }
+};
 
 /**
  * Admin accounts. Payload's own auth — `auth: true` adds the email/password
@@ -15,12 +63,17 @@ import { cityOptions } from '@/config/map.config';
  *
  * `city` is the other half of that, and is likewise kept rather than used: it
  * scopes a user to one city's content (ADR-0001 wants city scoping on day one,
- * not bolted on later), and `cityScoped` on Trails reads it. An admin edits
+ * not bolted on later), and the shared city access rules read it. An admin edits
  * every city, so today it is always ignored and the field stays hidden.
  */
 export const Users: CollectionConfig = {
   slug: 'users',
-  auth: true,
+  auth: {
+    cookies: {
+      sameSite: 'Lax',
+      secure: process.env.NODE_ENV === 'production',
+    },
+  },
   admin: {
     useAsTitle: 'email',
     defaultColumns: ['email', 'name', 'role', 'city'],
@@ -31,8 +84,11 @@ export const Users: CollectionConfig = {
     // Only admins manage accounts. Read is left to Payload's default, which
     // still lets anyone signed in fetch their own record via /me.
     create: ({ req }) => req.user?.role === 'admin',
-    delete: ({ req }) => req.user?.role === 'admin',
+    delete: canDeleteUser,
     update: ({ req }) => req.user?.role === 'admin',
+  },
+  hooks: {
+    beforeDelete: [preventDeletingLastAdmin],
   },
   fields: [
     {
