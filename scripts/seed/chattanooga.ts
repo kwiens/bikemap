@@ -33,10 +33,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chattanoogaData } from '../../src/data/cities/chattanooga';
-import {
-  type ElevationProfile,
-  slugForTrail,
-} from '../../src/data/mountain-bike-trails';
+import { slugForTrail } from '../../src/data/mountain-bike-trails';
 import {
   connect,
   parseArgs,
@@ -44,6 +41,7 @@ import {
   repoRoot,
   run,
   emptyVocabulary,
+  loadElevationProfile,
   loadVocabulary,
   upsertArea,
   upsertTrail,
@@ -53,8 +51,6 @@ import {
 // Staged for removal with the static fallback once fresh databases have a
 // database-native bootstrap path.
 const GEOJSON = 'public/data/chattanooga/trails.geojson';
-const PROFILE_DIR = 'public/data/elevation/chattanooga';
-
 /** Raw `Trail` value -> imported MultiLineString. */
 async function loadGeometry(): Promise<Map<string, MultiLineString>> {
   const raw = await readFile(path.join(repoRoot, GEOJSON), 'utf8');
@@ -77,16 +73,6 @@ async function loadGeometry(): Promise<Map<string, MultiLineString>> {
   return byName;
 }
 
-async function loadProfile(slug: string): Promise<ElevationProfile> {
-  const filename = path.join(repoRoot, PROFILE_DIR, `${slug}.json`);
-  const raw = await readFile(filename, 'utf8');
-  const profile = JSON.parse(raw) as ElevationProfile;
-  if (!Array.isArray(profile.profile) || profile.profile.length === 0) {
-    throw new Error(`Invalid Chattanooga elevation profile: ${filename}`);
-  }
-  return profile;
-}
-
 run(async () => {
   const { dryRun } = parseArgs(process.argv.slice(2));
   const payload = await connect();
@@ -95,12 +81,13 @@ run(async () => {
   const trails = chattanoogaData.mountainBikeTrails;
   const profiles = new Map(
     await Promise.all(
-      trails
-        .filter((trail) => geometry.has(trail.trailName))
-        .map(
-          async (trail) =>
-            [trail.trailName, await loadProfile(slugForTrail(trail))] as const,
-        ),
+      trails.map(
+        async (trail) =>
+          [
+            trail.trailName,
+            await loadElevationProfile('chattanooga', slugForTrail(trail)),
+          ] as const,
+      ),
     ),
   );
   payload.logger.info(

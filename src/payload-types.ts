@@ -270,7 +270,7 @@ export interface Trail {
     | boolean
     | null;
   /**
-   * Re-derive on the next save even if nothing changed. For an OSM trail that refetches the ways; for an edited one it just re-measures the line.
+   * Use this if the line or its measurements look out of date. OpenStreetMap lines are fetched again; drawn lines are measured again.
    */
   rebuildGeometry?: boolean | null;
   osmReport?:
@@ -283,15 +283,24 @@ export interface Trail {
     | boolean
     | null;
   /**
-   * Miles, measured from the OSM geometry.
+   * Miles, measured from the saved geometry.
    */
   distance?: number | null;
   /**
    * Feet, sampled from Mapbox Terrain-RGB.
    */
   elevationGain?: number | null;
+  /**
+   * Feet, sampled from Mapbox Terrain-RGB.
+   */
   elevationLoss?: number | null;
+  /**
+   * Feet, sampled from Mapbox Terrain-RGB.
+   */
   elevationMin?: number | null;
+  /**
+   * Feet, sampled from Mapbox Terrain-RGB.
+   */
   elevationMax?: number | null;
   /**
    * [swLng, swLat, neLng, neLat], for zoom-to-fit.
@@ -306,7 +315,7 @@ export interface Trail {
     | boolean
     | null;
   /**
-   * The per-point elevation chart, sampled on save. Trails in the checked-in data are served from public/data/elevation instead; this is what a trail created here draws from.
+   * The per-point elevation chart, imported with seeded geometry or sampled whenever geometry is rebuilt or edited.
    */
   elevationProfile?:
     | {
@@ -317,9 +326,6 @@ export interface Trail {
     | number
     | boolean
     | null;
-  /**
-   * OSM trails rebuild their line from the picked ways on every save. Edited trails keep the line as drawn — the map sets this for you the first time you move a point. Imported trails are left alone entirely.
-   */
   geometrySource: 'osm' | 'edited' | 'imported';
   updatedAt: string;
   createdAt: string;

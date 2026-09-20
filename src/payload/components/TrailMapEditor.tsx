@@ -81,7 +81,8 @@ import {
 import { parseOsmIds } from '@/payload/osm/ids';
 import { METERS_TO_MILES } from '@/payload/osm/units';
 import { OSM_BIKE_TRAIL_FILTER } from '@/utils/map';
-import { Banner, linkButtonStyle } from './admin-ui';
+import { cn } from '@/lib/utils';
+import { Banner } from './admin-ui';
 
 type Parts = [number, number][][];
 type Mode = 'draw' | 'move' | 'pick';
@@ -285,6 +286,13 @@ export function TrailMapEditor({
       : [...current, id];
     setNames((previous) => ({ ...previous, [id]: name }));
     setOsmIdsRef.current(next);
+    if (sourceRef.current === 'imported') {
+      // Selecting a maintainable source is the curator's explicit request to
+      // replace a style-only imported line. Without this, imported trails
+      // would accept the clicks and then ignore them on save.
+      sourceRef.current = 'osm';
+      setSourceRef.current('osm');
+    }
   }, []);
 
   /**
@@ -668,110 +676,128 @@ export function TrailMapEditor({
 
   return (
     <div className="field-type">
-      <label className="field-label" htmlFor={path}>
-        Trail geometry
-      </label>
+      <div className="field-label">Trail line</div>
 
-      <div style={toolbar}>
-        <ModeButton
-          active={mode === 'pick'}
-          disabled={!editable}
-          label="Pick ways"
-          onClick={() => setMode('pick')}
-        />
-        <ModeButton
-          active={mode === 'move'}
-          disabled={!editable || drawFailed}
-          label="Move points"
-          onClick={() => setMode('move')}
-        />
-        <ModeButton
-          active={mode === 'draw'}
-          disabled={!editable || drawFailed}
-          label="Draw"
-          onClick={() => setMode('draw')}
-        />
-        <span style={{ flex: 1 }} />
-        <ModeButton
-          active={false}
-          disabled={!editable || !editing || !history.canUndo}
-          label="Undo"
-          onClick={undo}
-        />
-        <ModeButton
-          active={false}
-          disabled={!editable || !editing || !history.canRedo}
-          label="Redo"
-          onClick={redo}
-        />
-        <ModeButton
-          active={basemap === 'satellite'}
-          disabled={false}
-          label="Satellite"
-          onClick={() =>
-            setBasemap((current) =>
-              current === 'satellite' ? 'streets' : 'satellite',
-            )
-          }
-        />
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div
+          aria-label="Trail line editing mode"
+          className="flex flex-wrap items-center gap-1.5"
+          role="group"
+        >
+          <ModeButton
+            active={mode === 'pick'}
+            disabled={!editable}
+            label="Choose from OpenStreetMap"
+            onClick={() => setMode('pick')}
+          />
+          <ModeButton
+            active={mode === 'move'}
+            disabled={!editable || drawFailed}
+            label="Adjust line"
+            onClick={() => setMode('move')}
+          />
+          <ModeButton
+            active={mode === 'draw'}
+            disabled={!editable || drawFailed}
+            label="Draw line"
+            onClick={() => setMode('draw')}
+          />
+        </div>
+        <div
+          aria-label="Trail line tools"
+          className="flex flex-wrap items-center gap-1.5"
+          role="group"
+        >
+          <ModeButton
+            active={false}
+            disabled={!editable || !editing || !history.canUndo}
+            isToggle={false}
+            label="Undo"
+            onClick={undo}
+          />
+          <ModeButton
+            active={false}
+            disabled={!editable || !editing || !history.canRedo}
+            isToggle={false}
+            label="Redo"
+            onClick={redo}
+          />
+          <ModeButton
+            active={basemap === 'satellite'}
+            disabled={false}
+            label="Satellite"
+            onClick={() =>
+              setBasemap((current) =>
+                current === 'satellite' ? 'streets' : 'satellite',
+              )
+            }
+          />
+        </div>
       </div>
 
       {staleNote && <Banner tone="warning">{staleNote}</Banner>}
 
       {drawFailed && (
         <Banner tone="error">
-          The line editor could not attach to the map, so the geometry is
+          The line editor could not attach to the map, so the trail line is
           read-only here. Everything else on this trail still saves normally.
         </Banner>
       )}
 
-      <div ref={containerRef} style={mapFrame} />
+      <div
+        className="h-[480px] w-full rounded-[var(--style-radius-s,4px)] border border-solid border-[color:var(--theme-elevation-150)]"
+        ref={containerRef}
+      />
 
-      <div style={statsRow}>
+      <div className="flex items-center gap-3 py-2 text-[0.85rem]">
         <strong ref={statsRef}>No line yet</strong>
-        <span style={{ flex: 1 }} />
+        <span className="flex-1" />
         {geometrySource === 'edited' && (
-          <span style={{ color: 'var(--theme-elevation-500)' }}>
-            edited by hand
+          <span className="text-[color:var(--theme-elevation-600)]">
+            Drawn here
           </span>
         )}
         {picked.length > 0 && geometrySource === 'edited' && (
-          <button onClick={revertToOsm} style={linkButton} type="button">
-            Discard edits and rebuild from OSM
+          <button
+            className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--theme-elevation-800)]"
+            onClick={revertToOsm}
+            type="button"
+          >
+            Use selected OpenStreetMap trails on next save
           </button>
         )}
       </div>
 
-      <p style={hint}>
+      <p className="mb-2 mt-0 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.45]">
         {hintFor(mode, geometrySource, hasLine, ids.length > 0, parts.length)}
       </p>
 
       {mode === 'pick' && (
-        <div style={{ marginTop: '0.25rem' }}>
+        <div className="mt-1">
           {picked.length === 0 ? (
-            <p style={{ color: 'var(--theme-elevation-500)', margin: 0 }}>
-              No ways picked yet.
+            <p className="m-0 text-[color:var(--theme-elevation-600)]">
+              No OpenStreetMap trail segments selected yet.
             </p>
           ) : (
-            <ol style={{ margin: 0, paddingLeft: '1.25rem' }}>
+            <ol className="m-0 pl-5">
               {picked.map((way) => (
-                <li key={way.id} style={{ marginBottom: '0.25rem' }}>
+                <li className="mb-1" key={way.id}>
                   {way.name}{' '}
                   <a
+                    className="text-[0.8rem] underline-offset-2 hover:underline"
                     href={`https://www.openstreetmap.org/way/${way.id}`}
                     rel="noreferrer"
                     target="_blank"
-                    style={{ fontSize: '0.8rem' }}
                   >
                     #{way.id}
                   </a>{' '}
                   <button
+                    className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={!editable}
                     onClick={() => togglePick(way.id, way.name)}
-                    style={linkButton}
                     type="button"
                   >
-                    remove
+                    Remove
                   </button>
                 </li>
               ))}
@@ -824,7 +850,7 @@ function staleLineNote(
   // An edited line has stopped tracking the ways altogether, so saying "save to
   // rebuild" would be a lie — saving deliberately will not touch it.
   if (source === 'edited') {
-    return 'The picked ways have changed, but this line is edited by hand so saving will not rebuild it from them. Use “Discard edits and rebuild from OSM” if you want the new ways applied.';
+    return 'The selected OpenStreetMap trails have changed, but this custom line will not be replaced when you save. Use “Use selected OpenStreetMap trails on next save” if you want those changes applied.';
   }
 
   if (mode === 'pick') {
@@ -832,7 +858,7 @@ function staleLineNote(
   }
 
   return hasLine
-    ? 'The picked ways have changed since this line was built, so the newly picked ones have no points on them yet. Save to rebuild the line, then edit it.'
+    ? 'The selected OpenStreetMap trails have changed since this line was built, so the new sections are not part of the editable line yet. Save to rebuild the line, then adjust it.'
     : null;
 }
 
@@ -844,7 +870,13 @@ function hintFor(
   pieces: number,
 ): string {
   if (mode === 'pick') {
-    return 'Click a trail to add it, click again to remove. Order matters for trails that double back — pick them in riding order. Saving rebuilds the line from these ways.';
+    if (source === 'edited') {
+      return 'Click trail segments to select them. Your custom line stays unchanged until you use “Use selected OpenStreetMap trails on next save.”';
+    }
+    if (source === 'imported') {
+      return 'Click a trail segment to start replacing the imported map line with OpenStreetMap. Select segments in riding order, then save to join and store them.';
+    }
+    return 'Click a trail segment to select it; click it again to remove it. For trails that double back, select segments in riding order. Saving joins those segments into one line and stores it with this trail.';
   }
 
   // The most confusing state in the editor: ways are picked but the line does
@@ -852,14 +884,14 @@ function hintFor(
   // save. Without saying so, Move points just looks broken.
   if (!hasLine) {
     return hasWays
-      ? 'Nothing to edit yet — the line is rebuilt from the picked ways when you save. Save this trail, then come back here to adjust it.'
-      : 'Nothing to edit yet. Pick some OSM ways and save, or switch to Draw and click along the trail to lay one down by hand.';
+      ? 'Nothing to adjust yet. Save this trail to build the line from the selected OpenStreetMap trails, then return here to adjust it.'
+      : 'Nothing to adjust yet. Choose OpenStreetMap trails and save, or switch to Draw line and click along the route.';
   }
 
   const takesOwnership =
     source === 'edited'
       ? ''
-      : ' The first change switches this trail to “Edited by hand”, so saving stops refetching it from OSM.';
+      : ' Your first change makes this a custom line, so future saves keep your version instead of replacing it from OpenStreetMap.';
 
   if (mode === 'draw') {
     return `Click to add points to the line; it snaps to nearby trails and points. Press Enter to finish a piece, Escape to cancel it.${takesOwnership}`;
@@ -877,38 +909,33 @@ function hintFor(
   // this sentence said "click a point and press Delete to remove it", which is
   // the gesture that removes the *whole piece* — following it lost a section of
   // trail, and Terra Draw cannot undo that on its own.
-  return `${selecting}drag a point to move it, drag a midpoint to add one, or right-click a point to remove it. Press Delete to remove the whole selected piece — useful for dropping a stray section, and Undo brings it back. Distance updates as you drag; elevation is recalculated on save.${takesOwnership}`;
+  return `${selecting}drag a point to move it, drag a midpoint to add one, or right-click a point to remove it. Press Delete to remove the whole selected piece; Undo brings it back. Distance updates as you drag. Use Calculate and save elevation below after the line is saved.${takesOwnership}`;
 }
 
 function ModeButton({
   active,
   disabled,
+  isToggle = true,
   label,
   onClick,
 }: {
   active: boolean;
   disabled?: boolean;
+  isToggle?: boolean;
   label: string;
   onClick: () => void;
 }) {
   return (
     <button
+      aria-pressed={isToggle ? active : undefined}
+      className={cn(
+        'rounded-[var(--style-radius-s,4px)] border border-solid border-[color:var(--theme-elevation-150)] px-2.5 py-1 text-[0.8rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--theme-elevation-800)] disabled:cursor-not-allowed disabled:opacity-50',
+        active
+          ? 'bg-[var(--theme-elevation-800)] text-[color:var(--theme-elevation-0)]'
+          : 'bg-[var(--theme-elevation-50)] text-[color:var(--theme-elevation-800)] hover:bg-[var(--theme-elevation-100)]',
+      )}
       disabled={disabled}
       onClick={onClick}
-      style={{
-        background: active
-          ? 'var(--theme-elevation-800)'
-          : 'var(--theme-elevation-50)',
-        border: '1px solid var(--theme-elevation-150)',
-        borderRadius: 'var(--style-radius-s, 4px)',
-        color: active
-          ? 'var(--theme-elevation-0)'
-          : 'var(--theme-elevation-800)',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        fontSize: '0.8rem',
-        opacity: disabled ? 0.5 : 1,
-        padding: '0.25rem 0.6rem',
-      }}
       type="button"
     >
       {label}
@@ -999,37 +1026,3 @@ function applyWayStyle(map: mapboxgl.Map, ids: number[], mode: Mode) {
     );
   }
 }
-
-const hint = {
-  color: 'var(--theme-elevation-500)',
-  fontSize: '0.8rem',
-  margin: '0 0 0.5rem',
-} as const;
-
-const toolbar = {
-  alignItems: 'center',
-  display: 'flex',
-  gap: '0.4rem',
-  marginBottom: '0.4rem',
-} as const;
-
-const mapFrame = {
-  border: '1px solid var(--theme-elevation-150)',
-  borderRadius: 'var(--style-radius-s, 4px)',
-  height: 480,
-  width: '100%',
-} as const;
-
-const statsRow = {
-  alignItems: 'center',
-  display: 'flex',
-  fontSize: '0.85rem',
-  gap: '0.75rem',
-  padding: '0.5rem 0',
-} as const;
-
-const linkButton = {
-  ...linkButtonStyle('danger'),
-  fontSize: '0.8rem',
-  textDecoration: 'none',
-} as const;

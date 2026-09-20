@@ -19,6 +19,7 @@ vi.mock('@/data/trail-source', () => ({
       icon: {},
       distance: 1.5,
       elevationGain: 200,
+      elevationLoss: 125,
     },
     {
       trailName: 'Trail B',
@@ -37,6 +38,9 @@ vi.mock('@/data/trail-source', () => ({
       rating: 'advanced',
       color: '#374151',
       icon: {},
+      distance: 0.68,
+      elevationGain: 0,
+      elevationLoss: 296,
     },
     {
       trailName: 'Trail D',
@@ -128,6 +132,49 @@ describe('MountainBikeTrails', () => {
     expect(screen.getByText('Trail A')).toBeInTheDocument();
     expect(screen.queryByText('Trail B')).not.toBeInTheDocument();
     expect(screen.queryByText('Trail C')).not.toBeInTheDocument();
+  });
+
+  it('shows climbing first and reveals descent on hover or focus', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Search trails...'), {
+      target: { value: 'Trail A' },
+    });
+
+    const trail = screen.getByRole('button', { name: /Trail A/ });
+    const descentDetail = screen.getByText(
+      (_content, element) => element?.classList.contains('max-w-0') ?? false,
+    );
+
+    expect(trail).toHaveTextContent('1.5 mi');
+    expect(trail).toHaveAccessibleName(/Climb 200 ft.*Descent 125 ft/);
+    expect(descentDetail).toHaveClass('max-w-0', 'opacity-0');
+
+    fireEvent.mouseEnter(trail);
+    expect(descentDetail).toHaveClass('max-w-[6rem]', 'opacity-100');
+
+    fireEvent.mouseLeave(trail);
+    expect(descentDetail).not.toHaveClass('max-w-[6rem]', 'opacity-100');
+
+    fireEvent.focus(trail);
+    expect(descentDetail).toHaveClass('max-w-[6rem]', 'opacity-100');
+
+    fireEvent.mouseEnter(trail);
+    fireEvent.mouseLeave(trail);
+    expect(descentDetail).toHaveClass('max-w-[6rem]', 'opacity-100');
+  });
+
+  it('shows descent when climbing is zero', () => {
+    render(<MountainBikeTrails {...defaultProps} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Search trails...'), {
+      target: { value: 'Trail C' },
+    });
+
+    const trail = screen.getByRole('button', { name: /Trail C/ });
+    expect(trail).toHaveTextContent('0.68 mi · Descent ↓296 ft');
+    expect(trail).toHaveAccessibleName(/Descent 296 ft/);
+    expect(trail).not.toHaveAccessibleName(/Climb/);
   });
 
   it('search is case insensitive', () => {

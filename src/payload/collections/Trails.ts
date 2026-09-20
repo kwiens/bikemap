@@ -1,7 +1,8 @@
-import type { Access, CollectionConfig, FilterOptions } from 'payload';
+import type { Access, CollectionConfig, Field, FilterOptions } from 'payload';
 import { resolveTrailGeometry } from '@/payload/hooks/resolveTrailGeometry';
 import { cityOptions, isCityId } from '@/config/map.config';
 import { DEFAULT_KIND_VALUE, UNRATED_VALUE } from '@/data/trail-vocabulary';
+import { recalculateTrailElevation } from '@/payload/endpoints/recalculate-trail-elevation';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { validateOsmIds } from '@/payload/osm/ids';
 import { slugify } from '@/utils/string';
@@ -84,6 +85,13 @@ export const Trails: CollectionConfig = {
   hooks: {
     beforeChange: [resolveTrailGeometry],
   },
+  endpoints: [
+    {
+      handler: recalculateTrailElevation,
+      method: 'post',
+      path: '/:id/recalculate-elevation',
+    },
+  ],
   fields: [
     /**
      * Tabs, and specifically **unnamed** ones.
@@ -95,8 +103,8 @@ export const Trails: CollectionConfig = {
      * were.
      *
      * `geometrySource` is deliberately not in here. It sits in the sidebar,
-     * where it stays visible from every tab — it decides what the Geometry tab
-     * will do on save, and reading it should not require going to look.
+     * where it stays visible from every tab — it decides what the Trail line
+     * tab will do on save, and reading it should not require going to look.
      */
     {
       type: 'tabs',
@@ -261,9 +269,9 @@ export const Trails: CollectionConfig = {
           ],
         },
         {
-          label: 'Geometry',
+          label: 'Trail line',
           description:
-            'Where the trail runs. Pick the OSM ways it rides on, or adjust the line by hand.',
+            'Choose where the trail appears on the map. Use OpenStreetMap, adjust an existing line, or draw one here.',
           fields: [
             // --- The authoring surface --------------------------------------------
             // One map, three modes: pick OSM ways, move the line's points, or draw it.
@@ -273,7 +281,7 @@ export const Trails: CollectionConfig = {
             {
               name: 'geom',
               type: 'json',
-              label: 'Trail geometry',
+              label: 'Trail line',
               admin: {
                 components: {
                   Field: '@/payload/components/TrailMapEditor#TrailMapEditor',
@@ -299,20 +307,14 @@ export const Trails: CollectionConfig = {
             {
               name: 'rebuildGeometry',
               type: 'checkbox',
+              label: 'Refresh the saved trail line on the next save',
               defaultValue: false,
               admin: {
                 condition: (data) => data?.geometrySource !== 'imported',
                 description:
-                  'Re-derive on the next save even if nothing changed. For an OSM trail that refetches the ways; for an edited one it just re-measures the line.',
+                  'Use this if the line or its measurements look out of date. OpenStreetMap lines are fetched again; drawn lines are measured again.',
               },
             },
-          ],
-        },
-        {
-          label: 'Measurements',
-          description:
-            'Measured from the line on every save. Read-only — a hand edit here would be overwritten by the next one.',
-          fields: [
             {
               name: 'osmReport',
               type: 'json',
@@ -323,72 +325,56 @@ export const Trails: CollectionConfig = {
                 readOnly: true,
               },
             },
-            {
-              type: 'row',
-              fields: [
-                {
-                  name: 'distance',
-                  type: 'number',
-                  admin: {
-                    description: 'Miles, measured from the OSM geometry.',
-                    readOnly: true,
-                    width: '50%',
-                  },
-                },
-                {
-                  name: 'elevationGain',
-                  type: 'number',
-                  admin: {
-                    description: 'Feet, sampled from Mapbox Terrain-RGB.',
-                    readOnly: true,
-                    width: '50%',
-                  },
-                },
-              ],
-            },
-            {
-              type: 'row',
-              fields: [
-                {
-                  name: 'elevationLoss',
-                  type: 'number',
-                  admin: { readOnly: true, width: '33%' },
-                },
-                {
-                  name: 'elevationMin',
-                  type: 'number',
-                  admin: { readOnly: true, width: '33%' },
-                },
-                {
-                  name: 'elevationMax',
-                  type: 'number',
-                  admin: { readOnly: true, width: '33%' },
-                },
-              ],
-            },
-            {
-              name: 'bounds',
-              type: 'json',
-              admin: {
-                description: '[swLng, swLat, neLng, neLat], for zoom-to-fit.',
-                readOnly: true,
-              },
-            },
-            {
-              name: 'elevationProfile',
-              type: 'json',
-              admin: {
-                description:
-                  'The per-point elevation chart, sampled on save. Trails in the checked-in data are served from public/data/elevation instead; this is what a trail created here draws from.',
-                readOnly: true,
-                // Hundreds of [distance, elevation, lng, lat] rows — nothing a
-                // curator can act on, and it makes the form unreadable.
-                hidden: true,
-              },
-            },
           ],
         },
       ],
+    },
+
+    // These values stay in form state for the public map and elevation action,
+    // but the chart below is their one curator-facing surface. Showing raw
+    // read-only numbers in a third tab made them look independently editable.
+    derivedMeasurement('distance'),
+    derivedMeasurement('elevationGain'),
+    derivedMeasurement('elevationLoss'),
+    derivedMeasurement('elevationMin'),
+    derivedMeasurement('elevationMax'),
+    {
+      name: 'bounds',
+      type: 'json',
+      admin: {
+        components: {
+          Field:
+            '@/payload/components/ElevationProfileAdmin#DerivedMeasurementField',
+        },
+        description: '[swLng, swLat, neLng, neLat], for zoom-to-fit.',
+        readOnly: true,
+      },
+    },
+    {
+      name: 'elevationProfile',
+      type: 'json',
+      admin: {
+        description:
+          'The per-point elevation chart, imported with seeded geometry or sampled whenever geometry is rebuilt or edited.',
+        readOnly: true,
+        // Hundreds of [distance, elevation, lng, lat] rows — nothing a
+        // curator can act on, and it makes the form unreadable.
+        hidden: true,
+      },
+    },
+
+    // Keep the chart and its refresh action visible beneath every tab. The
+    // elevation endpoint saves independently, so hiding this in Measurements
+    // made the result—and the fact that it was already persisted—easy to miss.
+    {
+      name: 'elevationProfileAdmin',
+      type: 'ui',
+      admin: {
+        components: {
+          Field:
+            '@/payload/components/ElevationProfileAdmin#ElevationProfileAdmin',
+        },
+      },
     },
 
     // Sidebar, so it stays on screen whichever tab is open: it decides what the
@@ -405,13 +391,40 @@ export const Trails: CollectionConfig = {
         { label: 'Imported — not maintained here', value: 'imported' },
       ],
       admin: {
-        description:
-          'OSM trails rebuild their line from the picked ways on every save. Edited trails keep the line as drawn — the map sets this for you the first time you move a point. Imported trails are left alone entirely.',
+        components: {
+          Field: '@/payload/components/GeometrySourceField#GeometrySourceField',
+        },
         position: 'sidebar',
       },
     },
   ],
 };
+
+/** Stored in the form and available to list columns, rendered by the chart. */
+function derivedMeasurement(
+  name:
+    | 'distance'
+    | 'elevationGain'
+    | 'elevationLoss'
+    | 'elevationMax'
+    | 'elevationMin',
+): Field {
+  return {
+    name,
+    type: 'number',
+    admin: {
+      components: {
+        Field:
+          '@/payload/components/ElevationProfileAdmin#DerivedMeasurementField',
+      },
+      description:
+        name === 'distance'
+          ? 'Miles, measured from the saved geometry.'
+          : 'Feet, sampled from Mapbox Terrain-RGB.',
+      readOnly: true,
+    },
+  };
+}
 
 export interface DerivedFromArgs {
   data?: Record<string, unknown>;

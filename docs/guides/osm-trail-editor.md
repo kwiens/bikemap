@@ -101,8 +101,13 @@ boundaries, so what gets *stored* comes from Overpass. This is the same choice
 
 - **Trail geometry** — one map with three modes (below). The whole authoring
   surface.
-- **Derived from OSM** — read-only build report, distance, elevation, bounds.
-  Hand edits would be overwritten on the next save.
+- **Measurements** — the build report plus a rendered elevation profile with
+  distance, climb, descent, and range. The raw derived fields stay hidden and
+  read-only because hand edits would be overwritten on the next measurement.
+- **Recalculate / repopulate elevation** — measures the last saved line again
+  without refetching OSM. For a style-owned trail with no CMS line, it restores
+  the checked-in profile instead. Unsaved edits must be saved first, and a
+  failed terrain or profile request leaves existing values untouched.
 - **Rebuild geometry** — force a refresh when a trail changed upstream.
 
 The build report is the important one, because referencing OSM has real failure
@@ -387,7 +392,7 @@ One script per city, because their pipelines genuinely differ:
 | Trails | 182 | 224 |
 | Casual routes | 8, derived from `bike-network.geojson` | imported separately with `pnpm db:import:chattanooga-routes` |
 | Geometry | `public/data/bend/trails.geojson`, by slug | `public/data/chattanooga/trails.geojson`, by raw `Trail` name |
-| Prepared profile | none — run the backfill | imported from `public/data/elevation/chattanooga`, measured from the same GIS line |
+| Prepared profile | imported from `public/data/elevation/bend`, generated from the same OSM line | imported from `public/data/elevation/chattanooga`, measured from the same GIS line |
 | `osmIds` | yes | none |
 | `geometrySource` | `osm` — rebuildable from OSM | `imported` — the rebuild hook skips it |
 
@@ -499,7 +504,7 @@ page. The markup mirrors `DefaultNavClient` in `@payloadcms/next`.
 |---|---|
 | **Details** | Trail name, complex, steward, rating, kind — plus an **Advanced** section, collapsed, for the fields that fill themselves in |
 | **Geometry** | The map editor, the picked ways, the rebuild checkbox |
-| **Measurements** | Distance, elevation, bounds, the build report — all read-only |
+| **Measurements** | Elevation chart, formatted totals, rebuild action, and the read-only build report |
 
 `geometrySource` sits in the **sidebar** rather than in a tab, because it
 decides what the Geometry tab will do on the next save and reading it should not
@@ -675,14 +680,29 @@ Three reasons, in order of how much they cost:
 3. **They come from a different pipeline** — see below.
 
 So a trail with no database row falls back to its checked-in file rather than
-losing its chart. Chattanooga's generated profiles are measured from the same
-GIS geometry as the static map fallback, and the seed imports that profile with
-the line. Deployments with or without the database therefore show the same
+losing its chart. Each bundled city's generated profiles are measured from the
+same geometry as its static map fallback, and its seed imports that profile
+with the line. Deployments with or without the database therefore show the same
 path, distance, and elevation statistics.
+
+Chattanooga's six Godsey Ridge trails are the exception on geometry ownership:
+their lines remain in the style-owned layer, but their checked-in profiles are
+still imported into Payload. The admin can display those charts; its
+**Repopulate elevation** action can restore one if the database predates the
+profile-importing seed. True terrain recalculation still requires stored
+geometry.
 
 `pnpm backfill:elevation` measures every trail that has geometry but no profile.
 It samples terrain only — the geometry is already in the row — so it needs no
 Overpass and is safe to run over every trail at once, and safe to re-run.
+
+For one trail, the **Measurements** tab shows the stored profile directly. With
+saved geometry, **Recalculate elevation** runs the same `measureParts` pipeline
+against that line, then updates the distance, bounds, elevation totals, and
+per-point profile together. Without geometry, **Repopulate elevation** restores
+the checked-in city-scoped profile and derives the same summary fields from it.
+Both preserve a trail's draft or published status and use normal Payload update
+access; neither publishes a draft or bypasses city scoping.
 
 ### The two pipelines do not agree, and the Python one is wrong about mountains
 

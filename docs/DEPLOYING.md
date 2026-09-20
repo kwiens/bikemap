@@ -111,9 +111,12 @@ static elevation profiles before the seed imports them with the geometry.
 ## 7. Trail elevation pipeline (optional)
 
 Only if you have mountain bike trails. `pnpm backfill:elevation` measures a
-database trail that has geometry but no stored profile. Chattanooga's prepared
-seed already includes profiles; the legacy Python script remains available for
-the historical Mapbox-vector-tile workflow.
+database trail that has geometry but no stored profile. The bundled Bend and
+Chattanooga seeds already include their prepared profiles; the legacy Python
+script remains available for the historical Mapbox-vector-tile workflow.
+For an individual trail, the Payload admin's **Measurements** tab renders the
+stored chart. It recalculates from saved geometry, or repopulates the bundled
+profile for a style-owned trail that has no CMS line.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate

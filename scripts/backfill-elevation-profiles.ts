@@ -2,11 +2,9 @@
  * Generates the stored elevation profile for every trail that has geometry.
  *
  * The elevation pane asks `/api/map/elevation/<slug>` first, which serves what
- * a trail last measured on save. A trail seeded from the checked-in data has
- * never been through that path — the seed writes `context.skipOsmRebuild`, on
- * purpose, so a few hundred rows don't fire a few hundred Overpass requests —
- * so it has stats but no profile, and falls back to whatever offline file is
- * still on disk, which cannot follow later edits to its ways.
+ * a trail last measured on save. Legacy seed rows and deployments importing
+ * their own data may have stats but no profile, and fall back to whatever
+ * offline file is still on disk, which cannot follow later edits to its ways.
  *
  * This fills them in **without touching Overpass**: the geometry is already in
  * the database, so only the terrain needs sampling. That makes it safe to run
