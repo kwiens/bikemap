@@ -39,8 +39,9 @@ const TONES: Record<Tone, { background: string; line: string }> = {
 /**
  * A short coloured notice — a validation error, a build warning, a caveat.
  *
- * The left rule rather than a full border because these stack directly above
- * the thing they are about, and a boxed notice reads as a separate section.
+ * A quiet outline keeps the notice distinct without turning one edge into a
+ * decorative accent. Tone colors still communicate severity in light and dark
+ * themes.
  */
 export function Banner({
   children,
@@ -53,12 +54,10 @@ export function Banner({
 
   return (
     <p
+      className="mb-2 rounded-[var(--style-radius-s)] border border-solid px-3 py-2"
       style={{
         background,
-        borderLeft: `3px solid ${line}`,
-        borderRadius: 'var(--style-radius-s)',
-        margin: '0 0 0.5rem',
-        padding: '0.5rem 0.75rem',
+        borderColor: line,
       }}
     >
       {children}
