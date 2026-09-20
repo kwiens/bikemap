@@ -11,6 +11,8 @@ end-to-end checklist. A condensed version is at the [bottom](#checklist).
   vector tilesets, terrain)
 - **Python 3.10+** — only if you have mountain bike trails to process
 - A host for the build — **Vercel** works with zero config
+- A **Postgres** database — only if you want the admin (step 10). The public map
+  runs without one.
 
 ## 1. Fork and run locally
 
@@ -140,7 +142,76 @@ Replace with your own:
 - **iOS splash screens** — `public/splash/*`
 - **README screenshots** — `screenshot-splash.png`, `screenshot-route.png`
 
-## 10. Deploy
+## 10. Content backend — database and admin (optional)
+
+Skip this and the map still works: it renders from the checked-in data in
+`src/data/`. Add it and you get `/admin`, where someone without a GitHub account
+can edit trails, and where riders' condition reports land.
+
+Any Postgres works — Neon, Supabase, RDS, your own. No extensions needed.
+
+### Environment variables
+
+Set these wherever you host, **and for every environment you want the admin in**
+— a variable scoped to Development only does nothing for a deployed site, which
+is the easiest mistake to make here.
+
+| Variable | |
+|---|---|
+| `DATABASE_URL` | Postgres connection string |
+| `DATABASE_URL_UNPOOLED` | Direct connection for migrations when the runtime URL uses a pooler |
+| `PAYLOAD_SECRET` | Signs admin sessions. Generate your own: `openssl rand -base64 32` |
+| `DATABASE_SSL` | Set to `disable` for a local database with no TLS |
+
+### Run the migrations
+
+Schema changes go through committed migrations; Payload's development `push`
+is off. Vercel runs `pnpm run ci`, which applies migrations before a
+**production** build and skips them in previews. Plain `pnpm build` only builds
+the application. For a manual deployment or initial database setup, load the
+target database credentials and run:
+
+```bash
+pnpm db:migrate
+pnpm db:seed:bend   # optional starter data
+```
+
+For manual deployments, apply any pending migrations before serving the new
+code. To inspect migration status with the same direct connection:
+
+```bash
+PAYLOAD_MIGRATING=true pnpm payload migrate:status
+```
+
+On Vercel, `vercel env pull` gets you the connection string without copying it
+by hand.
+
+`pnpm db:migrate` selects `DATABASE_URL_UNPOOLED` when it is set, falling back
+to `DATABASE_URL` for databases without a separate pooler. Application traffic
+continues to use `DATABASE_URL`.
+
+Preview builds share production data and must not migrate that database. See
+the preview and production database policy below for schema-changing PRs.
+
+### First sign-in
+
+Visit `/admin`. With no users yet it offers a create-first-user form; after that
+the route is closed to anyone signed out.
+
+### Elevation charts
+
+Chattanooga's seed imports prepared profiles alongside its geometry. For any
+trail that has geometry but still lacks a stored profile, run:
+
+```bash
+pnpm backfill:elevation
+```
+
+It samples terrain only, never Overpass, so it is safe to run over everything
+and safe to re-run. Expect the summary numbers to shift slightly — it remeasures
+them with the same maths the chart uses, so the two can't disagree.
+
+## 11. Deploy
 
 ```bash
 pnpm build      # verify the production build locally
@@ -239,3 +310,6 @@ Any Node host also works: set the same variables, run `pnpm run ci`, then
 - [ ] `public/terrain/` DEM tiles regenerated or removed (ride-recording elevation)
 - [ ] `public/` brand assets replaced
 - [ ] `pnpm build` passes; host env var set
+- [ ] *(if using the admin)* `DATABASE_URL` and `PAYLOAD_SECRET` set on the host
+- [ ] *(if using the admin)* `pnpm db:migrate` run against the deployed database
+- [ ] *(if using the admin)* first user created at `/admin`

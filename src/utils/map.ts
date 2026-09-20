@@ -892,6 +892,68 @@ function casingId(layerId: string): string {
 function glowId(layerId: string): string {
   return `${layerId} Glow`;
 }
+function closedId(layerId: string): string {
+  return `${layerId} Closed`;
+}
+
+/** Draw closures over the existing trail geometry without adding hit layers. */
+export function setClosedTrails(
+  map: mapboxgl.Map,
+  closed: MountainBikeTrail[],
+): void {
+  // At most one overlay per configured city trail layer; reopened trails leave
+  // no extra layers for Mapbox to evaluate on each frame.
+  for (const cfg of TRAIL_LAYERS) {
+    const id = closedId(cfg.layerId);
+    if (closed.length === 0) {
+      if (map.getLayer(id)) map.removeLayer(id);
+      continue;
+    }
+
+    const layer = map.getLayer(cfg.layerId) as
+      | mapboxgl.LineLayerSpecification
+      | undefined;
+    if (!layer || layer.type !== 'line') continue;
+
+    const filter: mapboxgl.FilterSpecification = layer.filter
+      ? ['all', layer.filter, areaMatchExpr(cfg, closed)]
+      : areaMatchExpr(cfg, closed);
+    if (map.getLayer(id)) {
+      map.setFilter(id, filter);
+      continue;
+    }
+
+    // Keep the overlay immediately above its trail, below the remaining style
+    // layers. Selection still queries the base line with the shared tap box.
+    const layers = map.getStyle().layers ?? [];
+    const nextLayer =
+      layers[layers.findIndex((item) => item.id === cfg.layerId) + 1];
+    map.addLayer(
+      {
+        id,
+        type: 'line',
+        source: layer.source,
+        ...(layer['source-layer']
+          ? { 'source-layer': layer['source-layer'] }
+          : {}),
+        ...(layer.minzoom === undefined ? {} : { minzoom: layer.minzoom }),
+        ...(layer.maxzoom === undefined ? {} : { maxzoom: layer.maxzoom }),
+        filter,
+        layout: {
+          'line-cap': 'butt',
+          'line-join': 'round',
+          visibility: layer.layout?.visibility ?? 'visible',
+        },
+        paint: {
+          'line-color': '#dc2626',
+          'line-dasharray': [1.5, 1.5],
+          'line-width': 3.5,
+        },
+      },
+      nextLayer?.id,
+    );
+  }
+}
 
 export { TRAIL_LAYERS };
 

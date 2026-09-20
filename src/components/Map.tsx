@@ -49,6 +49,7 @@ import {
   highlightMtnBikeArea,
   initMtnBikeColors,
   initMtnBikeLayers,
+  setClosedTrails,
   ensureMtnBikeSource,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
@@ -73,8 +74,10 @@ import {
 import { loadRide } from '@/utils/ride-storage';
 import { splitRideSegments } from '@/data/ride';
 import { mapConfig } from '@/config/map.config';
+import { useTrailConditions } from '@/components/TrailConditionsProvider';
+import { closedTrails } from '@/data/trail-conditions';
 import { MAP_EVENTS } from '@/events';
-import { clearMapReady, setMapReady } from '@/utils/map-ready';
+import { clearMapReady, onMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
 
 // Ride recording is unreachable in embed mode, and its subtree (history, GPX,
@@ -116,6 +119,7 @@ const MapboxMap = memo(function MapboxMap() {
   isEmbedRef.current = isEmbed;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const { latest: latestConditions } = useTrailConditions();
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
   const locationAccuracy = useRef<number>(0);
   const watchId = useRef<number | null>(null);
@@ -1682,6 +1686,20 @@ const MapboxMap = memo(function MapboxMap() {
     // GPS/compass hook extraction.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Draw a red dashed line over any trail whose newest report says it is shut.
+  // Keyed on the conditions, not just the map, so a closure filed while the
+  // page is open appears without a reload.
+  useEffect(() => {
+    if (isEmbed) return;
+    return onMapReady(() => {
+      if (!map.current) return;
+      setClosedTrails(
+        map.current,
+        closedTrails({ latest: latestConditions }, getMountainBikeTrails()),
+      );
+    });
+  }, [isEmbed, latestConditions]);
 
   return (
     <>

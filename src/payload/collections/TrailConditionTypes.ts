@@ -1,0 +1,137 @@
+import { APIError, type CollectionBeforeDeleteHook } from 'payload';
+import type { CollectionConfig } from 'payload';
+import { slugValidator, valueField } from './vocabulary-fields';
+
+/**
+ * Blocks deleting a condition type that reports still point at.
+ *
+ * `trail_conditions.condition_id` is NOT NULL with an ON DELETE SET NULL foreign
+ * key, so the delete would otherwise fail with a raw Postgres constraint
+ * violation. Unlike a trail — whose reports are cleared on delete — a condition
+ * type's reports are its history and shouldn't be silently discarded: retire the
+ * option with the Active switch instead. This is the "blocked" the field's own
+ * help text promises.
+ */
+const blockDeleteWhenReferenced: CollectionBeforeDeleteHook = async ({
+  id,
+  req,
+}) => {
+  const inUse = await req.payload.count({
+    collection: 'trail-conditions',
+    req,
+    where: { condition: { equals: id } },
+  });
+  if (inUse.totalDocs > 0) {
+    throw new APIError(
+      'This condition has reports using it. Untick "Offer this on the report form" to retire it instead of deleting.',
+      400,
+    );
+  }
+};
+
+/**
+ * The options behind the dropdown on the public report form.
+ *
+ * Curated like trail-ratings because conditions are local: "Dusty / loose"
+ * matters in Bend in August and nowhere in a Tennessee spring.
+ */
+export const TrailConditionTypes: CollectionConfig = {
+  slug: 'trail-condition-types',
+  labels: {
+    plural: 'Trail conditions',
+    singular: 'Trail condition',
+  },
+  // Best to worst, so the rider's dropdown reads as a scale.
+  defaultSort: 'sortOrder',
+  admin: {
+    useAsTitle: 'name',
+    defaultColumns: ['name', 'value', 'color', 'sortOrder', 'active'],
+    description:
+      'What riders can report a trail as being. Anything added here becomes selectable on the report form.',
+    group: 'Lists',
+    listSearchableFields: ['name', 'value'],
+  },
+  access: {
+    create: ({ req }) => req.user?.role === 'admin',
+    delete: ({ req }) => req.user?.role === 'admin',
+    read: ({ req }) => Boolean(req.user),
+    update: ({ req }) => req.user?.role === 'admin',
+  },
+  hooks: {
+    beforeDelete: [blockDeleteWhenReferenced],
+  },
+  fields: [
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'name',
+          type: 'text',
+          required: true,
+          unique: true,
+          admin: {
+            description: 'As riders see it, e.g. "Muddy — stay off".',
+            width: '50%',
+          },
+        },
+        valueField(
+          'The stable key the map matches on, e.g. "muddy". Lowercase and dashes.',
+        ),
+      ],
+    },
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'color',
+          type: 'text',
+          required: true,
+          defaultValue: '#6b7280',
+          admin: {
+            components: { Field: '@/payload/components/ColorField#ColorField' },
+            description: 'The badge colour.',
+            width: '50%',
+          },
+          validate: slugValidator.color,
+        },
+        {
+          name: 'sortOrder',
+          type: 'number',
+          required: true,
+          defaultValue: 50,
+          label: 'Sort order',
+          admin: {
+            description: 'Low to high, best first. Orders the dropdown.',
+            width: '50%',
+          },
+        },
+      ],
+    },
+    {
+      name: 'active',
+      type: 'checkbox',
+      defaultValue: true,
+      label: 'Offer this on the report form',
+      admin: {
+        description:
+          'Untick to retire an option. Deleting one that past reports use is blocked.',
+      },
+    },
+    {
+      name: 'marksClosed',
+      type: 'checkbox',
+      defaultValue: false,
+      index: true,
+      label: 'Mark the trail as closed on the map',
+      admin: {
+        description:
+          'Draws the trail as a red dashed line, and the badge stops expiring — a closure holds until someone reports something else. Nothing to do with the “closed to new reports” switches on a trail.',
+      },
+    },
+    {
+      name: 'description',
+      type: 'textarea',
+      admin: { description: 'What this means locally. Optional.' },
+    },
+  ],
+};

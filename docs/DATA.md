@@ -1,8 +1,12 @@
 # Data files
 
 All content shown on the map lives in `src/data/` as plain, typed TypeScript
-arrays — no database, no CMS, no admin panel. To change what a deployment
-shows, edit an array and ship a PR.
+arrays. To change what a deployment shows, edit an array and ship a PR.
+
+These are also the fallback the map uses when no database is configured, and the
+source the seeds import from. Stand up the optional CMS
+([DEPLOYING.md](DEPLOYING.md#10-content-backend-database-and-admin-optional))
+and trails come from there instead, with these left as the safety net.
 
 Each file exports a typed array; the `interface` at the top of the file is the
 contract. `icon` fields are Font Awesome `IconDefinition` values imported from

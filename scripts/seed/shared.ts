@@ -17,6 +17,7 @@ import {
   type MountainBikeTrail,
   slugForTrail,
 } from '../../src/data/mountain-bike-trails';
+import { DEFAULT_CONDITIONS } from '../../src/data/condition-vocabulary';
 import {
   DEFAULT_KIND_VALUE,
   DEFAULT_KINDS,
@@ -95,6 +96,20 @@ export async function loadVocabulary(payload: Payload): Promise<Vocabulary> {
     );
   }
 
+  // Conditions are seeded here too, though no trail points at one, for the same
+  // reason ratings are: the relationship on a *report* is required, so a
+  // database with no condition rows is one nobody can file a report against.
+  // Nothing is returned — the seeds never need the ids.
+  for (const seed of DEFAULT_CONDITIONS) {
+    const id = await findByValue(payload, 'trail-condition-types', seed.value);
+    if (id === undefined) {
+      await payload.create({
+        collection: 'trail-condition-types',
+        data: { ...seed, active: true, marksClosed: seed.marksClosed === true },
+      });
+    }
+  }
+
   return { kinds, ratings };
 }
 
@@ -107,7 +122,7 @@ export async function loadVocabulary(payload: Payload): Promise<Vocabulary> {
  */
 async function findByValue(
   payload: Payload,
-  collection: 'trail-kinds' | 'trail-ratings',
+  collection: 'trail-condition-types' | 'trail-kinds' | 'trail-ratings',
   value: string,
 ): Promise<number | undefined> {
   const existing = await payload.find({

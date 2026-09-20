@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload';
+import { conditionLockFields } from './condition-lock-fields';
 import { cityOptions } from '@/config/map.config';
 
 /**
@@ -86,6 +87,19 @@ export const TrailAreas: CollectionConfig = {
       name: 'description',
       type: 'textarea',
       admin: { description: 'Optional.' },
+    },
+    {
+      type: 'collapsible',
+      label: 'Condition reports',
+      admin: {
+        description:
+          'Close every trail in this complex to new rider reports at once — a seasonal closure, say.',
+        initCollapsed: true,
+      },
+      fields: conditionLockFields({
+        effect: 'for every trail in this complex',
+        example: 'Whole complex shut for the wet season.',
+      }),
     },
   ],
 };

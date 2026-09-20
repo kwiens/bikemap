@@ -157,6 +157,19 @@
           "primaryKey": false,
           "notNull": false,
           "default": "'draft'"
+        },
+        "condition_reports_closed": {
+          "name": "condition_reports_closed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "condition_reports_note": {
+          "name": "condition_reports_note",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -333,6 +346,21 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trails_condition_reports_closed_idx": {
+          "name": "trails_condition_reports_closed_idx",
+          "columns": [
+            {
+              "expression": "condition_reports_closed",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -577,6 +605,19 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": false
+        },
+        "version_condition_reports_closed": {
+          "name": "version_condition_reports_closed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "version_condition_reports_note": {
+          "name": "version_condition_reports_note",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -816,6 +857,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "_trails_v_version_version_condition_reports_closed_idx": {
+          "name": "_trails_v_version_version_condition_reports_closed_idx",
+          "columns": [
+            {
+              "expression": "version_condition_reports_closed",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -939,6 +995,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "condition_reports_closed": {
+          "name": "condition_reports_closed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "condition_reports_note": {
+          "name": "condition_reports_note",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1019,6 +1088,21 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_areas_condition_reports_closed_idx": {
+          "name": "trail_areas_condition_reports_closed_idx",
+          "columns": [
+            {
+              "expression": "condition_reports_closed",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1796,6 +1880,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "trail_conditions_id": {
+          "name": "trail_conditions_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "trail_areas_id": {
           "name": "trail_areas_id",
           "type": "integer",
@@ -1810,6 +1900,12 @@
         },
         "trail_kinds_id": {
           "name": "trail_kinds_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trail_condition_types_id": {
+          "name": "trail_condition_types_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -1888,6 +1984,21 @@
           "method": "btree",
           "with": {}
         },
+        "payload_locked_documents_rels_trail_conditions_id_idx": {
+          "name": "payload_locked_documents_rels_trail_conditions_id_idx",
+          "columns": [
+            {
+              "expression": "trail_conditions_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "payload_locked_documents_rels_trail_areas_id_idx": {
           "name": "payload_locked_documents_rels_trail_areas_id_idx",
           "columns": [
@@ -1923,6 +2034,21 @@
           "columns": [
             {
               "expression": "trail_kinds_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "payload_locked_documents_rels_trail_condition_types_id_idx": {
+          "name": "payload_locked_documents_rels_trail_condition_types_id_idx",
+          "columns": [
+            {
+              "expression": "trail_condition_types_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1991,6 +2117,19 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
+        "payload_locked_documents_rels_trail_conditions_fk": {
+          "name": "payload_locked_documents_rels_trail_conditions_fk",
+          "tableFrom": "payload_locked_documents_rels",
+          "tableTo": "trail_conditions",
+          "columnsFrom": [
+            "trail_conditions_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "payload_locked_documents_rels_trail_areas_fk": {
           "name": "payload_locked_documents_rels_trail_areas_fk",
           "tableFrom": "payload_locked_documents_rels",
@@ -2023,6 +2162,19 @@
           "tableTo": "trail_kinds",
           "columnsFrom": [
             "trail_kinds_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "payload_locked_documents_rels_trail_condition_types_fk": {
+          "name": "payload_locked_documents_rels_trail_condition_types_fk",
+          "tableFrom": "payload_locked_documents_rels",
+          "tableTo": "trail_condition_types",
+          "columnsFrom": [
+            "trail_condition_types_id"
           ],
           "columnsTo": [
             "id"
@@ -2430,6 +2582,418 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "public.trail_conditions": {
+      "name": "trail_conditions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "trail_id": {
+          "name": "trail_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "condition_id": {
+          "name": "condition_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observed_at": {
+          "name": "observed_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "enum_trail_conditions_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'public'"
+        },
+        "hidden": {
+          "name": "hidden",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "city": {
+          "name": "city",
+          "type": "enum_trail_conditions_city",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'bend'"
+        },
+        "reporter_hash": {
+          "name": "reporter_hash",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "trail_conditions_trail_idx": {
+          "name": "trail_conditions_trail_idx",
+          "columns": [
+            {
+              "expression": "trail_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_conditions_condition_idx": {
+          "name": "trail_conditions_condition_idx",
+          "columns": [
+            {
+              "expression": "condition_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_conditions_observed_at_idx": {
+          "name": "trail_conditions_observed_at_idx",
+          "columns": [
+            {
+              "expression": "observed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_conditions_hidden_idx": {
+          "name": "trail_conditions_hidden_idx",
+          "columns": [
+            {
+              "expression": "hidden",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_conditions_reporter_hash_idx": {
+          "name": "trail_conditions_reporter_hash_idx",
+          "columns": [
+            {
+              "expression": "reporter_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_conditions_updated_at_idx": {
+          "name": "trail_conditions_updated_at_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_conditions_created_at_idx": {
+          "name": "trail_conditions_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "trail_conditions_trail_id_trails_id_fk": {
+          "name": "trail_conditions_trail_id_trails_id_fk",
+          "tableFrom": "trail_conditions",
+          "tableTo": "trails",
+          "columnsFrom": [
+            "trail_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "trail_conditions_condition_id_trail_condition_types_id_fk": {
+          "name": "trail_conditions_condition_id_trail_condition_types_id_fk",
+          "tableFrom": "trail_conditions",
+          "tableTo": "trail_condition_types",
+          "columnsFrom": [
+            "condition_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.trail_condition_types": {
+      "name": "trail_condition_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "color": {
+          "name": "color",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#6b7280'"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 50
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "marks_closed": {
+          "name": "marks_closed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "description": {
+          "name": "description",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "trail_condition_types_name_idx": {
+          "name": "trail_condition_types_name_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_condition_types_value_idx": {
+          "name": "trail_condition_types_value_idx",
+          "columns": [
+            {
+              "expression": "value",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_condition_types_marks_closed_idx": {
+          "name": "trail_condition_types_marks_closed_idx",
+          "columns": [
+            {
+              "expression": "marks_closed",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_condition_types_updated_at_idx": {
+          "name": "trail_condition_types_updated_at_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trail_condition_types_created_at_idx": {
+          "name": "trail_condition_types_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.condition_reporting": {
+      "name": "condition_reporting",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "disabled_message": {
+          "name": "disabled_message",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -2481,6 +3045,22 @@
       "values": [
         "draft",
         "published"
+      ]
+    },
+    "public.enum_trail_conditions_source": {
+      "name": "enum_trail_conditions_source",
+      "schema": "public",
+      "values": [
+        "public",
+        "admin"
+      ]
+    },
+    "public.enum_trail_conditions_city": {
+      "name": "enum_trail_conditions_city",
+      "schema": "public",
+      "values": [
+        "chattanooga",
+        "bend"
       ]
     },
     "public.enum_trail_areas_city": {
