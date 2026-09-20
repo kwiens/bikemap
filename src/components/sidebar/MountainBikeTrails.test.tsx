@@ -134,7 +134,7 @@ describe('MountainBikeTrails', () => {
     expect(screen.queryByText('Trail C')).not.toBeInTheDocument();
   });
 
-  it('shows both climbing and descent', () => {
+  it('shows climbing first and reveals descent on hover or focus', () => {
     render(<MountainBikeTrails {...defaultProps} />);
 
     fireEvent.change(screen.getByPlaceholderText('Search trails...'), {
@@ -142,8 +142,26 @@ describe('MountainBikeTrails', () => {
     });
 
     const trail = screen.getByRole('button', { name: /Trail A/ });
-    expect(trail).toHaveTextContent('1.5 mi · Climb ↑200 ft · Descent ↓125 ft');
+    const descentDetail = screen.getByText(
+      (_content, element) => element?.classList.contains('max-w-0') ?? false,
+    );
+
+    expect(trail).toHaveTextContent('1.5 mi');
     expect(trail).toHaveAccessibleName(/Climb 200 ft.*Descent 125 ft/);
+    expect(descentDetail).toHaveClass('max-w-0', 'opacity-0');
+
+    fireEvent.mouseEnter(trail);
+    expect(descentDetail).toHaveClass('max-w-[6rem]', 'opacity-100');
+
+    fireEvent.mouseLeave(trail);
+    expect(descentDetail).not.toHaveClass('max-w-[6rem]', 'opacity-100');
+
+    fireEvent.focus(trail);
+    expect(descentDetail).toHaveClass('max-w-[6rem]', 'opacity-100');
+
+    fireEvent.mouseEnter(trail);
+    fireEvent.mouseLeave(trail);
+    expect(descentDetail).toHaveClass('max-w-[6rem]', 'opacity-100');
   });
 
   it('shows descent when climbing is zero', () => {
