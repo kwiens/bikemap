@@ -1,6 +1,5 @@
 'use client';
 
-import type { CSSProperties } from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Button,
@@ -224,19 +223,25 @@ export function ElevationProfileAdmin() {
   });
 
   return (
-    <section aria-labelledby="elevation-profile-heading" style={sectionStyle}>
-      <div style={headingRowStyle}>
+    <section
+      aria-labelledby="elevation-profile-heading"
+      className="mt-6 overflow-hidden rounded-[var(--style-radius-m)] border border-solid border-[color:var(--theme-elevation-150)] p-4"
+    >
+      <div className="mb-3 flex items-start justify-between gap-4">
         <div>
-          <h3 id="elevation-profile-heading" style={headingStyle}>
+          <h3
+            className="m-0 text-base font-semibold leading-tight"
+            id="elevation-profile-heading"
+          >
             Elevation profile
           </h3>
-          <p style={descriptionStyle}>
+          <p className="mb-0 mt-1 text-[color:var(--theme-elevation-600)] leading-[1.45]">
             Terrain samples riders see on the map. Recalculate from a saved
             line, or repopulate a bundled profile when the line is style-owned.
           </p>
         </div>
         {snapshot.profile && (
-          <span style={sampleCountStyle}>
+          <span className="shrink-0 rounded-full bg-[var(--theme-elevation-100)] px-[0.55rem] py-1 text-xs text-[color:var(--theme-elevation-650,var(--theme-elevation-600))]">
             {snapshot.profile.profile.length.toLocaleString()} samples
           </span>
         )}
@@ -257,7 +262,7 @@ export function ElevationProfileAdmin() {
       {error && <Banner tone="error">{error}</Banner>}
       {unavailableReason && <Banner>{unavailableReason}</Banner>}
 
-      <div style={actionRowStyle}>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-[0.65rem]">
         <Button
           buttonStyle="primary"
           disabled={!canUpdateElevation}
@@ -275,7 +280,7 @@ export function ElevationProfileAdmin() {
               ? 'Recalculate elevation'
               : 'Repopulate elevation'}
         </Button>
-        <span style={actionHintStyle}>
+        <span className="text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.4]">
           {hasGeometry
             ? 'Replaces the derived distance, climb, descent, range, bounds, and chart points.'
             : 'Restores the checked-in profile and its derived measurements without requiring CMS geometry.'}
@@ -299,12 +304,12 @@ function ProfileChart({ profile }: { profile: ElevationProfile }) {
   const range = `${formatFeet(profile.min)}–${formatFeet(profile.max)}`;
 
   return (
-    <figure style={figureStyle}>
+    <figure className="m-0 overflow-hidden rounded-[var(--style-radius-s)] border border-solid border-[color:var(--theme-elevation-150)] bg-[var(--theme-elevation-50)] px-2 pb-[0.35rem] pt-2">
       <svg
         aria-label={`Elevation profile for ${profile.trail}: ${range}`}
+        className="block h-[clamp(9rem,22vw,13.75rem)] w-full"
         preserveAspectRatio="none"
         role="img"
-        style={chartStyle}
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
       >
         <defs>
@@ -344,7 +349,7 @@ function ProfileChart({ profile }: { profile: ElevationProfile }) {
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <figcaption style={chartCaptionStyle}>
+      <figcaption className="flex justify-between pt-1 text-xs text-[color:var(--theme-elevation-600)]">
         <span>0 mi</span>
         <span>{formatMiles(profile.distance / FEET_PER_MILE)}</span>
       </figcaption>
@@ -359,7 +364,7 @@ function MeasurementSummary({ snapshot }: { snapshot: MeasurementSnapshot }) {
       : `${formatFeet(snapshot.elevationMin)}–${formatFeet(snapshot.elevationMax)}`;
 
   return (
-    <dl style={summaryStyle}>
+    <dl className="my-3 grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-px overflow-hidden">
       <Metric
         label="Distance"
         value={
@@ -381,9 +386,13 @@ function MeasurementSummary({ snapshot }: { snapshot: MeasurementSnapshot }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div style={metricStyle}>
-      <dt style={metricLabelStyle}>{label}</dt>
-      <dd style={metricValueStyle}>{value}</dd>
+    <div className="min-w-0 bg-[var(--theme-elevation-50)] px-3 py-[0.65rem]">
+      <dt className="mb-[0.2rem] text-xs text-[color:var(--theme-elevation-600)] leading-[1.2]">
+        {label}
+      </dt>
+      <dd className="m-0 text-base font-semibold leading-tight tabular-nums">
+        {value}
+      </dd>
     </div>
   );
 }
@@ -643,107 +652,3 @@ const CHART_WIDTH = 800;
 const CHART_HEIGHT = 220;
 const CHART_PADDING = 12;
 const CHART_GRID_LINES = [0.25, 0.5, 0.75] as const;
-
-const sectionStyle: CSSProperties = {
-  border: '1px solid var(--theme-elevation-150)',
-  borderRadius: 'var(--style-radius-m)',
-  marginTop: '1.5rem',
-  overflow: 'hidden',
-  padding: '1rem',
-};
-
-const headingRowStyle: CSSProperties = {
-  alignItems: 'flex-start',
-  display: 'flex',
-  gap: '1rem',
-  justifyContent: 'space-between',
-  marginBottom: '0.75rem',
-};
-
-const headingStyle: CSSProperties = {
-  fontSize: '1rem',
-  fontWeight: 600,
-  lineHeight: 1.25,
-  margin: 0,
-};
-
-const descriptionStyle: CSSProperties = {
-  color: 'var(--theme-elevation-600)',
-  lineHeight: 1.45,
-  margin: '0.25rem 0 0',
-};
-
-const sampleCountStyle: CSSProperties = {
-  background: 'var(--theme-elevation-100)',
-  borderRadius: '999px',
-  color: 'var(--theme-elevation-650, var(--theme-elevation-600))',
-  flexShrink: 0,
-  fontSize: '0.75rem',
-  padding: '0.25rem 0.55rem',
-};
-
-const figureStyle: CSSProperties = {
-  background: 'var(--theme-elevation-50)',
-  border: '1px solid var(--theme-elevation-150)',
-  borderRadius: 'var(--style-radius-s)',
-  margin: 0,
-  overflow: 'hidden',
-  padding: '0.5rem 0.5rem 0.35rem',
-};
-
-const chartStyle: CSSProperties = {
-  display: 'block',
-  height: 'clamp(9rem, 22vw, 13.75rem)',
-  width: '100%',
-};
-
-const chartCaptionStyle: CSSProperties = {
-  color: 'var(--theme-elevation-600)',
-  display: 'flex',
-  fontSize: '0.75rem',
-  justifyContent: 'space-between',
-  paddingTop: '0.25rem',
-};
-
-const summaryStyle: CSSProperties = {
-  display: 'grid',
-  gap: '1px',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))',
-  margin: '0.75rem 0',
-  overflow: 'hidden',
-};
-
-const metricStyle: CSSProperties = {
-  background: 'var(--theme-elevation-50)',
-  minWidth: 0,
-  padding: '0.65rem 0.75rem',
-};
-
-const metricLabelStyle: CSSProperties = {
-  color: 'var(--theme-elevation-600)',
-  fontSize: '0.75rem',
-  lineHeight: 1.2,
-  marginBottom: '0.2rem',
-};
-
-const metricValueStyle: CSSProperties = {
-  fontSize: '1rem',
-  fontVariantNumeric: 'tabular-nums',
-  fontWeight: 600,
-  lineHeight: 1.25,
-  margin: 0,
-};
-
-const actionRowStyle: CSSProperties = {
-  alignItems: 'center',
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '0.65rem 1rem',
-  marginTop: '0.75rem',
-};
-
-const actionHintStyle: CSSProperties = {
-  color: 'var(--theme-elevation-600)',
-  fontSize: '0.8rem',
-  lineHeight: 1.4,
-};
