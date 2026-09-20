@@ -331,16 +331,6 @@ export const Trails: CollectionConfig = {
                 readOnly: true,
               },
             },
-            {
-              name: 'elevationProfileAdmin',
-              type: 'ui',
-              admin: {
-                components: {
-                  Field:
-                    '@/payload/components/ElevationProfileAdmin#ElevationProfileAdmin',
-                },
-              },
-            },
             derivedMeasurement('distance'),
             derivedMeasurement('elevationGain'),
             derivedMeasurement('elevationLoss'),
@@ -373,6 +363,20 @@ export const Trails: CollectionConfig = {
           ],
         },
       ],
+    },
+
+    // Keep the chart and its refresh action visible beneath every tab. The
+    // elevation endpoint saves independently, so hiding this in Measurements
+    // made the result—and the fact that it was already persisted—easy to miss.
+    {
+      name: 'elevationProfileAdmin',
+      type: 'ui',
+      admin: {
+        components: {
+          Field:
+            '@/payload/components/ElevationProfileAdmin#ElevationProfileAdmin',
+        },
+      },
     },
 
     // Sidebar, so it stays on screen whichever tab is open: it decides what the

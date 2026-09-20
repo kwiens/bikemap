@@ -119,6 +119,14 @@ describe('ElevationProfileAdmin', () => {
     expect(screen.getByText('240 ft')).toBeInTheDocument();
     expect(screen.getByText('180 ft')).toBeInTheDocument();
     expect(screen.getByText('1,000 ft–1,240 ft')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Terrain samples riders see on the map. Recalculate from topo elevations along the track.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/saves immediately—no separate draft save is needed/i),
+    ).toBeInTheDocument();
   });
 
   it('reads the hidden profile from document data when it is absent from form state', () => {
@@ -143,7 +151,7 @@ describe('ElevationProfileAdmin', () => {
           elevationMax: 1300,
           elevationMin: 990,
         },
-        message: 'Elevation profile recalculated.',
+        message: 'Elevation profile recalculated and saved.',
         profile: { ...PROFILE, gain: 300, loss: 220, max: 1300, min: 990 },
         updatedAt: '2026-09-19T12:00:00.000Z',
       }),
@@ -181,7 +189,7 @@ describe('ElevationProfileAdmin', () => {
       }),
     );
     expect(ui.toast.success).toHaveBeenCalledWith(
-      'Elevation profile recalculated.',
+      'Elevation profile recalculated and saved.',
     );
   });
 
@@ -198,7 +206,7 @@ describe('ElevationProfileAdmin', () => {
           elevationMax: 1240,
           elevationMin: 1000,
         },
-        message: 'Bundled elevation profile repopulated.',
+        message: 'Bundled elevation profile repopulated and saved.',
         profile: PROFILE,
         updatedAt: '2026-09-19T12:00:00.000Z',
       }),
@@ -217,7 +225,7 @@ describe('ElevationProfileAdmin', () => {
 
     await waitFor(() =>
       expect(ui.toast.success).toHaveBeenCalledWith(
-        'Bundled elevation profile repopulated.',
+        'Bundled elevation profile repopulated and saved.',
       ),
     );
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -252,7 +260,7 @@ describe('ElevationProfileAdmin', () => {
     globalThis.fetch = vi.fn(async () =>
       Response.json({
         measurements: { distance: 1 },
-        message: 'Elevation profile recalculated.',
+        message: 'Elevation profile recalculated and saved.',
         profile: { profile: [] },
         updatedAt: '2026-09-19T12:00:00.000Z',
       }),

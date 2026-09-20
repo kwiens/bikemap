@@ -236,8 +236,8 @@ export function ElevationProfileAdmin() {
             Elevation profile
           </h3>
           <p className="mb-0 mt-1 text-[color:var(--theme-elevation-600)] leading-[1.45]">
-            Terrain samples riders see on the map. Recalculate from a saved
-            line, or repopulate a bundled profile when the line is style-owned.
+            Terrain samples riders see on the map. Recalculate from topo
+            elevations along the track.
           </p>
         </div>
         {snapshot.profile && (
@@ -282,8 +282,8 @@ export function ElevationProfileAdmin() {
         </Button>
         <span className="text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.4]">
           {hasGeometry
-            ? 'Replaces the derived distance, climb, descent, range, bounds, and chart points.'
-            : 'Restores the checked-in profile and its derived measurements without requiring CMS geometry.'}
+            ? 'Saves immediately—no separate draft save is needed. Replaces the derived distance, climb, descent, range, bounds, and chart points.'
+            : 'Saves immediately—no separate draft save is needed. Restores the checked-in profile and its derived measurements without requiring CMS geometry.'}
         </span>
       </div>
     </section>

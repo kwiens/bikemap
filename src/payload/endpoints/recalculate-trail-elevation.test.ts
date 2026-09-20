@@ -112,6 +112,7 @@ describe('recalculateTrailElevation', () => {
     );
     expect(await response.json()).toEqual(
       expect.objectContaining({
+        message: 'Elevation profile recalculated and saved.',
         measurements: expect.objectContaining({ elevationLoss: 180 }),
         profile: PROFILE,
         updatedAt: '2026-09-19T12:00:00.000Z',
@@ -189,7 +190,7 @@ describe('recalculateTrailElevation', () => {
     );
     expect(await response.json()).toEqual(
       expect.objectContaining({
-        message: 'Bundled elevation profile repopulated.',
+        message: 'Bundled elevation profile repopulated and saved.',
         profile: PROFILE,
       }),
     );

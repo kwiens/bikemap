@@ -83,7 +83,7 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
 
       profile = bundled;
       measurements = measurementsFromElevationProfile(bundled);
-      message = 'Bundled elevation profile repopulated.';
+      message = 'Bundled elevation profile repopulated and saved.';
     } else {
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
       if (!mapboxToken) {
@@ -125,7 +125,7 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
         elevationMax: measured.elevationMax,
         elevationMin: measured.elevationMin,
       };
-      message = 'Elevation profile recalculated.';
+      message = 'Elevation profile recalculated and saved.';
     }
 
     const updated = await req.payload.update({
