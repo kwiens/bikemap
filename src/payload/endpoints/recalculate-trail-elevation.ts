@@ -20,8 +20,10 @@ export interface RecalculateTrailElevationResponse {
 }
 
 interface PreviewRequest {
+  city?: unknown;
   geometry?: unknown;
   name?: unknown;
+  slug?: unknown;
 }
 
 interface ErrorResponse {
@@ -62,14 +64,16 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
     let profile: ElevationProfile;
 
     if (parsed.parts.length === 0) {
-      if (!isCityId(trail.city) || !trail.slug) {
+      const city = requestValue(body, 'city', trail.city);
+      const slug = requestValue(body, 'slug', trail.slug);
+      if (!isCityId(city) || typeof slug !== 'string' || !slug) {
         return errorResponse(
           'This trail has no line or bundled elevation profile to preview.',
           422,
         );
       }
 
-      const bundled = await getBundledElevationProfile(trail.city, trail.slug);
+      const bundled = await getBundledElevationProfile(city, slug);
       if (!bundled) {
         return errorResponse(
           'This trail has no line or bundled elevation profile to preview.',
@@ -138,6 +142,14 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
     return errorResponse('Elevation could not be calculated.', 500);
   }
 };
+
+function requestValue(
+  body: PreviewRequest | undefined,
+  field: 'city' | 'slug',
+  savedValue: unknown,
+): unknown {
+  return body && Object.hasOwn(body, field) ? body[field] : savedValue;
+}
 
 function readTrailId(value: unknown): number | string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {

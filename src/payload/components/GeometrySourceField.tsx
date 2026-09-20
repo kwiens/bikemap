@@ -63,8 +63,9 @@ function sourceCopy(
   }
 
   return {
-    description:
-      'This line is built from the OpenStreetMap trail segments selected under Trail line. Saving refreshes the line and stores it with this trail.',
+    description: hasStoredLine
+      ? 'This line was built from the selected OpenStreetMap segments. Refresh and review upstream changes before saving a replacement.'
+      : 'Choose OpenStreetMap segments, refresh and review the line, then save it with this trail.',
     label: 'OpenStreetMap',
   };
 }

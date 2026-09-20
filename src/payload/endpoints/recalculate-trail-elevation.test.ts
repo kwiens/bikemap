@@ -139,7 +139,13 @@ describe('recalculateTrailElevation', () => {
   });
 
   it('previews a bundled profile when the trail has no CMS geometry', async () => {
-    const { req, findByID, update } = request({ body: { geometry: null } });
+    const { req, findByID, update } = request({
+      body: {
+        city: 'bend',
+        geometry: null,
+        slug: 'renamed-trail',
+      },
+    });
     findByID.mockResolvedValueOnce({
       city: 'chattanooga',
       displayName: 'Test Trail',
@@ -153,8 +159,8 @@ describe('recalculateTrailElevation', () => {
 
     expect(response.status).toBe(200);
     expect(getBundledElevationProfile).toHaveBeenCalledWith(
-      'chattanooga',
-      'test-trail',
+      'bend',
+      'renamed-trail',
     );
     expect(measureParts).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();

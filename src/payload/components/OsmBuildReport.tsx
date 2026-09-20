@@ -159,22 +159,22 @@ function buildStatus(
 
   if (wayCount > 0 && !hasStoredLine) {
     return {
-      description: `${wayCount} OpenStreetMap ${wayCount === 1 ? 'segment is' : 'segments are'} selected. Save this trail to join them into one line and store it.`,
-      label: 'Ready to build',
+      description: `${wayCount} OpenStreetMap ${wayCount === 1 ? 'segment is' : 'segments are'} selected. Refresh the line from OpenStreetMap, review the preview, then save this trail to store it.`,
+      label: 'Ready to refresh',
     };
   }
 
   if (hasStoredLine) {
     return {
       description:
-        'A trail line is stored here. Choose OpenStreetMap segments above and save to connect future updates to their source.',
+        'A trail line is stored here. Choose OpenStreetMap segments above, refresh and review the line, then save to connect future updates to their source.',
       label: 'Stored with trail',
     };
   }
 
   return {
     description:
-      'No trail line is stored yet. Choose from OpenStreetMap above, click the trail segments in riding order, then save.',
+      'No trail line is stored yet. Choose OpenStreetMap segments above, refresh and review the line, then save.',
     label: 'Not stored yet',
   };
 }

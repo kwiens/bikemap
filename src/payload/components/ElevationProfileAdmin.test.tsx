@@ -86,6 +86,7 @@ const ORIGINAL_FETCH = globalThis.fetch;
 beforeEach(() => {
   ui.fields = {
     bounds: { value: [-85.3, 35.1, -85.29, 35.11] },
+    city: { value: 'chattanooga' },
     distance: { value: 1 },
     elevationGain: { value: 240 },
     elevationLoss: { value: 180 },
@@ -94,6 +95,7 @@ beforeEach(() => {
     elevationProfile: { value: PROFILE },
     geom: { value: GEOMETRY },
     geometrySource: { value: 'osm' },
+    slug: { value: 'test-trail' },
   };
   ui.documentInfo.data = {};
   ui.documentInfo.hasSavePermission = true;
@@ -199,8 +201,10 @@ describe('ElevationProfileAdmin', () => {
   });
 
   it('repopulates a bundled profile when the trail has no CMS geometry', async () => {
+    ui.fields.city = { value: 'bend' };
     ui.fields.geom = { value: null };
     ui.fields.geometrySource = { value: 'imported' };
+    ui.fields.slug = { value: 'renamed-trail' };
     delete ui.fields.elevationProfile;
     globalThis.fetch = vi.fn(async () =>
       Response.json({
@@ -238,6 +242,12 @@ describe('ElevationProfileAdmin', () => {
       '/api/trails/42/recalculate-elevation',
       expect.objectContaining({ method: 'POST' }),
     );
+    const requestInit = vi.mocked(globalThis.fetch).mock.calls[0]?.[1];
+    expect(JSON.parse(String(requestInit?.body))).toEqual({
+      city: 'bend',
+      geometry: null,
+      slug: 'renamed-trail',
+    });
   });
 
   it('can calculate from unsaved geometry changes', () => {

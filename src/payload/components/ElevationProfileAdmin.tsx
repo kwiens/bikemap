@@ -44,6 +44,7 @@ interface AdminFormField {
 
 interface MeasurementFormFields {
   bounds?: AdminFormField;
+  city?: AdminFormField;
   distance?: AdminFormField;
   elevationGain?: AdminFormField;
   elevationLoss?: AdminFormField;
@@ -54,6 +55,7 @@ interface MeasurementFormFields {
   geometrySource?: AdminFormField;
   rebuildElevation?: AdminFormField;
   rebuildGeometry?: AdminFormField;
+  slug?: AdminFormField;
   trailName?: AdminFormField;
   displayName?: AdminFormField;
 }
@@ -77,6 +79,7 @@ export function ElevationProfileAdmin() {
   const isBackgroundProcessing = useFormBackgroundProcessing();
   const isFormProcessing = isProcessing || isBackgroundProcessing;
   const boundsField = useAdminFormField('bounds');
+  const cityField = useAdminFormField('city');
   const distanceField = useAdminFormField('distance');
   const elevationGainField = useAdminFormField('elevationGain');
   const elevationLossField = useAdminFormField('elevationLoss');
@@ -87,6 +90,7 @@ export function ElevationProfileAdmin() {
   const geometrySourceField = useAdminFormField('geometrySource');
   const rebuildElevationField = useAdminFormField('rebuildElevation');
   const rebuildGeometryField = useAdminFormField('rebuildGeometry');
+  const slugField = useAdminFormField('slug');
   const displayNameField = useAdminFormField('displayName');
   const trailNameField = useAdminFormField('trailName');
   const dispatchFields = useFormFields(([, dispatch]) => dispatch);
@@ -115,6 +119,7 @@ export function ElevationProfileAdmin() {
   const formFields = useMemo<MeasurementFormFields>(
     () => ({
       bounds: boundsField,
+      city: cityField,
       distance: distanceField,
       elevationGain: elevationGainField,
       elevationLoss: elevationLossField,
@@ -125,11 +130,13 @@ export function ElevationProfileAdmin() {
       geometrySource: geometrySourceField,
       rebuildElevation: rebuildElevationField,
       rebuildGeometry: rebuildGeometryField,
+      slug: slugField,
       displayName: displayNameField,
       trailName: trailNameField,
     }),
     [
       boundsField,
+      cityField,
       distanceField,
       elevationGainField,
       elevationLossField,
@@ -140,6 +147,7 @@ export function ElevationProfileAdmin() {
       geometrySourceField,
       rebuildElevationField,
       rebuildGeometryField,
+      slugField,
       displayNameField,
       trailNameField,
     ],
@@ -154,12 +162,14 @@ export function ElevationProfileAdmin() {
     fieldValue(formFields, data, 'rebuildElevation') === true ||
     fieldValue(formFields, data, 'rebuildGeometry') === true;
   const geometry = fieldValue(formFields, data, 'geom');
+  const city = fieldValue(formFields, data, 'city');
+  const slug = fieldValue(formFields, data, 'slug');
   const calculationName =
     fieldValue(formFields, data, 'displayName') ??
     fieldValue(formFields, data, 'trailName');
   const calculationSourceKey = useMemo(
-    () => JSON.stringify([geometry, calculationName]),
-    [calculationName, geometry],
+    () => JSON.stringify([geometry, calculationName, city, slug]),
+    [calculationName, city, geometry, slug],
   );
   const parsedGeometry = parseTrailGeometry(geometry);
   const hasGeometry = parsedGeometry.ok && parsedGeometry.parts.length > 0;
@@ -202,8 +212,10 @@ export function ElevationProfileAdmin() {
       });
       const response = await fetch(endpoint, {
         body: JSON.stringify({
+          city,
           geometry,
           name: calculationName,
+          slug,
         }),
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
