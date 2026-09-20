@@ -105,7 +105,8 @@ database trail that has geometry but no stored profile. The bundled Bend and
 Chattanooga seeds already include their prepared profiles; the legacy Python
 script remains available for the historical Mapbox-vector-tile workflow.
 For an individual trail, the Payload admin's **Measurements** tab renders the
-stored chart and can recalculate it from the last saved geometry.
+stored chart. It recalculates from saved geometry, or repopulates the bundled
+profile for a style-owned trail that has no CMS line.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate

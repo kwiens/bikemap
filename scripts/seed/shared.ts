@@ -25,7 +25,10 @@ import {
   UNRATED_VALUE,
 } from '../../src/data/trail-vocabulary';
 import type { Trail } from '../../src/payload-types';
-import { parseElevationProfile } from '../../src/utils/elevation-profile';
+import {
+  measurementsFromElevationProfile,
+  parseElevationProfile,
+} from '../../src/utils/elevation-profile';
 
 export const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -298,16 +301,23 @@ export async function upsertTrail(
     slug: slugForTrail(trail),
     trailName: trail.trailName,
   };
+  const profileMeasurements = elevationProfile
+    ? measurementsFromElevationProfile(elevationProfile)
+    : null;
 
   // The line, the ways it was built from, and every number derived from it.
   // Withheld from a hand-edited row: these only make sense together.
   const geometry = {
-    bounds: trail.defaultBounds ?? null,
-    distance: trail.distance ?? null,
-    elevationGain: trail.elevationGain ?? null,
-    elevationLoss: trail.elevationLoss ?? null,
-    elevationMax: trail.elevationMax ?? null,
-    elevationMin: trail.elevationMin ?? null,
+    bounds: profileMeasurements?.bounds ?? trail.defaultBounds ?? null,
+    distance: profileMeasurements?.distance ?? trail.distance ?? null,
+    elevationGain:
+      profileMeasurements?.elevationGain ?? trail.elevationGain ?? null,
+    elevationLoss:
+      profileMeasurements?.elevationLoss ?? trail.elevationLoss ?? null,
+    elevationMax:
+      profileMeasurements?.elevationMax ?? trail.elevationMax ?? null,
+    elevationMin:
+      profileMeasurements?.elevationMin ?? trail.elevationMin ?? null,
     ...(elevationProfile !== undefined
       ? {
           elevationProfile:

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
-import { parseElevationProfile } from './elevation-profile';
+import {
+  measurementsFromElevationProfile,
+  parseElevationProfile,
+} from './elevation-profile';
 
 const PROFILE: ElevationProfile = {
   distance: 100,
@@ -40,5 +43,16 @@ describe('parseElevationProfile', () => {
         geometryGapDetails: [{ feet: 20, from: null, to: [-85.2, 35.2] }],
       }),
     ).toBeNull();
+  });
+
+  it('derives Payload measurements and bounds from profile samples', () => {
+    expect(measurementsFromElevationProfile(PROFILE)).toEqual({
+      bounds: [-85.3, 35.1, -85.29, 35.11],
+      distance: 0.02,
+      elevationGain: 20,
+      elevationLoss: 10,
+      elevationMax: 1020,
+      elevationMin: 1000,
+    });
   });
 });

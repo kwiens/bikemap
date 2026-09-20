@@ -135,15 +135,15 @@ export function ElevationProfileAdmin() {
   const geometry = fieldValue(formFields, data, 'geom');
   const parsedGeometry = parseTrailGeometry(geometry);
   const hasGeometry = parsedGeometry.ok && parsedGeometry.parts.length > 0;
-  const canRecalculate =
-    Boolean(id && isEditing && hasGeometry) &&
+  const canUpdateElevation =
+    Boolean(id && isEditing) &&
     hasSavePermission !== false &&
     !isModified &&
     !isFormProcessing &&
     !isCalculating;
 
-  async function handleRecalculate(): Promise<void> {
-    if (!canRecalculate || id === undefined) {
+  async function handleUpdateElevation(): Promise<void> {
+    if (!canUpdateElevation || id === undefined) {
       return;
     }
 
@@ -195,7 +195,7 @@ export function ElevationProfileAdmin() {
       const message =
         caught instanceof Error
           ? caught.message
-          : 'Elevation could not be recalculated.';
+          : 'Elevation could not be updated.';
       setError(message);
       toast.error(message);
     } finally {
@@ -207,8 +207,6 @@ export function ElevationProfileAdmin() {
   }
 
   const unavailableReason = actionUnavailableReason({
-    hasGeometry,
-    hasProfile: Boolean(snapshot.profile),
     hasSavePermission,
     id,
     isEditing,
@@ -224,8 +222,8 @@ export function ElevationProfileAdmin() {
             Elevation profile
           </h3>
           <p style={descriptionStyle}>
-            Terrain sampled along the saved trail line. These are the values
-            riders see on the map.
+            Terrain samples riders see on the map. Recalculate from a saved
+            line, or repopulate a bundled profile when the line is style-owned.
           </p>
         </div>
         {snapshot.profile && (
@@ -241,7 +239,7 @@ export function ElevationProfileAdmin() {
         <Banner>
           {hasGeometry
             ? 'No elevation profile is stored yet. Recalculate to populate it from the saved line.'
-            : 'No elevation profile or saved line is available. Add or import geometry, then save the trail first.'}
+            : 'No elevation profile is stored yet. Repopulate to restore the bundled profile for this trail.'}
         </Banner>
       )}
 
@@ -253,18 +251,25 @@ export function ElevationProfileAdmin() {
       <div style={actionRowStyle}>
         <Button
           buttonStyle="primary"
-          disabled={!canRecalculate}
+          disabled={!canUpdateElevation}
           icon={<RefreshCw aria-hidden size={16} />}
           margin={false}
-          onClick={() => void handleRecalculate()}
+          onClick={() => void handleUpdateElevation()}
           size="small"
           type="button"
         >
-          {isCalculating ? 'Calculating…' : 'Recalculate elevation'}
+          {isCalculating
+            ? hasGeometry
+              ? 'Calculating…'
+              : 'Repopulating…'
+            : hasGeometry
+              ? 'Recalculate elevation'
+              : 'Repopulate elevation'}
         </Button>
         <span style={actionHintStyle}>
-          Replaces the derived distance, climb, descent, range, bounds, and
-          chart points.
+          {hasGeometry
+            ? 'Replaces the derived distance, climb, descent, range, bounds, and chart points.'
+            : 'Restores the checked-in profile and its derived measurements without requiring CMS geometry.'}
         </span>
       </div>
     </section>
@@ -577,20 +582,16 @@ function messageFrom(body: unknown): string {
       return message;
     }
   }
-  return 'Elevation could not be recalculated.';
+  return 'Elevation could not be updated.';
 }
 
 function actionUnavailableReason({
-  hasGeometry,
-  hasProfile,
   hasSavePermission,
   id,
   isEditing,
   isFormProcessing,
   isModified,
 }: {
-  hasGeometry: boolean;
-  hasProfile: boolean;
   hasSavePermission: boolean | undefined;
   id: number | string | undefined;
   isEditing: boolean | undefined;
@@ -608,9 +609,6 @@ function actionUnavailableReason({
   }
   if (isModified) {
     return 'Save the trail first so the profile follows the latest geometry.';
-  }
-  if (!hasGeometry && hasProfile) {
-    return 'This trail has no saved line to measure.';
   }
   return null;
 }

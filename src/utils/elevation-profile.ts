@@ -3,6 +3,16 @@ import type {
   ElevationProfileGapDetail,
 } from '@/data/mountain-bike-trails';
 
+export interface ElevationProfileMeasurements {
+  bounds: [number, number, number, number];
+  /** Miles, matching the Payload trail field. */
+  distance: number;
+  elevationGain: number;
+  elevationLoss: number;
+  elevationMax: number;
+  elevationMin: number;
+}
+
 /**
  * Narrows untyped JSON into the profile shape used by both charts.
  *
@@ -35,6 +45,32 @@ export function parseElevationProfile(value: unknown): ElevationProfile | null {
   }
 
   return profile as ElevationProfile;
+}
+
+/** Converts a validated profile's feet-based totals into Payload fields. */
+export function measurementsFromElevationProfile(
+  profile: ElevationProfile,
+): ElevationProfileMeasurements {
+  let west = Number.POSITIVE_INFINITY;
+  let south = Number.POSITIVE_INFINITY;
+  let east = Number.NEGATIVE_INFINITY;
+  let north = Number.NEGATIVE_INFINITY;
+
+  for (const [, , longitude, latitude] of profile.profile) {
+    west = Math.min(west, longitude);
+    south = Math.min(south, latitude);
+    east = Math.max(east, longitude);
+    north = Math.max(north, latitude);
+  }
+
+  return {
+    bounds: [west, south, east, north],
+    distance: Number((profile.distance / FEET_PER_MILE).toFixed(2)),
+    elevationGain: Math.round(profile.gain),
+    elevationLoss: Math.round(profile.loss),
+    elevationMax: Math.round(profile.max),
+    elevationMin: Math.round(profile.min),
+  };
 }
 
 function isProfilePoint(value: unknown): boolean {
@@ -70,3 +106,5 @@ function isCoordinate(value: unknown): value is [number, number] {
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
+
+const FEET_PER_MILE = 5280;

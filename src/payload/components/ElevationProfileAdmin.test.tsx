@@ -180,6 +180,47 @@ describe('ElevationProfileAdmin', () => {
     );
   });
 
+  it('repopulates a bundled profile when the trail has no CMS geometry', async () => {
+    ui.fields.geom = { value: null };
+    delete ui.fields.elevationProfile;
+    globalThis.fetch = vi.fn(async () =>
+      Response.json({
+        measurements: {
+          bounds: [-85.3, 35.1, -85.29, 35.11],
+          distance: 1,
+          elevationGain: 240,
+          elevationLoss: 180,
+          elevationMax: 1240,
+          elevationMin: 1000,
+        },
+        message: 'Bundled elevation profile repopulated.',
+        profile: PROFILE,
+        updatedAt: '2026-09-19T12:00:00.000Z',
+      }),
+    ) as typeof fetch;
+
+    const view = render(<ElevationProfileAdmin />);
+    const action = view.getByRole('button', {
+      name: /repopulate elevation/i,
+    });
+
+    expect(action).toBeEnabled();
+    expect(
+      screen.getByText(/restore the bundled profile/i),
+    ).toBeInTheDocument();
+    fireEvent.click(action);
+
+    await waitFor(() =>
+      expect(ui.toast.success).toHaveBeenCalledWith(
+        'Bundled elevation profile repopulated.',
+      ),
+    );
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/trails/42/recalculate-elevation',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   it('requires unsaved geometry changes to be saved first', () => {
     ui.isModified = true;
 

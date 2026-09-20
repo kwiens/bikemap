@@ -3,10 +3,15 @@ import { APIError, type PayloadRequest } from 'payload';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
 import { measureParts } from '@/payload/osm/measure';
+import { getBundledElevationProfile } from '@/payload/read/bundled-elevation';
 import { recalculateTrailElevation } from './recalculate-trail-elevation';
 
 vi.mock('@/payload/osm/measure', () => ({
   measureParts: vi.fn(),
+}));
+
+vi.mock('@/payload/read/bundled-elevation', () => ({
+  getBundledElevationProfile: vi.fn(),
 }));
 
 vi.mock('next/cache', () => ({
@@ -42,6 +47,7 @@ const ORIGINAL_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 beforeEach(() => {
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN = 'test-token';
   vi.mocked(measureParts).mockResolvedValue(MEASURED);
+  vi.mocked(getBundledElevationProfile).mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -61,7 +67,7 @@ describe('recalculateTrailElevation', () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({
-      message: 'Sign in to recalculate trail elevation.',
+      message: 'Sign in to update trail elevation.',
     });
     expect(findByID).not.toHaveBeenCalled();
   });
@@ -131,7 +137,7 @@ describe('recalculateTrailElevation', () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      message: 'You do not have permission to recalculate this trail.',
+      message: 'You do not have permission to update this trail elevation.',
     });
     expect(update).not.toHaveBeenCalled();
   });
@@ -148,18 +154,65 @@ describe('recalculateTrailElevation', () => {
     expect(logger.warn).toHaveBeenCalledOnce();
   });
 
-  it('does not write when the trail has no saved geometry', async () => {
+  it('repopulates a bundled profile when the trail has no saved geometry', async () => {
     const { req, findByID, update } = request();
     findByID.mockResolvedValueOnce({
       _status: 'published',
+      city: 'chattanooga',
       displayName: 'Test Trail',
       geom: null,
+      slug: 'test-trail',
+      trailName: 'Test Trail',
+    });
+    vi.mocked(getBundledElevationProfile).mockResolvedValueOnce(PROFILE);
+
+    const response = await recalculateTrailElevation(req);
+
+    expect(response.status).toBe(200);
+    expect(getBundledElevationProfile).toHaveBeenCalledWith(
+      'chattanooga',
+      'test-trail',
+    );
+    expect(measureParts).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          bounds: [-85.3, 35.1, -85.29, 35.11],
+          distance: 1,
+          elevationGain: 240,
+          elevationLoss: 180,
+          elevationMax: 1240,
+          elevationMin: 1000,
+          elevationProfile: PROFILE,
+        },
+      }),
+    );
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        message: 'Bundled elevation profile repopulated.',
+        profile: PROFILE,
+      }),
+    );
+  });
+
+  it('does not write without saved geometry or a bundled profile', async () => {
+    const { req, findByID, update } = request();
+    findByID.mockResolvedValueOnce({
+      _status: 'published',
+      city: 'chattanooga',
+      displayName: 'Test Trail',
+      geom: null,
+      slug: 'test-trail',
       trailName: 'Test Trail',
     });
 
     const response = await recalculateTrailElevation(req);
 
     expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({
+      message:
+        'This trail has no saved geometry or bundled elevation profile to restore.',
+    });
     expect(measureParts).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
   });

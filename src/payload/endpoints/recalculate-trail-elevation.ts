@@ -1,9 +1,12 @@
 import { revalidatePath } from 'next/cache';
 import { APIError, type PayloadHandler } from 'payload';
+import { isCityId } from '@/config/map.config';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { measureParts } from '@/payload/osm/measure';
+import { getBundledElevationProfile } from '@/payload/read/bundled-elevation';
 import type { Trail } from '@/payload-types';
+import { measurementsFromElevationProfile } from '@/utils/elevation-profile';
 
 export interface RecalculateTrailElevationResponse {
   message: string;
@@ -24,16 +27,16 @@ interface ErrorResponse {
 }
 
 /**
- * Re-measures one trail from the geometry already saved in Payload.
+ * Updates one trail's elevation from the best server-owned source available.
  *
- * This is intentionally narrower than saving the whole trail: it never
- * refetches OSM ways and never accepts geometry or measurements from the
- * browser. The same `measureParts` function used by the save hook remains the
- * sole authority for distance, bounds, aggregate elevation, and chart points.
+ * A trail with CMS geometry is measured through the same `measureParts` path
+ * used by the save hook. A style-owned trail without a stored line restores
+ * its checked-in profile from the city's canonical public assets. Neither path
+ * refetches OSM or accepts geometry or measurements from the browser.
  */
 export const recalculateTrailElevation: PayloadHandler = async (req) => {
   if (!req.user) {
-    return errorResponse('Sign in to recalculate trail elevation.', 401);
+    return errorResponse('Sign in to update trail elevation.', 401);
   }
 
   const id = readTrailId(req.routeParams?.id);
@@ -58,56 +61,79 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
     if (!parsed.ok) {
       return errorResponse(parsed.error, 422);
     }
+    let message: string;
+    let measurements: RecalculateTrailElevationResponse['measurements'];
+    let profile: ElevationProfile;
+
     if (parsed.parts.length === 0) {
-      return errorResponse(
-        'This trail has no saved geometry to measure. Add or import a line, save the trail, then try again.',
-        422,
+      if (!isCityId(trail.city) || !trail.slug) {
+        return errorResponse(
+          'This trail has no saved geometry or bundled elevation profile to restore.',
+          422,
+        );
+      }
+
+      const bundled = await getBundledElevationProfile(trail.city, trail.slug);
+      if (!bundled) {
+        return errorResponse(
+          'This trail has no saved geometry or bundled elevation profile to restore.',
+          422,
+        );
+      }
+
+      profile = bundled;
+      measurements = measurementsFromElevationProfile(bundled);
+      message = 'Bundled elevation profile repopulated.';
+    } else {
+      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+      if (!mapboxToken) {
+        return errorResponse(
+          'Elevation cannot be sampled because the Mapbox token is not configured.',
+          503,
+        );
+      }
+
+      const measured = await measureParts(
+        parsed.parts,
+        trail.displayName || trail.trailName || 'Trail',
+        { mapboxToken },
       );
-    }
 
-    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (!mapboxToken) {
-      return errorResponse(
-        'Elevation cannot be sampled because the Mapbox token is not configured.',
-        503,
-      );
-    }
+      // A transient tile failure must not erase a profile that is already good.
+      // `measureParts` can still return an accurate distance in this case, but
+      // this endpoint exists specifically to refresh elevation as one unit.
+      if (
+        !measured.profile ||
+        measured.elevationGain === null ||
+        measured.elevationLoss === null ||
+        measured.elevationMax === null ||
+        measured.elevationMin === null
+      ) {
+        return errorResponse(
+          measured.warnings[0] ??
+            'No elevation samples were returned. The existing measurements were left unchanged.',
+          502,
+        );
+      }
 
-    const measured = await measureParts(
-      parsed.parts,
-      trail.displayName || trail.trailName || 'Trail',
-      { mapboxToken },
-    );
-
-    // A transient tile failure must not erase a profile that is already good.
-    // `measureParts` can still return an accurate distance in this case, but
-    // this endpoint exists specifically to refresh elevation as one unit.
-    if (
-      !measured.profile ||
-      measured.elevationGain === null ||
-      measured.elevationLoss === null ||
-      measured.elevationMax === null ||
-      measured.elevationMin === null
-    ) {
-      return errorResponse(
-        measured.warnings[0] ??
-          'No elevation samples were returned. The existing measurements were left unchanged.',
-        502,
-      );
-    }
-
-    const updated = await req.payload.update({
-      collection: 'trails',
-      context: { skipOsmRebuild: true },
-      data: {
+      profile = measured.profile;
+      measurements = {
         bounds: measured.bounds,
         distance: measured.distance,
         elevationGain: measured.elevationGain,
         elevationLoss: measured.elevationLoss,
         elevationMax: measured.elevationMax,
         elevationMin: measured.elevationMin,
-        elevationProfile:
-          measured.profile as unknown as Trail['elevationProfile'],
+      };
+      message = 'Elevation profile recalculated.';
+    }
+
+    const updated = await req.payload.update({
+      collection: 'trails',
+      context: { skipOsmRebuild: true },
+      data: {
+        ...measurements,
+        elevationProfile: profile as unknown as Trail['elevationProfile'],
       },
       draft: trail._status === 'draft',
       id,
@@ -126,22 +152,15 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
       } catch (error) {
         req.payload.logger.warn({
           err: error,
-          msg: `Trail ${String(id)} was recalculated, but its public elevation cache could not be invalidated.`,
+          msg: `Trail ${String(id)} elevation was updated, but its public cache could not be invalidated.`,
         });
       }
     }
 
     return Response.json({
-      measurements: {
-        bounds: measured.bounds,
-        distance: measured.distance,
-        elevationGain: measured.elevationGain,
-        elevationLoss: measured.elevationLoss,
-        elevationMax: measured.elevationMax,
-        elevationMin: measured.elevationMin,
-      },
-      message: 'Elevation profile recalculated.',
-      profile: measured.profile,
+      measurements,
+      message,
+      profile,
       updatedAt: updated.updatedAt,
     } satisfies RecalculateTrailElevationResponse);
   } catch (error) {
@@ -151,10 +170,10 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
     }
     req.payload.logger.error({
       err: error,
-      msg: `Could not recalculate elevation for trail ${String(id)}.`,
+      msg: `Could not update elevation for trail ${String(id)}.`,
     });
     return errorResponse(
-      'Elevation could not be recalculated. The existing measurements were left unchanged.',
+      'Elevation could not be updated. The existing measurements were left unchanged.',
       500,
     );
   }
@@ -185,7 +204,7 @@ function payloadErrorResponse(error: unknown): Response | null {
 
   if (error.status === 401 || error.status === 403) {
     return errorResponse(
-      'You do not have permission to recalculate this trail.',
+      'You do not have permission to update this trail elevation.',
       error.status,
     );
   }
