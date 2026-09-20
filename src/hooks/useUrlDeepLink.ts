@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { bikeRoutes } from '@/data/geo_data';
+import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
@@ -50,7 +50,9 @@ export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
           );
         }
       } else if (routeSlug) {
-        const found = bikeRoutes.find((r) => slugify(r.name) === routeSlug);
+        const found = getBikeRoutes().find(
+          (r) => slugify(r.name) === routeSlug,
+        );
         if (found) {
           window.dispatchEvent(
             new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {

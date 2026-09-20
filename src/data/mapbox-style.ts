@@ -1,4 +1,7 @@
-import { bikeRoutes as chattanoogaBikeRoutes } from '@/data/bike-routes';
+import {
+  bikeRoutes as chattanoogaBikeRoutes,
+  type BikeRoute,
+} from '@/data/bike-routes';
 import type { CityData } from './cities/types';
 
 // What the shared Mapbox Studio style bakes in, declared once per style.
@@ -14,8 +17,7 @@ export const STYLE_OWNED_ROUTE_LAYER_IDS = chattanoogaBikeRoutes.map(
 );
 
 // Dedicated Chattanooga route tilesets baked into the shared Studio style.
-// A city with its own runtime route source can remove these from the composite;
-// Chattanooga keeps them because Studio remains its route source of truth.
+// They can be removed when every route for the active city is runtime-owned.
 export const STYLE_OWNED_ROUTE_TILESET_IDS = [
   'swuller.a2odh3pm',
   'swuller.b0vlobi3',
@@ -32,12 +34,25 @@ export const STYLE_STRAY_LAYER_IDS = [
   'Godsey Ridge Trails',
 ];
 
-/**
- * Style-owned route layers the given city must hide: everything the style
- * bakes in except the city's own routes.
- */
+/** Hide route layers the active city's static style manifest does not own. */
 export function hiddenStyleLayerIdsFor(city: CityData): string[] {
-  if (city.bikeRoutesUrl) return STYLE_OWNED_ROUTE_LAYER_IDS;
   const ownRouteIds = new Set(city.bikeRoutes.map((route) => route.id));
   return STYLE_OWNED_ROUTE_LAYER_IDS.filter((id) => !ownRouteIds.has(id));
+}
+
+/** Hide every known style route except published Routes that explicitly use it. */
+export function inactiveStyleRouteLayerIds(
+  routes: BikeRoute[],
+  runtimeIds: string[],
+): string[] {
+  const runtime = new Set(runtimeIds);
+  const visibleStudioIds = new Set(
+    routes.flatMap((route) =>
+      route.geometrySource === 'studio' ||
+      (!route.geometrySource && !runtime.has(route.id))
+        ? [route.id]
+        : [],
+    ),
+  );
+  return STYLE_OWNED_ROUTE_LAYER_IDS.filter((id) => !visibleStudioIds.has(id));
 }

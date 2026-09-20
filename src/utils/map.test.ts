@@ -26,6 +26,7 @@ import {
   loadBikeRouteOptimizedStyle,
   queryNearbyLineFeatures,
   ensureOsmTrailsSource,
+  ensureInlineRoutes,
   setOsmTrailsVisible,
   OSM_BIKE_TRAIL_FILTER,
   OSM_POI_FILTER,
@@ -462,6 +463,51 @@ describe('Mapbox Geo Integration', () => {
       );
     });
 
+    it('does not reapply Studio direction fixes to normalized database geometry', () => {
+      const coordinates = [
+        [-85.3, 35],
+        [-85.31, 35.01],
+      ];
+      const mockMap = {
+        querySourceFeatures: vi.fn().mockReturnValue([
+          {
+            type: 'Feature',
+            properties: { id: route.id },
+            geometry: { type: 'LineString', coordinates },
+          },
+        ]),
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(undefined),
+        addLayer: vi.fn(),
+      } as unknown as mapboxgl.Map;
+
+      syncRouteArrowLayer(
+        mockMap,
+        {
+          ...route,
+          reverseArrowBounds: [[-86, 34, -85, 36]],
+        },
+        {
+          id: BIKE_ROUTE_LAYER_ID,
+          type: 'line',
+          source: 'bike-routes-source',
+        } as mapboxgl.AnyLayer,
+      );
+
+      expect(mockMap.addSource).toHaveBeenCalledWith('route1-arrows-source', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [
+            expect.objectContaining({
+              geometry: { type: 'LineString', coordinates },
+            }),
+          ],
+        },
+      });
+    });
+
     it('should skip routes configured to hide arrows', () => {
       const mockMap = {
         querySourceFeatures: vi.fn(),
@@ -760,7 +806,7 @@ describe('Mapbox Geo Integration', () => {
     it('should skip arrow layers that do not exist', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
-        getLayer: vi.fn().mockReturnValue(undefined),
+        getLayer: vi.fn((id: string) => (id === 'route1' ? { id } : undefined)),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -893,6 +939,111 @@ describe('Mapbox Geo Integration', () => {
     });
   });
 
+  describe('ensureInlineRoutes', () => {
+    it('replaces a style-backed route with the configured GeoJSON source', () => {
+      const layers = new Map<string, mapboxgl.AnyLayer>([
+        [
+          'route1',
+          {
+            id: 'route1',
+            type: 'line',
+            source: 'composite',
+          } as mapboxgl.AnyLayer,
+        ],
+      ]);
+      const mockMap = {
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getStyle: vi.fn().mockReturnValue({
+          layers: [{ id: 'labels', type: 'symbol' }],
+        }),
+        getLayer: vi.fn((id: string) => layers.get(id)),
+        removeLayer: vi.fn((id: string) => layers.delete(id)),
+        addLayer: vi.fn((layer: mapboxgl.AnyLayer) => {
+          layers.set(layer.id, layer);
+        }),
+      } as unknown as mapboxgl.Map;
+      const route: BikeRoute = {
+        id: 'route1',
+        name: 'Route 1',
+        color: '#2563EB',
+        description: 'Test route',
+        icon: {} as IconDefinition,
+        defaultWidth: 8,
+        opacity: 1,
+        distance: 5,
+      };
+
+      const collection: GeoJSON.FeatureCollection = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { id: 'route1' },
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-85.3, 35],
+                [-85.31, 35.01],
+              ],
+            },
+          },
+        ],
+      };
+
+      ensureInlineRoutes(mockMap, collection, [route]);
+
+      expect(mockMap.removeLayer).toHaveBeenCalledWith('route1');
+      expect(mockMap.addSource).toHaveBeenCalledWith('bike-routes-source', {
+        type: 'geojson',
+        data: collection,
+        maxzoom: 14,
+        promoteId: 'id',
+        tolerance: 0.5,
+      });
+      expect(mockMap.addLayer).toHaveBeenCalledTimes(2);
+      expect(layers.get(BIKE_ROUTE_LAYER_ID)).toMatchObject({
+        id: BIKE_ROUTE_LAYER_ID,
+        source: 'bike-routes-source',
+      });
+    });
+
+    it('removes a runtime-owned Studio route when the database has no geometry', () => {
+      const layers = new Map<string, mapboxgl.AnyLayer>([
+        [
+          'route1',
+          {
+            id: 'route1',
+            type: 'line',
+            source: 'composite',
+          } as mapboxgl.AnyLayer,
+        ],
+      ]);
+      const mockMap = {
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getLayer: vi.fn((id: string) => layers.get(id)),
+        removeLayer: vi.fn((id: string) => layers.delete(id)),
+      } as unknown as mapboxgl.Map;
+      const route: BikeRoute = {
+        id: 'route1',
+        name: 'Route 1',
+        color: '#2563EB',
+        description: 'Test route',
+        icon: {} as IconDefinition,
+        defaultWidth: 8,
+        opacity: 1,
+        distance: 5,
+      };
+
+      ensureInlineRoutes(mockMap, null, [route]);
+
+      expect(mockMap.removeLayer).toHaveBeenCalledWith('route1');
+      expect(mockMap.addSource).not.toHaveBeenCalled();
+      expect(layers.has('route1')).toBe(false);
+    });
+  });
+
   describe('calculateRouteBounds', () => {
     it('should calculate bounds for LineString features', () => {
       const mockMap = {
@@ -978,6 +1129,44 @@ describe('Mapbox Geo Integration', () => {
       const bounds = calculateRouteBounds(mockMap, mockRoute, mockLayer);
 
       expect(bounds).not.toBeNull();
+    });
+
+    it('filters shared GeoJSON sources to the requested inline route', () => {
+      const mockMap = {
+        querySourceFeatures: vi.fn().mockReturnValue([
+          {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-85.3, 35.0],
+                [-85.31, 35.01],
+              ],
+            },
+          },
+        ]),
+      } as unknown as mapboxgl.Map;
+      const mockRoute = {
+        id: 'test-route',
+      } as BikeRoute;
+      const filter: mapboxgl.FilterSpecification = [
+        '==',
+        ['get', 'id'],
+        'test-route',
+      ];
+      const mockLayer = {
+        id: 'test-route',
+        type: 'line',
+        source: 'inline-routes-source',
+        filter,
+      } as mapboxgl.AnyLayer;
+
+      expect(
+        calculateRouteBounds(mockMap, mockRoute, mockLayer),
+      ).not.toBeNull();
+      expect(mockMap.querySourceFeatures).toHaveBeenCalledWith(
+        'inline-routes-source',
+        { filter },
+      );
     });
 
     it('should return null when layer has no source', () => {

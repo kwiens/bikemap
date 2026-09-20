@@ -19,7 +19,9 @@ Content backend (Payload + OSM — see below):
 ```bash
 pnpm db:up              # Start local Postgres via docker compose
 pnpm db:migrate         # Apply migrations
-pnpm db:seed:bend       # Import Bend's trails (Chattanooga has its own script)
+pnpm db:seed:bend       # Import Bend's trails and Casual routes
+pnpm db:seed:bend-routes # Sync only Bend's 8 Casual routes (also runs on deploy)
+pnpm db:seed:chattanooga-routes # Sync 5 legacy Studio-backed route rows
 pnpm generate:types     # Regenerate src/payload-types.ts after a collection change
 pnpm generate:importmap # Regenerate the admin import map after adding a component
 ```
@@ -107,10 +109,10 @@ src/
 
 ### Core Data Flow
 
-1. **Page Entry** (`src/app/(frontend)/page.tsx`): Reads CMS trails on the server, then renders `HomeClient.tsx`, which dynamically imports Map with SSR disabled
+1. **Page Entry** (`src/app/(frontend)/page.tsx`): Reads CMS trails and routes on the server, then renders `HomeClient.tsx`, which dynamically imports Map with SSR disabled
 2. **Map Component** (`src/components/Map.tsx`): Main orchestrator that initializes Mapbox, manages markers, and handles custom events
 3. **Data Sources** (`src/data/`):
-   - `geo_data.ts`: barrel re-exporting the **active city's** data (`bikeRoutes`, `mapFeatures`, `bikeResources`, `mountainBikeTrails`, `elevationBasePath`, ...) — components import from here and stay city-agnostic
+   - `geo_data.ts`: barrel re-exporting the **active city's** static config (`mapFeatures`, `bikeResources`, route/network URLs, and trail-layer config). Published lists come from `route-source.ts` and `trail-source.ts`.
    - `gbfs.ts`: live bike share data (station-based for Chattanooga, free-bike/Veo for Bend — a discriminated `GBFSConfig` union)
 
 ### Event-Driven Communication
@@ -143,7 +145,7 @@ The app uses custom DOM events (`window.dispatchEvent`) for component communicat
 
 ### Map Styling
 
-Routes are styled via Mapbox Studio (referenced by layer IDs like `riverwalk-loop-v3-public`). Route bounds are calculated from layer features at runtime to enable zoom-to-fit.
+Route display metadata comes from Payload and is keyed by stable layer IDs such as `riverwalk-loop-v3-public`. Each Route explicitly chooses imported geometry, a linked Trail, or a legacy Mapbox Studio layer. Chattanooga's imported Riverwalk geometry comes only from Payload; its same-named Studio layer must stay disabled even when the database is unavailable or unseeded.
 
 ### Mountain Bike Trails
 
@@ -459,6 +461,15 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
 - `src/payload/osm/build.ts` — orchestrates the OSM path
 - `src/payload/components/TrailMapEditor.tsx` — the one admin map (pick/move/draw)
 - `src/payload/read/trails.ts` — reads trails back out for the public map
+- `src/payload/collections/Routes.ts` + `src/payload/read/routes.ts` — Casual
+  route records and the public map read path. A route either owns imported
+  geometry, selects a same-city Trail and reuses its current measurements, or
+  explicitly names a legacy Mapbox Studio layer that has not been migrated.
+  Casual reads Routes only; linking a Trail is how a curator exposes it there
+  without duplicating its line. Use
+  `pnpm db:import:chattanooga-routes` rather than committing generated route
+  GeoJSON. Bend's seed derives its eight imported routes directly from the
+  committed bike-network source.
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
 - `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind
@@ -474,10 +485,11 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   differ (Bend has OSM-referenced geometry; Chattanooga imports an archived GIS
   snapshot without osmIds), and **only Bend is seeded by default**
 
-**How the public map gets its trails.** `src/app/(frontend)/page.tsx` is a
+**How the public map gets its trails and routes.** `src/app/(frontend)/page.tsx` is a
 server component: it calls `getCityTrails()` (Payload's Local API — a typed
-function call, no HTTP hop) and passes trails into `HomeClient` as props, which
-publishes them to `src/data/trail-source.ts` during render. The page resolves
+function call, no HTTP hop) plus `getCityRoutes()`, and passes both into
+`HomeClient` as props. The client publishes them to `src/data/trail-source.ts`
+and `src/data/route-source.ts` during render. The page resolves
 its city from the request hostname, so it reads `headers()` and renders per
 request; `/api/map/trails` sends `Cache-Control: max-age=60`, so an admin edit
 is live within a minute without a rebuild.

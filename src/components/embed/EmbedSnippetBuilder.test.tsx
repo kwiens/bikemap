@@ -8,6 +8,7 @@ import { EmbedSnippetBuilder } from './EmbedSnippetBuilder';
 import type { EmbedBuilderConfig } from '@/utils/embed-options';
 
 const CONFIG = {
+  cityId: 'chattanooga',
   routes: [
     { id: 'route-1', name: 'Riverwalk Loop', slug: 'riverwalk-loop' },
     { id: 'route-2', name: 'Zoo Loop', slug: 'zoo-loop' },
@@ -31,12 +32,11 @@ afterEach(() => {
 });
 
 describe('EmbedSnippetBuilder', () => {
-  it('defaults to a bare /embed snippet with no query string', () => {
+  it('keeps the selected city in the default embed snippet', () => {
     render(<EmbedSnippetBuilder baseUrl={baseUrl} config={CONFIG} />);
 
     const snippet = getSnippetText();
-    expect(snippet).toContain(`${baseUrl}/embed`);
-    expect(snippet).not.toContain(`${baseUrl}/embed?`);
+    expect(snippet).toContain(`${baseUrl}/embed?city=chattanooga`);
   });
 
   it('adds sidebar=open to the snippet when toggled open', () => {
@@ -58,7 +58,7 @@ describe('EmbedSnippetBuilder', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show live preview' }));
 
     const iframe = screen.getByTitle('Bike map preview') as HTMLIFrameElement;
-    expect(iframe.getAttribute('src')).toBe('/embed');
+    expect(iframe.getAttribute('src')).toBe('/embed?city=chattanooga');
   });
 
   it('loads the preview with the options chosen before it was shown', () => {
@@ -68,7 +68,9 @@ describe('EmbedSnippetBuilder', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show live preview' }));
 
     const iframe = screen.getByTitle('Bike map preview') as HTMLIFrameElement;
-    expect(iframe.getAttribute('src')).toBe('/embed?layers=attractions');
+    expect(iframe.getAttribute('src')).toBe(
+      '/embed?layers=attractions&city=chattanooga',
+    );
   });
 
   it('only offers layers the city can actually render', () => {

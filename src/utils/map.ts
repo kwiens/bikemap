@@ -265,7 +265,9 @@ export function syncRouteArrowLayer(
     type: 'FeatureCollection',
     features: applyArrowDirectionOverrides(
       removeOverlappingSegments(features),
-      route.reverseArrowBounds,
+      // The database importer has already normalized multipart directions.
+      // Studio-owned geometry still needs its legacy bounds repair.
+      layer.id === BIKE_ROUTE_LAYER_ID ? [] : route.reverseArrowBounds,
     ),
   };
   const arrowSourceId = `${route.id}-arrows-source`;
@@ -350,7 +352,7 @@ export function updateRouteOpacity(
 
   routes.forEach((route) => {
     const isSelected = route.id === selectedId;
-    if (!hasCombinedLayer) {
+    if (map.getLayer(route.id)) {
       try {
         map.setPaintProperty(
           route.id,
@@ -407,13 +409,14 @@ export function calculateRouteBounds(
   const sourceId = layer.source;
   const sourceLayer = layer['source-layer'];
 
-  if (!sourceId || !sourceLayer) {
+  if (!sourceId) {
     return null;
   }
 
-  // Query all features in this layer
+  const filter = 'filter' in layer ? layer.filter : undefined;
   const features = map.querySourceFeatures(sourceId, {
-    sourceLayer: sourceLayer,
+    ...(sourceLayer ? { sourceLayer } : {}),
+    ...(filter ? { filter } : {}),
   });
 
   if (features.length === 0) {
@@ -1257,18 +1260,42 @@ export function setBikeNetworkVisible(
 
 // --- Inline (GeoJSON-backed) bike routes -------------------------------------
 
-// Attach every curated route from one static GeoJSON source. Color, width, and
+// Attach curated routes from one loaded GeoJSON source. Color, width, and
 // selection state are data-driven so the renderer only evaluates one casing
 // and one route layer regardless of how many routes a city has. Idempotent.
 export function ensureInlineRoutes(
   map: mapboxgl.Map,
-  url: string,
+  collection: GeoJSON.FeatureCollection | null,
   routes: BikeRoute[],
 ): void {
   try {
+    const routeIds = new Set(routes.map((route) => route.id));
+    for (const route of routes) {
+      for (const layerId of [`${route.id}-casing`, route.id]) {
+        const existing = map.getLayer(layerId);
+        if (existing) {
+          map.removeLayer(layerId);
+        }
+      }
+    }
+
+    if (!collection) {
+      return;
+    }
+    const data: GeoJSON.FeatureCollection = {
+      ...collection,
+      features: collection.features.filter((feature) => {
+        const id = feature.properties?.id;
+        return typeof id === 'string' && routeIds.has(id);
+      }),
+    };
+    if (data.features.length === 0) {
+      return;
+    }
+
     ensureSource(map, BIKE_ROUTE_SOURCE_ID, {
       type: 'geojson',
-      data: url,
+      data,
       maxzoom: 14,
       tolerance: 0.5,
       promoteId: 'id',
