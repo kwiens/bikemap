@@ -16,9 +16,10 @@
  * the map marks differently from a rider's guess.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { useDocumentInfo, useFormFields } from '@payloadcms/ui';
+import { useDocumentInfo } from '@payloadcms/ui';
+import { cn } from '@/lib/utils';
 import { observedAtNoonUtc } from '@/data/trail-conditions';
-import { Banner, linkButtonStyle } from './admin-ui';
+import { Banner } from './admin-ui';
 
 interface ConditionType {
   color?: null | string;
@@ -48,23 +49,11 @@ function typeOf(report: Report): ConditionType | null {
   return typeof report.condition === 'object' ? report.condition : null;
 }
 
-const CONTROL: React.CSSProperties = {
-  background: 'var(--theme-input-bg)',
-  border: '1px solid var(--theme-elevation-150)',
-  borderRadius: 'var(--style-radius-s)',
-  color: 'var(--theme-text)',
-  padding: '0.4rem 0.6rem',
-};
+const CONTROL_CLASS =
+  'rounded-[var(--style-radius-s)] border border-solid border-[var(--theme-elevation-150)] bg-[var(--theme-input-bg)] px-2.5 py-1.5 text-[var(--theme-text)]';
 
 export function TrailConditionLog() {
   const { id } = useDocumentInfo();
-  // The trail's own city, straight from the edit form. Without it the report
-  // takes the collection's default (the deployment's active city), so a report
-  // logged on another city's trail would never surface on that city's map.
-  const city = useFormFields(
-    ([fields]) => fields?.city?.value as string | undefined,
-  );
-
   const [types, setTypes] = useState<ConditionType[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [condition, setCondition] = useState('');
@@ -79,7 +68,7 @@ export function TrailConditionLog() {
     }
     try {
       const response = await fetch(
-        `/api/trail-conditions?depth=1&limit=${HISTORY_LIMIT}&sort=-observedAt&where[trail][equals]=${id}`,
+        `/api/trail-conditions?depth=1&limit=${HISTORY_LIMIT}&sort=-observedAt,-createdAt,-id&select[condition]=true&select[hidden]=true&select[observedAt]=true&select[source]=true&where[trail][equals]=${id}`,
         { credentials: 'include' },
       );
       const data = await response.json();
@@ -110,7 +99,7 @@ export function TrailConditionLog() {
   }, [loadReports]);
 
   async function submit() {
-    if (!id || !condition || busy) {
+    if (!id || !condition || !observedAt || busy) {
       return;
     }
     setBusy(true);
@@ -119,8 +108,6 @@ export function TrailConditionLog() {
     try {
       const response = await fetch('/api/trail-conditions', {
         body: JSON.stringify({
-          // Stamp the trail's own city, not the collection default.
-          ...(city ? { city } : {}),
           condition: Number(condition),
           hidden: false,
           // Noon UTC, so the day reads correctly for admins west of UTC.
@@ -152,12 +139,13 @@ export function TrailConditionLog() {
 
   async function hide(reportId: number) {
     try {
-      await fetch(`/api/trail-conditions/${reportId}`, {
+      const response = await fetch(`/api/trail-conditions/${reportId}`, {
         body: JSON.stringify({ hidden: true }),
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
         method: 'PATCH',
       });
+      if (!response.ok) throw new Error('Could not hide that report.');
       await loadReports();
     } catch {
       setError('Could not hide that report.');
@@ -189,20 +177,12 @@ export function TrailConditionLog() {
     <div className="field-type">
       {error && <Banner tone="error">{error}</Banner>}
 
-      <div
-        style={{
-          alignItems: 'end',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          marginBottom: '0.75rem',
-        }}
-      >
-        <label style={{ display: 'grid', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.8rem' }}>Condition</span>
+      <div className="mb-3 flex flex-wrap items-end gap-2">
+        <label className="grid gap-1">
+          <span className="text-[0.8rem]">Condition</span>
           <select
             onChange={(event) => setCondition(event.target.value)}
-            style={{ ...CONTROL, minWidth: '12rem' }}
+            className={cn(CONTROL_CLASS, 'min-w-48')}
             value={condition}
           >
             <option value="">Pick one…</option>
@@ -214,22 +194,21 @@ export function TrailConditionLog() {
           </select>
         </label>
 
-        <label style={{ display: 'grid', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.8rem' }}>Observed</span>
+        <label className="grid gap-1">
+          <span className="text-[0.8rem]">Observed</span>
           <input
             max={today()}
             onChange={(event) => setObservedAt(event.target.value)}
-            style={CONTROL}
+            className={CONTROL_CLASS}
             type="date"
             value={observedAt}
           />
         </label>
 
         <button
-          className="btn btn--style-primary btn--size-small"
-          disabled={!condition || busy}
+          className="m-0 cursor-pointer rounded-[var(--style-radius-s)] border-0 bg-[var(--theme-text)] px-3 py-2 text-[var(--theme-bg)] disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!condition || !observedAt || busy}
           onClick={submit}
-          style={{ margin: 0 }}
           type="button"
         >
           {busy ? 'Saving…' : 'Log condition'}
@@ -237,56 +216,46 @@ export function TrailConditionLog() {
       </div>
 
       {reports.length > 0 && (
-        <table
-          style={{
-            borderCollapse: 'collapse',
-            fontSize: '0.85rem',
-            width: '100%',
-          }}
-        >
+        <table className="w-full border-collapse text-[0.85rem]">
           <tbody>
             {reports.map((report) => {
               const type = typeOf(report);
               return (
                 <tr
                   key={report.id}
-                  style={{
-                    borderTop: '1px solid var(--theme-elevation-100)',
-                    opacity: report.hidden ? 0.45 : 1,
-                  }}
+                  className={cn(
+                    'border-x-0 border-b-0 border-t border-solid border-[var(--theme-elevation-100)]',
+                    report.hidden && 'opacity-[0.45]',
+                  )}
                 >
-                  <td style={{ padding: '0.35rem 0.5rem 0.35rem 0' }}>
+                  <td className="py-[0.35rem] pr-2">
                     <span
+                      className="mr-2 inline-block h-[0.6rem] w-[0.6rem] rounded-full"
                       style={{
                         background: type?.color ?? 'var(--theme-elevation-300)',
-                        borderRadius: '50%',
-                        display: 'inline-block',
-                        height: '0.6rem',
-                        marginRight: '0.5rem',
-                        width: '0.6rem',
                       }}
                     />
                     {type?.name ?? 'Unknown'}
                   </td>
-                  <td style={{ color: 'var(--theme-elevation-600)' }}>
+                  <td className="text-[var(--theme-elevation-600)]">
                     {/* UTC: observedAt is a day, stored at noon UTC — rendering
                         in local time would slide it a day west of UTC. */}
                     {new Date(report.observedAt).toLocaleDateString(undefined, {
                       timeZone: 'UTC',
                     })}
                   </td>
-                  <td style={{ color: 'var(--theme-elevation-600)' }}>
+                  <td className="text-[var(--theme-elevation-600)]">
                     {report.source === 'admin' ? 'Official' : 'Rider'}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td className="text-right">
                     {report.hidden ? (
-                      <span style={{ color: 'var(--theme-elevation-500)' }}>
+                      <span className="text-[var(--theme-elevation-500)]">
                         Hidden
                       </span>
                     ) : (
                       <button
                         onClick={() => hide(report.id)}
-                        style={linkButtonStyle('danger')}
+                        className="cursor-pointer border-0 bg-transparent p-0 text-[var(--theme-error-500)] underline"
                         type="button"
                       >
                         Hide
@@ -301,7 +270,7 @@ export function TrailConditionLog() {
       )}
 
       {loaded && reports.length === 0 && (
-        <p style={{ color: 'var(--theme-elevation-500)', margin: 0 }}>
+        <p className="m-0 text-[var(--theme-elevation-500)]">
           Nothing reported yet.
         </p>
       )}

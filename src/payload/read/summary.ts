@@ -82,7 +82,7 @@ export async function getTrailSummary(city: CityId): Promise<TrailSummary> {
           collection: 'trail-conditions',
           where: {
             and: [
-              inCity,
+              { 'trail.city': { equals: city } },
               { createdAt: { greater_than: weekAgo.toISOString() } },
             ],
           },

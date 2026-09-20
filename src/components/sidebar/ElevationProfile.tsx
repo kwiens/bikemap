@@ -110,14 +110,21 @@ function curatedSlug(trailName: string): string | null {
   return trail ? slugForTrail(trail) : null;
 }
 /**
- * Colour stops per chart.
+ * Maximum color stops per chart.
  *
- * The other place grade detail is lost: a 2,000-point trail capped at 200 stops
- * averages away roughly every short pitch. Raising it keeps them, at the cost
- * of more nodes in one `<linearGradient>` — cheap, since the gradient is
- * memoised and only rebuilds when the profile or width changes.
+ * Long profiles were previously reduced to 200 stops, which flattened short
+ * pitches. Six hundred preserves much more of that detail while keeping the
+ * memoized SVG gradient reasonably small.
  */
-export const MAX_GRADIENT_STOPS = 600;
+const MAX_GRADIENT_STOPS = 600;
+
+/**
+ * Samples on either side of a point included in its smoothed grade.
+ *
+ * Terrain elevation needs some smoothing, but the old five-sample window hid
+ * short, steep sections. A three-sample window keeps those sections visible.
+ */
+const GRADE_SMOOTHING_WINDOW = 1;
 
 const CHART_SVG_CLASS =
   'w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none';
@@ -186,7 +193,6 @@ export function computeGrades(
   }
 
   const smoothed = points.map(() => 0);
-  const WINDOW = 2;
   let segmentStart = 0;
   for (let segmentEnd = 1; segmentEnd <= points.length; segmentEnd++) {
     if (segmentEnd < points.length && !segmentStarts.has(segmentEnd)) {
@@ -197,8 +203,8 @@ export function computeGrades(
       let totalRise = 0;
       let totalRun = 0;
       for (
-        let j = Math.max(segmentStart + 1, i - WINDOW);
-        j <= Math.min(segmentEnd - 1, i + WINDOW);
+        let j = Math.max(segmentStart + 1, i - GRADE_SMOOTHING_WINDOW);
+        j <= Math.min(segmentEnd - 1, i + GRADE_SMOOTHING_WINDOW);
         j++
       ) {
         totalRise += rises[j];
@@ -702,8 +708,8 @@ export function ElevationProfile() {
 
   /**
    * The pane's second reason to open. It used to need a chart, which would have
-   * hidden conditions on exactly the trails nobody has curated yet — every
-   * Chattanooga trail, and any whose ways Overpass couldn't resolve.
+   * hidden conditions on trails without a stored or bundled chart, including
+   * those whose ways Overpass couldn't resolve.
    *
    * `conditionOptions` is in the test because with no database there is no
    * vocabulary, and the pane must not open on an empty strip.
@@ -788,13 +794,22 @@ export function ElevationProfile() {
           <button
             type="button"
             className={ACTION_BTN_CLASS}
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              window.dispatchEvent(
-                new CustomEvent(MAP_EVENTS.TOAST, {
-                  detail: { message: 'Link copied' },
-                }),
-              );
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(window.location.href);
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.TOAST, {
+                    detail: { message: 'Link copied' },
+                  }),
+                );
+              } catch (error) {
+                console.error('Failed to copy link:', error);
+                window.dispatchEvent(
+                  new CustomEvent(MAP_EVENTS.TOAST, {
+                    detail: { message: 'Could not copy link' },
+                  }),
+                );
+              }
             }}
             title="Copy link"
           >

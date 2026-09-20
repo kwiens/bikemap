@@ -1,5 +1,26 @@
-import type { CollectionConfig } from 'payload';
-import { activeCityId } from '@/config/map.config';
+import type { CollectionBeforeValidateHook, CollectionConfig } from 'payload';
+import { cityOptions } from '@/config/map.config';
+
+const assignTrailCity: CollectionBeforeValidateHook = async ({
+  data,
+  originalDoc,
+  req,
+}) => {
+  const trail = data?.trail ?? originalDoc?.trail;
+  const trailId = typeof trail === 'object' && trail ? trail.id : trail;
+  if (!trailId) return data;
+
+  // One shared admin serves every city. Derive this from the saved trail even
+  // for REST writes and edits, rather than trusting the form or deployment.
+  const parent = await req.payload.findByID({
+    collection: 'trails',
+    id: trailId,
+    depth: 0,
+    select: { city: true },
+    req,
+  });
+  return { ...data, city: parent.city };
+};
 
 /**
  * Condition reports — "Bear Creek was muddy on Saturday".
@@ -36,6 +57,7 @@ export const TrailConditions: CollectionConfig = {
     read: ({ req }) => Boolean(req.user),
     update: ({ req }) => req.user?.role === 'admin',
   },
+  hooks: { beforeValidate: [assignTrailCity] },
   fields: [
     {
       type: 'row',
@@ -103,14 +125,9 @@ export const TrailConditions: CollectionConfig = {
       name: 'city',
       type: 'select',
       required: true,
-      defaultValue: activeCityId,
-      options: [
-        { label: 'Chattanooga', value: 'chattanooga' },
-        { label: 'Bend', value: 'bend' },
-      ],
-      // Hidden like the one on Trails: a deployment serves one city. Kept
-      // denormalised so the summary query needn't join through to the trail.
-      admin: { hidden: true },
+      options: cityOptions,
+      index: true,
+      admin: { readOnly: true, description: 'Taken from the selected trail.' },
     },
     {
       name: 'reporterHash',

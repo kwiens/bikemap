@@ -167,12 +167,8 @@ export function TrailConditionsStrip({
             </div>
           )}
           {!loading &&
-            history?.map((report, index) => (
-              <div
-                // biome-ignore lint/suspicious/noArrayIndexKey: reports carry no id and same-day/same-value ones are indistinguishable; this newest-first list is fully replaced each load and never reordered, so index is stable.
-                key={index}
-                className="flex items-center gap-2 py-0.5"
-              >
+            history?.map((report) => (
+              <div key={report.id} className="flex items-center gap-2 py-0.5">
                 <span
                   className="shrink-0 w-2 h-2 rounded-full"
                   style={{ backgroundColor: report.color }}

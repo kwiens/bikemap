@@ -405,6 +405,9 @@ export interface TrailCondition {
    * Takes this off the public map. The row stays, so repeat abuse is still visible here.
    */
   hidden?: boolean | null;
+  /**
+   * Taken from the selected trail.
+   */
   city: 'chattanooga' | 'bend';
   /**
    * A one-way hash of the submitter’s IP, so repeat abuse can be found together. The address itself is never stored.

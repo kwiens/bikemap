@@ -1,3 +1,5 @@
+/** @vitest-environment jsdom */
+
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -54,6 +56,8 @@ function report(daysAgo: number, name: string): ConditionReport {
     color: '#b45309',
     marksClosed: false,
     name,
+    id: 1,
+    createdAt: observed.toISOString(),
     observedAt: observed.toISOString(),
     source: 'public',
     value: 'muddy',

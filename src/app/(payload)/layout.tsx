@@ -11,6 +11,8 @@ import { getThemeCss } from '@/payload/read/theme';
 import { importMap } from './admin/importMap';
 
 import '@payloadcms/next/css';
+// Custom admin components use utilities without resetting Payload styles.
+import './tailwind.css';
 // Must come after Payload's stylesheet — see the note in custom.css about why
 // this needs no !important.
 import './custom.css';
@@ -71,6 +73,7 @@ export default async function Layout({ children }: Args) {
         //
         // Content is custom properties only; see sanitizeCss in read/theme.ts
         // for why it cannot close its own <style> element.
+        // eslint-disable-next-line @eslint-react/dom-no-dangerously-set-innerhtml -- sanitizeCss restricts this to safe custom properties.
         <style dangerouslySetInnerHTML={{ __html: themeCss }} />
       )}
       {children}

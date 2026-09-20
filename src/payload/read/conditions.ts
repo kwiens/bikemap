@@ -7,7 +7,8 @@ import 'server-only';
  * on a map that works without them, so a database hiccup costs a badge, not the
  * page.
  */
-import { getPayload } from 'payload';
+import { getPayload, type PopulateType, type SelectType } from 'payload';
+import { sql } from '@payloadcms/db-postgres';
 import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
 import { DEFAULT_CONDITION_COLOR } from '@/data/condition-vocabulary';
@@ -28,17 +29,21 @@ import type {
  * still points at one. A deleted condition leaves an id or a null; neither
  * should throw. Same unwrap `trails.ts` does for `rating`.
  */
-function typeOf(report: TrailCondition): TrailConditionType | null {
+function typeOf(
+  report: Pick<TrailCondition, 'condition'>,
+): TrailConditionType | null {
   return report.condition && typeof report.condition === 'object'
     ? report.condition
     : null;
 }
 
-function trailOf(report: TrailCondition): Trail | null {
+function trailOf(report: Pick<TrailCondition, 'trail'>): Trail | null {
   return report.trail && typeof report.trail === 'object' ? report.trail : null;
 }
 
-function toOption(row: TrailConditionType): ConditionOption {
+function toOption(
+  row: Pick<TrailConditionType, 'color' | 'description' | 'name' | 'value'>,
+): ConditionOption {
   return {
     color: row.color || DEFAULT_CONDITION_COLOR,
     description: row.description ?? undefined,
@@ -51,12 +56,19 @@ function toOption(row: TrailConditionType): ConditionOption {
  * Colour and name come off the vocabulary row rather than the report, so
  * recolouring a condition repaints every badge that used it.
  */
-function toReport(report: TrailCondition): ConditionReport | null {
+function toReport(
+  report: Pick<
+    TrailCondition,
+    'condition' | 'observedAt' | 'id' | 'createdAt' | 'source'
+  >,
+): ConditionReport | null {
   const type = typeOf(report);
   if (!type || !report.observedAt) {
     return null;
   }
   return {
+    id: report.id,
+    createdAt: report.createdAt,
     color: type.color || DEFAULT_CONDITION_COLOR,
     marksClosed: type.marksClosed === true,
     name: type.name,
@@ -73,6 +85,26 @@ const NO_SUMMARY: ConditionSummary = {
   // Open: a failure should not read as a deliberate closure.
   reporting: { enabled: true, message: '' },
 };
+
+const REPORT_SELECT = {
+  condition: true,
+  trail: true,
+  observedAt: true,
+  source: true,
+  createdAt: true,
+} satisfies SelectType;
+
+// Imported geometry and stored elevation profiles can be large. Neither
+// belongs in a badge/history read, even when relationships are populated.
+const REPORT_POPULATE = {
+  trails: { slug: true, city: true, _status: true },
+  'trail-condition-types': {
+    color: true,
+    marksClosed: true,
+    name: true,
+    value: true,
+  },
+} satisfies PopulateType;
 
 /**
  * The trails closed to new reports, and the note to show for each.
@@ -155,9 +187,9 @@ async function lockedTrails(
  * The dropdown's options, the newest visible report per trail, and wherever
  * reporting is switched off.
  *
- * The reports are one query reduced in JS, not one per trail. Postgres can say
- * "latest per group" better, but only via a lateral join Payload's query builder
- * can't express, and a few hundred rows don't justify raw SQL.
+ * Find one newest report per published trail in Postgres, then populate only
+ * those rows. A global report limit would eventually drop old closures, even
+ * though closures must remain visible until a newer report replaces them.
  */
 export async function getConditionSummary(
   city: CityId,
@@ -176,31 +208,10 @@ export async function getConditionSummary(
         limit: 100,
         pagination: false,
         sort: 'sortOrder',
+        select: { color: true, description: true, name: true, value: true },
         where: { active: { not_equals: false } },
       }),
-      payload.find({
-        collection: 'trail-conditions',
-        // 1 so `condition` and `trail` resolve to documents rather than ids.
-        depth: 1,
-        limit: 5000,
-        pagination: false,
-        // `-createdAt` breaks ties: `observedAt` is day-only, so two reports on
-        // the same trail the same day are equal on it, and without a tiebreaker
-        // the "latest" (a closure vs a same-day reopen) would fall to arbitrary
-        // row order. The one filed last wins.
-        sort: ['-observedAt', '-createdAt'],
-        // No date floor. A closure holds until someone reports something else,
-        // so the newest report per trail has to be found at any age — a window
-        // would quietly reopen a trail shut last season. Freshness is applied
-        // per report on the client, which is where the rule lives.
-        //
-        // The limit is the bound instead: newest-first means the newest report
-        // per trail is in there while total non-hidden reports stay under it.
-        // Past that, the answer is a current-condition column on the trail.
-        where: {
-          and: [{ city: { equals: city } }, { hidden: { not_equals: true } }],
-        },
-      }),
+      latestReports(payload, city),
       payload.findGlobal({ slug: 'condition-reporting', depth: 0 }),
     ]);
 
@@ -211,16 +222,14 @@ export async function getConditionSummary(
     const latest: Record<string, ConditionReport> = {};
     for (const row of reports.docs) {
       const trail = trailOf(row);
-      // A report whose trail is gone shouldn't be reachable — Trails deletes its
-      // reports first — but a direct SQL delete would leave one.
-      //
-      // Guard `_status` too: the public read is anonymous, so a report on an
-      // unpublished trail must not surface its slug and condition here. Every
-      // other public query filters published in its `where`; this one joins the
-      // trail at depth 1, so the check is in JS. Matched on `draft` rather than
-      // `!== published` so a missing status fails open to a shown badge (a
-      // decoration) rather than hiding every trail's condition.
-      if (!trail?.slug || trail._status === 'draft' || latest[trail.slug]) {
+      // Recheck after population: a trail can be unpublished, moved to another
+      // city, or deleted between selecting IDs and reading their relationships.
+      if (
+        !trail?.slug ||
+        trail.city !== city ||
+        trail._status !== 'published' ||
+        latest[trail.slug]
+      ) {
         continue;
       }
       const report = toReport(row);
@@ -244,6 +253,35 @@ export async function getConditionSummary(
     );
     return NO_SUMMARY;
   }
+}
+
+async function latestReports(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  city: CityId,
+) {
+  // Payload cannot express DISTINCT ON. Select only IDs here; its Local API
+  // still owns relationship population and vocabulary-to-badge conversion.
+  const result = await payload.db.drizzle.execute<{ id: number }>(sql`
+    SELECT DISTINCT ON (report.trail_id) report.id
+    FROM trail_conditions AS report
+    INNER JOIN trails AS trail ON trail.id = report.trail_id
+    WHERE trail.city = ${city}
+      AND trail._status = 'published'
+      AND report.hidden IS DISTINCT FROM true
+    ORDER BY report.trail_id, report.observed_at DESC, report.created_at DESC, report.id DESC
+  `);
+  const ids = result.rows.map(({ id }) => id);
+  if (ids.length === 0) return { docs: [] };
+  return payload.find({
+    collection: 'trail-conditions',
+    depth: 1,
+    // Bounded by the city's published trails, not accumulated report history.
+    limit: ids.length,
+    pagination: false,
+    select: REPORT_SELECT,
+    populate: REPORT_POPULATE,
+    where: { id: { in: ids }, hidden: { not_equals: true } },
+  });
 }
 
 /** How many past reports a trail's history shows. */
@@ -291,9 +329,11 @@ export async function getTrailConditionHistory(
       depth: 1,
       limit: HISTORY_LIMIT,
       pagination: false,
+      select: REPORT_SELECT,
+      populate: REPORT_POPULATE,
       // `-createdAt` breaks day-only `observedAt` ties, so same-day reports list
       // in the order they were filed rather than an arbitrary one.
-      sort: ['-observedAt', '-createdAt'],
+      sort: ['-observedAt', '-createdAt', '-id'],
       where: {
         and: [
           { trail: { equals: trail.id } },

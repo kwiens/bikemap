@@ -55,11 +55,10 @@ quietly reopen because nobody has ridden it in a fortnight, and expiring one
 would take a barrier off the map on a timer. `isConditionCurrent` is where that
 rule lives; ask it rather than `isConditionFresh` on anything user-facing.
 
-That is also why `getConditionSummary` has **no date floor** on its query. A
-window would silently reopen a trail shut last season. The row limit is the
-bound instead: newest-first means the newest report per trail is in the result
-while total non-hidden reports stay under it. Past that, the answer is a
-current-condition column on the trail.
+That is also why `getConditionSummary` has **no date floor or global report
+limit**. Postgres selects the newest visible report per published trail, then
+Payload populates only those rows. The result is bounded by the city's trails,
+so a busy trail's history cannot crowd out another trail's old closure.
 
 **The "closed to reports" switches do not do this.** Those are moderation — an
 admin muting a trail that is attracting nonsense should not paint it closed for
@@ -110,9 +109,9 @@ Three switches, and **any one of them being off is enough**:
 | A **trail** → Condition reports | just that one |
 
 Each carries an optional **note** — the sentence a rider sees where the "Report"
-button was ("Closed for logging until 1 May"). The most specific one wins: trail,
-then complex, then site-wide, then a plain fallback. Ticking the box and leaving
-the note blank means "no comment", not "show an empty line".
+button was ("Closed for logging until 1 May"). A site-wide closure takes
+precedence. Otherwise the trail's active note wins over the complex's. Blank
+notes use a plain fallback, and inactive switches never contribute old notes.
 
 The site-wide switch exists mainly **for a fork**. This repo is meant to be stood
 up by any trail org, and some will want the curated trail data without a public
@@ -242,9 +241,9 @@ fine while a chart was the only thing in it.
 
 It now opens for **a chart or conditions**, with the chart, the y-axis, the
 distance/climbing stats and the GPX button all conditional. Without that,
-conditions would have been invisible on exactly the trails nobody has curated
-yet — every Chattanooga trail, whose geometry still lives in a Mapbox tileset,
-and any trail whose ways Overpass could not resolve.
+conditions would be invisible on trails whose elevation profile is missing or
+whose ways Overpass could not resolve. Chattanooga's imported GIS trails use
+Payload geometry and prepared profiles; reporting does not depend on either.
 
 The gate also tests that the vocabulary loaded: with no database there are no
 options, and the pane must not open on an empty strip.
@@ -260,7 +259,7 @@ has something to try.
 ## API
 
 ```
-GET  /api/map/conditions?city=bend          → { options, latest }
+GET  /api/map/conditions?city=bend          → { options, latest, locked, reporting }
 POST /api/map/conditions?city=bend          → file a report
 GET  /api/map/conditions/<slug>?city=bend   → { slug, reports }
 ```
@@ -274,11 +273,26 @@ global closure needn't name every slug. `lockFor(summary, slug)` combines the
 two — use it rather than reading either field directly, or the precedence gets
 re-derived somewhere and drifts.
 
-The GET caches for 30 seconds, much shorter than the trails route's hour,
+The GET caches for 30 seconds, shorter than the trails route's minute,
 because conditions are the one thing on this map that is supposed to change
 during the day. The POST returns the report it just wrote so the client can show
 it immediately rather than waiting the cache out — the rider who just filed it
 is the one person guaranteed to be looking.
+
+Reports include their ID and submission time. Both server queries and the
+client order them by observation date, submission time, then ID, so same-day
+closures and reopenings survive a stale cached response. Reading conditions
+selects only badge and relationship metadata; it never loads trail geometry or
+stored elevation profiles.
+
+The shared admin serves both cities. Every report's city is assigned by a
+collection hook from its saved trail, including direct REST writes and edits.
+The city-integrity migration repairs older mismatches and removes the old
+deployment-specific default. Public endpoints use the common city registry.
+
+Closure overlays reuse the configured trail source and the shared selection
+query. They add no transparent hit layers and are removed when no trails are
+closed, preserving the map rendering optimizations.
 
 The GET has **no 503 branch**, unlike the trails route: `getConditionSummary`
 answers empty on an unreachable database, and a map with no badges is the map as

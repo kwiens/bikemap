@@ -1,3 +1,5 @@
+/** @vitest-environment jsdom */
+
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -19,6 +21,8 @@ const fresh: ConditionReport = {
   color: '#b45309',
   marksClosed: false,
   name: 'Muddy — stay off',
+  id: 1,
+  createdAt: new Date().toISOString(),
   observedAt: new Date().toISOString(),
   source: 'public',
   value: 'muddy',

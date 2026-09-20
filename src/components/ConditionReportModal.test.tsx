@@ -1,3 +1,5 @@
+/** @vitest-environment jsdom */
+
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -76,6 +78,8 @@ describe('ConditionReportModal', () => {
       marksClosed: false,
       name: 'Muddy — stay off',
       observedAt: '2026-08-07T00:00:00.000Z',
+      id: 42,
+      createdAt: '2026-08-07T12:00:00.000Z',
       source: 'public',
       value: 'muddy',
     };

@@ -12,7 +12,8 @@
  * a header, not `export const revalidate`, which applies to the whole segment.
  */
 import { NextResponse } from 'next/server';
-import { CITY_IDS, type CityId, parseCityId } from '@/data/cities';
+import { cityIds, isCityId } from '@/config/map.config';
+import type { CityId } from '@/data/cities/types';
 import {
   clientAddress,
   hashReporter,
@@ -28,7 +29,8 @@ import { getConditionSummary } from '@/payload/read/conditions';
 export const dynamic = 'force-dynamic';
 
 function cityFrom(request: Request): CityId | null {
-  return parseCityId(new URL(request.url).searchParams.get('city'));
+  const city = new URL(request.url).searchParams.get('city');
+  return isCityId(city) ? city : null;
 }
 
 export async function GET(request: Request) {
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
 
   if (!city) {
     return NextResponse.json(
-      { error: `city must be one of: ${CITY_IDS.join(', ')}` },
+      { error: `city must be one of: ${cityIds.join(', ')}` },
       { status: 400 },
     );
   }
@@ -48,7 +50,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json(summary, {
     headers: {
-      // Shorter than the trails route's hour: conditions are meant to change
+      // Shorter than the trails route's minute: conditions are meant to change
       // during the day.
       'Cache-Control': 'public, max-age=30, stale-while-revalidate=300',
     },
@@ -60,14 +62,21 @@ export async function POST(request: Request) {
 
   if (!city) {
     return NextResponse.json(
-      { error: `city must be one of: ${CITY_IDS.join(', ')}` },
+      { error: `city must be one of: ${cityIds.join(', ')}` },
       { status: 400 },
     );
   }
 
   let body: ReportBody;
   try {
-    body = (await request.json()) as ReportBody;
+    const value: unknown = await request.json();
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return NextResponse.json(
+        { error: 'Expected a JSON object.' },
+        { status: 400 },
+      );
+    }
+    body = value as ReportBody;
   } catch {
     return NextResponse.json({ error: 'Expected JSON.' }, { status: 400 });
   }

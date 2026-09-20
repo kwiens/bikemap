@@ -106,7 +106,7 @@ function CitySummary({ summary }: { summary: TrailSummary }) {
         {/* Plain, never 'attention': riders reporting conditions is the system
             working. It is here so a sudden spike is visible, not as a chore. */}
         <Stat
-          href={`/admin/collections/trail-conditions?where[city][equals]=${summary.city}`}
+          href={`/admin/collections/trail-conditions?where[trail.city][equals]=${summary.city}`}
           label="Reports"
           note="filed in the last 7 days"
           value={summary.reportsThisWeek}

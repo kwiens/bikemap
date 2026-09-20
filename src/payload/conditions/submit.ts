@@ -80,6 +80,12 @@ export async function submitConditionReport(
           conditionReportsNote: true,
           slug: true,
         },
+        populate: {
+          'trail-areas': {
+            conditionReportsClosed: true,
+            conditionReportsNote: true,
+          },
+        },
         where: {
           and: [
             { slug: { equals: input.slug } },
@@ -93,6 +99,7 @@ export async function submitConditionReport(
         depth: 0,
         limit: 1,
         pagination: false,
+        select: { color: true, marksClosed: true, name: true, value: true },
         where: {
           and: [
             { value: { equals: input.condition } },
@@ -131,15 +138,17 @@ export async function submitConditionReport(
         // note only counts when that level's own switch is on: Payload hides the
         // note field when the box is unticked but keeps the stored text, so a
         // leftover note from a past closure must not speak for an active one.
-        message: resolveLockMessage(
-          settings?.enabled === false ? settings?.disabledMessage : null,
-          trail.conditionReportsClosed === true
-            ? trail.conditionReportsNote
-            : null,
-          area?.conditionReportsClosed === true
-            ? area?.conditionReportsNote
-            : null,
-        ),
+        message:
+          settings?.enabled === false
+            ? resolveLockMessage(settings?.disabledMessage)
+            : resolveLockMessage(
+                trail.conditionReportsClosed === true
+                  ? trail.conditionReportsNote
+                  : null,
+                area?.conditionReportsClosed === true
+                  ? area?.conditionReportsNote
+                  : null,
+              ),
         ok: false,
         reason: 'locked',
       };
@@ -189,8 +198,9 @@ export async function submitConditionReport(
       };
     }
 
-    await payload.create({
+    const saved = await payload.create({
       collection: 'trail-conditions',
+      depth: 0,
       data: {
         city: input.city,
         condition: type.id,
@@ -206,6 +216,8 @@ export async function submitConditionReport(
     return {
       ok: true,
       report: {
+        id: saved.id,
+        createdAt: saved.createdAt,
         color: type.color || DEFAULT_CONDITION_COLOR,
         marksClosed: type.marksClosed === true,
         name: type.name,

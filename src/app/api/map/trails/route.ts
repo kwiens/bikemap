@@ -15,8 +15,7 @@ import { NextResponse } from 'next/server';
 import { cityIds, isCityId } from '@/config/map.config';
 import { getCityTrails } from '@/payload/read/trails';
 
-// Matches the page's revalidate: geometry changes when an editor saves, not
-// per request.
+// Geometry changes when an editor saves, not per request.
 export const revalidate = 60;
 
 export async function GET(request: Request) {

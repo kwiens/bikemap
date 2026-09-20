@@ -1,3 +1,5 @@
+/** @vitest-environment jsdom */
+
 import {
   act,
   fireEvent,
@@ -12,7 +14,6 @@ import {
   computeGrades,
   downsampleStops,
   formatGrade,
-  MAX_GRADIENT_STOPS,
   findClosestProfileIndex,
   loadProfile,
   profilePointToXY,
@@ -91,7 +92,19 @@ describe('computeGrades', () => {
       [131, 115, -85, 35],
     ];
 
-    expect(computeGrades(uneven)[3]).toBeCloseTo(11.45, 2);
+    expect(computeGrades(uneven)[2]).toBeCloseTo(12.22, 2);
+  });
+
+  it('keeps a short pitch visible in the middle of a profile', () => {
+    const points: [number, number, number, number][] = [
+      [0, 100, -85, 35],
+      [100, 100, -85, 35],
+      [200, 130, -85, 35],
+      [300, 130, -85, 35],
+      [400, 130, -85, 35],
+    ];
+
+    expect(computeGrades(points)[2]).toBeCloseTo(10, 5);
   });
 
   it('does not smooth across explicit geometry gaps', () => {
@@ -132,18 +145,6 @@ describe('computeGrades', () => {
     expect(grades[3]).toBeCloseTo(-10, 5);
   });
 
-  it('keeps a short pitch visible rather than averaging it away', () => {
-    // A short climb should remain visible after distance-weighted smoothing.
-    const pitch: [number, number, number, number][] = [
-      [0, 100, -85, 35],
-      [100, 100, -85, 35],
-      [200, 130, -85, 35],
-      [300, 130, -85, 35],
-      [400, 130, -85, 35],
-    ];
-    expect(Math.max(...computeGrades(pitch))).toBeGreaterThan(9);
-  });
-
   it('returns one grade per point and handles degenerate profiles', () => {
     expect(computeGrades(climb)).toHaveLength(climb.length);
     expect(computeGrades([[0, 100, -85, 35]])).toEqual([0]);
@@ -178,7 +179,7 @@ describe('downsampleStops', () => {
     ]) as [number, number, number, number][];
   }
 
-  it('returns all points when count is <= 200', () => {
+  it('returns all points when count is <= 600', () => {
     const points = makePoints(50);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
@@ -187,11 +188,11 @@ describe('downsampleStops', () => {
   });
 
   it('caps the stop count on a profile longer than the cap', () => {
-    const points = makePoints(MAX_GRADIENT_STOPS + 100);
+    const points = makePoints(700);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
     const stops = downsampleStops(points, colors, maxDist);
-    expect(stops).toHaveLength(MAX_GRADIENT_STOPS);
+    expect(stops).toHaveLength(600);
   });
 
   it('first offset is 0 and last is approximately 1', () => {

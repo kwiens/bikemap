@@ -1,6 +1,7 @@
 // GPX 1.1 generation from GeoJSON features, recorded rides, and elevation
 // profiles. Spec: https://www.topografix.com/gpx/1/1/
 
+import type * as GeoJSON from 'geojson';
 import { splitRideSegments, type StoredRidePoint } from '../data/ride';
 import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';

@@ -32,7 +32,7 @@ describe('getTrailSummary', () => {
       collection: 'trail-conditions',
       where: {
         and: [
-          { city: { equals: 'bend' } },
+          { 'trail.city': { equals: 'bend' } },
           { createdAt: { greater_than: '2026-09-12T12:00:00.000Z' } },
         ],
       },

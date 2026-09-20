@@ -183,6 +183,8 @@ describe('closures', () => {
       color: '#dc2626',
       marksClosed,
       name: marksClosed ? 'Closed' : 'Dry',
+      id: 1,
+      createdAt: observed.toISOString(),
       observedAt: observed.toISOString(),
       source: 'public',
       value: marksClosed ? 'closed' : 'dry',

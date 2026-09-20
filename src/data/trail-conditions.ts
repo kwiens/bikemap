@@ -18,6 +18,9 @@ export interface ConditionOption {
 
 /** One report, as the map shows it. */
 export interface ConditionReport {
+  id: number;
+  /** Submission time breaks ties between observations from the same day. */
+  createdAt: string;
   color: string;
   /**
    * This condition means the trail is shut. Set on the condition type, not the
@@ -31,6 +34,20 @@ export interface ConditionReport {
   /** `admin` means the trail steward said so, rather than a rider guessing. */
   source: 'admin' | 'public';
   value: string;
+}
+
+/** Same ordering as Payload's condition queries, including same-day updates. */
+export function isNewerCondition(
+  candidate: ConditionReport,
+  current: ConditionReport,
+): boolean {
+  if (candidate.observedAt !== current.observedAt) {
+    return candidate.observedAt > current.observedAt;
+  }
+  if (candidate.createdAt !== current.createdAt) {
+    return candidate.createdAt > current.createdAt;
+  }
+  return candidate.id > current.id;
 }
 
 /** Shown where the Report button was, when nobody wrote a note. */

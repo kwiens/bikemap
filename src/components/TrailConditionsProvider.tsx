@@ -23,6 +23,7 @@ import {
   type ConditionOption,
   type ConditionReport,
   type ConditionSummary,
+  isNewerCondition,
   lockFor,
 } from '@/data/trail-conditions';
 
@@ -51,9 +52,8 @@ interface TrailConditionsValue {
  * The overlay exists for the race where a refresh beats the GET's 30-second
  * cache and comes back without the report the rider just filed. But it must not
  * outrank a *newer* server report — e.g. a steward closing the trail after the
- * rider rode it. Keep the local echo only while its observation is at least as
- * recent as the server's; an equal or newer server report wins, since the server
- * is the source of truth.
+ * rider rode it. Compare observation date, submission time, then ID, just as
+ * the server does; an equal or newer server report wins.
  */
 function mergeLocal(
   server: Record<string, ConditionReport>,
@@ -62,7 +62,7 @@ function mergeLocal(
   const merged = { ...server };
   for (const [slug, report] of Object.entries(local)) {
     const current = merged[slug];
-    if (!current || report.observedAt > current.observedAt) {
+    if (!current || isNewerCondition(report, current)) {
       merged[slug] = report;
     }
   }
@@ -119,10 +119,10 @@ export function TrailConditionsProvider({
   const localRef = useRef<Record<string, ConditionReport>>({});
 
   const recordLocal = useCallback((slug: string, report: ConditionReport) => {
-    localRef.current = { ...localRef.current, [slug]: report };
+    localRef.current = mergeLocal(localRef.current, { [slug]: report });
     setSummary((prev) => ({
       ...prev,
-      latest: { ...prev.latest, [slug]: report },
+      latest: mergeLocal(prev.latest, { [slug]: report }),
     }));
   }, []);
 
