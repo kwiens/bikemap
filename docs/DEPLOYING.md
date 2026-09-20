@@ -25,6 +25,12 @@ pnpm dev                       # http://localhost:3000
 The map will be blank until you add a Mapbox token (next step) — the browser
 console says so explicitly.
 
+For a multi-city checkout, `?city=<id>` overrides hostname and
+`NEXT_PUBLIC_CITY_ID` selection on public pages. For example, use
+`http://localhost:3000/?city=bend` to test Bend without restarting the dev
+server. Invalid city ids are ignored and fall back to the normal hostname/env
+resolution.
+
 ## 2. Mapbox setup
 
 1. In [Mapbox Studio](https://studio.mapbox.com/), create (or duplicate) a map

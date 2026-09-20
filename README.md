@@ -116,6 +116,14 @@ pnpm dev                           # http://localhost:3000
 
 A free [Mapbox](https://account.mapbox.com/access-tokens/) public token is required for the map to render.
 
+The `city` query parameter overrides hostname and environment selection for a
+request, which makes it easy to exercise either configured city locally:
+
+```text
+http://localhost:3000/?city=chattanooga
+http://localhost:3000/?city=bend
+```
+
 ### Scripts
 
 | Command | What it does |
