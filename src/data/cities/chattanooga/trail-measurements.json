@@ -623,6 +623,54 @@
     "elevationMax": 1218,
     "elevationMin": 993
   },
+  "Godsey Ridge Blue 1": {
+    "defaultBounds": [-85.302853, 35.120165, -85.301374, 35.121293],
+    "distance": 0.25,
+    "elevationGain": 95,
+    "elevationLoss": 151,
+    "elevationMax": 881,
+    "elevationMin": 776
+  },
+  "Godsey Ridge Blue 2": {
+    "defaultBounds": [-85.301711, 35.120778, -85.300742, 35.123043],
+    "distance": 0.24,
+    "elevationGain": 114,
+    "elevationLoss": 59,
+    "elevationMax": 841,
+    "elevationMin": 776
+  },
+  "Godsey Ridge Expert 1": {
+    "defaultBounds": [-85.301994, 35.120035, -85.30031, 35.121158],
+    "distance": 0.31,
+    "elevationGain": 211,
+    "elevationLoss": 100,
+    "elevationMax": 949,
+    "elevationMin": 832
+  },
+  "Godsey Ridge Expert 2": {
+    "defaultBounds": [-85.301427, 35.120873, -85.299865, 35.122436],
+    "distance": 0.28,
+    "elevationGain": 90,
+    "elevationLoss": 201,
+    "elevationMax": 943,
+    "elevationMin": 831
+  },
+  "Godsey Ridge Expert Spur": {
+    "defaultBounds": [-85.300528, 35.12061, -85.300258, 35.120872],
+    "distance": 0.03,
+    "elevationGain": 16,
+    "elevationLoss": 12,
+    "elevationMax": 952,
+    "elevationMin": 940
+  },
+  "Godsey Ridge Green": {
+    "defaultBounds": [-85.302469, 35.121044, -85.300582, 35.123595],
+    "distance": 0.27,
+    "elevationGain": 60,
+    "elevationLoss": 56,
+    "elevationMax": 803,
+    "elevationMin": 774
+  },
   "Grindstone Ridge": {
     "defaultBounds": [-85.4054185, 35.0561751, -85.3886238, 35.0577344],
     "distance": 1.7,

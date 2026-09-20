@@ -3,14 +3,11 @@ import { bikeRoutes } from '@/data/bike-routes';
 import { localResources } from '@/data/local-resources';
 import { mapFeatures } from '@/data/map-features';
 import {
-  GODSEY_LAYER_ID,
-  GODSEY_SOURCE_LAYER,
   MTN_BIKE_LAYER_ID,
   MTN_BIKE_SOURCE_ID,
   mountainBikeTrails as baseMountainBikeTrails,
   regionFor,
 } from '@/data/mountain-bike-trails';
-import { TRAIL_METADATA } from '@/data/trail-metadata';
 import type { CityData } from '@/data/cities/types';
 import { applyChattanoogaMeasurements } from './measurements';
 
@@ -30,26 +27,19 @@ export const chattanoogaData: CityData = {
   bikeResources,
   localResources,
   mountainBikeTrails,
-  trailMetadata: TRAIL_METADATA,
   regionFor,
   mountainBike: {
     layers: [
       {
         layerId: MTN_BIKE_LAYER_ID,
         sourceId: MTN_BIKE_SOURCE_ID,
-        // Served from Payload after `db:seed:chattanooga`. The permitted GIS
-        // snapshot used by the seed remains the fallback when the CMS is down
-        // or has not been seeded yet.
+        // Payload is authoritative. This deprecated static fallback is staged
+        // for removal once fresh databases bootstrap without it and CMS outage
+        // handling no longer depends on a public GeoJSON file.
         geojsonUrl: '/api/map/trails?city=chattanooga',
         geojsonFallbackUrl: '/data/chattanooga/trails.geojson',
         trailProp: 'Trail',
         matchBy: 'name',
-      },
-      {
-        layerId: GODSEY_LAYER_ID,
-        sourceLayer: GODSEY_SOURCE_LAYER,
-        trailProp: 'Name',
-        metadata: TRAIL_METADATA,
       },
     ],
     hiddenTrails: HIDDEN_TRAILS,
