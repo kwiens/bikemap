@@ -3,7 +3,9 @@ import {
   type Access,
   type CollectionBeforeDeleteHook,
   type CollectionConfig,
+  type PayloadRequest,
 } from 'payload';
+import { sql, type PostgresAdapter } from '@payloadcms/db-postgres';
 import { cityOptions } from '@/config/map.config';
 
 /** Admins may remove other accounts, but never the account in active use. */
@@ -24,6 +26,8 @@ export const preventDeletingLastAdmin: CollectionBeforeDeleteHook = async ({
   id,
   req,
 }) => {
+  await lockAdministratorDeletion(req);
+
   const [user, { totalDocs }] = await Promise.all([
     req.payload.findByID({
       collection: 'users',
@@ -48,6 +52,28 @@ export const preventDeletingLastAdmin: CollectionBeforeDeleteHook = async ({
     );
   }
 };
+
+/**
+ * Payload opens a transaction before collection delete hooks run. A
+ * transaction-scoped advisory lock makes the following administrator count
+ * and the eventual delete one serialized operation across every app instance.
+ */
+async function lockAdministratorDeletion(req: PayloadRequest): Promise<void> {
+  const transactionID = await req.transactionID;
+  const transaction = transactionID
+    ? (req.payload.db as unknown as PostgresAdapter).sessions[
+        String(transactionID)
+      ]?.db
+    : undefined;
+
+  if (!transaction) {
+    throw new Error('User deletion requires an active database transaction.');
+  }
+
+  await transaction.execute(
+    sql`select pg_advisory_xact_lock(hashtext('bikemap:administrator-deletion'))`,
+  );
+}
 
 /**
  * Admin accounts. Payload's own auth — `auth: true` adds the email/password

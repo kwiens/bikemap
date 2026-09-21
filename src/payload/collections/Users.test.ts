@@ -1,13 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { PostgresAdapter } from '@payloadcms/db-postgres';
 import type { PayloadRequest } from 'payload';
 import { canDeleteUser, preventDeletingLastAdmin } from './Users';
 
 function requestWithUser(user: Record<string, unknown> | null) {
   return {
+    transactionID: 'test-transaction',
     user,
     payload: {
       count: vi.fn(),
       findByID: vi.fn(),
+      db: {
+        sessions: {
+          'test-transaction': {
+            db: { execute: vi.fn().mockResolvedValue({ rows: [] }) },
+          },
+        },
+      },
     },
   } as unknown as PayloadRequest;
 }
@@ -56,5 +65,36 @@ describe('preventDeletingLastAdmin', () => {
     await expect(
       preventDeletingLastAdmin({ id: 2, req } as never),
     ).resolves.toBeUndefined();
+  });
+
+  it('takes the transaction lock before checking administrators', async () => {
+    const req = requestWithUser({ id: 1, role: 'admin' });
+    vi.mocked(req.payload.findByID).mockResolvedValue({
+      id: 2,
+      role: 'admin',
+    } as never);
+    vi.mocked(req.payload.count).mockResolvedValue({ totalDocs: 2 });
+
+    await preventDeletingLastAdmin({ id: 2, req } as never);
+
+    const execute = vi.mocked(
+      (req.payload.db as unknown as PostgresAdapter).sessions[
+        'test-transaction'
+      ].db.execute,
+    );
+    expect(execute).toHaveBeenCalledOnce();
+    expect(execute.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(req.payload.count).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('fails closed when deletion bypasses Payload transactions', async () => {
+    const req = requestWithUser({ id: 1, role: 'admin' });
+    req.transactionID = undefined;
+
+    await expect(
+      preventDeletingLastAdmin({ id: 2, req } as never),
+    ).rejects.toThrow('requires an active database transaction');
+    expect(req.payload.count).not.toHaveBeenCalled();
   });
 });

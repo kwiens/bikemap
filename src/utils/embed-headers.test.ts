@@ -100,6 +100,7 @@ describe('buildContentSecurityPolicy', () => {
     expect(policy).toContain("script-src-attr 'none'");
     expect(policy).toContain("worker-src 'self' blob:");
     expect(policy).toContain('https://api.mapbox.com');
+    expect(policy).toContain('https://*.tiles.mapbox.com');
     expect(policy).toContain('https://tiles.openstreetmap.us');
     expect(policy).toContain("frame-ancestors 'self'");
     expect(policy).toContain('upgrade-insecure-requests');

@@ -82,7 +82,7 @@ export function buildContentSecurityPolicy(
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
     "font-src 'self' data: https://cdn.jsdelivr.net",
     "img-src 'self' data: blob: https://api.mapbox.com",
-    "connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://tiles.openstreetmap.us https://chattanooga.publicbikesystem.net https://cluster-prod.veoride.com",
+    "connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://tiles.openstreetmap.us https://chattanooga.publicbikesystem.net https://cluster-prod.veoride.com",
     "worker-src 'self' blob:",
     "child-src 'self' blob:",
     "frame-src 'self'",
