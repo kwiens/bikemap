@@ -1,5 +1,9 @@
 import type { CollectionConfig } from 'payload';
 import { cityOptions } from '@/config/map.config';
+import {
+  invalidatePublicTrailSummariesAfterChange,
+  invalidatePublicTrailSummariesAfterDelete,
+} from '@/payload/cache/public-trails';
 
 /**
  * Trail complexes — the places trails are grouped under in the sidebar
@@ -24,6 +28,10 @@ import { cityOptions } from '@/config/map.config';
  */
 export const TrailAreas: CollectionConfig = {
   slug: 'trail-areas',
+  hooks: {
+    afterChange: [invalidatePublicTrailSummariesAfterChange],
+    afterDelete: [invalidatePublicTrailSummariesAfterDelete],
+  },
   indexes: [{ fields: ['city', 'name'], unique: true }],
   labels: {
     plural: 'Trail complexes',

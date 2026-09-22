@@ -16,23 +16,47 @@ import 'server-only';
  * and the caller falls back to the checked-in data — losing the CMS must not
  * take the public map down with it.
  */
+import { unstable_cache } from 'next/cache';
 import { getPayload } from 'payload';
 import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
+import {
+  PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_TRAIL_GEOJSON_CACHE_TAG,
+  PUBLIC_TRAIL_SUMMARIES_CACHE_TAG,
+} from '@/payload/cache/public-trails';
 import { appearanceFor } from './appearance';
 import type { Trail, TrailKind, TrailRating } from '@/payload-types';
+
+type TrailReadStatus = 'empty' | 'ok' | 'unavailable';
+type TrailSummaryDocument = Pick<
+  Trail,
+  | 'area'
+  | 'bounds'
+  | 'displayName'
+  | 'distance'
+  | 'elevationGain'
+  | 'elevationLoss'
+  | 'elevationMax'
+  | 'elevationMin'
+  | 'kind'
+  | 'osmIds'
+  | 'rating'
+  | 'slug'
+  | 'trailName'
+>;
 
 /**
  * `rating` and `kind` are relationships, so at depth 1 they arrive as the
  * related document — but only if the row still points at one. A rating deleted
  * out from under a trail leaves an id, or null, and neither should throw.
  */
-function ratingOf(trail: Trail): TrailRating | null {
+function ratingOf(trail: Pick<Trail, 'rating'>): TrailRating | null {
   return trail.rating && typeof trail.rating === 'object' ? trail.rating : null;
 }
 
-function kindOf(trail: Trail): TrailKind | null {
+function kindOf(trail: Pick<Trail, 'kind'>): TrailKind | null {
   return trail.kind && typeof trail.kind === 'object' ? trail.kind : null;
 }
 
@@ -61,7 +85,7 @@ function osmIdsFor(value: Trail['osmIds']): number[] | undefined {
  * The app has always worked with a plain `recArea` string, so unwrap it here
  * rather than teach every consumer about the join.
  */
-function areaOf(trail: Trail): { name: string; region?: string } {
+function areaOf(trail: Pick<Trail, 'area'>): { name: string; region?: string } {
   const area = trail.area;
   if (area && typeof area === 'object') {
     return {
@@ -72,7 +96,7 @@ function areaOf(trail: Trail): { name: string; region?: string } {
   return { name: '' };
 }
 
-function toMountainBikeTrail(trail: Trail): MountainBikeTrail {
+function toMountainBikeTrail(trail: TrailSummaryDocument): MountainBikeTrail {
   const area = areaOf(trail);
   // Colour, icon and the rating key all come off the two vocabulary rows —
   // see `appearance.ts` for which one wins where.
@@ -98,16 +122,17 @@ function toMountainBikeTrail(trail: Trail): MountainBikeTrail {
   };
 }
 
-export interface CityTrailData {
+export interface TrailFeatureCollection {
   /** GeoJSON FeatureCollection of every trail that has geometry. */
-  geojson: {
-    features: {
-      geometry: unknown;
-      properties: Record<string, unknown>;
-      type: 'Feature';
-    }[];
-    type: 'FeatureCollection';
-  };
+  features: {
+    geometry: unknown;
+    properties: Record<string, unknown>;
+    type: 'Feature';
+  }[];
+  type: 'FeatureCollection';
+}
+
+export interface CityTrailSummaryData {
   /**
    * Why there might be no trails, which callers need to tell apart:
    *
@@ -118,70 +143,161 @@ export interface CityTrailData {
    * Reporting `empty` as `unavailable` would send someone debugging a database
    * that is working perfectly well.
    */
-  status: 'empty' | 'ok' | 'unavailable';
+  status: TrailReadStatus;
   trails: MountainBikeTrail[];
 }
 
-const NONE = {
-  geojson: { features: [], type: 'FeatureCollection' as const },
-  trails: [],
+export interface CityTrailGeojsonData {
+  geojson: TrailFeatureCollection;
+  status: TrailReadStatus;
+}
+
+const EMPTY_GEOJSON: TrailFeatureCollection = {
+  features: [],
+  type: 'FeatureCollection',
 };
 
 /**
- * Published trails for a city, plus their geometry as a FeatureCollection
- * shaped like the static files the map already reads.
+ * Published trail metadata for one city's sidebar. Geometry and elevation
+ * profiles are deliberately excluded because the homepage does not use them.
  */
-export async function getCityTrails(city: CityId): Promise<CityTrailData> {
+async function readCityTrailSummaries(
+  city: CityId,
+): Promise<CityTrailSummaryData> {
+  const payload = await getPayload({ config });
+  const result = await payload.find({
+    collection: 'trails',
+    // Resolve only the three relationships that affect public presentation.
+    depth: 1,
+    limit: 2000,
+    pagination: false,
+    populate: {
+      'trail-areas': { name: true, region: true },
+      'trail-kinds': { color: true, icon: true, value: true },
+      'trail-ratings': { color: true, value: true },
+    },
+    select: {
+      area: true,
+      bounds: true,
+      displayName: true,
+      distance: true,
+      elevationGain: true,
+      elevationLoss: true,
+      elevationMax: true,
+      elevationMin: true,
+      kind: true,
+      osmIds: true,
+      rating: true,
+      slug: true,
+      trailName: true,
+    },
+    sort: 'displayName',
+    where: {
+      and: [{ city: { equals: city } }, { _status: { equals: 'published' } }],
+    },
+  });
+
+  return {
+    status: result.docs.length > 0 ? 'ok' : 'empty',
+    trails: result.docs.map(toMountainBikeTrail),
+  };
+}
+
+const readCachedCityTrailSummaries = unstable_cache(
+  readCityTrailSummaries,
+  ['public-city-trail-summaries'],
+  {
+    revalidate: PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
+    tags: [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG],
+  },
+);
+
+/** Read public trail metadata for a city. Never throws. */
+export async function getCityTrailSummaries(
+  city: CityId,
+): Promise<CityTrailSummaryData> {
   if (!process.env.DATABASE_URL) {
-    return { ...NONE, status: 'unavailable' };
+    return { status: 'unavailable', trails: [] };
   }
 
   try {
-    const payload = await getPayload({ config });
-    const result = await payload.find({
-      collection: 'trails',
-      // 1 so the `area` relationship resolves to its document rather than an id.
-      depth: 1,
-      // One city's curated trails is a few hundred rows; paging them would just
-      // add round trips.
-      limit: 2000,
-      pagination: false,
-      sort: 'displayName',
-      where: {
-        and: [{ city: { equals: city } }, { _status: { equals: 'published' } }],
-      },
-    });
-
-    if (result.docs.length === 0) {
-      return { ...NONE, status: 'empty' };
-    }
-
-    const trails = result.docs.map(toMountainBikeTrail);
-
-    const features = result.docs
-      .filter((trail) => trail.geom)
-      .map((trail) => ({
-        geometry: trail.geom,
-        properties: {
-          osmIds: osmIdsFor(trail.osmIds) ?? [],
-          slug: trail.slug ?? undefined,
-          Trail: trail.trailName ?? '',
-        },
-        type: 'Feature' as const,
-      }));
-
-    return {
-      geojson: { features, type: 'FeatureCollection' },
-      status: 'ok',
-      trails,
-    };
+    return await readCachedCityTrailSummaries(city);
   } catch (error) {
-    // The map must survive the CMS being down. Log loudly, return nothing, and
-    // let the caller fall back to the checked-in data.
     console.error(
-      `Could not read trails for "${city}" from Payload; falling back to the checked-in data.`,
+      `Could not read trail summaries for "${city}" from Payload; falling back to the checked-in data.`,
       error,
     );
-    return { ...NONE, status: 'unavailable' };
+    return { status: 'unavailable', trails: [] };
+  }
+}
+
+/**
+ * Published geometry shaped like the static GeoJSON files the map already
+ * reads. Sidebar metadata and elevation profiles are deliberately excluded.
+ */
+async function readCityTrailGeojson(
+  city: CityId,
+): Promise<CityTrailGeojsonData> {
+  const payload = await getPayload({ config });
+  const result = await payload.find({
+    collection: 'trails',
+    depth: 0,
+    limit: 2000,
+    pagination: false,
+    select: {
+      geom: true,
+      osmIds: true,
+      slug: true,
+      trailName: true,
+    },
+    sort: 'trailName',
+    where: {
+      and: [{ city: { equals: city } }, { _status: { equals: 'published' } }],
+    },
+  });
+
+  const features = result.docs
+    .filter((trail) => Boolean(trail.geom))
+    .map((trail) => ({
+      geometry: trail.geom,
+      properties: {
+        osmIds: osmIdsFor(trail.osmIds) ?? [],
+        slug: trail.slug ?? undefined,
+        Trail: trail.trailName ?? '',
+      },
+      type: 'Feature' as const,
+    }));
+
+  return {
+    geojson: { features, type: 'FeatureCollection' },
+    status: result.docs.length > 0 ? 'ok' : 'empty',
+  };
+}
+
+const readCachedCityTrailGeojson = unstable_cache(
+  readCityTrailGeojson,
+  ['public-city-trail-geojson'],
+  {
+    revalidate: PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
+    tags: [PUBLIC_TRAIL_GEOJSON_CACHE_TAG],
+  },
+);
+
+/** Read public trail geometry for a city. Never throws. */
+export async function getCityTrailGeojson(
+  city: CityId,
+): Promise<CityTrailGeojsonData> {
+  if (!process.env.DATABASE_URL) {
+    return { geojson: EMPTY_GEOJSON, status: 'unavailable' };
+  }
+
+  try {
+    return await readCachedCityTrailGeojson(city);
+  } catch (error) {
+    console.error(
+      `Could not read trail geometry for "${city}" from Payload; falling back to the checked-in data.`,
+      error,
+    );
+    return { geojson: EMPTY_GEOJSON, status: 'unavailable' };
   }
 }
