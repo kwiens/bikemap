@@ -26,6 +26,7 @@ interface BuildReport {
   resolvedIds?: number[];
   /** Which path produced the line — see resolveTrailGeometry. */
   source?: 'edited' | 'osm' | null;
+  isPreview?: boolean;
   warnings?: string[];
 }
 
@@ -66,7 +67,7 @@ export function OsmBuildReport({ path }: { path: string }) {
             className="m-0 text-sm font-semibold leading-tight"
             id={headingId}
           >
-            Saved trail line
+            Trail line status
           </h3>
           <p className="mb-0 mt-1 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.45]">
             {status.description}
@@ -105,6 +106,14 @@ function buildStatus(
   hasStoredLine: boolean,
   wayCount: number,
 ): BuildStatus {
+  if (report?.isPreview) {
+    const resolvedCount = report.resolvedIds?.length ?? wayCount;
+    return {
+      description: `Previewed after joining ${resolvedCount} OpenStreetMap ${resolvedCount === 1 ? 'segment' : 'segments'}. Review the map, then save the trail to keep this line.`,
+      label: 'Unsaved preview',
+    };
+  }
+
   if (report?.builtAt) {
     const builtAt = new Date(report.builtAt).toLocaleString();
     if (report.source === 'edited' || source === 'edited') {
@@ -115,7 +124,7 @@ function buildStatus(
     }
     const resolvedCount = report.resolvedIds?.length ?? wayCount;
     return {
-      description: `Stored ${builtAt} after joining ${resolvedCount} OpenStreetMap ${resolvedCount === 1 ? 'segment' : 'segments'}. Future saves refresh it from those segments.`,
+      description: `Stored ${builtAt} after joining ${resolvedCount} OpenStreetMap ${resolvedCount === 1 ? 'segment' : 'segments'}. It stays unchanged until you preview and save another refresh.`,
       label: 'Stored with trail',
     };
   }
@@ -150,22 +159,22 @@ function buildStatus(
 
   if (wayCount > 0 && !hasStoredLine) {
     return {
-      description: `${wayCount} OpenStreetMap ${wayCount === 1 ? 'segment is' : 'segments are'} selected. Save this trail to join them into one line and store it.`,
-      label: 'Ready to build',
+      description: `${wayCount} OpenStreetMap ${wayCount === 1 ? 'segment is' : 'segments are'} selected. Refresh the line from OpenStreetMap, review the preview, then save this trail to store it.`,
+      label: 'Ready to refresh',
     };
   }
 
   if (hasStoredLine) {
     return {
       description:
-        'A trail line is stored here. Choose OpenStreetMap segments above and save to connect future updates to their source.',
+        'A trail line is stored here. Choose OpenStreetMap segments above, refresh and review the line, then save to connect future updates to their source.',
       label: 'Stored with trail',
     };
   }
 
   return {
     description:
-      'No trail line is stored yet. Choose from OpenStreetMap above, click the trail segments in riding order, then save.',
+      'No trail line is stored yet. Choose OpenStreetMap segments above, refresh and review the line, then save.',
     label: 'Not stored yet',
   };
 }

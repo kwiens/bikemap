@@ -438,20 +438,20 @@ Payload 3 runs inside this Next app (admin at `/admin`, config at
 `src/payload.config.ts`).
 
 **The core idea: by default a trail does not own its geometry.** It stores the
-OSM ways it rides on (`osmIds`), and the `resolveTrailGeometry` `beforeChange`
-hook rebuilds `geom`, `distance`, `elevation*`, and `bounds` from Overpass +
-Mapbox Terrain-RGB on save. `distance` and the elevation fields are always
-read-only — they are measured from the line, never typed.
+OSM ways it rides on (`osmIds`). The editor resolves them through Overpass into
+an unsaved preview; after a curator reviews it, the `resolveTrailGeometry`
+`beforeChange` hook validates and measures that exact line on save without
+fetching OSM again. `distance` and the elevation fields are always read-only —
+they are measured from the line, never typed.
 
 The admin has **one map** (`TrailMapEditor`, the "Trail geometry" field) with
 three modes: **Pick ways** (the default), **Move points**, and **Draw**. When
 OSM is wrong or missing, the latter two let a curator drag/insert/delete points
 or draw a line from scratch. **The first such edit flips `geometrySource` to
-`'edited'`**, which
-stops the OSM rebuild for that trail — otherwise the next save would refetch the
-ways and discard the edit. The line is then owned in the CMS; only the
-measurements are still derived, via the same `measureParts` the OSM path uses.
-"Discard edits and rebuild from OSM" reverses it.
+`'edited'`**, which stops the trail from tracking OSM. The line is then owned in
+the CMS; only the measurements are still derived, via the same `measureParts`
+the OSM path uses. Choosing OSM segments and refreshing previews a replacement;
+only the following ordinary save keeps it.
 
 - `src/payload/osm/overpass.ts` — fetch full-resolution ways by id (retry/backoff)
 - `src/payload/osm/assemble.ts` — join ways end to end; report gaps, never drop
@@ -505,9 +505,10 @@ Things to know before touching it:
   or an empty result all return an empty list, and `setMountainBikeTrails`
   ignores an empty list so the checked-in data stays in place. Preserve that —
   losing the CMS must not take the public map down.
-- **Bulk writes must pass `context: { skipOsmRebuild: true }`**, or the
-  `beforeChange` hook fires one Overpass request per row and gets the machine
-  rate-limited. Trails with `geometrySource: 'imported'` are skipped anyway.
+- **Bulk writes must pass `context: { skipOsmRebuild: true }`** so prepared OSM
+  geometry and measurements can be imported directly instead of being rejected
+  for lacking an interactive preview. Trails with `geometrySource: 'imported'`
+  are skipped anyway.
 - **The elevation chart prefers the database, with a city-scoped static fallback.**
   The pane fetches `/api/map/elevation/<slug>?city=<city>`, serving the profile
   measured on the trail's last save. A miss falls back to
@@ -609,9 +610,12 @@ Things to know before touching it:
 - **Overpass is a shared community endpoint.** It rate-limits (429) and sheds
   load (504) routinely. The client retries with backoff; don't script bulk
   requests against the public instance.
-- **Geometry rebuilds only when `osmIds` change** (or the line moves, for an
-  edited trail), or when the `rebuildGeometry` checkbox is ticked. Don't make the
-  hook unconditional — it costs an Overpass round trip plus terrain sampling.
+- **Ordinary saves never rebuild OSM geometry.** The trail editor's refresh
+  action calls the preview endpoint, renders the returned line, and marks that
+  exact reviewed geometry for the save hook. A changed `osmIds` list without a
+  matching preview is rejected. This keeps Overpass latency and upstream
+  changes out of the save transaction and prevents a curator from publishing a
+  line they never saw.
 - **Payload runs collection `beforeChange` hooks *before* field `validate`.** A
   field validator only ever sees what the hooks returned, so a server-side check
   that must not be bypassed belongs in the hook — that's why
