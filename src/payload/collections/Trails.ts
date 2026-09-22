@@ -1,7 +1,12 @@
-import type { Access, CollectionConfig, Field, FilterOptions } from 'payload';
+import type { CollectionConfig, Field, FilterOptions } from 'payload';
 import { resolveTrailGeometry } from '@/payload/hooks/resolveTrailGeometry';
 import { cityOptions, isCityId } from '@/config/map.config';
 import { DEFAULT_KIND_VALUE, UNRATED_VALUE } from '@/data/trail-vocabulary';
+import {
+  accessAssignedCity,
+  canChangeCity,
+  createInAssignedCity,
+} from '@/payload/access/city-scoped';
 import { recalculateTrailElevation } from '@/payload/endpoints/recalculate-trail-elevation';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { validateOsmIds } from '@/payload/osm/ids';
@@ -27,26 +32,6 @@ import { defaultVocabularyId } from './vocabulary-fields';
  * The stored `geom` is plain JSON rather than a PostGIS column. See docs/adr/0001.
  */
 
-/**
- * Admins edit every city; any other role only the city on its user record.
- *
- * Admin is the only role today, so in practice this is "signed in". The scoping
- * is here rather than deferred because it is the shape that has to hold when a
- * second role arrives — and a rule written then, against live data, is the kind
- * that gets one case wrong.
- */
-const cityScoped: Access = ({ req }) => {
-  const user = req.user;
-  if (!user) {
-    return false;
-  }
-  if (user.role === 'admin') {
-    return true;
-  }
-  // No city on a scoped user means no rows, rather than all rows.
-  return user.city ? { city: { equals: user.city } } : false;
-};
-
 const areasForTrailCity: FilterOptions = ({ data }) =>
   isCityId(data.city) ? { city: { equals: data.city } } : true;
 
@@ -71,11 +56,13 @@ export const Trails: CollectionConfig = {
   },
   // Published trails are public; everything else needs a login.
   access: {
-    create: cityScoped,
-    delete: cityScoped,
+    create: createInAssignedCity,
+    delete: accessAssignedCity,
     read: ({ req }) =>
-      req.user ? cityScoped({ req }) : { _status: { equals: 'published' } },
-    update: cityScoped,
+      req.user
+        ? accessAssignedCity({ req })
+        : { _status: { equals: 'published' } },
+    update: accessAssignedCity,
   },
   versions: {
     drafts: true,
@@ -142,6 +129,9 @@ export const Trails: CollectionConfig = {
                   type: 'select',
                   required: true,
                   options: cityOptions,
+                  access: {
+                    update: canChangeCity,
+                  },
                   admin: {
                     description:
                       'Which public city map serves this trail. The admin and database are shared across every city.',

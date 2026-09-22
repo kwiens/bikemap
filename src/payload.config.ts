@@ -11,6 +11,7 @@ import { Trails } from './payload/collections/Trails';
 import { Users } from './payload/collections/Users';
 import { resolveDatabaseUrl } from './payload/database';
 import { Theme } from './payload/globals/Theme';
+import { payloadCsrfOrigins, payloadSecret } from './payload/security';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -51,7 +52,8 @@ export default buildConfig({
     Users,
   ],
   globals: [Theme],
-  secret: process.env.PAYLOAD_SECRET || '',
+  csrf: payloadCsrfOrigins(),
+  secret: payloadSecret(),
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },

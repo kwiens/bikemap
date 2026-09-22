@@ -1,19 +1,12 @@
-import type { Access, CollectionConfig, FilterOptions } from 'payload';
+import type { CollectionConfig, FilterOptions } from 'payload';
 import { cityOptions, isCityId } from '@/config/map.config';
+import {
+  accessAssignedCity,
+  canChangeCity,
+  createInAssignedCity,
+} from '@/payload/access/city-scoped';
 import { resolveRouteSource } from '@/payload/hooks/resolveRouteSource';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
-
-/** Admins edit every city; future scoped roles only edit their assigned city. */
-const cityScoped: Access = ({ req }) => {
-  const user = req.user;
-  if (!user) {
-    return false;
-  }
-  if (user.role === 'admin') {
-    return true;
-  }
-  return user.city ? { city: { equals: user.city } } : false;
-};
 
 const publishedTrailsForRouteCity: FilterOptions = ({ data }) =>
   isCityId(data.city)
@@ -40,11 +33,13 @@ export const Routes: CollectionConfig = {
     listSearchableFields: ['name', 'routeId'],
   },
   access: {
-    create: cityScoped,
-    delete: cityScoped,
+    create: createInAssignedCity,
+    delete: accessAssignedCity,
     read: ({ req }) =>
-      req.user ? cityScoped({ req }) : { _status: { equals: 'published' } },
-    update: cityScoped,
+      req.user
+        ? accessAssignedCity({ req })
+        : { _status: { equals: 'published' } },
+    update: accessAssignedCity,
   },
   versions: {
     drafts: true,
@@ -71,6 +66,9 @@ export const Routes: CollectionConfig = {
           type: 'select',
           required: true,
           options: cityOptions,
+          access: {
+            update: canChangeCity,
+          },
           admin: { width: '25%' },
         },
         {
