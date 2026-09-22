@@ -45,6 +45,7 @@
     "@payloadcms/db-postgres": "3.90.1",
     "@payloadcms/next": "3.90.1",
     "@payloadcms/ui": "3.90.1",
+    "@vercel/analytics": "2.0.1",
     "clsx": "2.1.1",
     "graphql": "16.14.2",
     "lucide-react": "1.45.0",
