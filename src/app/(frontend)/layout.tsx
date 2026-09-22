@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
+import { Analytics } from '@vercel/analytics/next';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import './globals.css';
 import './map.css';
@@ -156,6 +157,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <Analytics />
         <Script src="/register-sw.js" strategy="lazyOnload" />
       </body>
     </html>
