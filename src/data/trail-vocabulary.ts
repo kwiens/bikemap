@@ -15,9 +15,9 @@
  * - **The icons.** A FontAwesome `IconDefinition` is an object, not a value —
  *   it can't round-trip through Postgres. A kind stores an icon *key* and this
  *   maps it back, which also keeps the icon set to ones already bundled.
- * - **The fallbacks.** `getCityTrails` must never throw, so every derived value
- *   needs an answer even when the vocabulary rows are missing or a curator has
- *   left a colour blank.
+ * - **The fallbacks.** `getCityTrailSummaries` must never throw, so every
+ *   derived value needs an answer even when the vocabulary rows are missing or
+ *   a curator has left a colour blank.
  *
  * Client-safe: no Node-only imports, so the sidebar can use it too.
  */

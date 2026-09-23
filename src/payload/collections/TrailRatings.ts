@@ -1,4 +1,8 @@
 import type { CollectionConfig } from 'payload';
+import {
+  invalidatePublicTrailSummariesAfterChange,
+  invalidatePublicTrailSummariesAfterDelete,
+} from '@/payload/cache/public-trails';
 import { slugValidator, valueField } from './vocabulary-fields';
 
 /**
@@ -15,6 +19,10 @@ import { slugValidator, valueField } from './vocabulary-fields';
  */
 export const TrailRatings: CollectionConfig = {
   slug: 'trail-ratings',
+  hooks: {
+    afterChange: [invalidatePublicTrailSummariesAfterChange],
+    afterDelete: [invalidatePublicTrailSummariesAfterDelete],
+  },
   labels: {
     plural: 'Trail ratings',
     singular: 'Trail rating',

@@ -1,5 +1,9 @@
 import type { CollectionConfig } from 'payload';
 import { KIND_ICON_OPTIONS } from '@/data/trail-vocabulary';
+import {
+  invalidatePublicTrailSummariesAfterChange,
+  invalidatePublicTrailSummariesAfterDelete,
+} from '@/payload/cache/public-trails';
 import { slugValidator, valueField } from './vocabulary-fields';
 
 /**
@@ -17,6 +21,10 @@ import { slugValidator, valueField } from './vocabulary-fields';
  */
 export const TrailKinds: CollectionConfig = {
   slug: 'trail-kinds',
+  hooks: {
+    afterChange: [invalidatePublicTrailSummariesAfterChange],
+    afterDelete: [invalidatePublicTrailSummariesAfterDelete],
+  },
   labels: {
     plural: 'Trail kinds',
     singular: 'Trail kind',

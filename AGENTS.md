@@ -486,13 +486,15 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   snapshot without osmIds), and **only Bend is seeded by default**
 
 **How the public map gets its trails and routes.** `src/app/(frontend)/page.tsx` is a
-server component: it calls `getCityTrails()` (Payload's Local API — a typed
-function call, no HTTP hop) plus `getCityRoutes()`, and passes both into
+server component: it calls `getCityTrailSummaries()` (Payload's Local API — a
+typed function call, no HTTP hop) plus `getCityRoutes()`, and passes both into
 `HomeClient` as props. The client publishes them to `src/data/trail-source.ts`
 and `src/data/route-source.ts` during render. The page resolves
 its city from the request hostname, so it reads `headers()` and renders per
-request; `/api/map/trails` sends `Cache-Control: max-age=60`, so an admin edit
-is live within a minute without a rebuild.
+request. The trail summaries and GeoJSON use separate 24-hour Data Cache entries
+that collection hooks expire after content edits. `/api/map/trails` also sends
+`Cache-Control: max-age=60, stale-while-revalidate=3600`, so existing clients may
+serve one stale response while they refresh after an edit.
 
 Things to know before touching it:
 
@@ -501,10 +503,10 @@ Things to know before touching it:
   import time and never sees the database rows. Anything derived from the list
   must be built lazily and invalidated via `onMountainBikeTrailsChange` — see
   the `trailByName` / `osmIdOwner` lookups in `utils/map.ts`.
-- **`getCityTrails` never throws.** No `DATABASE_URL`, an unreachable database,
-  or an empty result all return an empty list, and `setMountainBikeTrails`
-  ignores an empty list so the checked-in data stays in place. Preserve that —
-  losing the CMS must not take the public map down.
+- **The public trail readers never throw.** No `DATABASE_URL`, an unreachable
+  database, or an empty result all return an empty list, and
+  `setMountainBikeTrails` ignores an empty list so the checked-in data stays in
+  place. Preserve that — losing the CMS must not take the public map down.
 - **Bulk writes must pass `context: { skipOsmRebuild: true }`**, or the
   `beforeChange` hook fires one Overpass request per row and gets the machine
   rate-limited. Trails with `geometrySource: 'imported'` are skipped anyway.
@@ -575,7 +577,7 @@ Things to know before touching it:
   (The `vocabulary` in `loadVocabulary` / `defaultVocabularyId` /
   `trail-vocabulary.ts` is the data-model term and is unrelated to the nav
   label — don't rename those to match.)
-- **`getTrailSummary` never throws**, same rule as `getCityTrails` and
+- **`getTrailSummary` never throws**, same rule as the public trail readers and
   `getThemeCss` — it feeds the dashboard, which is the first page after signing
   in, so an exception there locks everyone out over a decorative panel. An
   unreachable database renders `—`, never `0`. Note one count is done in JS on
@@ -586,8 +588,8 @@ Things to know before touching it:
   Theme global. Class names like `.btn__content` are internals that move between
   releases. `--theme-elevation-*` resolves to a `--color-base-*` scale that dark
   mode *inverts*, so retinting that ramp themes both modes at once.
-- **`getThemeCss` never throws**, same rule as `getCityTrails` — a theme row
-  must never lock anyone out of the admin. Its `customCss` is injected verbatim,
+- **`getThemeCss` never throws**, same rule as the public trail readers — a
+  theme row must never lock anyone out of the admin. Its `customCss` is injected verbatim,
   so `sanitizeCss` strips `<`/`>`; don't remove that.
 - **The project is ESM** (`"type": "module"` — Payload 3's CLI requires it). New
   root config files must be ESM or `.cjs`.
