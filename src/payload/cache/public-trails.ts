@@ -13,7 +13,9 @@ function expireTags(tags: string[], req: PayloadRequest): void {
   try {
     // Callers pass only the summary tag or the two public trail cache tags.
     for (const tag of tags) {
-      revalidateTag(tag, 'max');
+      // A content write should make the next public read fresh. The normal
+      // cache remains aggressive; only the first read after an edit refills it.
+      revalidateTag(tag, { expire: 0 });
     }
   } catch (error) {
     // Payload's CLI can run collection hooks outside Next's request context.

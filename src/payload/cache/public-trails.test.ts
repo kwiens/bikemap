@@ -39,10 +39,10 @@ describe('public trail cache hooks', () => {
     invalidatePublicTrailDataAfterDelete(deletion as never);
 
     expect(mocks.revalidateTag.mock.calls).toEqual([
-      [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG, 'max'],
-      [PUBLIC_TRAIL_GEOJSON_CACHE_TAG, 'max'],
-      [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG, 'max'],
-      [PUBLIC_TRAIL_GEOJSON_CACHE_TAG, 'max'],
+      [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG, { expire: 0 }],
+      [PUBLIC_TRAIL_GEOJSON_CACHE_TAG, { expire: 0 }],
+      [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG, { expire: 0 }],
+      [PUBLIC_TRAIL_GEOJSON_CACHE_TAG, { expire: 0 }],
     ]);
   });
 
@@ -54,8 +54,8 @@ describe('public trail cache hooks', () => {
     invalidatePublicTrailSummariesAfterDelete(deletion as never);
 
     expect(mocks.revalidateTag.mock.calls).toEqual([
-      [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG, 'max'],
-      [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG, 'max'],
+      [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG, { expire: 0 }],
+      [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG, { expire: 0 }],
     ]);
   });
 
