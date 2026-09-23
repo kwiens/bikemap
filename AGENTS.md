@@ -491,8 +491,10 @@ typed function call, no HTTP hop) plus `getCityRoutes()`, and passes both into
 `HomeClient` as props. The client publishes them to `src/data/trail-source.ts`
 and `src/data/route-source.ts` during render. The page resolves
 its city from the request hostname, so it reads `headers()` and renders per
-request; `/api/map/trails` sends `Cache-Control: max-age=60`, so an admin edit
-is live within a minute without a rebuild.
+request. The trail summaries and GeoJSON use separate 24-hour Data Cache entries
+that collection hooks expire after content edits. `/api/map/trails` also sends
+`Cache-Control: max-age=60, stale-while-revalidate=3600`, so existing clients may
+serve one stale response while they refresh after an edit.
 
 Things to know before touching it:
 
@@ -501,10 +503,10 @@ Things to know before touching it:
   import time and never sees the database rows. Anything derived from the list
   must be built lazily and invalidated via `onMountainBikeTrailsChange` — see
   the `trailByName` / `osmIdOwner` lookups in `utils/map.ts`.
-- **The public trail readers never throw.** No `DATABASE_URL`, an unreachable database,
-  or an empty result all return an empty list, and `setMountainBikeTrails`
-  ignores an empty list so the checked-in data stays in place. Preserve that —
-  losing the CMS must not take the public map down.
+- **The public trail readers never throw.** No `DATABASE_URL`, an unreachable
+  database, or an empty result all return an empty list, and
+  `setMountainBikeTrails` ignores an empty list so the checked-in data stays in
+  place. Preserve that — losing the CMS must not take the public map down.
 - **Bulk writes must pass `context: { skipOsmRebuild: true }`**, or the
   `beforeChange` hook fires one Overpass request per row and gets the machine
   rate-limited. Trails with `geometrySource: 'imported'` are skipped anyway.
@@ -586,8 +588,8 @@ Things to know before touching it:
   Theme global. Class names like `.btn__content` are internals that move between
   releases. `--theme-elevation-*` resolves to a `--color-base-*` scale that dark
   mode *inverts*, so retinting that ramp themes both modes at once.
-- **`getThemeCss` never throws**, same rule as the public trail readers — a theme row
-  must never lock anyone out of the admin. Its `customCss` is injected verbatim,
+- **`getThemeCss` never throws**, same rule as the public trail readers — a
+  theme row must never lock anyone out of the admin. Its `customCss` is injected verbatim,
   so `sanitizeCss` strips `<`/`>`; don't remove that.
 - **The project is ESM** (`"type": "module"` — Payload 3's CLI requires it). New
   root config files must be ESM or `.cjs`.

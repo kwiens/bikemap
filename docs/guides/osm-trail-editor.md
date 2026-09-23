@@ -436,10 +436,16 @@ when the API fails or answers with no features.
 
 The page renders per request: it resolves its city from the request host, so one
 deployment can serve several cities and a render cached across hosts would hand
-a visitor another city's trails. `/api/map/trails` sends
-`Cache-Control: max-age=60, stale-while-revalidate=3600`, so an edit in `/admin`
-is live within a minute without a rebuild. Trail edits are rare and the payload
-is a few hundred rows, so the query is cheap enough to run per request.
+a visitor another city's trails. The database reads are cached separately for
+24 hours: one small projection supplies sidebar summaries, while another
+supplies only map geometry. Trail, complex, rating, and kind hooks immediately
+expire the affected entries after an edit, so the next server read refills them.
+
+Next's default Data Cache caps an entry at 2 MiB. Chattanooga's GeoJSON is close
+to that size, so the geometry entry is gzip-compressed internally and expanded
+before the API responds. `/api/map/trails` also sends `Cache-Control: public,
+max-age=60, stale-while-revalidate=3600`; existing clients may serve one stale
+response while they refresh after an edit.
 
 ## Admin appearance
 
