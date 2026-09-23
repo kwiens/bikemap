@@ -4,7 +4,13 @@ const mocks = vi.hoisted(() => ({
   find: vi.fn(),
   getPayload: vi.fn(),
   revalidateTag: vi.fn(),
-  unstableCache: vi.fn((callback: (...args: unknown[]) => unknown) => callback),
+  unstableCache: vi.fn(
+    (
+      callback: (...args: unknown[]) => unknown,
+      _keyParts?: string[],
+      _options?: unknown,
+    ) => callback,
+  ),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -16,6 +22,10 @@ vi.mock('next/cache', () => ({
 }));
 
 const { getCityTrailGeojson, getCityTrailSummaries } = await import('./trails');
+
+const compressedGeojsonReader = mocks.unstableCache.mock.calls.find(
+  ([, keys]) => Array.isArray(keys) && keys[0] === 'public-city-trail-geojson',
+)?.[0] as (city: string) => Promise<string>;
 
 const originalDatabaseUrl = process.env.DATABASE_URL;
 
@@ -154,5 +164,53 @@ describe('getCityTrailGeojson', () => {
       },
       status: 'ok',
     });
+  });
+
+  it('keeps production-scale geometry below the Next Data Cache limit', async () => {
+    const coordinateCount = 120_000;
+    const geometry = {
+      coordinates: Array.from({ length: coordinateCount }, (_, index) => [
+        -85.3 + (index % 2_000) * 0.000_01,
+        35 + (index % 1_500) * 0.000_01,
+      ]),
+      type: 'LineString',
+    };
+    mocks.find.mockResolvedValue({
+      docs: [
+        {
+          geom: geometry,
+          osmIds: [123],
+          slug: 'large-trail',
+          trailName: 'Large Trail',
+        },
+      ],
+    });
+
+    const uncompressedData = {
+      geojson: {
+        features: [
+          {
+            geometry,
+            properties: {
+              osmIds: [123],
+              slug: 'large-trail',
+              Trail: 'Large Trail',
+            },
+            type: 'Feature',
+          },
+        ],
+        type: 'FeatureCollection',
+      },
+      status: 'ok',
+    };
+    const compressed = await compressedGeojsonReader('chattanooga');
+    const cacheLimitBytes = 2 * 1024 * 1024;
+
+    expect(Buffer.byteLength(JSON.stringify(uncompressedData))).toBeGreaterThan(
+      cacheLimitBytes,
+    );
+    expect(Buffer.byteLength(JSON.stringify(compressed))).toBeLessThan(
+      cacheLimitBytes,
+    );
   });
 });

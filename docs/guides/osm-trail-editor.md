@@ -358,7 +358,7 @@ The map at `/` is a **server component**. It reads Payload through the Local API
 as props:
 
 ```
-app/(frontend)/page.tsx   getCityTrails + getCityRoutes ← Local API, per request
+app/(frontend)/page.tsx   getCityTrailSummaries + getCityRoutes ← Local API, cached
         ↓ props
 HomeClient.tsx            set trails + routes           ← during render
         ↓
@@ -412,7 +412,7 @@ rate-limited. Re-running either is safe: rows match on `(trailName, city)`.
 
 ### It degrades rather than breaks
 
-`getCityTrails` **never throws**, and it distinguishes three outcomes so callers
+The public trail readers **never throw**, and they distinguish three outcomes so callers
 don't confuse them:
 
 | `status` | Meaning | API returns |
@@ -534,8 +534,8 @@ with no line, trails with no elevation chart, trails whose last build warned, an
 the five most recently edited. It is additive — Payload's collection cards still
 render below it, so the normal way into a collection survives this failing.
 
-Two things it has to keep doing. `getTrailSummary` **never throws**, like
-`getCityTrails` and `getThemeCss`: the dashboard is the first page after signing
+Two things it has to keep doing. `getTrailSummary` **never throws**, like the
+public trail readers and `getThemeCss`: the dashboard is the first page after signing
 in, so an exception there is an admin nobody can get into, over a decorative
 panel. And an unreachable database shows `—`, never `0` — a zero is a claim.
 
@@ -645,7 +645,7 @@ a rating a curator added comes back as `unrated`.
 One admin and one global database serve every city. The `city` picker is visible
 on trails, complexes, and stewards; trails and complexes require an explicit
 choice so the server's fallback city cannot misfile global-admin edits.
-`getCityTrails` filters on it, the seeds set it per city, and user access is
+The public trail readers filter on it, the seeds set it per city, and user access is
 scoped by it. The dashboard shows a separate, city-filtered summary for every
 configured city.
 
@@ -660,7 +660,7 @@ The profile was never missing — `measureParts` samples the terrain on every sa
 to *produce* the distance and elevation totals, and used to discard the
 per-point series it computed on the way. It is stored now and read back by
 `src/payload/read/elevation.ts`, under the same never-throws rule as
-`getCityTrails`: no database means no chart from this path, not a broken page.
+the public trail readers: no database means no chart from this path, not a broken page.
 The lookup is scoped to a city the caller passes, which keeps it unambiguous
 without making slugs globally unique — two cities may both have a "Ridge Trail",
 and only one is being served. The city comes from the request (`?city=`, or the

@@ -16,6 +16,7 @@ import 'server-only';
  * and the caller falls back to the checked-in data — losing the CMS must not
  * take the public map down with it.
  */
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { unstable_cache } from 'next/cache';
 import { getPayload } from 'payload';
 import config from '@payload-config';
@@ -274,8 +275,23 @@ async function readCityTrailGeojson(
   };
 }
 
+async function readCompressedCityTrailGeojson(city: CityId): Promise<string> {
+  const data = await readCityTrailGeojson(city);
+
+  // Next's default Data Cache refuses entries above 2 MiB. Chattanooga's
+  // uncompressed FeatureCollection is already close to that limit, while its
+  // repeated GeoJSON structure and coordinates compress to a small fraction.
+  return gzipSync(JSON.stringify(data)).toString('base64');
+}
+
+function decompressCityTrailGeojson(value: string): CityTrailGeojsonData {
+  return JSON.parse(
+    gunzipSync(Buffer.from(value, 'base64')).toString('utf8'),
+  ) as CityTrailGeojsonData;
+}
+
 const readCachedCityTrailGeojson = unstable_cache(
-  readCityTrailGeojson,
+  readCompressedCityTrailGeojson,
   ['public-city-trail-geojson'],
   {
     revalidate: PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
@@ -292,7 +308,7 @@ export async function getCityTrailGeojson(
   }
 
   try {
-    return await readCachedCityTrailGeojson(city);
+    return decompressCityTrailGeojson(await readCachedCityTrailGeojson(city));
   } catch (error) {
     console.error(
       `Could not read trail geometry for "${city}" from Payload; falling back to the checked-in data.`,
