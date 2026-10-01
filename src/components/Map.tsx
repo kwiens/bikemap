@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, memo, useCallback } from 'react';
+import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import mapboxgl from 'mapbox-gl';
 import { MapLegendProvider } from '@/components/MapLegend';
@@ -111,12 +111,18 @@ if (!hasMapboxToken) {
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
-  const bikeRoutes = getBikeRoutes();
   const { isEmbed, options: embedOptions } = useEmbed();
+  const isMtbEmbed = isEmbed && embedOptions.mode === 'mtb';
+  const bikeRoutes = useMemo(
+    () => (isMtbEmbed ? [] : getBikeRoutes()),
+    [isMtbEmbed],
+  );
   // Embed mode is fixed for the lifetime of the tree, but the init effect runs
   // once on mount and must not list it as a dependency.
   const isEmbedRef = useRef(isEmbed);
   isEmbedRef.current = isEmbed;
+  const embedModeRef = useRef(embedOptions.mode);
+  embedModeRef.current = embedOptions.mode;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
@@ -1002,7 +1008,7 @@ const MapboxMap = memo(function MapboxMap() {
               canPruneStudioRoutes,
               styleRequestController.signal,
             ),
-            bikeRoutesUrl
+            bikeRoutesUrl && !isMtbEmbed
               ? fetchRouteCollection(
                   bikeRoutesUrl,
                   styleRequestController.signal,
@@ -1081,7 +1087,7 @@ const MapboxMap = memo(function MapboxMap() {
           const configuredInlineRoutes = bikeRoutes.filter((route) =>
             configuredInlineIds.has(route.id),
           );
-          if (bikeRoutesUrl) {
+          if (bikeRoutesUrl && !isMtbEmbed) {
             ensureInlineRoutes(newMap, routeCollection, configuredInlineRoutes);
           }
           const inlineRouteIds = configuredInlineIds;
@@ -1177,12 +1183,10 @@ const MapboxMap = memo(function MapboxMap() {
           // scans during initialization and keeping the interaction path fast.
           initRouteBoundsFromDefaults(bikeRoutes);
 
-          // Embed mode is Casual-only: the MTB tab is hidden, so attaching the
-          // trail tilesets would cost the partner's page two extra vector
-          // sources and their tile traffic on the critical path to MAP_READY,
-          // and would leave trail lines clickable with no UI to show the
-          // result. Skip the whole stack there.
-          const showTrails = !isEmbedRef.current;
+          // Casual embeds skip the trail stack and its tile traffic. MTB embeds
+          // attach it because their sidebar and deep links expose trails.
+          const showTrails =
+            !isEmbedRef.current || embedModeRef.current === 'mtb';
 
           if (showTrails) {
             // Initialize all mountain bike trail layers. The MTB tileset

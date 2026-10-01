@@ -15,6 +15,8 @@ export const EMBED_LAYERS = [
 
 export type EmbedLayer = (typeof EMBED_LAYERS)[number];
 
+export type EmbedMode = 'casual' | 'mtb';
+
 /**
  * The marker/overlay layers that form a mutually-exclusive radio group in the
  * map UI (turning one on hides the others — see `toggleLayer` in
@@ -29,11 +31,15 @@ export const MARKER_LAYERS = [
 ] as const satisfies readonly EmbedLayer[];
 
 export interface EmbedOptions {
+  /** Which curated route family the embed exposes. */
+  mode: EmbedMode;
   /** Whether the routes sidebar starts open. Defaults to closed — a 280px
    *  drawer eats most of a typical embed width. */
   sidebarOpen: boolean;
   /** Route slug (see `slugify(route.name)`) to select once the map is ready. */
   route?: string;
+  /** Curated trail slug to select once an MTB embed is ready. */
+  trail?: string;
   /** Initial map center as [lng, lat]; falls back to the city default. */
   center?: [number, number];
   /** Initial zoom; falls back to the city default. */
@@ -46,6 +52,7 @@ export interface EmbedOptions {
 }
 
 export const DEFAULT_EMBED_OPTIONS: EmbedOptions = {
+  mode: 'casual',
   sidebarOpen: false,
   layers: [],
 };
@@ -56,8 +63,10 @@ export const DEFAULT_EMBED_OPTIONS: EmbedOptions = {
  * still render a map.
  *
  * Supported params:
+ *   mode=casual|mtb
  *   sidebar=open|closed
  *   route=<slug>
+ *   trail=<slug>
  *   center=<lng>,<lat>
  *   zoom=<number>
  *   layers=attractions,bikeResources,bikeRentals,bikeNetwork  (comma list;
@@ -73,12 +82,17 @@ export function parseEmbedOptions(
 
   const options: EmbedOptions = { ...DEFAULT_EMBED_OPTIONS, layers: [] };
 
+  if (params.get('mode') === 'mtb') options.mode = 'mtb';
+
   const sidebar = params.get('sidebar');
   if (sidebar === 'open') options.sidebarOpen = true;
   else if (sidebar === 'closed') options.sidebarOpen = false;
 
   const route = params.get('route')?.trim();
   if (route) options.route = route;
+
+  const trail = params.get('trail')?.trim();
+  if (trail) options.trail = trail;
 
   const center = parseCenter(params.get('center'));
   if (center) options.center = center;
@@ -97,8 +111,10 @@ export function parseEmbedOptions(
  */
 export function buildEmbedSearch(options: Partial<EmbedOptions>): string {
   const params = new URLSearchParams();
+  if (options.mode === 'mtb') params.set('mode', 'mtb');
   if (options.sidebarOpen) params.set('sidebar', 'open');
   if (options.route) params.set('route', options.route);
+  if (options.trail) params.set('trail', options.trail);
   if (options.center) {
     params.set('center', options.center.map(formatCoord).join(','));
   }

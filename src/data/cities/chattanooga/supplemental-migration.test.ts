@@ -9,6 +9,7 @@ interface SupplementalFeature {
   geometry: unknown;
   properties: {
     source: string;
+    supplementalMode?: 'connect';
     Trail: string;
   };
 }
@@ -44,14 +45,15 @@ describe('Chattanooga supplemental trail data migration', () => {
     const migrationByName = new Map(
       migrationTrails.map((trail) => [trail.trailName, trail]),
     );
+    const standaloneFeatures = supplementalCollection.features.filter(
+      (feature) => feature.properties.supplementalMode !== 'connect',
+    );
 
     expect(migrationTrails).toHaveLength(6);
     expect(migrationByName.size).toBe(migrationTrails.length);
-    expect(supplementalCollection.features).toHaveLength(
-      migrationTrails.length,
-    );
+    expect(standaloneFeatures).toHaveLength(migrationTrails.length);
 
-    for (const feature of supplementalCollection.features) {
+    for (const feature of standaloneFeatures) {
       const trailName = feature.properties.Trail;
       const migrationTrail = migrationByName.get(trailName);
       const measurement = measurements[trailName];

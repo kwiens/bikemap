@@ -14,9 +14,13 @@ export function EmbedAttribution() {
 
   if (!isEmbed) return null;
 
-  const href = options.route
-    ? `${siteConfig.url}?route=${encodeURIComponent(options.route)}`
-    : siteConfig.url;
+  const selection =
+    options.mode === 'mtb' && options.trail
+      ? `trail=${encodeURIComponent(options.trail)}`
+      : options.mode === 'casual' && options.route
+        ? `route=${encodeURIComponent(options.route)}`
+        : '';
+  const href = selection ? `${siteConfig.url}?${selection}` : siteConfig.url;
 
   return (
     <a

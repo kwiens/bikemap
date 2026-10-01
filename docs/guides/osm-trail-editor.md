@@ -694,12 +694,11 @@ same geometry as its static map fallback, and its seed imports that profile
 with the line. Deployments with or without the database therefore show the same
 path, distance, and elevation statistics.
 
-Chattanooga's six Godsey Ridge trails are the exception on geometry ownership:
-their lines remain in the style-owned layer, but their checked-in profiles are
-still imported into Payload. The admin can display those charts; its
-**Repopulate elevation** action can restore one if the database predates the
-profile-importing seed. True terrain recalculation still requires stored
-geometry.
+Chattanooga's six Godsey Ridge trails come from the checked-in supplemental
+dataset because they are absent from the regional shapefile. Their lines and
+profiles are imported into Payload like the other Chattanooga trails; the
+legacy style-owned layer is hidden at runtime. The admin can display and
+recalculate those charts from the stored geometry.
 
 `pnpm backfill:elevation` measures every trail that has geometry but no profile.
 It samples terrain only — the geometry is already in the row — so it needs no

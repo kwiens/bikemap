@@ -11,6 +11,10 @@
 
 import { cityDataById, type CityId } from '@/data/cities';
 import type { BikeRoute } from '@/data/bike-routes';
+import {
+  slugForTrail,
+  type MountainBikeTrail,
+} from '@/data/mountain-bike-trails';
 import { resolveActiveCityId, cityConfigs } from '@/config/map.config';
 import { slugify } from '@/utils/string';
 import { MARKER_LAYERS, type EmbedLayer } from '@/utils/embed';
@@ -21,9 +25,16 @@ export interface EmbedRouteOption {
   slug: string;
 }
 
+export interface EmbedTrailOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface EmbedBuilderConfig {
   cityId: CityId;
   routes: EmbedRouteOption[];
+  trails: EmbedTrailOption[];
   /** Layers this city can actually render, in `MARKER_LAYERS` order. */
   availableLayers: EmbedLayer[];
 }
@@ -38,10 +49,12 @@ export interface EmbedBuilderConfig {
 export function embedBuilderConfig(
   hostname: string | undefined,
   routes: BikeRoute[],
+  trails: MountainBikeTrail[],
   cityQuery?: unknown,
 ): EmbedBuilderConfig {
   const cityId = resolveActiveCityId(hostname, cityQuery);
   const city = cityDataById[cityId];
+  const availableTrails = trails.length > 0 ? trails : city.mountainBikeTrails;
 
   const canShow: Record<EmbedLayer, boolean> = {
     attractions: city.mapFeatures.length > 0,
@@ -56,6 +69,11 @@ export function embedBuilderConfig(
       id: route.id,
       name: route.name,
       slug: slugify(route.name),
+    })),
+    trails: availableTrails.map((trail) => ({
+      id: trail.trailName,
+      name: trail.displayName,
+      slug: slugForTrail(trail),
     })),
     availableLayers: [...MARKER_LAYERS, 'bikeNetwork' as const].filter(
       (layer) => canShow[layer],
