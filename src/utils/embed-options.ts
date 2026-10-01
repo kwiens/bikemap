@@ -11,6 +11,10 @@
 
 import { cityDataById, type CityId } from '@/data/cities';
 import type { BikeRoute } from '@/data/bike-routes';
+import {
+  slugForTrail,
+  type MountainBikeTrail,
+} from '@/data/mountain-bike-trails';
 import { resolveActiveCityId, cityConfigs } from '@/config/map.config';
 import { slugify } from '@/utils/string';
 import { MARKER_LAYERS, type EmbedLayer } from '@/utils/embed';
@@ -21,9 +25,16 @@ export interface EmbedRouteOption {
   slug: string;
 }
 
+export interface EmbedTrailOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface EmbedBuilderConfig {
   cityId: CityId;
   routes: EmbedRouteOption[];
+  trails: EmbedTrailOption[];
   /** Layers this city can actually render, in `MARKER_LAYERS` order. */
   availableLayers: EmbedLayer[];
 }
@@ -38,10 +49,12 @@ export interface EmbedBuilderConfig {
 export function embedBuilderConfig(
   hostname: string | undefined,
   routes: BikeRoute[],
+  trails: MountainBikeTrail[],
   cityQuery?: unknown,
 ): EmbedBuilderConfig {
   const cityId = resolveActiveCityId(hostname, cityQuery);
   const city = cityDataById[cityId];
+  const availableTrails = trails.length > 0 ? trails : city.mountainBikeTrails;
 
   const canShow: Record<EmbedLayer, boolean> = {
     attractions: city.mapFeatures.length > 0,
@@ -57,8 +70,25 @@ export function embedBuilderConfig(
       name: route.name,
       slug: slugify(route.name),
     })),
+    trails: trailOptions(availableTrails),
     availableLayers: [...MARKER_LAYERS, 'bikeNetwork' as const].filter(
       (layer) => canShow[layer],
     ),
   };
+}
+
+/**
+ * One option per selectable slug. Neither `trailName` nor `slug` is unique in
+ * Payload, and the embed's deep link resolves a slug to its first match, so a
+ * second trail with the same slug could never be selected from the snippet.
+ */
+function trailOptions(trails: MountainBikeTrail[]): EmbedTrailOption[] {
+  const bySlug = new Map<string, EmbedTrailOption>();
+  for (const trail of trails) {
+    const slug = slugForTrail(trail);
+    if (!bySlug.has(slug)) {
+      bySlug.set(slug, { id: slug, name: trail.displayName, slug });
+    }
+  }
+  return [...bySlug.values()];
 }

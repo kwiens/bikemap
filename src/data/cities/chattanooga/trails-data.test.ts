@@ -14,7 +14,7 @@ interface TrailFeature {
     coordinates: [number, number][][];
     type: 'MultiLineString';
   };
-  properties: { Trail: string };
+  properties: { supplementalMode?: 'connect'; Trail: string };
   type: 'Feature';
 }
 
@@ -114,7 +114,7 @@ describe('Chattanooga trail import geometry', () => {
         (count, feature) => count + feature.geometry.coordinates.length,
         0,
       ),
-    ).toBe(403);
+    ).toBe(402);
     expect(matched).toHaveLength(224);
     expect(missing).toEqual([]);
 
@@ -163,9 +163,35 @@ describe('Chattanooga trail import geometry', () => {
 
     expect(supplementalCollection.type).toBe('FeatureCollection');
     expect(supplementalCollection.features.length).toBeGreaterThan(0);
-    for (const feature of supplementalCollection.features) {
+    for (const feature of supplementalCollection.features.filter(
+      (candidate) => candidate.properties.supplementalMode !== 'connect',
+    )) {
       expect(combinedByName.get(feature.properties.Trail)).toEqual(feature);
     }
+  });
+
+  it('fills the regional Cherokee Trail gap with one connected line', () => {
+    const combined = collection.features.find(
+      (feature) => feature.properties.Trail === 'Cherokee Trail',
+    );
+    const correction = supplementalCollection.features.find(
+      (feature) =>
+        feature.properties.Trail === 'Cherokee Trail' &&
+        feature.properties.supplementalMode === 'connect',
+    );
+    const line = combined?.geometry.coordinates[0] ?? [];
+    const connector = correction?.geometry.coordinates[0] ?? [];
+    const connectorStart = line.findIndex(
+      (position) =>
+        position[0] === connector[0]?.[0] && position[1] === connector[0]?.[1],
+    );
+
+    expect(combined?.geometry.coordinates).toHaveLength(1);
+    expect(connector).toHaveLength(29);
+    expect(connectorStart).toBeGreaterThanOrEqual(0);
+    expect(
+      line.slice(connectorStart, connectorStart + connector.length),
+    ).toEqual(connector);
   });
 
   it('keeps imported geometry, summaries, and static profiles in sync', () => {
