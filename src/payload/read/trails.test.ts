@@ -46,7 +46,9 @@ afterAll(() => {
 });
 
 describe('getCityTrailSummaries', () => {
-  it('versions both public caches for the Cherokee geometry migration', () => {
+  it('versions both public caches for the Cherokee geometry migration', async () => {
+    vi.resetModules();
+    await import('./trails');
     expect(PUBLIC_TRAIL_CACHE_DATA_VERSION).toBe(
       '20260921_152202_repair_cherokee_trail_geometry',
     );
