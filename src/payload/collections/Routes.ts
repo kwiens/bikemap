@@ -1,7 +1,9 @@
 import type { Access, CollectionConfig, FilterOptions } from 'payload';
 import { cityOptions, isCityId } from '@/config/map.config';
+import { routeNetwork } from '@/payload/endpoints/route-network';
 import { resolveRouteSource } from '@/payload/hooks/resolveRouteSource';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
+import { parseRoutePlan } from '@/payload/routing/plan';
 
 /** Admins edit every city; future scoped roles only edit their assigned city. */
 const cityScoped: Access = ({ req }) => {
@@ -35,7 +37,7 @@ export const Routes: CollectionConfig = {
     useAsTitle: 'name',
     defaultColumns: ['name', 'city', 'kind', 'geometrySource', 'updatedAt'],
     description:
-      'Every published Route appears in Casual mode. Its geometry may come from an import, an existing Trail, or a current Mapbox Studio layer.',
+      'Every published Route appears in Casual mode. Build one on the map from trails and roads, or reuse an import, an existing Trail, or a current Mapbox Studio layer.',
     group: 'Map content',
     listSearchableFields: ['name', 'routeId'],
   },
@@ -53,6 +55,13 @@ export const Routes: CollectionConfig = {
   hooks: {
     beforeValidate: [resolveRouteSource],
   },
+  endpoints: [
+    {
+      handler: routeNetwork,
+      method: 'get',
+      path: '/network',
+    },
+  ],
   fields: [
     {
       type: 'row',
@@ -109,8 +118,13 @@ export const Routes: CollectionConfig = {
           name: 'geometrySource',
           type: 'select',
           required: true,
-          defaultValue: 'imported',
+          // New routes are built on the map; the other sources are for
+          // routes migrated from elsewhere. A function so the default lives
+          // in the app rather than the column: Postgres cannot use an enum
+          // value as a default in the transaction that adds it.
+          defaultValue: () => 'composed',
           options: [
+            { label: 'Built on the map', value: 'composed' },
             { label: 'Imported geometry', value: 'imported' },
             { label: 'Existing trail', value: 'trail' },
             { label: 'Mapbox Studio layer', value: 'studio' },
@@ -118,7 +132,7 @@ export const Routes: CollectionConfig = {
           admin: {
             width: '25%',
             description:
-              'Imported and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.',
+              'Built, Imported, and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.',
           },
         },
         {
@@ -176,8 +190,11 @@ export const Routes: CollectionConfig = {
           min: 0,
           admin: {
             width: '25%',
+            // A built route's distance is measured from its line on save and
+            // shown by the editor, so there is nothing here to type.
             condition: (_, siblingData) =>
-              siblingData.geometrySource !== 'trail',
+              siblingData.geometrySource !== 'trail' &&
+              siblingData.geometrySource !== 'composed',
             description: 'Route distance in miles.',
           },
         },
@@ -205,7 +222,8 @@ export const Routes: CollectionConfig = {
             width: '50%',
             readOnly: true,
             condition: (_, siblingData) =>
-              siblingData.geometrySource !== 'trail',
+              siblingData.geometrySource !== 'trail' &&
+              siblingData.geometrySource !== 'composed',
             description: '[west, south, east, north] bounds.',
           },
         },
@@ -219,6 +237,19 @@ export const Routes: CollectionConfig = {
           },
         },
       ],
+    },
+    {
+      name: 'plan',
+      type: 'json',
+      label: 'Route',
+      admin: {
+        condition: (_, siblingData) =>
+          siblingData.geometrySource === 'composed',
+        components: {
+          Field: '@/payload/components/RouteMapEditor#RouteMapEditor',
+        },
+      },
+      validate: validateRoutePlan,
     },
     {
       name: 'geom',
@@ -261,6 +292,17 @@ export const Routes: CollectionConfig = {
     },
   ],
 };
+
+export function validateRoutePlan(
+  value: unknown,
+  options: { siblingData?: Record<string, unknown> } = {},
+): string | true {
+  if (options.siblingData?.geometrySource !== 'composed') {
+    return true;
+  }
+  const parsed = parseRoutePlan(value);
+  return parsed.ok ? true : parsed.error;
+}
 
 export function validateRouteGeometry(
   value: unknown,

@@ -1,6 +1,13 @@
 import { ValidationError, type CollectionBeforeValidateHook } from 'payload';
 import { isCityId } from '@/config/map.config';
+import { boundsOf } from '@/payload/osm/assemble';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
+import { METERS_TO_MILES } from '@/payload/osm/units';
+import {
+  parseRoutePlan,
+  planGeometry,
+  planMeters,
+} from '@/payload/routing/plan';
 import { STYLE_OWNED_ROUTE_LAYER_IDS } from '@/data/mapbox-style';
 import { slugify } from '@/utils/string';
 
@@ -116,11 +123,15 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
     return current;
   }
 
+  if (source === 'composed') {
+    return resolveComposedRoute(current, stored, req, isPublishing);
+  }
+
   if (source !== 'imported' && source !== 'studio') {
     error(
       req,
       'geometrySource',
-      'Choose imported geometry, an existing trail, or a Mapbox Studio layer.',
+      'Choose a route built on the map, imported geometry, an existing trail, or a Mapbox Studio layer.',
     );
   }
 
@@ -173,3 +184,56 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
 
   return current;
 };
+
+/**
+ * A route built in the route editor: everything public is derived from its
+ * plan.
+ *
+ * The line, distance, and bounds are computed here on every save, never taken
+ * from the request, so a built route's numbers cannot disagree with the line
+ * it draws — the same rule a hand-edited trail follows.
+ */
+function resolveComposedRoute(
+  current: RouteData,
+  stored: RouteData | undefined,
+  req: Parameters<CollectionBeforeValidateHook>[0]['req'],
+  isPublishing: boolean,
+): RouteData {
+  current.sourceTrail = null;
+
+  const parsed = parseRoutePlan(valueOf(current, stored, 'plan'));
+  if (!parsed.ok) {
+    error(req, 'plan', parsed.error);
+  }
+  const geom = planGeometry(parsed.plan);
+  current.plan = parsed.plan;
+  current.geom = geom;
+  current.distance = geom
+    ? Math.round(planMeters(parsed.plan) * METERS_TO_MILES * 100) / 100
+    : null;
+  current.bounds = geom ? boundsOf(geom.coordinates) : null;
+
+  const name = valueOf(current, stored, 'name');
+  if (
+    !valueOf(current, stored, 'routeId') &&
+    typeof name === 'string' &&
+    name
+  ) {
+    current.routeId = slugify(name);
+  }
+
+  if (!isPublishing) {
+    return current;
+  }
+  if (!name) {
+    error(req, 'name', 'Give this route a name.');
+  }
+  if (!geom) {
+    error(
+      req,
+      'plan',
+      'Place at least two waypoints on the map to publish this route.',
+    );
+  }
+  return current;
+}
