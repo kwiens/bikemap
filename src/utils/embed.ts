@@ -72,7 +72,8 @@ export const DEFAULT_EMBED_OPTIONS: EmbedOptions = {
  *   layers=attractions,bikeResources,bikeRentals,bikeNetwork  (comma list;
  *     at most one of attractions/bikeResources/bikeRentals is kept — the
  *     first one that appears — since the map treats them as a radio group;
- *     bikeNetwork is independent and may accompany it)
+ *     bikeNetwork is independent and may accompany it; ignored when
+ *     mode=mtb)
  */
 export function parseEmbedOptions(
   search: string | URLSearchParams,
@@ -100,7 +101,11 @@ export function parseEmbedOptions(
   const zoom = parseZoom(params.get('zoom'));
   if (zoom !== undefined) options.zoom = zoom;
 
-  options.layers = parseLayers(params.get('layers'));
+  // Layer toggles live only in the Casual sidebar, so an MTB embed that
+  // honoured them would show markers nothing in the frame can turn off.
+  if (options.mode === 'casual') {
+    options.layers = parseLayers(params.get('layers'));
+  }
 
   return options;
 }
@@ -119,7 +124,7 @@ export function buildEmbedSearch(options: Partial<EmbedOptions>): string {
     params.set('center', options.center.map(formatCoord).join(','));
   }
   if (options.zoom !== undefined) params.set('zoom', String(options.zoom));
-  if (options.layers && options.layers.length > 0) {
+  if (options.mode !== 'mtb' && options.layers && options.layers.length > 0) {
     params.set('layers', options.layers.join(','));
   }
   return params.toString();

@@ -198,6 +198,10 @@ copy's geometry source is already `edited`. Migration
 `20260921_152202_repair_cherokee_trail_geometry` similarly repairs only the
 known two-part Cherokee geometry and preserves diverged or curator-owned rows.
 The city seed remains the repeatable full import for a new or rebuilt database.
+Raw-SQL migrations skip the hooks that expire the public trail cache, so a
+migration that changes trail rows must also set
+`PUBLIC_TRAIL_CACHE_DATA_VERSION` (`src/payload/cache/public-trails.ts`) to its
+name; otherwise the new build serves cached pre-migration trails for a day.
 
 `ensureMtnBikeSource(map)` attaches `MTN_BIKE_SOURCE_ID` as GeoJSON, reads
 `/api/map/trails?city=chattanooga`, and falls back to the checked-in GeoJSON if

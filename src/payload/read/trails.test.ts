@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PUBLIC_TRAIL_CACHE_DATA_VERSION } from '@/payload/cache/public-trails';
 
 const mocks = vi.hoisted(() => ({
   find: vi.fn(),
@@ -45,6 +46,16 @@ afterAll(() => {
 });
 
 describe('getCityTrailSummaries', () => {
+  it('versions both public caches for the Cherokee geometry migration', () => {
+    expect(PUBLIC_TRAIL_CACHE_DATA_VERSION).toBe(
+      '20260921_152202_repair_cherokee_trail_geometry',
+    );
+    expect(mocks.unstableCache.mock.calls.map(([, keys]) => keys)).toEqual([
+      ['public-city-trail-summaries', PUBLIC_TRAIL_CACHE_DATA_VERSION],
+      ['public-city-trail-geojson', PUBLIC_TRAIL_CACHE_DATA_VERSION],
+    ]);
+  });
+
   it('selects only fields used by the public trail list', async () => {
     mocks.find.mockResolvedValue({
       docs: [

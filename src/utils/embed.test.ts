@@ -38,6 +38,15 @@ describe('parseEmbedOptions', () => {
     expect(parseEmbedOptions('trail=%20').trail).toBeUndefined();
   });
 
+  it('drops layers in MTB mode, whose sidebar has no layer toggles', () => {
+    expect(
+      parseEmbedOptions('?mode=mtb&layers=attractions,bikeNetwork').layers,
+    ).toEqual([]);
+    expect(parseEmbedOptions('?layers=attractions').layers).toEqual([
+      'attractions',
+    ]);
+  });
+
   it('parses center and zoom, rejecting malformed values', () => {
     expect(parseEmbedOptions('center=-85.31,35.05&zoom=13')).toMatchObject({
       center: [-85.31, 35.05],
@@ -124,7 +133,7 @@ describe('buildEmbedSearch', () => {
       trail: 'chunky',
       center: [-85.309, 35.0456] as [number, number],
       zoom: 12.5,
-      layers: ['attractions', 'bikeNetwork'] as const,
+      layers: [] as const,
     };
     const search = buildEmbedSearch({
       ...options,
@@ -139,6 +148,12 @@ describe('buildEmbedSearch', () => {
   it('omits the default mode and emits MTB mode', () => {
     expect(buildEmbedSearch({ mode: 'casual' })).toBe('');
     expect(buildEmbedSearch({ mode: 'mtb' })).toBe('mode=mtb');
+  });
+
+  it('does not emit layers for MTB mode', () => {
+    expect(buildEmbedSearch({ mode: 'mtb', layers: ['attractions'] })).toBe(
+      'mode=mtb',
+    );
   });
 
   it('rounds coordinates to 5 decimals', () => {

@@ -440,6 +440,9 @@ a visitor another city's trails. The database reads are cached separately for
 24 hours: one small projection supplies sidebar summaries, while another
 supplies only map geometry. Trail, complex, rating, and kind hooks immediately
 expire the affected entries after an edit, so the next server read refills them.
+Migrations write with raw SQL and bypass those hooks; one that changes trail
+rows sets `PUBLIC_TRAIL_CACHE_DATA_VERSION` to its own name, which changes the
+cache key so the deploy reads fresh.
 
 Next's default Data Cache caps an entry at 2 MiB. Chattanooga's GeoJSON is close
 to that size, so the geometry entry is gzip-compressed internally and expanded

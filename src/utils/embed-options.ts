@@ -70,13 +70,25 @@ export function embedBuilderConfig(
       name: route.name,
       slug: slugify(route.name),
     })),
-    trails: availableTrails.map((trail) => ({
-      id: trail.trailName,
-      name: trail.displayName,
-      slug: slugForTrail(trail),
-    })),
+    trails: trailOptions(availableTrails),
     availableLayers: [...MARKER_LAYERS, 'bikeNetwork' as const].filter(
       (layer) => canShow[layer],
     ),
   };
+}
+
+/**
+ * One option per selectable slug. Neither `trailName` nor `slug` is unique in
+ * Payload, and the embed's deep link resolves a slug to its first match, so a
+ * second trail with the same slug could never be selected from the snippet.
+ */
+function trailOptions(trails: MountainBikeTrail[]): EmbedTrailOption[] {
+  const bySlug = new Map<string, EmbedTrailOption>();
+  for (const trail of trails) {
+    const slug = slugForTrail(trail);
+    if (!bySlug.has(slug)) {
+      bySlug.set(slug, { id: slug, name: trail.displayName, slug });
+    }
+  }
+  return [...bySlug.values()];
 }

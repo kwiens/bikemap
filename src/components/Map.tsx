@@ -121,8 +121,6 @@ const MapboxMap = memo(function MapboxMap() {
   // once on mount and must not list it as a dependency.
   const isEmbedRef = useRef(isEmbed);
   isEmbedRef.current = isEmbed;
-  const embedModeRef = useRef(embedOptions.mode);
-  embedModeRef.current = embedOptions.mode;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const locationMarker = useRef<mapboxgl.Marker | null>(null);
@@ -1087,7 +1085,7 @@ const MapboxMap = memo(function MapboxMap() {
           const configuredInlineRoutes = bikeRoutes.filter((route) =>
             configuredInlineIds.has(route.id),
           );
-          if (bikeRoutesUrl && !isMtbEmbed) {
+          if (bikeRoutesUrl) {
             ensureInlineRoutes(newMap, routeCollection, configuredInlineRoutes);
           }
           const inlineRouteIds = configuredInlineIds;
@@ -1185,8 +1183,7 @@ const MapboxMap = memo(function MapboxMap() {
 
           // Casual embeds skip the trail stack and its tile traffic. MTB embeds
           // attach it because their sidebar and deep links expose trails.
-          const showTrails =
-            !isEmbedRef.current || embedModeRef.current === 'mtb';
+          const showTrails = !isEmbedRef.current || isMtbEmbed;
 
           if (showTrails) {
             // Initialize all mountain bike trail layers. The MTB tileset
