@@ -11,6 +11,9 @@
  *   Draw         click along the trail to extend it. How a trail that isn't in
  *                OSM at all gets geometry.
  *
+ * Import GPX replaces the line with a recorded or planned track, then drops into
+ * Move points to tidy it up. It is the Draw path with the clicking done by a GPS.
+ *
  * One map rather than one per field, because picking a way and adjusting the
  * result are the same task at two different distances — two maps meant losing
  * your place on every switch.
@@ -78,11 +81,12 @@ import {
   toTrailGeometry,
   type TrailGeometry,
 } from '@/payload/osm/geometry';
+import { parseGpx } from '@/payload/osm/gpx';
 import { parseOsmIds } from '@/payload/osm/ids';
 import { METERS_TO_MILES } from '@/payload/osm/units';
 import { OSM_BIKE_TRAIL_FILTER } from '@/utils/map';
 import { cn } from '@/lib/utils';
-import { Banner } from './admin-ui';
+import { Banner, type Tone } from './admin-ui';
 import { removeSelectedLinePointAt } from './terra-draw-point-removal';
 
 type Parts = [number, number][][];
@@ -140,9 +144,13 @@ export function TrailMapEditor({
   const { setValue: setRebuild } = useField<boolean>({
     path: 'rebuildGeometry',
   });
+  const { setValue: setTrailName, value: trailName } = useField<string>({
+    path: 'trailName',
+  });
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const statsRef = useRef<HTMLSpanElement | null>(null);
+  const gpxInputRef = useRef<HTMLInputElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<TerraDraw | null>(null);
 
@@ -166,6 +174,10 @@ export function TrailMapEditor({
   const [history, setHistory] = useState({ canRedo: false, canUndo: false });
   const [isRemovingPoint, setIsRemovingPoint] = useState(false);
   const [pointRemovalNote, setPointRemovalNote] = useState<string | null>(null);
+  const [importNote, setImportNote] = useState<{
+    text: string;
+    tone: Tone;
+  } | null>(null);
   /**
    * The ways the line currently on screen was built from.
    *
@@ -688,6 +700,79 @@ export function TrailMapEditor({
     }
   }, [readBack]);
 
+  /**
+   * Replaces the line with a GPX file's tracks.
+   *
+   * Lands as 'edited' through `commit`, not 'imported': 'imported' means "not
+   * maintained here" and skips measuring entirely, whereas a GPX line is ours to
+   * adjust and its distance and elevation must follow the line on save.
+   *
+   * Loaded as a new baseline, so Undo cannot step back across it — Terra Draw's
+   * history has no record of a wholesale replacement. That is why replacing an
+   * existing line asks first.
+   */
+  const importGpx = useCallback(
+    async (file: File) => {
+      setImportNote(null);
+      let text: string;
+      try {
+        text = await file.text();
+      } catch {
+        setImportNote({
+          text: `${file.name} could not be read.`,
+          tone: 'error',
+        });
+        return;
+      }
+      const parsed = parseGpx(text);
+      if (!parsed.ok) {
+        setImportNote({ text: `${file.name}: ${parsed.error}`, tone: 'error' });
+        return;
+      }
+      if (
+        partsRef.current.length > 0 &&
+        !window.confirm(
+          `Replace the current trail line with the track from ${file.name}? This cannot be undone, but leaving without saving keeps the current line.`,
+        )
+      ) {
+        return;
+      }
+
+      partsRef.current = parsed.parts;
+      loadDraw(parsed.parts);
+      paintStats();
+      commit();
+      // The line no longer comes from the picked ways, and saying they have
+      // "changed since this line was built" would send the curator off to
+      // rebuild from OSM — the opposite of what they just did.
+      setLineWays(idsRef.current);
+
+      const bounds = boundsOf(parsed.parts);
+      if (mapRef.current && bounds) {
+        mapRef.current.fitBounds(bounds, { padding: 60 });
+      }
+      if (!trailName?.trim() && parsed.name) {
+        setTrailName(parsed.name);
+      }
+      // Already in Move points, the mode effect won't re-run, and `loadDraw`
+      // just cleared the selection that shows the handles.
+      if (modeRef.current === 'move') {
+        autoSelect();
+      } else {
+        setMode('move');
+      }
+
+      const kept = parsed.parts.reduce((total, part) => total + part.length, 0);
+      const pieces =
+        parsed.parts.length > 1 ? ` in ${parsed.parts.length} pieces` : '';
+      setImportNote({
+        text: `Imported ${file.name}: ${parsed.pointsRead.toLocaleString()} GPS points simplified to ${kept.toLocaleString()}${pieces}. Adjust the line if needed, then save to measure its distance and elevation.`,
+        tone: 'info',
+      });
+    },
+    [autoSelect, commit, loadDraw, paintStats, setTrailName, trailName],
+  );
+
   const revertToOsm = useCallback(() => {
     setGeometrySource('osm');
     setRebuild(true);
@@ -771,6 +856,28 @@ export function TrailMapEditor({
             }}
           />
           <ModeButton
+            active={false}
+            disabled={!editable || !ready || drawFailed}
+            isToggle={false}
+            label="Import GPX"
+            onClick={() => gpxInputRef.current?.click()}
+          />
+          <input
+            accept=".gpx,application/gpx+xml"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              // Cleared so choosing the same file again still fires `change`.
+              event.target.value = '';
+              if (file) {
+                void importGpx(file);
+              }
+            }}
+            ref={gpxInputRef}
+            tabIndex={-1}
+            type="file"
+          />
+          <ModeButton
             active={basemap === 'satellite'}
             disabled={false}
             label="Satellite"
@@ -782,6 +889,8 @@ export function TrailMapEditor({
           />
         </div>
       </div>
+
+      {importNote && <Banner tone={importNote.tone}>{importNote.text}</Banner>}
 
       {staleNote && <Banner tone="warning">{staleNote}</Banner>}
 
@@ -950,7 +1059,7 @@ function hintFor(
   if (!hasLine) {
     return hasWays
       ? 'Nothing to adjust yet. Save this trail to build the line from the selected OpenStreetMap trails, then return here to adjust it.'
-      : 'Nothing to adjust yet. Choose OpenStreetMap trails and save, or switch to Draw line and click along the route.';
+      : 'Nothing to adjust yet. Choose OpenStreetMap trails and save, import a GPX file, or switch to Draw line and click along the route.';
   }
 
   const takesOwnership =
