@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { lengthMeters } from './assemble';
-import { parseGpx, simplifyLine } from './gpx';
+import { parseGpx, SIMPLIFY_WINDOW_POINTS, simplifyLine } from './gpx';
 
 function gpx(
   body: string,
@@ -118,6 +118,47 @@ describe('parseGpx', () => {
     expect(parsed.ok && parsed.pointsRead).toBe(2);
   });
 
+  it('skips points with blank coordinates instead of plotting them at 0', () => {
+    const parsed = parseGpx(
+      gpx(`<trk><trkseg>
+        <trkpt lat="44.0" lon="-121.4"/>
+        <trkpt lat="" lon="-121.395"/>
+        <trkpt lat="44.005" lon="  "/>
+        <trkpt lat="44.01" lon="-121.39"/>
+      </trkseg></trk>`),
+    );
+
+    expect(parsed.ok && parsed.parts).toEqual([
+      [
+        [-121.4, 44.0],
+        [-121.39, 44.01],
+      ],
+    ]);
+  });
+
+  it('refuses files with more points than it will simplify', () => {
+    // jsdom's XML parser is far slower than a browser's, so the limit is
+    // exercised at a small size rather than the real one.
+    const parsed = parseGpx(
+      gpx(`<trk>
+        <trkseg>${trkpts([
+          [-121.4, 44.0],
+          [-121.39, 44.01],
+        ])}</trkseg>
+        <trkseg>${trkpts([
+          [-121.38, 44.02],
+          [-121.37, 44.03],
+        ])}</trkseg>
+      </trk>`),
+      { maxPoints: 3 },
+    );
+
+    expect(parsed).toEqual({
+      error: expect.stringContaining('the limit is'),
+      ok: false,
+    });
+  });
+
   it('drops segments too short to draw', () => {
     const parsed = parseGpx(
       gpx(`<trk>
@@ -188,6 +229,32 @@ describe('simplifyLine', () => {
 
     expect(simplifyLine(line, 3)).toHaveLength(3);
     expect(simplifyLine(line, 20)).toHaveLength(2);
+  });
+
+  it('simplifies in bounded windows, keeping each window boundary', () => {
+    const count = SIMPLIFY_WINDOW_POINTS * 3 + 1;
+    const straight = Array.from(
+      { length: count },
+      (_, i) => [-121.4 + i * 0.00001, 44.0] as [number, number],
+    );
+
+    expect(simplifyLine(straight, 3)).toEqual([
+      straight[0],
+      straight[SIMPLIFY_WINDOW_POINTS],
+      straight[SIMPLIFY_WINDOW_POINTS * 2],
+      straight[count - 1],
+    ]);
+  });
+
+  it('keeps every point of a line that is all detail', () => {
+    // A zigzag ~20 m wide: nothing is within tolerance of its neighbours.
+    const zigzag = Array.from(
+      { length: SIMPLIFY_WINDOW_POINTS * 2 + 7 },
+      (_, i) =>
+        [-121.4 + i * 0.0001, 44.0 + (i % 2) * 0.0002] as [number, number],
+    );
+
+    expect(simplifyLine(zigzag, 3)).toEqual(zigzag);
   });
 
   it('returns copies, not the caller’s arrays', () => {

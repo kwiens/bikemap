@@ -81,7 +81,7 @@ import {
   toTrailGeometry,
   type TrailGeometry,
 } from '@/payload/osm/geometry';
-import { parseGpx } from '@/payload/osm/gpx';
+import { MAX_GPX_BYTES, parseGpx } from '@/payload/osm/gpx';
 import { parseOsmIds } from '@/payload/osm/ids';
 import { METERS_TO_MILES } from '@/payload/osm/units';
 import { OSM_BIKE_TRAIL_FILTER } from '@/utils/map';
@@ -714,6 +714,13 @@ export function TrailMapEditor({
   const importGpx = useCallback(
     async (file: File) => {
       setImportNote(null);
+      if (file.size > MAX_GPX_BYTES) {
+        setImportNote({
+          text: `${file.name} is ${(file.size / 1024 / 1024).toFixed(0)} MB; the limit is ${MAX_GPX_BYTES / 1024 / 1024} MB. Trim it to the trail in another tool first.`,
+          tone: 'error',
+        });
+        return;
+      }
       let text: string;
       try {
         text = await file.text();

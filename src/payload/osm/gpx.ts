@@ -21,6 +21,26 @@ import { MIN_POINTS_PER_PART } from './geometry';
  */
 export const GPX_SIMPLIFY_TOLERANCE_M = 3;
 
+/**
+ * The largest file the editor will read. Parsing and simplifying happen on the
+ * main thread of the admin tab, so the input has to be bounded; a day-long
+ * one-second recording with elevation and timestamps is around 10 MB.
+ */
+export const MAX_GPX_BYTES = 25 * 1024 * 1024;
+
+/** The most track or route points one import may carry — ~28 hours at 1 Hz. */
+export const MAX_GPX_POINTS = 100_000;
+
+/**
+ * How many points one Douglas–Peucker pass may span.
+ *
+ * Douglas–Peucker is quadratic when its splits are lopsided, so the line is
+ * simplified in windows of at most this many points: worst-case work is
+ * `points × window`, not `points²`. Each window boundary keeps one extra
+ * point, which is nothing beside the hundreds a window drops.
+ */
+export const SIMPLIFY_WINDOW_POINTS = 1000;
+
 export type GpxImport =
   | {
       error: null;
@@ -42,7 +62,10 @@ export type GpxImport =
  */
 export function parseGpx(
   text: string,
-  toleranceMeters = GPX_SIMPLIFY_TOLERANCE_M,
+  {
+    maxPoints = MAX_GPX_POINTS,
+    toleranceMeters = GPX_SIMPLIFY_TOLERANCE_M,
+  }: { maxPoints?: number; toleranceMeters?: number } = {},
 ): GpxImport {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   if (
@@ -57,6 +80,14 @@ export function parseGpx(
     segments.length > 0
       ? segments.map((segment) => byLocalName(segment, 'trkpt'))
       : byLocalName(doc, 'rte').map((route) => byLocalName(route, 'rtept'));
+
+  const pointCount = runs.reduce((total, run) => total + run.length, 0);
+  if (pointCount > maxPoints) {
+    return {
+      error: `That GPX file has ${pointCount.toLocaleString()} points; the limit is ${maxPoints.toLocaleString()}. Trim it to the trail in another tool first.`,
+      ok: false,
+    };
+  }
 
   let pointsRead = 0;
   const parts: [number, number][][] = [];
@@ -86,7 +117,8 @@ export function parseGpx(
  * accurate to well under a meter across a trail's extent, which is all a
  * three-meter tolerance needs. Iterative rather than recursive, so a long
  * recording can't overflow the stack. Endpoints are always kept, so pieces that
- * met before simplifying still meet after.
+ * met before simplifying still meet after. Runs in windows of
+ * `SIMPLIFY_WINDOW_POINTS` so the work stays bounded — see there.
  */
 export function simplifyLine(
   points: [number, number][],
@@ -105,13 +137,17 @@ export function simplifyLine(
     (lat - originLat) * metersPerDegLat,
   ]);
 
+  const lastIndex = points.length - 1;
   const keep = new Uint8Array(points.length);
-  keep[0] = 1;
-  keep[points.length - 1] = 1;
+  keep[lastIndex] = 1;
 
   // Each entry is a span whose endpoints are kept; the stack never holds more
   // spans than the line has points.
-  const stack: [number, number][] = [[0, points.length - 1]];
+  const stack: [number, number][] = [];
+  for (let start = 0; start < lastIndex; start += SIMPLIFY_WINDOW_POINTS) {
+    keep[start] = 1;
+    stack.push([start, Math.min(start + SIMPLIFY_WINDOW_POINTS, lastIndex)]);
+  }
   while (stack.length > 0) {
     const [first, last] = stack.pop()!;
     let farthest = -1;
@@ -162,16 +198,23 @@ function byLocalName(root: Document | Element, localName: string): Element[] {
 
 /** One point's position, or nothing when its attributes aren't a valid pair. */
 function positionOf(point: Element): [number, number][] {
-  const lat = Number(point.getAttribute('lat'));
-  const lng = Number(point.getAttribute('lon'));
+  const lat = coordinateOf(point, 'lat');
+  const lng = coordinateOf(point, 'lon');
   const valid =
-    point.hasAttribute('lat') &&
-    point.hasAttribute('lon') &&
     Number.isFinite(lat) &&
     Number.isFinite(lng) &&
     Math.abs(lat) <= 90 &&
     Math.abs(lng) <= 180;
   return valid ? [[lng, lat]] : [];
+}
+
+/**
+ * An attribute as a number, or NaN when it is missing or blank. `Number('')`
+ * is 0, so without the blank check an empty `lat=""` would plot at the equator.
+ */
+function coordinateOf(point: Element, name: 'lat' | 'lon'): number {
+  const raw = point.getAttribute(name)?.trim();
+  return raw ? Number(raw) : Number.NaN;
 }
 
 /** A stopped recorder logs the same fix over and over; one copy is enough. */
