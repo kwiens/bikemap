@@ -7,7 +7,7 @@ import { siteConfigForHostname } from '@/config/site.config';
 import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
 import { getCityRoutes } from '@/payload/read/routes';
-import { getCityTrails } from '@/payload/read/trails';
+import { getCityTrailSummaries } from '@/payload/read/trails';
 import {
   ArrowLeft,
   MessageCircle,
@@ -100,7 +100,7 @@ export default async function AboutPage({
   const isBend = siteConfig.cityId === 'bend';
   const [{ routes }, { trails }] = await Promise.all([
     getCityRoutes(siteConfig.cityId),
-    getCityTrails(siteConfig.cityId),
+    getCityTrailSummaries(siteConfig.cityId),
   ]);
   const builderConfig = embedBuilderConfig(
     hostname,
