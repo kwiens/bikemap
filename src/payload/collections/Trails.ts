@@ -7,6 +7,7 @@ import {
   invalidatePublicTrailDataAfterDelete,
 } from '@/payload/cache/public-trails';
 import { recalculateTrailElevation } from '@/payload/endpoints/recalculate-trail-elevation';
+import { trailNetwork } from '@/payload/endpoints/trail-network';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { validateOsmIds } from '@/payload/osm/ids';
 import { slugify } from '@/utils/string';
@@ -96,6 +97,11 @@ export const Trails: CollectionConfig = {
       handler: recalculateTrailElevation,
       method: 'post',
       path: '/:id/recalculate-elevation',
+    },
+    {
+      handler: trailNetwork,
+      method: 'get',
+      path: '/network',
     },
   ],
   fields: [
