@@ -40,6 +40,8 @@ export interface TrailNetwork {
    * every animation frame while Follow trails previews the next leg.
    */
   grid: Map<string, number[]>;
+  /** Long segments checked directly instead of expanding their bounding boxes. */
+  unindexedSegments: number[];
   nodes: Map<number, Position>;
   /** Every segment once, as node-id pairs — what snapping searches. */
   segments: [number, number][];
@@ -77,6 +79,8 @@ export const MAX_SNAP_METERS = 150;
 
 /** The snapping index's cell size: about 160 × 220 m at Bend's latitude. */
 const SNAP_GRID_DEG = 0.002;
+/** Bounds each index insertion and query, independent of geographic extent. */
+const MAX_SNAP_GRID_CELLS = 256;
 
 const METERS_PER_DEG_LAT = 111_320;
 
@@ -84,6 +88,7 @@ export function createTrailNetwork(): TrailNetwork {
   return {
     edges: new Map(),
     grid: new Map(),
+    unindexedSegments: [],
     nodes: new Map(),
     segments: [],
     wayIds: new Set(),
@@ -109,12 +114,18 @@ export function addWays(network: TrailNetwork, ways: NetworkWay[]): void {
     network.wayIds.add(way.id);
 
     for (let index = 0; index < way.nodes.length; index++) {
-      network.nodes.set(way.nodes[index], way.coordinates[index]);
+      if (isPosition(way.coordinates[index])) {
+        network.nodes.set(way.nodes[index], way.coordinates[index]);
+      }
     }
     for (let index = 1; index < way.nodes.length; index++) {
       const a = way.nodes[index - 1];
       const b = way.nodes[index];
-      if (a === b) {
+      if (
+        a === b ||
+        !isPosition(way.coordinates[index - 1]) ||
+        !isPosition(way.coordinates[index])
+      ) {
         continue;
       }
       const meters = distance(
@@ -146,6 +157,9 @@ export function snapToNetwork(
   point: Position,
   maxMeters = MAX_SNAP_METERS,
 ): NetworkSnap | null {
+  if (!isPosition(point) || !Number.isFinite(maxMeters) || maxMeters < 0) {
+    return null;
+  }
   const project = flatProjection(point);
   let best: NetworkSnap | null = null;
 
@@ -153,13 +167,22 @@ export function snapToNetwork(
   const lngDeg =
     maxMeters /
     (METERS_PER_DEG_LAT * Math.max(0.01, Math.cos((point[1] * Math.PI) / 180)));
-  const candidates = new Set<number>();
-  for (const key of gridCells(
+  const keys = gridCells(
     [point[0] - lngDeg, point[1] - latDeg],
     [point[0] + lngDeg, point[1] + latDeg],
-  )) {
-    for (const segment of network.grid.get(key) ?? []) {
+  );
+  // A very large search radius scans the existing graph, never an enormous
+  // geographic rectangle. Long segments remain snappable at their midpoint.
+  const candidates = new Set<number>(network.unindexedSegments);
+  if (keys === null) {
+    for (let segment = 0; segment < network.segments.length; segment++) {
       candidates.add(segment);
+    }
+  } else {
+    for (const key of keys) {
+      for (const segment of network.grid.get(key) ?? []) {
+        candidates.add(segment);
+      }
     }
   }
 
@@ -331,16 +354,21 @@ export function cellBounds(key: string): [number, number, number, number] {
   ];
 }
 
-/** Adds a segment to every snapping cell its bounding box touches. */
+/** Indexes local segments; retains long ones without geographic amplification. */
 function indexSegment(
   network: TrailNetwork,
   segment: number,
   [a, b]: [Position, Position],
 ) {
-  for (const key of gridCells(
+  const keys = gridCells(
     [Math.min(a[0], b[0]), Math.min(a[1], b[1])],
     [Math.max(a[0], b[0]), Math.max(a[1], b[1])],
-  )) {
+  );
+  if (keys === null) {
+    network.unindexedSegments.push(segment);
+    return;
+  }
+  for (const key of keys) {
     const bucket = network.grid.get(key);
     if (bucket) {
       bucket.push(segment);
@@ -350,23 +378,39 @@ function indexSegment(
   }
 }
 
-/** Snapping-grid keys covering a box, from its south-west to north-east corner. */
-function gridCells([west, south]: Position, [east, north]: Position): string[] {
+/** Returns null when a box needs the bounded-by-graph-size fallback. */
+function gridCells(
+  [west, south]: Position,
+  [east, north]: Position,
+): string[] | null {
+  const minX = Math.floor(west / SNAP_GRID_DEG);
+  const maxX = Math.floor(east / SNAP_GRID_DEG);
+  const minY = Math.floor(south / SNAP_GRID_DEG);
+  const maxY = Math.floor(north / SNAP_GRID_DEG);
+  const count = (maxX - minX + 1) * (maxY - minY + 1);
+  if (!Number.isFinite(count) || count > MAX_SNAP_GRID_CELLS) {
+    return null;
+  }
   const keys: string[] = [];
-  for (
-    let x = Math.floor(west / SNAP_GRID_DEG);
-    x <= Math.floor(east / SNAP_GRID_DEG);
-    x++
-  ) {
-    for (
-      let y = Math.floor(south / SNAP_GRID_DEG);
-      y <= Math.floor(north / SNAP_GRID_DEG);
-      y++
-    ) {
+  for (let x = minX; x <= maxX; x++) {
+    for (let y = minY; y <= maxY; y++) {
       keys.push(`${x}:${y}`);
     }
   }
   return keys;
+}
+
+function isPosition(value: unknown): value is Position {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    typeof value[0] === 'number' &&
+    typeof value[1] === 'number' &&
+    Number.isFinite(value[0]) &&
+    Number.isFinite(value[1]) &&
+    Math.abs(value[0]) <= 180 &&
+    Math.abs(value[1]) <= 90
+  );
 }
 
 function link(network: TrailNetwork, from: number, to: number, meters: number) {
