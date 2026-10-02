@@ -82,6 +82,84 @@ describe('addWays', () => {
     ]);
     expect(built.segments).toHaveLength(0);
   });
+
+  it('bounds snapping index work for a long diagonal without dropping the way', () => {
+    const built = createTrailNetwork();
+    addWays(built, [
+      {
+        coordinates: [
+          [0, 0],
+          [1, 1],
+        ],
+        id: 1,
+        name: null,
+        nodes: [1, 2],
+      },
+    ]);
+    expect(built.grid.size).toBeLessThanOrEqual(256);
+    expect(built.segments).toEqual([[1, 2]]);
+    expect(snapToNetwork(built, [0.5, 0.5])?.point).toEqual([0.5, 0.5]);
+  });
+
+  it('keeps a distant segment connected and snappable without expanding its box', () => {
+    const built = createTrailNetwork();
+    addWays(built, [
+      {
+        coordinates: [
+          [0, 0],
+          [60, 60],
+        ],
+        id: 1,
+        name: null,
+        nodes: [1, 2],
+      },
+      {
+        coordinates: [
+          [60, 60],
+          [60.001, 60],
+        ],
+        id: 2,
+        name: null,
+        nodes: [2, 3],
+      },
+    ]);
+    expect(built.grid.size).toBeLessThanOrEqual(256);
+    const middle = snapToNetwork(built, [30, 30]);
+    const end = snapToNetwork(built, [60.001, 60]);
+    expect(middle?.point).toEqual([30, 30]);
+    expect(routeBetween(built, middle!, end!)).toEqual([
+      [30, 30],
+      [60, 60],
+      [60.001, 60],
+    ]);
+  });
+
+  it.each(
+    [[Infinity, 0], [0, NaN], [181, 0], [0, -91], ['0', 0], null].map(
+      (bad) => ({ bad }),
+    ),
+  )(
+    'skips invalid endpoints without bridging gaps or losing valid pieces: $bad',
+    ({ bad }) => {
+      const built = createTrailNetwork();
+      addWays(built, [
+        {
+          coordinates: [
+            [0, 0],
+            bad,
+            [0.001, 0],
+            [0.002, 0],
+          ] as NetworkWay['coordinates'],
+          id: 1,
+          name: null,
+          nodes: [1, 2, 3, 4],
+        },
+      ]);
+      expect(built.segments).toEqual([[3, 4]]);
+      expect(built.nodes.has(2)).toBe(false);
+      expect(snapToNetwork(built, [0.0015, 0])?.point).toEqual([0.0015, 0]);
+    },
+  );
 });
 
 describe('snapToNetwork', () => {
@@ -111,6 +189,26 @@ describe('snapToNetwork', () => {
 
   it('returns null beyond the snapping distance', () => {
     expect(snapToNetwork(network(), node(0.5, 5), 50)).toBeNull();
+  });
+
+  it('handles a huge search radius by scanning existing segments', () => {
+    const built = network();
+    const point = node(0.5, 0.1);
+    expect(snapToNetwork(built, point, 20_000_000)).toEqual(
+      snapToNetwork(built, point),
+    );
+    expect(snapToNetwork(built, point, Number.MAX_VALUE)).toEqual(
+      snapToNetwork(built, point),
+    );
+  });
+
+  it('rejects invalid snapping coordinates and distances', () => {
+    const built = network();
+    expect(snapToNetwork(built, [Infinity, 0])).toBeNull();
+    expect(snapToNetwork(built, [0, 91])).toBeNull();
+    expect(snapToNetwork(built, node(0, 0), Infinity)).toBeNull();
+    expect(snapToNetwork(built, node(0, 0), NaN)).toBeNull();
+    expect(snapToNetwork(built, node(0, 0), -1)).toBeNull();
   });
 });
 
