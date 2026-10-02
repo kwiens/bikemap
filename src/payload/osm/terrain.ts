@@ -120,23 +120,62 @@ async function loadTile(
   return settled;
 }
 
-/** Inserts intermediate points so no gap exceeds roughly the DEM resolution. */
+function validSampleBudget(value: number): boolean {
+  return Number.isInteger(value) && value >= 2 && value <= MAX_SAMPLES;
+}
+
+/**
+ * Plans intermediate samples before allocating them, retaining every vertex.
+ * Returns no samples if the original vertices alone exceed the budget. That
+ * must mean unavailable elevation, not a simplified line with lost climbs.
+ */
 export function densify(
   line: [number, number][],
   stepMeters: number = SAMPLE_STEP_M,
+  maxSamples: number = MAX_SAMPLES,
 ): [number, number][] {
+  if (
+    !validSampleBudget(maxSamples) ||
+    !Number.isFinite(stepMeters) ||
+    stepMeters <= 0 ||
+    line.length > maxSamples
+  ) {
+    return [];
+  }
   if (line.length < 2) {
     return [...line];
   }
 
+  // Count desired *extra* points in O(vertices), without building the fine
+  // line. Very long segments therefore cost the same planning work as short
+  // ones. Original vertices have first claim on the budget.
+  const extras: number[] = [];
+  let wanted = 0;
+  for (let i = 1; i < line.length; i++) {
+    const [lng1, lat1] = line[i - 1];
+    const [lng2, lat2] = line[i];
+    const extra = Math.max(
+      0,
+      Math.floor(haversineDistance(lat1, lng1, lat2, lng2) / stepMeters) - 1,
+    );
+    if (!Number.isFinite(extra)) {
+      return [];
+    }
+    extras.push(extra);
+    wanted += extra;
+  }
+  if (!Number.isFinite(wanted)) {
+    return [];
+  }
+  let remaining = maxSamples - line.length;
+  const scale = wanted > remaining ? remaining / wanted : 1;
   const out: [number, number][] = [line[0]];
   for (let i = 1; i < line.length; i++) {
     const [lng1, lat1] = line[i - 1];
     const [lng2, lat2] = line[i];
-    const steps = Math.max(
-      1,
-      Math.floor(haversineDistance(lat1, lng1, lat2, lng2) / stepMeters),
-    );
+    const extra = Math.min(remaining, Math.floor(extras[i - 1] * scale));
+    remaining -= extra;
+    const steps = 1 + extra;
     for (let k = 1; k <= steps; k++) {
       const t = k / steps;
       out.push([lng1 + (lng2 - lng1) * t, lat1 + (lat2 - lat1) * t]);
@@ -165,12 +204,10 @@ export async function sampleTerrain(
     return null;
   }
 
-  // Coarsen rather than refuse when a trail is very long.
-  const fine = densify(line, SAMPLE_STEP_M);
-  const sampled =
-    fine.length > maxSamples
-      ? densify(line, SAMPLE_STEP_M * Math.ceil(fine.length / maxSamples))
-      : fine;
+  const sampled = densify(line, SAMPLE_STEP_M, maxSamples);
+  if (sampled.length === 0) {
+    return null;
+  }
 
   const needed = new Map<string, { x: number; y: number }>();
   for (const [lng, lat] of sampled) {
@@ -216,9 +253,10 @@ export async function sampleTerrain(
  * that ground and books its descent and climb as the trail's own, so parts are
  * kept apart here and only combined once each has been measured.
  *
- * {@link MAX_SAMPLES} is a budget for the whole trail, split between parts in
- * proportion to their length so every part is sampled at the same resolution
- * and a many-part trail costs no more than a single-part one of equal length.
+ * {@link MAX_SAMPLES} is a budget for the whole trail. Original vertices are
+ * reserved first, and spare samples are split in proportion to part lengths.
+ * If the vertices cannot fit, elevation is unavailable for the whole trail;
+ * no part is silently discarded to make room for another.
  *
  * Returns one entry per part that yielded terrain (parts that read nothing are
  * dropped), or null when nothing could be read at all.
@@ -226,25 +264,33 @@ export async function sampleTerrain(
 export async function sampleTerrainParts(
   parts: [number, number][][],
   token: string,
+  maxSamples: number = MAX_SAMPLES,
 ): Promise<TerrainPoint[][] | null> {
+  if (!validSampleBudget(maxSamples) || !token) {
+    return null;
+  }
   const usable = parts.filter((part) => part.length >= 2);
-  if (usable.length === 0 || !token) {
+  const vertices = usable.reduce((sum, part) => sum + part.length, 0);
+  if (usable.length === 0 || vertices > maxSamples) {
     return null;
   }
 
   const lengths = usable.map((part) => lengthMeters([part]));
   const total = lengths.reduce((sum, meters) => sum + meters, 0);
+  if (!Number.isFinite(total)) {
+    return null;
+  }
+  const spare = maxSamples - vertices;
+  let remaining = spare;
 
   const sampled: TerrainPoint[][] = [];
   for (const [index, part] of usable.entries()) {
     const share = total > 0 ? lengths[index] / total : 1 / usable.length;
-    // Floor of 2: a part shorter than its share of a sample still keeps its own
-    // vertices, since `densify` never drops a coordinate.
-    const points = await sampleTerrain(
-      part,
-      token,
-      Math.max(2, Math.floor(MAX_SAMPLES * share)),
-    );
+    // Reserve all original vertices across all parts first. Otherwise giving
+    // every short part a minimum of two can overrun the whole-trail budget.
+    const extra = Math.min(remaining, Math.floor(spare * share));
+    remaining -= extra;
+    const points = await sampleTerrain(part, token, part.length + extra);
     if (points) {
       sampled.push(points);
     }
