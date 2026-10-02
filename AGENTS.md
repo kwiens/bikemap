@@ -44,6 +44,11 @@ GitHub posts written by an agent start with `🤖` alone on the first line. This
 applies to issue and pull-request bodies, comments, reviews, and review-thread
 replies. Do not add the marker to commits, titles, or file contents.
 
+Pull requests get an automatic Claude code review, an architecture review,
+and a generated architecture summary in the description; `@claude` in a PR
+or issue asks Claude for help. The review instructions and setup live in
+[`.github/claude/README.md`](.github/claude/README.md).
+
 ## Architecture
 
 This is a Next.js App Router application displaying an interactive Mapbox map of bike routes, trails, and resources. It is **multi-city**: Chattanooga, TN ([bikechatt.com](https://bikechatt.com)) and Bend, OR (ridebend.org) run from the same codebase, selected per-request by hostname (or `NEXT_PUBLIC_CITY_ID` in development).
