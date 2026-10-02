@@ -1,6 +1,8 @@
+import { randomBytes } from 'node:crypto';
 import { siteConfigs } from '@/config/site.config';
 
 const MIN_SECRET_LENGTH = 32;
+const localFallbackSecret = randomBytes(32).toString('hex');
 
 /** Fail at startup instead of silently accepting an easy-to-guess signing key. */
 export function requirePayloadSecret(
@@ -16,9 +18,10 @@ export function requirePayloadSecret(
 }
 
 /**
- * Static analysis imports Payload config without loading Next's env files. A
- * deterministic fallback is acceptable only outside production/deployments;
- * those processes always require an operator-owned secret.
+ * Static analysis imports Payload config without loading Next's env files.
+ * Local development also needs a safe fallback when no secret is configured;
+ * keep it stable for this process so all requests use the same signing key.
+ * Production and deployments always require an operator-owned secret.
  */
 export function payloadSecret(env: NodeJS.ProcessEnv = process.env): string {
   if (env.PAYLOAD_SECRET) {
@@ -29,7 +32,7 @@ export function payloadSecret(env: NodeJS.ProcessEnv = process.env): string {
     return requirePayloadSecret(undefined);
   }
 
-  return 'local-static-analysis-only-payload-secret';
+  return localFallbackSecret;
 }
 
 /**

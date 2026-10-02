@@ -28,8 +28,11 @@ describe('payloadSecret', () => {
     ).toThrow('at least 32 bytes');
   });
 
-  it('provides a local-only value when static tooling does not load env files', () => {
-    expect(payloadSecret({ NODE_ENV: 'test' })).toHaveLength(41);
+  it('provides a process-stable random local value when no env file is loaded', () => {
+    const first = payloadSecret({ NODE_ENV: 'test' });
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
+    expect(payloadSecret({ NODE_ENV: 'development' })).toBe(first);
+    expect(first).not.toBe('local-static-analysis-only-payload-secret');
   });
 });
 
