@@ -75,7 +75,14 @@ export function parseRoutePlan(value: unknown): PlanParse {
   if (!raw || typeof raw !== 'object') {
     return fail('The route plan must be an object.');
   }
-  const { legs, waypoints } = raw as { legs?: unknown; waypoints?: unknown };
+  const { legs, version, waypoints } = raw as {
+    legs?: unknown;
+    version?: unknown;
+    waypoints?: unknown;
+  };
+  if (version !== 1) {
+    return fail('The route plan has an unsupported version.');
+  }
   if (!Array.isArray(waypoints) || !Array.isArray(legs)) {
     return fail('The route plan must list its waypoints and legs.');
   }
@@ -110,6 +117,12 @@ export function parseRoutePlan(value: unknown): PlanParse {
     ) {
       return fail(`Leg ${index + 1} must be a line of at least two points.`);
     }
+    if (
+      !samePosition(coordinates[0], waypoints[index]) ||
+      !samePosition(coordinates.at(-1), waypoints[index + 1])
+    ) {
+      return fail(`Leg ${index + 1} must start and end at its waypoints.`);
+    }
     parsedLegs.push({
       coordinates: coordinates.map(([lng, lat]) => [Number(lng), Number(lat)]),
       mode,
@@ -128,6 +141,15 @@ export function parseRoutePlan(value: unknown): PlanParse {
       waypoints: waypoints.map(([lng, lat]) => [Number(lng), Number(lat)]),
     },
   };
+}
+
+function samePosition(
+  a: Position | undefined,
+  b: Position | undefined,
+): boolean {
+  return Boolean(
+    a && b && Number(a[0]) === Number(b[0]) && Number(a[1]) === Number(b[1]),
+  );
 }
 
 /**
@@ -184,6 +206,25 @@ export function straightLeg(
     steps: meters > 0 ? [{ meters, source: { kind: 'straight' } }] : [],
     ...(mode === 'network' ? { isUnrouted: true } : {}),
   };
+}
+
+/** Keeps an older routing response from replacing a leg changed by a later edit. */
+export function replacePendingLeg(
+  current: RoutePlan,
+  pending: RoutePlan,
+  index: number,
+  routed: RouteLeg,
+): RoutePlan {
+  if (
+    current.legs[index] !== pending.legs[index] ||
+    !samePosition(current.waypoints[index], pending.waypoints[index]) ||
+    !samePosition(current.waypoints[index + 1], pending.waypoints[index + 1])
+  ) {
+    return current;
+  }
+  const legs = [...current.legs];
+  legs[index] = routed;
+  return { ...current, legs };
 }
 
 // --- Edits ----------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { type CellKey, cellsCovering } from './cells';
+import { type CellKey, cellsCovering, MAX_LEG_CELLS } from './cells';
 import type { NetworkWay, Position } from './graph';
 import { cellsForLeg, RouteNetworkStore } from './network-store';
 
@@ -7,6 +7,12 @@ const at = (east: number, north: number): Position => [
   -121.3 + east * 0.001,
   44.05 + north * 0.001,
 ];
+
+it('stops enumerating cells once a leg exceeds the routing limit', () => {
+  const keys = cellsForLeg([-170, -80], [170, 80]);
+
+  expect(keys).toHaveLength(MAX_LEG_CELLS + 1);
+});
 
 function street(id: number, from: Position, to: Position): NetworkWay {
   return {

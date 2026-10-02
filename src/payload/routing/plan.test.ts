@@ -11,6 +11,7 @@ import {
   planGeometry,
   planMeters,
   planSteps,
+  replacePendingLeg,
   type RoutePlan,
   removeWaypoint,
   reversePlan,
@@ -54,6 +55,28 @@ describe('parseRoutePlan', () => {
 
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toMatch(/must have 1 legs/);
+  });
+
+  it('rejects a leg detached from its waypoints', () => {
+    const plan = planThrough(at(0, 0), at(1, 0), at(2, 0));
+    const parsed = parseRoutePlan({
+      ...plan,
+      legs: [
+        plan.legs[0],
+        { ...plan.legs[1], coordinates: [at(3, 0), at(2, 0)] },
+      ],
+    });
+
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toMatch(/Leg 2 must start and end at its waypoints/);
+  });
+
+  it('rejects a plan from an unsupported version', () => {
+    const plan = planThrough(at(0, 0), at(1, 0));
+
+    expect(parseRoutePlan({ ...plan, version: 2 }).error).toMatch(
+      /unsupported version/,
+    );
   });
 
   it('rejects bad positions, modes, and oversized plans', () => {
@@ -106,6 +129,21 @@ describe('planGeometry', () => {
 });
 
 describe('edits', () => {
+  it('does not apply a stale route after undo restores the same endpoints', () => {
+    const pending = planThrough(at(0, 0), at(1, 0));
+    const previous = {
+      ...pending,
+      legs: [straightLeg(at(0, 0), at(1, 0), 'straight')],
+    };
+    const routed = {
+      ...pending.legs[0],
+      isUnrouted: false,
+    };
+
+    expect(replacePendingLeg(previous, pending, 0, routed)).toBe(previous);
+    expect(replacePendingLeg(pending, pending, 0, routed).legs[0]).toBe(routed);
+  });
+
   it('appends a waypoint and asks for its leg to be routed', () => {
     const edit = appendWaypoint(planThrough(at(0, 0)), at(1, 0));
 

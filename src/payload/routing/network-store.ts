@@ -13,6 +13,7 @@ import {
   cellBounds,
   cellsCovering,
   LEG_MARGIN_DEG,
+  MAX_LEG_CELLS,
 } from './cells';
 import {
   buildRouteGraph,
@@ -179,12 +180,15 @@ export class RouteNetworkStore {
 /** The cells a leg between two points needs, with a margin for detours. */
 export function cellsForLeg(from: Position, to: Position): CellKey[] {
   const margin = LEG_MARGIN_DEG;
-  return cellsCovering([
-    Math.min(from[0], to[0]) - margin,
-    Math.min(from[1], to[1]) - margin,
-    Math.max(from[0], to[0]) + margin,
-    Math.max(from[1], to[1]) + margin,
-  ]);
+  return cellsCovering(
+    [
+      Math.min(from[0], to[0]) - margin,
+      Math.min(from[1], to[1]) - margin,
+      Math.max(from[0], to[0]) + margin,
+      Math.max(from[1], to[1]) + margin,
+    ],
+    MAX_LEG_CELLS + 1,
+  );
 }
 
 /** The cells around one point — enough to snap a click. */

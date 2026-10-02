@@ -45,13 +45,11 @@ export function cellKey(x: number, y: number): CellKey {
   return `${x},${y}`;
 }
 
-/** Every cell a [west, south, east, north] box touches. */
-export function cellsCovering([west, south, east, north]: [
-  number,
-  number,
-  number,
-  number,
-]): CellKey[] {
+/** Cells a [west, south, east, north] box touches, up to `maxKeys`. */
+export function cellsCovering(
+  [west, south, east, north]: [number, number, number, number],
+  maxKeys = Number.POSITIVE_INFINITY,
+): CellKey[] {
   const keys: CellKey[] = [];
   for (
     let x = Math.floor(west / ROUTE_CELL_DEG);
@@ -64,6 +62,9 @@ export function cellsCovering([west, south, east, north]: [
       y++
     ) {
       keys.push(cellKey(x, y));
+      if (keys.length >= maxKeys) {
+        return keys;
+      }
     }
   }
   return keys;

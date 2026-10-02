@@ -61,6 +61,7 @@ import {
   parseRoutePlan,
   planMeters,
   planSteps,
+  replacePendingLeg,
   type RouteLeg,
   type RoutePlan,
   removeWaypoint,
@@ -351,9 +352,9 @@ export function RouteMapEditor({
   /**
    * Routes the given legs and swaps them into whatever the plan is by then.
    *
-   * A leg is only replaced if its two waypoints are still the ones it was
-   * routed between — the curator may have dragged one again while the
-   * network was loading, in which case that later edit owns the leg.
+   * A leg is only replaced if it is still the same placeholder. Undo, redo,
+   * or another edit can restore the same endpoints while changing the leg's
+   * intended shape, and an older routing result must not overwrite that edit.
    */
   const routeLegs = useCallback(
     async (target: RoutePlan, indexes: number[]) => {
@@ -370,7 +371,7 @@ export function RouteMapEditor({
             if (!from || !to || !leg) {
               return null;
             }
-            return { from, index, leg: await routeOne(from, to, leg.mode), to };
+            return { index, leg: await routeOne(from, to, leg.mode) };
           }),
         );
 
@@ -379,16 +380,7 @@ export function RouteMapEditor({
           if (!result) {
             continue;
           }
-          const { from, index, leg, to } = result;
-          if (
-            samePoint(next.waypoints[index], from) &&
-            samePoint(next.waypoints[index + 1], to) &&
-            next.legs[index]?.mode === leg.mode
-          ) {
-            const legs = [...next.legs];
-            legs[index] = leg;
-            next = { ...next, legs };
-          }
+          next = replacePendingLeg(next, target, result.index, result.leg);
         }
         if (next !== planRef.current) {
           showPlan(next);
