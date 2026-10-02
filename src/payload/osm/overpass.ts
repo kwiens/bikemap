@@ -8,10 +8,12 @@
  * (This mirrors the choice made in scripts/osm_trail_elevation.py.)
  *
  * The public endpoint is a shared community resource. Requests here are
- * deliberately small — a handful of way ids from one editor pressing save —
- * and must send a User-Agent or Overpass answers 406.
+ * deliberately small — a handful of way ids from one editor pressing save, or
+ * one capped, cached box of trail network for Follow trails — and must send a
+ * User-Agent or Overpass answers 406.
  */
 import { MAX_WAYS_PER_REQUEST } from './ids';
+import type { NetworkWay } from './trail-network';
 
 /** A single OSM way with its full-resolution geometry. */
 export interface OsmWay {
@@ -187,4 +189,56 @@ export async function fetchWaysByIds(
       tags: element.tags ?? {},
     }))
     .filter((way) => way.coordinates.length >= 2);
+}
+
+/**
+ * The bike-relevant ways in a box, with node ids, for the editor's routing.
+ *
+ * The filter mirrors `OSM_BIKE_TRAIL_FILTER` (and the query in
+ * `scripts/osm_trail_elevation.py`), so Follow trails routes over exactly the
+ * grey lines the editor draws. Ways come back whole even where they run outside
+ * the box, which keeps junctions near its edge connected.
+ *
+ * `bbox` is [west, south, east, north].
+ */
+export async function fetchTrailNetwork(
+  [west, south, east, north]: [number, number, number, number],
+  options: OverpassOptions = {},
+): Promise<NetworkWay[]> {
+  const timeout = options.timeoutSeconds ?? 60;
+  const box = `${south},${west},${north},${east}`;
+  const allowed = '["bicycle"!~"^(no|private)$"]["access"!~"^(no|private)$"]';
+  const query =
+    `[out:json][timeout:${timeout}];(` +
+    `way["bicycle"~"^(yes|designated|permissive)$"](${box});` +
+    `way["mtb:scale"]${allowed}(${box});` +
+    `way["highway"="cycleway"]${allowed}(${box});` +
+    ');out geom;';
+
+  const response = await requestWithRetry(
+    options.endpoint ?? DEFAULT_ENDPOINT,
+    query,
+    options,
+  );
+  const payload = (await response.json()) as {
+    elements?: (OverpassElement & { nodes?: number[] })[];
+  };
+
+  return (payload.elements ?? [])
+    .filter(
+      (element) =>
+        element.type === 'way' &&
+        element.geometry &&
+        element.nodes &&
+        element.nodes.length === element.geometry.length &&
+        element.nodes.length >= 2,
+    )
+    .map((element) => ({
+      coordinates: (element.geometry ?? []).map(
+        ({ lat, lon }) => [lon, lat] as [number, number],
+      ),
+      id: element.id,
+      name: element.tags?.name ?? null,
+      nodes: element.nodes ?? [],
+    }));
 }
