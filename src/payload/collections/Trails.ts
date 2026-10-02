@@ -2,6 +2,10 @@ import type { Access, CollectionConfig, Field, FilterOptions } from 'payload';
 import { resolveTrailGeometry } from '@/payload/hooks/resolveTrailGeometry';
 import { cityOptions, isCityId } from '@/config/map.config';
 import { DEFAULT_KIND_VALUE, UNRATED_VALUE } from '@/data/trail-vocabulary';
+import {
+  invalidatePublicTrailDataAfterChange,
+  invalidatePublicTrailDataAfterDelete,
+} from '@/payload/cache/public-trails';
 import { recalculateTrailElevation } from '@/payload/endpoints/recalculate-trail-elevation';
 import { previewTrailGeometry } from '@/payload/endpoints/preview-trail-geometry';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
@@ -84,6 +88,8 @@ export const Trails: CollectionConfig = {
     maxPerDoc: 50,
   },
   hooks: {
+    afterChange: [invalidatePublicTrailDataAfterChange],
+    afterDelete: [invalidatePublicTrailDataAfterDelete],
     beforeChange: [resolveTrailGeometry],
   },
   endpoints: [

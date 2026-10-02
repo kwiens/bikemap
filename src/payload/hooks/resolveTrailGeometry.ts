@@ -19,7 +19,7 @@
  */
 import { ValidationError, type CollectionBeforeChangeHook } from 'payload';
 import { isCityId } from '@/config/map.config';
-import { gapsBetweenParts, NOTABLE_GAP_M } from '@/payload/osm/assemble';
+import { NOTABLE_GAP_M } from '@/payload/osm/assemble';
 import {
   parseTrailGeometry,
   samePartsAs,
@@ -207,7 +207,9 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
       );
     }
 
-    const gaps = gapsBetweenParts(parts);
+    // In walking order, as the profile walks them: stored order would report
+    // a break between two pieces that were merely listed apart.
+    const gaps = measured.gaps;
     const warnings = [...measured.warnings];
     const notable = gaps.filter((gap) => gap.distanceMeters > NOTABLE_GAP_M);
     if (notable.length > 0) {
@@ -393,7 +395,7 @@ async function saveOsmPreview(
       req,
     );
   }
-  const gaps = gapsBetweenParts(parsed.parts);
+  const gaps = measured.gaps;
   const warnings = [...new Set([...report.warnings, ...measured.warnings])];
 
   return {

@@ -5,8 +5,8 @@ import { appearanceFor } from './appearance';
 
 // Ratings and kinds are curated in the admin, so these rows are whatever a
 // curator left behind — including half-filled and deleted. Every case has to
-// produce something drawable, because `getCityTrails` must never throw and an
-// uncoloured trail is an invisible one.
+// produce something drawable, because `getCityTrailSummaries` must never throw
+// and an uncoloured trail is an invisible one.
 
 const easy = { color: RATING_COLORS.easy, value: 'easy' };
 const singletrack = { color: null, icon: 'mountain' };

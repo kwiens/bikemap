@@ -43,6 +43,7 @@ const MEASURED = {
   elevationLoss: 180,
   elevationMax: 1240,
   elevationMin: 1000,
+  gaps: [],
   profile: PROFILE,
   warnings: [],
 };

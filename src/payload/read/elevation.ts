@@ -14,9 +14,9 @@ import 'server-only';
  * on every save to *get* those totals and used to discard the per-point series
  * it computed on the way. Now it is stored, and this reads it back.
  *
- * **Never throws**, the same rule as `getCityTrails`: a missing database or a
- * bad query returns null and the pane simply has no chart, rather than the page
- * failing.
+ * **Never throws**, the same rule as the public trail reads: a missing database
+ * or a bad query returns null and the pane simply has no chart, rather than the
+ * page failing.
  */
 import { getPayload } from 'payload';
 import config from '@payload-config';

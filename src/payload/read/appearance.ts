@@ -36,10 +36,10 @@ export interface TrailAppearance {
 /**
  * Every branch here answers with something drawable, deliberately.
  *
- * `getCityTrails` must never throw, and a trail whose rating row was deleted —
- * the relationship is `ON DELETE set null` — would otherwise reach the map with
- * no colour at all and vanish into the basemap. A grey line that is visibly
- * ungraded is a far better failure than an invisible one.
+ * `getCityTrailSummaries` must never throw, and a trail whose rating row was
+ * deleted — the relationship is `ON DELETE set null` — would otherwise reach
+ * the map with no colour at all and vanish into the basemap. A grey line that
+ * is visibly ungraded is a far better failure than an invisible one.
  */
 export function appearanceFor(
   rating: null | RatingRow | undefined,
