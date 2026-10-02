@@ -19,8 +19,8 @@
  * your place on every switch.
  *
  * **Moving or drawing flips the trail to `geometrySource: 'edited'`**, which
- * stops the OSM rebuild for it — otherwise the next save would refetch the ways
- * and throw the edit away. "Discard edits" puts it back.
+ * makes the line curator-owned. Otherwise the save hook treats it as OSM-owned
+ * and restores the last reviewed OSM line, throwing the point edit away.
  *
  * ## Terra Draw owns the line; we own the ways
  *
@@ -55,7 +55,15 @@ import mapboxgl from 'mapbox-gl';
 // The public app pulls this in from its own layout, but the (payload) route
 // group is a separate tree — without it the map renders with broken controls.
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useField } from '@payloadcms/ui';
+import {
+  toast,
+  useConfig,
+  useDocumentInfo,
+  useField,
+  useFormBackgroundProcessing,
+  useFormProcessing,
+} from '@payloadcms/ui';
+import { formatAdminURL } from 'payload/shared';
 import {
   TerraDraw,
   TerraDrawLineStringMode,
@@ -73,6 +81,7 @@ import {
 } from '@/data/osm-trails';
 import { boundsOf, lengthMeters } from '@/payload/osm/assemble';
 import { createDeletedPieces } from '@/payload/osm/deleted-pieces';
+import type { PreviewTrailGeometryResponse } from '@/payload/endpoints/preview-trail-geometry';
 import {
   featuresToParts,
   parseTrailGeometry,
@@ -144,9 +153,29 @@ export function TrailMapEditor({
   const { setValue: setRebuild } = useField<boolean>({
     path: 'rebuildGeometry',
   });
+  const { setValue: setBounds } = useField({ path: 'bounds' });
+  const { setValue: setDistance } = useField({ path: 'distance' });
+  const { setValue: setElevationGain } = useField({ path: 'elevationGain' });
+  const { setValue: setElevationLoss } = useField({ path: 'elevationLoss' });
+  const { setValue: setElevationMax } = useField({ path: 'elevationMax' });
+  const { setValue: setElevationMin } = useField({ path: 'elevationMin' });
+  const { setValue: setElevationProfile } = useField({
+    path: 'elevationProfile',
+  });
+  const { setValue: setOsmReport } = useField({ path: 'osmReport' });
+  const { value: displayName } = useField<string>({ path: 'displayName' });
   const { setValue: setTrailName, value: trailName } = useField<string>({
     path: 'trailName',
   });
+  const {
+    config: {
+      routes: { api: apiRoute },
+      serverURL,
+    },
+  } = useConfig();
+  const isProcessing = useFormProcessing();
+  const isBackgroundProcessing = useFormBackgroundProcessing();
+  const { data: documentData, id: documentId } = useDocumentInfo();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const statsRef = useRef<HTMLSpanElement | null>(null);
@@ -165,6 +194,7 @@ export function TrailMapEditor({
    * See `deleted-pieces.ts` for why it has to exist.
    */
   const deletedRef = useRef(createDeletedPieces());
+  const refreshRequestRef = useRef<AbortController | null>(null);
 
   const [ready, setReady] = useState(false);
   const [drawFailed, setDrawFailed] = useState(false);
@@ -174,6 +204,9 @@ export function TrailMapEditor({
   const [history, setHistory] = useState({ canRedo: false, canUndo: false });
   const [isRemovingPoint, setIsRemovingPoint] = useState(false);
   const [pointRemovalNote, setPointRemovalNote] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasUnsavedPreview, setHasUnsavedPreview] = useState(false);
   const [importNote, setImportNote] = useState<{
     text: string;
     tone: Tone;
@@ -182,7 +215,7 @@ export function TrailMapEditor({
    * The ways the line currently on screen was built from.
    *
    * Picking a way does not add it to the line — the line is assembled from
-   * Overpass on the server when you save. So a way picked a moment ago has no
+   * Overpass when you refresh the preview. So a way picked a moment ago has no
    * points on it, and in Move points that reads as "this way is broken" rather
    * than "this way isn't in the line yet". Comparing against this is how the
    * editor can say which it is.
@@ -203,6 +236,8 @@ export function TrailMapEditor({
   const sourceRef = useRef(geometrySource);
   const setGeomRef = useRef(setGeom);
   const setOsmIdsRef = useRef(setOsmIds);
+  const setOsmReportRef = useRef(setOsmReport);
+  const setRebuildRef = useRef(setRebuild);
   const setSourceRef = useRef(setGeometrySource);
   idsRef.current = ids;
   modeRef.current = mode;
@@ -211,9 +246,34 @@ export function TrailMapEditor({
   sourceRef.current = geometrySource;
   setGeomRef.current = setGeom;
   setOsmIdsRef.current = setOsmIds;
+  setOsmReportRef.current = setOsmReport;
+  setRebuildRef.current = setRebuild;
   setSourceRef.current = setGeometrySource;
 
   const editable = !readOnly;
+
+  const cancelRefresh = useCallback(() => {
+    const request = refreshRequestRef.current;
+    if (!request) {
+      return;
+    }
+    refreshRequestRef.current = null;
+    request.abort();
+    setIsRefreshing(false);
+  }, []);
+
+  useEffect(() => {
+    refreshRequestRef.current?.abort();
+    refreshRequestRef.current = null;
+    setRefreshError(null);
+    setIsRefreshing(false);
+    setHasUnsavedPreview(false);
+
+    return () => {
+      refreshRequestRef.current?.abort();
+      refreshRequestRef.current = null;
+    };
+  }, [documentData?.updatedAt, documentId]);
 
   // --- reading and writing the line --------------------------------------
 
@@ -234,15 +294,21 @@ export function TrailMapEditor({
   /**
    * Writes the working line into the form, and takes ownership of it.
    *
-   * Flipping the source is what makes the edit survive: an 'osm' trail refetches
-   * its ways on the next save and would overwrite whatever was dragged.
+   * Flipping the source is what makes the edit survive: an 'osm' trail restores
+   * its last reviewed geometry unless a new OSM preview accompanies the save.
    */
   const commit = useCallback(() => {
+    // A late OSM response must never overwrite a point edit made while the
+    // network request was running.
+    cancelRefresh();
+    setHasUnsavedPreview(false);
+    setOsmReportRef.current(null);
+    setRebuildRef.current(false);
     setGeomRef.current(toTrailGeometry(partsRef.current));
     if (sourceRef.current !== 'edited') {
       setSourceRef.current('edited');
     }
-  }, []);
+  }, [cancelRefresh]);
 
   /**
    * Pulls Terra Draw's store back into `parts` and, optionally, the form.
@@ -294,23 +360,34 @@ export function TrailMapEditor({
     [commit, paintStats, syncHistory],
   );
 
-  const togglePick = useCallback((id: number, name: string) => {
-    const current = idsRef.current;
-    // Order is meaningful — it disambiguates trails that double back — so
-    // append rather than sort.
-    const next = current.includes(id)
-      ? current.filter((existing) => existing !== id)
-      : [...current, id];
-    setNames((previous) => ({ ...previous, [id]: name }));
-    setOsmIdsRef.current(next);
-    if (sourceRef.current === 'imported') {
-      // Selecting a maintainable source is the curator's explicit request to
-      // replace a style-only imported line. Without this, imported trails
-      // would accept the clicks and then ignore them on save.
-      sourceRef.current = 'osm';
-      setSourceRef.current('osm');
-    }
-  }, []);
+  const togglePick = useCallback(
+    (id: number, name: string) => {
+      // The response is tied to the exact ordered id list sent to Overpass. If
+      // that list changes, discard the request instead of pairing an old line
+      // with the new selection.
+      cancelRefresh();
+      const current = idsRef.current;
+      // Order is meaningful — it disambiguates trails that double back — so
+      // append rather than sort.
+      const next = current.includes(id)
+        ? current.filter((existing) => existing !== id)
+        : [...current, id];
+      setNames((previous) => ({ ...previous, [id]: name }));
+      setHasUnsavedPreview(false);
+      setRefreshError(null);
+      setOsmReportRef.current(null);
+      setRebuildRef.current(false);
+      setOsmIdsRef.current(next);
+      if (sourceRef.current === 'imported') {
+        // Selecting a maintainable source is the curator's explicit request to
+        // replace a style-only imported line. Without this, imported trails
+        // would accept the clicks and then ignore them on save.
+        sourceRef.current = 'osm';
+        setSourceRef.current('osm');
+      }
+    },
+    [cancelRefresh],
+  );
 
   /**
    * Replaces Terra Draw's store with the given line.
@@ -700,6 +777,88 @@ export function TrailMapEditor({
     }
   }, [readBack]);
 
+  async function refreshFromOsm(): Promise<void> {
+    if (
+      !editable ||
+      ids.length === 0 ||
+      isRefreshing ||
+      refreshRequestRef.current !== null ||
+      isProcessing ||
+      isBackgroundProcessing
+    ) {
+      return;
+    }
+
+    setRefreshError(null);
+    setIsRefreshing(true);
+    const controller = new AbortController();
+    const requestedIds = [...ids];
+    refreshRequestRef.current = controller;
+
+    try {
+      const endpoint = formatAdminURL({
+        apiRoute,
+        path: '/trails/preview-osm-geometry',
+        serverURL,
+      });
+      const response = await fetch(endpoint, {
+        body: JSON.stringify({ name: displayName || trailName, osmIds: ids }),
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: controller.signal,
+      });
+      const body: unknown = await response.json();
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (!sameOrderedIds(requestedIds, idsRef.current)) {
+        return;
+      }
+      if (!response.ok || !isGeometryPreview(body)) {
+        throw new Error(messageFrom(body));
+      }
+
+      setGeom(body.geometry);
+      setGeometrySource('osm');
+      setBounds(body.measurements.bounds);
+      setDistance(body.measurements.distance);
+      setElevationGain(body.measurements.elevationGain);
+      setElevationLoss(body.measurements.elevationLoss);
+      setElevationMax(body.measurements.elevationMax);
+      setElevationMin(body.measurements.elevationMin);
+      setElevationProfile(body.profile);
+      setOsmReport({
+        ...body.report,
+        builtAt: new Date().toISOString(),
+        isPreview: true,
+        requestedIds,
+        source: 'osm',
+      });
+      setRebuild(true);
+      // The builder may reorder connected ways while joining them. The preview
+      // still corresponds to the ordered selection we sent, so track that
+      // request rather than comparing the form against the assembled order.
+      setLineWays(requestedIds);
+      setHasUnsavedPreview(true);
+      toast.success(body.message);
+    } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'The trail line could not be refreshed.';
+      setRefreshError(message);
+      toast.error(message);
+    } finally {
+      if (refreshRequestRef.current === controller) {
+        refreshRequestRef.current = null;
+        setIsRefreshing(false);
+      }
+    }
+  }
   /**
    * Replaces the line with a GPX file's tracks.
    *
@@ -780,11 +939,6 @@ export function TrailMapEditor({
     [autoSelect, commit, loadDraw, paintStats, setTrailName, trailName],
   );
 
-  const revertToOsm = useCallback(() => {
-    setGeometrySource('osm');
-    setRebuild(true);
-  }, [setGeometrySource, setRebuild]);
-
   // --- render ------------------------------------------------------------
 
   if (!mapConfig.mapbox.accessToken) {
@@ -804,6 +958,12 @@ export function TrailMapEditor({
   const hasLine = parts.length > 0;
   const staleNote = staleLineNote(mode, ids, lineWays, geometrySource, hasLine);
   const editing = mode !== 'pick' && !drawFailed;
+  const canRefresh =
+    editable &&
+    picked.length > 0 &&
+    !isRefreshing &&
+    !isProcessing &&
+    !isBackgroundProcessing;
 
   return (
     <div className="field-type">
@@ -901,6 +1061,15 @@ export function TrailMapEditor({
 
       {staleNote && <Banner tone="warning">{staleNote}</Banner>}
 
+      {hasUnsavedPreview && (
+        <Banner>
+          This refreshed line is only a preview. Review it here, then use Save
+          draft or Publish to keep it.
+        </Banner>
+      )}
+
+      {refreshError && <Banner tone="error">{refreshError}</Banner>}
+
       {drawFailed && (
         <Banner tone="error">
           The line editor could not attach to the map, so the trail line is
@@ -920,15 +1089,6 @@ export function TrailMapEditor({
           <span className="text-[color:var(--theme-elevation-600)]">
             Drawn here
           </span>
-        )}
-        {picked.length > 0 && geometrySource === 'edited' && (
-          <button
-            className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--theme-elevation-800)]"
-            onClick={revertToOsm}
-            type="button"
-          >
-            Use selected OpenStreetMap trails on next save
-          </button>
         )}
       </div>
 
@@ -959,29 +1119,48 @@ export function TrailMapEditor({
               No OpenStreetMap trail segments selected yet.
             </p>
           ) : (
-            <ol className="m-0 pl-5">
-              {picked.map((way) => (
-                <li className="mb-1" key={way.id}>
-                  {way.name}{' '}
-                  <a
-                    className="text-[0.8rem] underline-offset-2 hover:underline"
-                    href={`https://www.openstreetmap.org/way/${way.id}`}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    #{way.id}
-                  </a>{' '}
-                  <button
-                    className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!editable}
-                    onClick={() => togglePick(way.id, way.name)}
-                    type="button"
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ol>
+            <>
+              <ol className="m-0 pl-5">
+                {picked.map((way) => (
+                  <li className="mb-1" key={way.id}>
+                    {way.name}{' '}
+                    <a
+                      className="text-[0.8rem] underline-offset-2 hover:underline"
+                      href={`https://www.openstreetmap.org/way/${way.id}`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      #{way.id}
+                    </a>{' '}
+                    <button
+                      className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!editable}
+                      onClick={() => togglePick(way.id, way.name)}
+                      type="button"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <ModeButton
+                  active={false}
+                  disabled={!canRefresh}
+                  isToggle={false}
+                  label={
+                    isRefreshing
+                      ? 'Refreshing line…'
+                      : 'Refresh line from OpenStreetMap'
+                  }
+                  onClick={() => void refreshFromOsm()}
+                />
+                <span className="max-w-[60ch] text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.4]">
+                  Loads the latest selected segments into this form without
+                  saving them.
+                </span>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -1030,7 +1209,7 @@ function staleLineNote(
   // An edited line has stopped tracking the ways altogether, so saying "save to
   // rebuild" would be a lie — saving deliberately will not touch it.
   if (source === 'edited') {
-    return 'The selected OpenStreetMap trails have changed, but this custom line will not be replaced when you save. Use “Use selected OpenStreetMap trails on next save” if you want those changes applied.';
+    return 'The selected OpenStreetMap trails have changed, but this custom line is still on the map. Refresh the line below to preview the selected segments before saving them.';
   }
 
   if (mode === 'pick') {
@@ -1038,8 +1217,12 @@ function staleLineNote(
   }
 
   return hasLine
-    ? 'The selected OpenStreetMap trails have changed since this line was built, so the new sections are not part of the editable line yet. Save to rebuild the line, then adjust it.'
+    ? 'The selected OpenStreetMap trails have changed since this line was built. Refresh the line below to preview the new sections before saving or adjusting them.'
     : null;
+}
+
+function sameOrderedIds(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
 function hintFor(
@@ -1052,21 +1235,21 @@ function hintFor(
 ): string {
   if (mode === 'pick') {
     if (source === 'edited') {
-      return 'Click trail segments to select them. Your custom line stays unchanged until you use “Use selected OpenStreetMap trails on next save.”';
+      return 'Click trail segments to select them. Your custom line stays unchanged until you refresh the line, so you can review the replacement before saving.';
     }
     if (source === 'imported') {
-      return 'Click a trail segment to start replacing the imported map line with OpenStreetMap. Select segments in riding order, then save to join and store them.';
+      return 'Click a trail segment to start replacing the imported map line with OpenStreetMap. Select segments in riding order, then refresh the line to review it.';
     }
-    return 'Click a trail segment to select it; click it again to remove it. For trails that double back, select segments in riding order. Saving joins those segments into one line and stores it with this trail.';
+    return 'Click a trail segment to select it; click it again to remove it. For trails that double back, select segments in riding order. Refresh joins those segments into a line you can review before saving.';
   }
 
   // The most confusing state in the editor: ways are picked but the line does
-  // not exist yet, because it is assembled from Overpass on the server when you
-  // save. Without saying so, Move points just looks broken.
+  // not exist yet, because it is assembled from Overpass when you refresh the
+  // preview. Without saying so, Move points just looks broken.
   if (!hasLine) {
     return hasWays
-      ? 'Nothing to adjust yet. Save this trail to build the line from the selected OpenStreetMap trails, then return here to adjust it.'
-      : 'Nothing to adjust yet. Choose OpenStreetMap trails and save, import a GPX file, or switch to Draw line and click along the route.';
+      ? 'Nothing to adjust yet. Return to Choose from OpenStreetMap and refresh the line first.'
+      : 'Nothing to adjust yet. Choose OpenStreetMap trails and refresh the line, import a GPX file, or switch to Draw line and click along the route.';
   }
 
   const takesOwnership =
@@ -1094,7 +1277,72 @@ function hintFor(
   // this sentence said "click a point and press Delete to remove it", which is
   // the gesture that removes the *whole piece* — following it lost a section of
   // trail, and Terra Draw cannot undo that on its own.
-  return `${selecting}drag a point to move it, drag a midpoint to add one, or choose Remove point and click a point. You can also right-click a point to remove it. Press Delete to remove the whole selected piece; Undo brings it back. Distance updates as you drag. Use Calculate and save elevation below after the line is saved.${takesOwnership}`;
+  return `${selecting}drag a point to move it, drag a midpoint to add one, or choose Remove point and click a point. You can also right-click a point to remove it. Press Delete to remove the whole selected piece; Undo brings it back. Distance updates as you drag. Calculate elevation below when the line is ready.${takesOwnership}`;
+}
+
+function isGeometryPreview(
+  value: unknown,
+): value is PreviewTrailGeometryResponse {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as Partial<PreviewTrailGeometryResponse>;
+  const measurements = candidate.measurements;
+  const report = candidate.report;
+  const parsed = parseTrailGeometry(candidate.geometry);
+  return Boolean(
+    typeof candidate.message === 'string' &&
+      parsed.ok &&
+      parsed.parts.length > 0 &&
+      measurements &&
+      isBounds(measurements.bounds) &&
+      isFiniteNumber(measurements.distance) &&
+      isOptionalNumber(measurements.elevationGain) &&
+      isOptionalNumber(measurements.elevationLoss) &&
+      isOptionalNumber(measurements.elevationMax) &&
+      isOptionalNumber(measurements.elevationMin) &&
+      report &&
+      Array.isArray(report.gaps) &&
+      Array.isArray(report.missingIds) &&
+      Array.isArray(report.resolvedIds) &&
+      Array.isArray(report.warnings),
+  );
+}
+
+function isBounds(
+  value: unknown,
+): value is [number, number, number, number] | null {
+  return (
+    value === null ||
+    (Array.isArray(value) && value.length === 4 && value.every(isFiniteNumber))
+  );
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isOptionalNumber(value: unknown): value is number | null {
+  return value === null || isFiniteNumber(value);
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'name' in error &&
+    error.name === 'AbortError'
+  );
+}
+
+function messageFrom(value: unknown): string {
+  if (value && typeof value === 'object' && 'message' in value) {
+    const message = value.message;
+    if (typeof message === 'string') {
+      return message;
+    }
+  }
+  return 'The trail line could not be refreshed.';
 }
 
 function ModeButton({

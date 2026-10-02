@@ -8,7 +8,6 @@ import {
   useDocumentInfo,
   useFormBackgroundProcessing,
   useFormFields,
-  useFormModified,
   useFormProcessing,
 } from '@payloadcms/ui';
 import { RefreshCw } from 'lucide-react';
@@ -39,11 +38,13 @@ interface ApiError {
 }
 
 interface AdminFormField {
+  initialValue?: unknown;
   value?: unknown;
 }
 
 interface MeasurementFormFields {
   bounds?: AdminFormField;
+  city?: AdminFormField;
   distance?: AdminFormField;
   elevationGain?: AdminFormField;
   elevationLoss?: AdminFormField;
@@ -52,36 +53,33 @@ interface MeasurementFormFields {
   elevationProfile?: AdminFormField;
   geom?: AdminFormField;
   geometrySource?: AdminFormField;
+  rebuildElevation?: AdminFormField;
+  rebuildGeometry?: AdminFormField;
+  slug?: AdminFormField;
+  trailName?: AdminFormField;
+  displayName?: AdminFormField;
 }
 
 /**
  * The actionable form of a stored elevation profile.
  *
  * Raw point tuples remain hidden JSON; this field shows what a curator needs
- * to judge the result, and can rebuild it from the last saved geometry without
- * asking them to save unrelated form fields or run a script.
+ * to judge the result. Calculation updates the open form so the chart can be
+ * reviewed before the normal Save draft or Publish action persists it.
  */
 export function ElevationProfileAdmin() {
-  const {
-    data,
-    hasSavePermission,
-    id,
-    incrementVersionCount,
-    isEditing,
-    setData,
-    setLastUpdateTime,
-  } = useDocumentInfo();
+  const { data, hasSavePermission, id, isEditing } = useDocumentInfo();
   const {
     config: {
       routes: { api: apiRoute },
       serverURL,
     },
   } = useConfig();
-  const isModified = useFormModified();
   const isProcessing = useFormProcessing();
   const isBackgroundProcessing = useFormBackgroundProcessing();
   const isFormProcessing = isProcessing || isBackgroundProcessing;
   const boundsField = useAdminFormField('bounds');
+  const cityField = useAdminFormField('city');
   const distanceField = useAdminFormField('distance');
   const elevationGainField = useAdminFormField('elevationGain');
   const elevationLossField = useAdminFormField('elevationLoss');
@@ -90,6 +88,11 @@ export function ElevationProfileAdmin() {
   const elevationProfileField = useAdminFormField('elevationProfile');
   const geometryField = useAdminFormField('geom');
   const geometrySourceField = useAdminFormField('geometrySource');
+  const rebuildElevationField = useAdminFormField('rebuildElevation');
+  const rebuildGeometryField = useAdminFormField('rebuildGeometry');
+  const slugField = useAdminFormField('slug');
+  const displayNameField = useAdminFormField('displayName');
+  const trailNameField = useAdminFormField('trailName');
   const dispatchFields = useFormFields(([, dispatch]) => dispatch);
   const [result, setResult] = useState<MeasurementSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +119,7 @@ export function ElevationProfileAdmin() {
   const formFields = useMemo<MeasurementFormFields>(
     () => ({
       bounds: boundsField,
+      city: cityField,
       distance: distanceField,
       elevationGain: elevationGainField,
       elevationLoss: elevationLossField,
@@ -124,9 +128,15 @@ export function ElevationProfileAdmin() {
       elevationProfile: elevationProfileField,
       geom: geometryField,
       geometrySource: geometrySourceField,
+      rebuildElevation: rebuildElevationField,
+      rebuildGeometry: rebuildGeometryField,
+      slug: slugField,
+      displayName: displayNameField,
+      trailName: trailNameField,
     }),
     [
       boundsField,
+      cityField,
       distanceField,
       elevationGainField,
       elevationLossField,
@@ -135,6 +145,11 @@ export function ElevationProfileAdmin() {
       elevationProfileField,
       geometryField,
       geometrySourceField,
+      rebuildElevationField,
+      rebuildGeometryField,
+      slugField,
+      displayNameField,
+      trailNameField,
     ],
   );
   const formSnapshot = useMemo(
@@ -142,7 +157,20 @@ export function ElevationProfileAdmin() {
     [data, formFields],
   );
   const snapshot = result ?? formSnapshot;
+  const isPreview =
+    result !== null ||
+    fieldValue(formFields, data, 'rebuildElevation') === true ||
+    fieldValue(formFields, data, 'rebuildGeometry') === true;
   const geometry = fieldValue(formFields, data, 'geom');
+  const city = fieldValue(formFields, data, 'city');
+  const slug = fieldValue(formFields, data, 'slug');
+  const calculationName =
+    fieldValue(formFields, data, 'displayName') ??
+    fieldValue(formFields, data, 'trailName');
+  const calculationSourceKey = useMemo(
+    () => JSON.stringify([geometry, calculationName, city, slug]),
+    [calculationName, city, geometry, slug],
+  );
   const parsedGeometry = parseTrailGeometry(geometry);
   const hasGeometry = parsedGeometry.ok && parsedGeometry.parts.length > 0;
   const geometrySource = fieldValue(formFields, data, 'geometrySource');
@@ -152,9 +180,19 @@ export function ElevationProfileAdmin() {
     Boolean(id && isEditing) &&
     hasSavePermission !== false &&
     hasElevationSource &&
-    !isModified &&
     !isFormProcessing &&
     !isCalculating;
+
+  // A result belongs to the exact line and name sent to the server. Abort and
+  // discard it when another editor field changes either value, or a late
+  // response could display measurements for a line that is no longer open.
+  useEffect(() => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setResult(null);
+    setError(null);
+    setIsCalculating(false);
+  }, [calculationSourceKey]);
 
   async function handleUpdateElevation(): Promise<void> {
     if (!canUpdateElevation || id === undefined) {
@@ -173,7 +211,14 @@ export function ElevationProfileAdmin() {
         serverURL,
       });
       const response = await fetch(endpoint, {
+        body: JSON.stringify({
+          city,
+          geometry,
+          name: calculationName,
+          slug,
+        }),
         credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         method: 'POST',
         signal: controller.signal,
       });
@@ -189,20 +234,7 @@ export function ElevationProfileAdmin() {
 
       const next = snapshotFromResponse(body);
       setResult(next);
-      updateFormFields(dispatchFields, next);
-      setData({
-        ...data,
-        bounds: next.bounds,
-        distance: next.distance,
-        elevationGain: next.elevationGain,
-        elevationLoss: next.elevationLoss,
-        elevationMax: next.elevationMax,
-        elevationMin: next.elevationMin,
-        elevationProfile: next.profile,
-        updatedAt: body.updatedAt,
-      });
-      setLastUpdateTime(Date.now());
-      incrementVersionCount();
+      updateFormFields(dispatchFields, next, formFields, data);
       toast.success(body.message);
     } catch (caught) {
       if (isAbortError(caught)) {
@@ -211,7 +243,7 @@ export function ElevationProfileAdmin() {
       const message =
         caught instanceof Error
           ? caught.message
-          : 'Elevation could not be updated.';
+          : 'Elevation could not be calculated.';
       setError(message);
       toast.error(message);
     } finally {
@@ -227,7 +259,6 @@ export function ElevationProfileAdmin() {
     id,
     isEditing,
     isFormProcessing,
-    isModified,
     hasElevationSource,
   });
 
@@ -251,7 +282,7 @@ export function ElevationProfileAdmin() {
         </div>
         {snapshot.profile && (
           <span className="shrink-0 rounded-full bg-[var(--theme-elevation-100)] px-[0.55rem] py-1 text-xs text-[color:var(--theme-elevation-650,var(--theme-elevation-600))]">
-            Stored with trail ·{' '}
+            {isPreview ? 'Unsaved preview' : 'Stored with trail'} ·{' '}
             {snapshot.profile.profile.length.toLocaleString()} samples
           </span>
         )}
@@ -262,10 +293,10 @@ export function ElevationProfileAdmin() {
       ) : (
         <Banner>
           {hasGeometry
-            ? 'No elevation profile is stored yet. Use “Calculate and save elevation” below to create it from the saved trail line.'
+            ? 'No elevation profile is stored yet. Calculate it below, review the preview, then save the trail if it looks right.'
             : canImportBundledProfile
-              ? 'No elevation profile is stored with this trail yet. Use “Import and save bundled profile” below to copy in the existing rider profile.'
-              : 'No elevation profile is stored yet. Save a trail line first, then calculate and save its elevation.'}
+              ? 'No elevation profile is stored with this trail yet. Preview the bundled rider profile below, then save the trail if it looks right.'
+              : 'No elevation profile is stored yet. Add a trail line first, then calculate its elevation.'}
         </Banner>
       )}
 
@@ -286,16 +317,16 @@ export function ElevationProfileAdmin() {
         >
           {isCalculating
             ? canImportBundledProfile
-              ? 'Importing and saving…'
-              : 'Calculating and saving…'
+              ? 'Loading preview…'
+              : 'Calculating…'
             : canImportBundledProfile
-              ? 'Import and save bundled profile'
-              : 'Calculate and save elevation'}
+              ? 'Preview bundled profile'
+              : 'Calculate elevation'}
         </Button>
         <span className="text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.4]">
           {canImportBundledProfile
-            ? 'This stores the bundled profile with the trail immediately—no separate Save draft is needed. It does not require an editable trail line here.'
-            : 'This stores the profile with the trail immediately—no separate Save draft is needed. It replaces the distance, climb, descent, range, bounds, and chart points.'}
+            ? 'This loads the bundled profile into the form without saving it. Review it, then use Save draft or Publish to keep it.'
+            : 'This replaces the distance, climb, descent, range, bounds, and chart points in the form without saving. Review the result, then use Save draft or Publish to keep it.'}
         </span>
       </div>
     </section>
@@ -536,6 +567,8 @@ function updateFormFields(
     value: unknown;
   }) => void,
   snapshot: MeasurementSnapshot,
+  fields: MeasurementFormFields,
+  data: Record<string, unknown> | undefined,
 ): void {
   const values: Record<string, unknown> = {
     bounds: snapshot.bounds,
@@ -545,12 +578,15 @@ function updateFormFields(
     elevationMax: snapshot.elevationMax,
     elevationMin: snapshot.elevationMin,
     elevationProfile: snapshot.profile,
+    rebuildElevation: true,
   };
 
   for (const [path, value] of Object.entries(values)) {
+    const fieldPath = path as keyof MeasurementFormFields;
     dispatch({
-      initialValue: value,
-      modified: false,
+      initialValue:
+        fields[fieldPath]?.initialValue ?? fieldValue(fields, data, fieldPath),
+      modified: true,
       path,
       type: 'UPDATE',
       value,
@@ -593,7 +629,6 @@ function isRecalculation(
   const measurements = candidate.measurements;
   return Boolean(
     typeof candidate.message === 'string' &&
-      typeof candidate.updatedAt === 'string' &&
       parseElevationProfile(candidate.profile) &&
       measurements &&
       readBounds(measurements.bounds) === measurements.bounds &&
@@ -612,7 +647,7 @@ function messageFrom(body: unknown): string {
       return message;
     }
   }
-  return 'Elevation could not be updated.';
+  return 'Elevation could not be calculated.';
 }
 
 function actionUnavailableReason({
@@ -620,14 +655,12 @@ function actionUnavailableReason({
   id,
   isEditing,
   isFormProcessing,
-  isModified,
   hasElevationSource,
 }: {
   hasSavePermission: boolean | undefined;
   id: number | string | undefined;
   isEditing: boolean | undefined;
   isFormProcessing: boolean;
-  isModified: boolean;
   hasElevationSource: boolean;
 }): string | null {
   if (!id || !isEditing) {
@@ -639,11 +672,8 @@ function actionUnavailableReason({
   if (isFormProcessing) {
     return 'Wait for the current save to finish before recalculating.';
   }
-  if (isModified) {
-    return 'Save the trail first so the profile follows the latest geometry.';
-  }
   if (!hasElevationSource) {
-    return 'Save a trail line first, then calculate its elevation here.';
+    return 'Add a trail line first, then calculate its elevation here.';
   }
   return null;
 }

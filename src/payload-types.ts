@@ -269,10 +269,8 @@ export interface Trail {
     | number
     | boolean
     | null;
-  /**
-   * Use this if the line or its measurements look out of date. OpenStreetMap lines are fetched again; drawn lines are measured again.
-   */
   rebuildGeometry?: boolean | null;
+  rebuildElevation?: boolean | null;
   osmReport?:
     | {
         [k: string]: unknown;
@@ -626,6 +624,7 @@ export interface TrailsSelect<T extends boolean = true> {
   geom?: T;
   osmIds?: T;
   rebuildGeometry?: T;
+  rebuildElevation?: T;
   osmReport?: T;
   distance?: T;
   elevationGain?: T;
