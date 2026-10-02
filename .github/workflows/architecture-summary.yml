@@ -1,0 +1,132 @@
+name: Architecture Summary
+
+# Keeps a collapsed "Architecture summary" at the end of each pull request's
+# description: a short spec of what the PR builds, rewritten on every push,
+# following .github/claude/architecture-summary.md. It describes and never
+# judges; architecture-review.yml is the review. Text outside the summary's
+# markers is never touched (scripts/pr-section.ts owns the edit).
+#
+# Regenerate it for one PR by hand with:
+#   gh workflow run architecture-summary.yml -f pr_number=<number>
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to write the summary for
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  summary:
+    name: Architecture Summary
+    # Fork PRs get neither the Claude secret nor a writable token.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.type != 'Bot')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A newer push supersedes an in-flight summary.
+    concurrency:
+      group: architecture-summary-${{ inputs.pr_number || github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    env:
+      WORK_DIR: /tmp/architecture-summary
+
+    steps:
+      - name: Resolve the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_PR: ${{ inputs.pr_number }}
+          EVENT_PR: ${{ github.event.pull_request.number }}
+          EVENT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$INPUT_PR" ]; then
+            number="$INPUT_PR"
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$number" --jq .head.sha)
+          else
+            number="$EVENT_PR"
+            sha="$EVENT_SHA"
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out the summary tooling from the default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .ci-trusted
+          sparse-checkout: |
+            .github
+            scripts
+          persist-credentials: false
+
+      # pr-section.ts relies on Node's built-in TypeScript support.
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .ci-trusted/.nvmrc
+
+      # Everything Claude reads is fetched here, so the generation step needs
+      # only read access to the checkout and this directory.
+      - name: Gather pull request context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          mkdir -p "$WORK_DIR"
+          cp .ci-trusted/.github/claude/architecture-summary.md "$WORK_DIR/prompt.md"
+          gh pr view "$PR_NUMBER" --json title,body,baseRefName,commits > "$WORK_DIR/pr.json"
+          gh pr diff "$PR_NUMBER" > "$WORK_DIR/diff.patch"
+          git apply --numstat "$WORK_DIR/diff.patch" > "$WORK_DIR/files.txt" \
+            || gh pr diff "$PR_NUMBER" --name-only > "$WORK_DIR/files.txt"
+          node .ci-trusted/scripts/pr-section.ts extract "$WORK_DIR/current-section.md"
+
+      - name: Write the summary
+        id: generate
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Read /tmp/architecture-summary/prompt.md and follow it exactly.
+            The pull request is #${{ steps.pr.outputs.number }} in ${{ github.repository }}
+            at head commit ${{ steps.pr.outputs.sha }}. Return the summary as
+            the `section` field of your structured output.
+          claude_args: |
+            --model sonnet
+            --allowedTools "Read,Glob,Grep"
+            --add-dir /tmp/architecture-summary
+            --json-schema '{"type":"object","properties":{"section":{"type":"string"}},"required":["section"]}'
+
+      - name: Publish the summary
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STRUCTURED: ${{ steps.generate.outputs.structured_output }}
+        run: |
+          if [ -z "$STRUCTURED" ]; then
+            echo "::error::Claude returned no summary. On a PR that changes this workflow file, claude-code-action declines to run; otherwise see the previous step's log."
+            exit 1
+          fi
+          printf '%s' "$STRUCTURED" | jq -er '.section' > "$WORK_DIR/section.md"
+          node .ci-trusted/scripts/pr-section.ts publish "$WORK_DIR/section.md"

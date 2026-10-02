@@ -17,7 +17,7 @@
  * every derived number is computed here, never accepted from the client.
  */
 import { ValidationError, type CollectionBeforeChangeHook } from 'payload';
-import { gapsBetweenParts, NOTABLE_GAP_M } from '@/payload/osm/assemble';
+import { NOTABLE_GAP_M } from '@/payload/osm/assemble';
 import { buildTrailFromOsm } from '@/payload/osm/build';
 import {
   parseTrailGeometry,
@@ -193,7 +193,9 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
       mapboxToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
     });
 
-    const gaps = gapsBetweenParts(parts);
+    // In walking order, as the profile walks them: stored order would report
+    // a break between two pieces that were merely listed apart.
+    const gaps = measured.gaps;
     const warnings = [...measured.warnings];
     const notable = gaps.filter((gap) => gap.distanceMeters > NOTABLE_GAP_M);
     if (notable.length > 0) {

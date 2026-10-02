@@ -7,6 +7,10 @@ import {
   canChangeCity,
   createInAssignedCity,
 } from '@/payload/access/city-scoped';
+import {
+  invalidatePublicTrailDataAfterChange,
+  invalidatePublicTrailDataAfterDelete,
+} from '@/payload/cache/public-trails';
 import { recalculateTrailElevation } from '@/payload/endpoints/recalculate-trail-elevation';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { validateOsmIds } from '@/payload/osm/ids';
@@ -70,6 +74,8 @@ export const Trails: CollectionConfig = {
     maxPerDoc: 50,
   },
   hooks: {
+    afterChange: [invalidatePublicTrailDataAfterChange],
+    afterDelete: [invalidatePublicTrailDataAfterDelete],
     beforeChange: [resolveTrailGeometry],
   },
   endpoints: [
