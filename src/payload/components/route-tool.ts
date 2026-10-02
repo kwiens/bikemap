@@ -158,17 +158,23 @@ export function createRouteTool(
       (key) => now - (failed.get(key) ?? -Infinity) < RETRY_AFTER_MS,
     );
     const wanted = missing.filter((key) => !cooling.includes(key));
-    // Newest view first: an editor who pans on before a slow cell arrives cares
-    // about where they are now.
-    queue = [...wanted, ...queue.filter((key) => !wanted.includes(key))];
+    // Only fetch cells in the current view. Keeping cells from every previous
+    // view would queue Overpass work long after the editor panned away.
+    queue = wanted;
     if (queue.length === 0 && !isFetching) {
-      // A cell still waiting to retry keeps its error showing; "loaded" would
-      // send the curator clicking into an area with no trails to follow.
-      if (cooling.length === 0) {
-        report({ network: 'ready', networkMessage: null });
-      }
+      report(
+        cooling.length > 0
+          ? {
+              network: 'error',
+              networkMessage:
+                'Some trails could not be loaded. Retrying shortly…',
+            }
+          : { network: 'ready', networkMessage: null },
+      );
     }
-    void drain();
+    if (queue.length > 0) {
+      void drain();
+    }
   }
 
   async function drain() {
@@ -177,8 +183,8 @@ export function createRouteTool(
     }
     isFetching = true;
     try {
-      // Bounded by the cells in view when it was last filled: each is shifted
-      // off once, and a failure waits out `RETRY_AFTER_MS` before re-queueing.
+      // Bounded by the cells in the latest view: each is shifted off once,
+      // and a failure waits out `RETRY_AFTER_MS` before re-queueing.
       while (queue.length > 0) {
         const key = queue.shift() as string;
         if (loaded.has(key)) {
@@ -204,9 +210,9 @@ export function createRouteTool(
     } finally {
       isFetching = false;
     }
-    if (status.network === 'loading') {
-      report({ network: 'ready', networkMessage: null });
-    }
+    // A successful request must not hide an earlier failure in the same view.
+    // Recheck the current bounds in case the editor panned during the fetch.
+    loadView();
   }
 
   // --- building a route ---------------------------------------------------
