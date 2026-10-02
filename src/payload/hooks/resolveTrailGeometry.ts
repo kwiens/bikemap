@@ -366,18 +366,12 @@ async function saveOsmPreview(
     });
   }
 
-  const measured = await measureParts(parsed.parts, nameOf(data, originalDoc), {
-    mapboxToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
-  });
-  if (data.rebuildElevation === true && !measured.profile) {
-    throw elevationValidationError(
-      measured.warnings[0] ?? 'No elevation samples were returned.',
-      req,
-    );
-  }
   const report = previewReport(data.osmReport);
   const reportedIds = [...report.resolvedIds, ...report.missingIds];
-  if (!sameIdSet(osmIds, reportedIds)) {
+  if (
+    !sameIds(osmIds, report.requestedIds) ||
+    !sameIdSet(osmIds, reportedIds)
+  ) {
     throw new ValidationError({
       collection: 'trails',
       errors: [
@@ -389,6 +383,15 @@ async function saveOsmPreview(
       ],
       req,
     });
+  }
+  const measured = await measureParts(parsed.parts, nameOf(data, originalDoc), {
+    mapboxToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
+  });
+  if (data.rebuildElevation === true && !measured.profile) {
+    throw elevationValidationError(
+      measured.warnings[0] ?? 'No elevation samples were returned.',
+      req,
+    );
   }
   const gaps = gapsBetweenParts(parsed.parts);
   const warnings = [...new Set([...report.warnings, ...measured.warnings])];
@@ -428,19 +431,22 @@ function isOsmPreviewReport(value: unknown): boolean {
 
 function previewReport(value: unknown): {
   missingIds: number[];
+  requestedIds: number[];
   resolvedIds: number[];
   warnings: string[];
 } {
   if (!value || typeof value !== 'object') {
-    return { missingIds: [], resolvedIds: [], warnings: [] };
+    return { missingIds: [], requestedIds: [], resolvedIds: [], warnings: [] };
   }
   const report = value as {
     missingIds?: unknown;
+    requestedIds?: unknown;
     resolvedIds?: unknown;
     warnings?: unknown;
   };
   return {
     missingIds: validOsmIds(report.missingIds),
+    requestedIds: validOsmIds(report.requestedIds),
     resolvedIds: validOsmIds(report.resolvedIds),
     warnings: Array.isArray(report.warnings)
       ? report.warnings.filter(

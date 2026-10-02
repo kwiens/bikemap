@@ -222,6 +222,7 @@ describe('other sources', () => {
         osmIds: [1, 2],
         osmReport: {
           isPreview: true,
+          requestedIds: [1, 2],
           resolvedIds: [1, 2],
           warnings: [],
         },
@@ -246,6 +247,35 @@ describe('other sources', () => {
         osmReport: {
           isPreview: true,
           missingIds: [],
+          requestedIds: [1, 2],
+          resolvedIds: [1, 2],
+          warnings: [],
+        },
+        rebuildGeometry: true,
+      },
+      originalDoc: { geom: multiLine([A, B]), osmIds: [1, 2] },
+    }).catch((error: unknown) => error as ValidationError);
+
+    expect(fetched).toBe(0);
+    expect(failed).toBeInstanceOf(ValidationError);
+    expect((failed as ValidationError).data.errors).toEqual([
+      {
+        message: expect.stringMatching(/changed after this preview/i),
+        path: 'geom',
+      },
+    ]);
+  });
+
+  it('rejects an OSM preview when the same ways are reordered', async () => {
+    const failed = await run({
+      data: {
+        geom: multiLine([A, B, C]),
+        geometrySource: 'osm',
+        osmIds: [2, 1],
+        osmReport: {
+          isPreview: true,
+          missingIds: [],
+          requestedIds: [1, 2],
           resolvedIds: [1, 2],
           warnings: [],
         },

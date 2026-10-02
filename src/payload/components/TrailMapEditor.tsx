@@ -818,6 +818,7 @@ export function TrailMapEditor({
         ...body.report,
         builtAt: new Date().toISOString(),
         isPreview: true,
+        requestedIds,
         source: 'osm',
       });
       setRebuild(true);
