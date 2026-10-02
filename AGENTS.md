@@ -523,6 +523,14 @@ Things to know before touching it:
   city in both lookups so same-named trails cannot collide. Chattanooga's seed
   imports its prepared profiles directly; `pnpm backfill:elevation` measures
   any trail that still has geometry but no profile, without touching Overpass.
+- **Multi-part lines are measured in walking order, not stored order.**
+  `measureParts` walks every line in `walkingOrder` (`osm/assemble.ts`), so
+  pieces stored out of sequence or backwards (common in the GIS import) don't
+  make the chart leap between far ends of the trail. Gain and
+  loss swap when a piece is walked the other way, so changing that ordering
+  changes stored numbers: regenerate with `pnpm prepare:chattanooga-measurements`
+  and re-measure the database with
+  `pnpm backfill:elevation -- --city=<city> --force --multipart`.
 - **`computeElevation`'s spike filter needs a run cap.** It replaces readings
   further than `ELEVATION_SPIKE_THRESHOLD` (25 m) from a running EMA. On a
   sustained climb the EMA lags by about `step * (1-alpha)/alpha`, and on a ~30%

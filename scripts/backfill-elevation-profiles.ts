@@ -21,6 +21,11 @@
  *   pnpm backfill:elevation -- --dry-run
  *   pnpm backfill:elevation
  *   pnpm backfill:elevation -- --city=chattanooga --force
+ *   pnpm backfill:elevation -- --city=chattanooga --force --multipart
+ *
+ * `--multipart` limits the run to trails whose line is in more than one piece.
+ * Those are the only profiles that depend on the order the pieces are walked
+ * in, so it is the run to use after that ordering changes.
  */
 import { getPayload } from 'payload';
 import config from '../src/payload.config';
@@ -38,6 +43,8 @@ interface Options {
   dryRun: boolean;
   /** Re-measure trails that already have a profile. */
   force: boolean;
+  /** Only trails whose line is in more than one piece. */
+  multipartOnly: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -47,6 +54,7 @@ function parseArgs(argv: string[]): Options {
     ),
     dryRun: argv.includes('--dry-run'),
     force: argv.includes('--force'),
+    multipartOnly: argv.includes('--multipart'),
   };
 }
 
@@ -68,7 +76,9 @@ function parseCityArg(value: string | undefined): CityId {
 }
 
 async function main() {
-  const { city, dryRun, force } = parseArgs(process.argv.slice(2));
+  const { city, dryRun, force, multipartOnly } = parseArgs(
+    process.argv.slice(2),
+  );
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   if (!token) {
     throw new Error(
@@ -85,9 +95,14 @@ async function main() {
     where: { city: { equals: city } },
   });
 
-  const todo = result.docs.filter(
-    (trail) => trail.geom && (force || !trail.elevationProfile),
-  );
+  // Parsed once here: the multipart filter needs the parts, and so does the
+  // measurement below.
+  const todo = result.docs
+    .filter((trail) => trail.geom && (force || !trail.elevationProfile))
+    .map((trail) => ({ parsed: parseTrailGeometry(trail.geom), trail }))
+    .filter(
+      ({ parsed }) => !multipartOnly || !parsed.ok || parsed.parts.length > 1,
+    );
 
   payload.logger.info(
     `${city}: ${result.docs.length} trails, ${todo.length} to measure` +
@@ -98,8 +113,7 @@ async function main() {
   let noTerrain = 0;
   let noGeometry = 0;
 
-  for (const trail of todo) {
-    const parsed = parseTrailGeometry(trail.geom);
+  for (const { parsed, trail } of todo) {
     if (!parsed.ok || parsed.parts.length === 0) {
       noGeometry += 1;
       payload.logger.warn(
