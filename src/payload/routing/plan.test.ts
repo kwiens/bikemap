@@ -217,6 +217,22 @@ describe('routeLeg', () => {
     ]);
   });
 
+  it('reaches a waypoint off the network with a straight approach', () => {
+    // ~144 m south of the path's first segment: past the snap radius, within
+    // reach of a straight approach.
+    const leg = routeLeg(graph, at(0.5, -1.3), at(1, 0.5), 'network');
+
+    expect(leg.isUnrouted).toBeUndefined();
+    expect(leg.coordinates[0]).toEqual(at(0.5, -1.3));
+    expect(leg.coordinates[1][0]).toBeCloseTo(at(0.5, 0)[0], 6);
+    expect(leg.coordinates[1][1]).toBeCloseTo(at(0.5, 0)[1], 6);
+    expect(leg.steps[0]).toEqual({
+      meters: expect.closeTo(144, -1),
+      source: { kind: 'straight' },
+    });
+    expect(leg.steps[1].source).toMatchObject({ kind: 'osm' });
+  });
+
   it('falls back to a flagged straight line when nothing connects', () => {
     const leg = routeLeg(graph, at(0, 0), at(5, 5), 'network');
 
