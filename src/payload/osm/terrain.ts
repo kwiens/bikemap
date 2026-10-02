@@ -167,14 +167,23 @@ export function densify(
   if (!Number.isFinite(wanted)) {
     return [];
   }
-  let remaining = maxSamples - line.length;
-  const scale = wanted > remaining ? remaining / wanted : 1;
+  const available = maxSamples - line.length;
+  const scale = wanted > available ? available / wanted : 1;
+  let cumulativeWanted = 0;
+  let allocated = 0;
   const out: [number, number][] = [line[0]];
   for (let i = 1; i < line.length; i++) {
     const [lng1, lat1] = line[i - 1];
     const [lng2, lat2] = line[i];
-    const extra = Math.min(remaining, Math.floor(extras[i - 1] * scale));
-    remaining -= extra;
+    cumulativeWanted += extras[i - 1];
+    // Round the running total rather than each segment's share. Otherwise
+    // many segments wanting one point each can all round down to zero.
+    const target =
+      i === line.length - 1
+        ? Math.min(available, wanted)
+        : Math.min(available, Math.floor(cumulativeWanted * scale));
+    const extra = target - allocated;
+    allocated = target;
     const steps = 1 + extra;
     for (let k = 1; k <= steps; k++) {
       const t = k / steps;
@@ -281,15 +290,21 @@ export async function sampleTerrainParts(
     return null;
   }
   const spare = maxSamples - vertices;
-  let remaining = spare;
+  let cumulativeShare = 0;
+  let allocated = 0;
 
   const sampled: TerrainPoint[][] = [];
   for (const [index, part] of usable.entries()) {
     const share = total > 0 ? lengths[index] / total : 1 / usable.length;
     // Reserve all original vertices across all parts first. Otherwise giving
     // every short part a minimum of two can overrun the whole-trail budget.
-    const extra = Math.min(remaining, Math.floor(spare * share));
-    remaining -= extra;
+    cumulativeShare += share;
+    const target =
+      index === usable.length - 1
+        ? spare
+        : Math.min(spare, Math.floor(spare * cumulativeShare));
+    const extra = target - allocated;
+    allocated = target;
     const points = await sampleTerrain(part, token, part.length + extra);
     if (points) {
       sampled.push(points);

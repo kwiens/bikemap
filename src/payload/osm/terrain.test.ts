@@ -189,6 +189,16 @@ describe('terrain sampling budgets', () => {
     for (const point of line) expect(points).toContainEqual(point);
   });
 
+  it('uses spare samples across many similar segments', () => {
+    const line: [number, number][] = Array.from({ length: 5 }, (_, index) => [
+      index * 0.0004,
+      0,
+    ]);
+    const points = densify(line, 20, 8);
+    expect(points).toHaveLength(8);
+    for (const point of line) expect(points).toContainEqual(point);
+  });
+
   it('declines dense geometry rather than dropping vertices and reporting false elevations', async () => {
     const fetch = setFetchStub(vi.fn(async () => okTile(100)));
     expect(
@@ -228,6 +238,23 @@ describe('terrain sampling budgets', () => {
       expect([part[0].lng, part[0].lat]).toEqual(parts[index][0]);
       expect([part.at(-1)?.lng, part.at(-1)?.lat]).toEqual(parts[index][1]);
     });
+  });
+
+  it('uses a spare sample when equal parts each receive a fractional share', async () => {
+    setFetchStub(vi.fn(async () => okTile(100)));
+    const parts: [number, number][][] = [
+      [
+        [0, 0],
+        [0.02, 0],
+      ],
+      [
+        [1, 1],
+        [1.02, 1],
+      ],
+    ];
+    const result = await sampleTerrainParts(parts, TOKEN, 5);
+    expect(result?.flat()).toHaveLength(5);
+    expect(result).toHaveLength(2);
   });
 
   it('declines the entire profile when part vertices exceed the whole-trail budget', async () => {
