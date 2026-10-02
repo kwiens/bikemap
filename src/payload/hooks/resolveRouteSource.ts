@@ -117,14 +117,19 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
       current.name = name;
     }
     if (!valueOf(current, stored, 'routeId')) {
-      current.routeId = trail.slug || slugify(name);
+      current.routeId = await availableRouteId(
+        req,
+        city,
+        trail.slug || slugify(name),
+        stored?.id,
+      );
     }
     current.kind = 'trail';
     return current;
   }
 
   if (source === 'composed') {
-    return resolveComposedRoute(current, stored, req, isPublishing);
+    return await resolveComposedRoute(current, stored, req, isPublishing);
   }
 
   if (source !== 'imported' && source !== 'studio') {
@@ -193,12 +198,12 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
  * from the request, so a built route's numbers cannot disagree with the line
  * it draws — the same rule a hand-edited trail follows.
  */
-function resolveComposedRoute(
+async function resolveComposedRoute(
   current: RouteData,
   stored: RouteData | undefined,
   req: Parameters<CollectionBeforeValidateHook>[0]['req'],
   isPublishing: boolean,
-): RouteData {
+): Promise<RouteData> {
   current.sourceTrail = null;
 
   const parsed = parseRoutePlan(valueOf(current, stored, 'plan'));
@@ -217,9 +222,15 @@ function resolveComposedRoute(
   if (
     !valueOf(current, stored, 'routeId') &&
     typeof name === 'string' &&
-    name
+    name &&
+    isCityId(valueOf(current, stored, 'city'))
   ) {
-    current.routeId = slugify(name);
+    current.routeId = await availableRouteId(
+      req,
+      valueOf(current, stored, 'city'),
+      slugify(name),
+      stored?.id,
+    );
   }
 
   if (!isPublishing) {
@@ -236,4 +247,41 @@ function resolveComposedRoute(
     );
   }
   return current;
+}
+
+/**
+ * `base`, or `base-2`, `base-3`… — the first id no other route in the city
+ * uses. Only consulted when the id is being filled in for the curator; an id
+ * they typed is theirs, and a clash is reported by the unique index.
+ *
+ * Bounded by the routes sharing the prefix, which is a handful.
+ */
+async function availableRouteId(
+  req: Parameters<CollectionBeforeValidateHook>[0]['req'],
+  city: unknown,
+  base: string,
+  selfId: unknown,
+): Promise<string> {
+  if (!isCityId(city)) {
+    return base;
+  }
+  const { docs } = await req.payload.find({
+    collection: 'routes',
+    depth: 0,
+    limit: 0,
+    pagination: false,
+    req,
+    select: { routeId: true },
+    where: {
+      and: [{ city: { equals: city } }, { routeId: { like: base } }],
+    },
+  });
+  const taken = new Set(
+    docs.filter((doc) => doc.id !== selfId).map((doc) => doc.routeId),
+  );
+  let candidate = base;
+  for (let suffix = 2; taken.has(candidate); suffix++) {
+    candidate = `${base}-${suffix}`;
+  }
+  return candidate;
 }

@@ -159,6 +159,26 @@ describe('routeBetween', () => {
     expect(names(result?.steps ?? [])).toEqual(['Main St', 'Loop']);
   });
 
+  it('does not cut across a switchback to the middle of its own trail', () => {
+    // A hairpin: the trail ends ~8 m below its own upper leg.
+    const graph = buildRouteGraph({
+      trails: [
+        {
+          name: 'Switchback',
+          parts: [[at(0, 0), at(3, 0), at(3, 0.5), at(1, 0.5), at(1, 0.07)]],
+          slug: 'switchback',
+        },
+      ],
+      ways: [],
+    });
+    const a = snapToGraph(graph, at(1, 0.07));
+    const b = snapToGraph(graph, at(1, 0));
+    const result = a && b ? routeBetween(graph, a, b) : null;
+
+    // Following the trail is ~5 segments long; a shortcut would be ~8 m.
+    expect(result?.steps[0].meters).toBeGreaterThan(400);
+  });
+
   it('joins a trail to a road it crosses at a shared vertex', () => {
     const result = route(
       [way(1, [1, 2, 3], [at(0, 0), at(2, 0), at(4, 0)], { name: 'Main St' })],

@@ -21,7 +21,7 @@ const WAYPOINT_SNAP_METERS = 30;
 
 /**
  * Routes a leg between two waypoints. Never fails: a leg the network can't
- * connect comes back straight and flagged `unrouted`, so the route stays
+ * connect comes back straight and flagged `isUnrouted`, so the route stays
  * drawable and the editor can say which leg needs another waypoint.
  */
 export function routeLeg(

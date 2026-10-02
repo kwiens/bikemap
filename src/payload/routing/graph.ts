@@ -24,6 +24,7 @@
  *
  * Client-safe: this runs in the admin bundle.
  */
+import { dropRepeatedPoints } from '@/payload/osm/geometry';
 import { haversineDistance } from '@/utils/ride-stats';
 
 export type Position = [number, number];
@@ -269,29 +270,26 @@ function stitchDeadEnds(graph: RouteGraph, newId: () => number): void {
   // Decided up front, before any stitch changes a node's degree: a loop
   // trail's two ends stitch to each other, and must still count as dead ends
   // when it comes to reaching the rest of the network.
-  const deadEnds = [...graph.edges]
-    .filter(([, edges]) => edges.length === 1)
-    .map(([id, edges]) => ({ id, source: edges[0].source }));
+  const deadEnds = new Map(
+    [...graph.edges]
+      .filter(([, edges]) => edges.length === 1)
+      .map(([id, edges]) => [id, edges[0].source]),
+  );
 
-  for (const { id, source } of deadEnds) {
+  for (const [id, source] of deadEnds) {
     const position = graph.nodes.get(id);
     if (!position) {
       continue;
     }
-    // Another line first — that is the gap that disconnects whole trails —
-    // then a gap inside the same line, such as a GIS trail's split parts.
-    for (const accept of [
-      (other: number) => other !== source,
-      (other: number) => other === source,
-    ]) {
-      const snap = snapToGraph(graph, position, STITCH_METERS, {
-        accept,
-        exclude: id,
-        preferTrails: false,
-      });
-      if (!snap) {
-        continue;
-      }
+
+    // Another line: the gap that disconnects whole trails. Any point on it
+    // will do, splitting the segment if need be.
+    const snap = snapToGraph(graph, position, STITCH_METERS, {
+      accept: (other) => other !== source,
+      exclude: id,
+      preferTrails: false,
+    });
+    if (snap) {
       const target =
         snap.metersToFrom <= SAME_NODE_METERS
           ? snap.from
@@ -300,7 +298,44 @@ function stitchDeadEnds(graph: RouteGraph, newId: () => number): void {
             : splitSegment(graph, snap, newId());
       connect(graph, id, target);
     }
+
+    // The same line: only end to end — a loop's two ends, or a GIS trail's
+    // split parts. Joining an end to the middle of its own line would let
+    // routes cut straight across a switchback.
+    const partner = nearestDeadEnd(graph, deadEnds, id, source, position);
+    if (partner !== null) {
+      connect(graph, id, partner);
+    }
   }
+}
+
+/** The nearest other dead end of the same source within `STITCH_METERS`. */
+function nearestDeadEnd(
+  graph: RouteGraph,
+  deadEnds: Map<number, number>,
+  id: number,
+  source: number,
+  position: Position,
+): number | null {
+  let nearest: number | null = null;
+  let nearestMeters = STITCH_METERS;
+  for (const index of segmentsNear(graph, position, STITCH_METERS)) {
+    const segment = graph.segments[index];
+    for (const candidate of [segment.a, segment.b]) {
+      if (candidate === id || deadEnds.get(candidate) !== source) {
+        continue;
+      }
+      const point = graph.nodes.get(candidate);
+      const meters = point
+        ? distance(position, point)
+        : Number.POSITIVE_INFINITY;
+      if (meters <= nearestMeters) {
+        nearest = candidate;
+        nearestMeters = meters;
+      }
+    }
+  }
+  return nearest;
 }
 
 /**
@@ -590,7 +625,7 @@ export function routeBetween(
     appendStep(steps, edge.meters, sourceOf(graph, edge.source));
   }
 
-  return { coordinates: dropRepeats(coordinates), steps };
+  return { coordinates: dropRepeatedPoints(coordinates), steps };
 }
 
 /**
@@ -790,15 +825,6 @@ function flatProjection(origin: Position): (p: Position) => [number, number] {
     (lng - origin[0]) * metersPerDegLng,
     (lat - origin[1]) * metersPerDegLat,
   ];
-}
-
-function dropRepeats(points: Position[]): Position[] {
-  return points.filter(
-    (point, index) =>
-      index === 0 ||
-      point[0] !== points[index - 1][0] ||
-      point[1] !== points[index - 1][1],
-  );
 }
 
 /** A binary min-heap of node ids keyed by priority. */

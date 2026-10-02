@@ -14,7 +14,11 @@
  * Client-safe: shared by the admin editor and the server hook.
  */
 import { lengthMeters } from '@/payload/osm/assemble';
-import type { TrailGeometry } from '@/payload/osm/geometry';
+import {
+  isPosition,
+  safeParse,
+  type TrailGeometry,
+} from '@/payload/osm/geometry';
 import {
   appendStep,
   distance,
@@ -35,7 +39,7 @@ export interface RouteLeg {
    * Kept distinct from a chosen straight leg so the editor can keep flagging
    * it until a waypoint fixes it.
    */
-  unrouted?: boolean;
+  isUnrouted?: boolean;
 }
 
 export interface RoutePlan {
@@ -90,11 +94,11 @@ export function parseRoutePlan(value: unknown): PlanParse {
 
   const parsedLegs: RouteLeg[] = [];
   for (const [index, leg] of legs.entries()) {
-    const { coordinates, mode, steps, unrouted } = (leg ?? {}) as {
+    const { coordinates, isUnrouted, mode, steps } = (leg ?? {}) as {
       coordinates?: unknown;
       mode?: unknown;
       steps?: unknown;
-      unrouted?: unknown;
+      isUnrouted?: unknown;
     };
     if (mode !== 'network' && mode !== 'straight') {
       return fail(`Leg ${index + 1} has an unknown mode.`);
@@ -111,7 +115,7 @@ export function parseRoutePlan(value: unknown): PlanParse {
       mode,
       // Steps are a display aid; a malformed one is dropped, not fatal.
       steps: Array.isArray(steps) ? steps.filter(isStep) : [],
-      ...(unrouted === true ? { unrouted: true } : {}),
+      ...(isUnrouted === true ? { isUnrouted: true } : {}),
     });
   }
 
@@ -178,7 +182,7 @@ export function straightLeg(
     coordinates: [from, to],
     mode,
     steps: meters > 0 ? [{ meters, source: { kind: 'straight' } }] : [],
-    ...(mode === 'network' ? { unrouted: true } : {}),
+    ...(mode === 'network' ? { isUnrouted: true } : {}),
   };
 }
 
@@ -347,19 +351,6 @@ export function closeLoop(plan: RoutePlan): PlanEdit {
   return appendWaypoint(plan, first);
 }
 
-function isPosition(value: unknown): value is Position {
-  if (!Array.isArray(value) || value.length < 2) {
-    return false;
-  }
-  const [lng, lat] = value.map(Number);
-  return (
-    Number.isFinite(lng) &&
-    Number.isFinite(lat) &&
-    Math.abs(lng) <= 180 &&
-    Math.abs(lat) <= 90
-  );
-}
-
 function isStep(value: unknown): value is RouteStep {
   const step = value as { meters?: unknown; source?: { kind?: unknown } };
   return (
@@ -376,11 +367,3 @@ const STEP_KINDS = new Set<StepSource['kind']>([
   'straight',
   'trail',
 ]);
-
-function safeParse(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}

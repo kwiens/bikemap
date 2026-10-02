@@ -94,6 +94,12 @@ const DEFAULT_ROUTE_COLOR = '#2563EB';
 /** Most cells loaded just to draw the view; routing loads its own. */
 const MAX_VIEW_CELLS = 4;
 
+/**
+ * Fitting a route of one waypoint, or one short leg, would otherwise zoom
+ * to the map's limit on a blank tile.
+ */
+const FIT_OPTIONS = { maxZoom: 16, padding: 60 };
+
 /** Undo depth. Each entry is a whole plan, which is small. */
 const MAX_HISTORY = 100;
 
@@ -154,19 +160,35 @@ export function RouteMapEditor({
   if (!storeRef.current) {
     storeRef.current = new RouteNetworkStore(fetchCell, () => {
       setPending(storeRef.current?.pending ?? 0);
-      paintNetwork();
+      scheduleNetworkPaint();
     });
   }
 
   // --- drawing ------------------------------------------------------------
 
-  /** Pushes the loaded network into the map. Cheap enough to call on change. */
+  /** Pushes the loaded network into the map. */
   const paintNetwork = useCallback(() => {
     const source = mapRef.current?.getSource(NETWORK_SOURCE) as
       | mapboxgl.GeoJSONSource
       | undefined;
     source?.setData(networkCollection(storeRef.current?.allWays() ?? []));
   }, []);
+
+  /**
+   * Repaints the network once per frame at most. The store reports a change
+   * when each cell starts and finishes loading, and re-uploading every loaded
+   * way for each of those is real work once a few city cells are in.
+   */
+  const networkFrameRef = useRef<number | null>(null);
+  const scheduleNetworkPaint = useCallback(() => {
+    if (networkFrameRef.current !== null) {
+      return;
+    }
+    networkFrameRef.current = requestAnimationFrame(() => {
+      networkFrameRef.current = null;
+      paintNetwork();
+    });
+  }, [paintNetwork]);
 
   const paintRoute = useCallback(() => {
     const map = mapRef.current;
@@ -260,7 +282,7 @@ export function RouteMapEditor({
         event.preventDefault();
         if (!readOnlyRef.current) {
           void applyEditRef.current((current) =>
-            removeWaypoint(current, index),
+            removeWaypoint(current, waypointIndex(current, index, point)),
           );
         }
       });
@@ -273,9 +295,16 @@ export function RouteMapEditor({
         .addTo(map);
       marker.on('dragend', () => {
         const { lat, lng } = marker.getLngLat();
+        // The snap may wait on the network, and the plan can change
+        // meanwhile (an undo, say) — so the waypoint is found again by where
+        // it was, not trusted to still be at `index`.
         void snapPoint([lng, lat]).then((snapped) =>
           applyEditRef.current((current) =>
-            moveWaypoint(current, index, snapped),
+            moveWaypoint(
+              current,
+              waypointIndex(current, index, point),
+              snapped,
+            ),
           ),
         );
       });
@@ -414,7 +443,14 @@ export function RouteMapEditor({
   const handleMapClick = useCallback(
     async (event: mapboxgl.MapMouseEvent) => {
       const map = mapRef.current;
-      if (!map || readOnlyRef.current) {
+      // Markers live inside the canvas container, so a click on one bubbles
+      // up as a map click — which would drop a second waypoint on top of it.
+      const target = event.originalEvent.target;
+      if (
+        !map ||
+        readOnlyRef.current ||
+        (target instanceof Element && target.closest('.mapboxgl-marker'))
+      ) {
         return;
       }
       const point: Position = [event.lngLat.lng, event.lngLat.lat];
@@ -466,6 +502,9 @@ export function RouteMapEditor({
       paintNetwork();
       paintRoute();
       setReady(true);
+      // `moveend` doesn't fire for the starting camera, so the opening view
+      // would otherwise show no network until the curator pans.
+      loadView();
     });
     map.on('click', (event) => {
       void handleMapClick(event);
@@ -485,6 +524,10 @@ export function RouteMapEditor({
 
     paintMarkers();
     return () => {
+      if (networkFrameRef.current !== null) {
+        cancelAnimationFrame(networkFrameRef.current);
+        networkFrameRef.current = null;
+      }
       for (const marker of markersRef.current) {
         marker.remove();
       }
@@ -561,7 +604,7 @@ export function RouteMapEditor({
   const fitRoute = useCallback(() => {
     const bounds = boundsOf(planRef.current.legs.map((leg) => leg.coordinates));
     if (bounds) {
-      mapRef.current?.fitBounds(bounds, { padding: 60 });
+      mapRef.current?.fitBounds(bounds, FIT_OPTIONS);
     }
   }, []);
 
@@ -576,7 +619,10 @@ export function RouteMapEditor({
     [plan],
   );
   const miles = planMeters(plan) * METERS_TO_MILES;
-  const unrouted = plan.legs.filter((leg) => leg.unrouted).length;
+  // Edits draw a straight placeholder until the router answers; those are
+  // not failures yet, so nothing is reported while routing is in flight.
+  const unroutedCount =
+    routing > 0 ? 0 : plan.legs.filter((leg) => leg.isUnrouted).length;
   const editable = !readOnly;
 
   if (!mapConfig.mapbox.accessToken) {
@@ -645,12 +691,13 @@ export function RouteMapEditor({
       </div>
 
       {note && <Banner tone="warning">{note}</Banner>}
-      {unrouted > 0 && (
+      {unroutedCount > 0 && (
         <Banner tone="warning">
-          {unrouted === 1 ? 'One leg' : `${unrouted} legs`} could not be routed
-          along trails or roads and {unrouted === 1 ? 'is' : 'are'} drawn as a
-          dashed straight line. Add a waypoint on a connecting trail or road, or
-          mark the leg as a straight line on purpose.
+          {unroutedCount === 1 ? 'One leg' : `${unroutedCount} legs`} could not
+          be routed along trails or roads and{' '}
+          {unroutedCount === 1 ? 'is' : 'are'} drawn as a dashed straight line.
+          Add a waypoint on a connecting trail or road, or mark the leg as a
+          straight line on purpose.
         </Banner>
       )}
 
@@ -741,7 +788,7 @@ export function RouteMapEditor({
                       <span>
                         Leg {index + 1}:{' '}
                         {(legMeters(leg) * METERS_TO_MILES).toFixed(2)} mi
-                        {leg.unrouted && (
+                        {leg.isUnrouted && routing === 0 && (
                           <span className="ml-1 text-[color:var(--theme-warning-600,#b45309)]">
                             · not connected
                           </span>
@@ -845,7 +892,7 @@ function initialView(
     plan.waypoints,
   ]);
   if (bounds) {
-    return { bounds, fitBoundsOptions: { padding: 60 } };
+    return { bounds, fitBoundsOptions: FIT_OPTIONS };
   }
   const view = (city ? cityConfigs[city] : mapConfig).defaultView;
   return { center: view.center, zoom: view.zoom };
@@ -944,7 +991,7 @@ function routeCollection(plan: RoutePlan): GeoJSON.FeatureCollection {
       geometry: { coordinates: leg.coordinates, type: 'LineString' },
       properties: {
         leg: index,
-        straight: leg.mode === 'straight' || Boolean(leg.unrouted),
+        straight: leg.mode === 'straight' || Boolean(leg.isUnrouted),
       },
       type: 'Feature',
     })),
@@ -1020,4 +1067,18 @@ function withKeys<T>(
     seen.set(base, count + 1);
     return { item, key: `${base}#${count}` };
   });
+}
+
+/**
+ * Where a waypoint is now. Its creation-time index is right unless the plan
+ * changed underneath; then it is found by position. -1 makes the edit a no-op.
+ */
+function waypointIndex(
+  plan: RoutePlan,
+  index: number,
+  point: Position,
+): number {
+  return samePoint(plan.waypoints[index], point)
+    ? index
+    : plan.waypoints.findIndex((candidate) => samePoint(candidate, point));
 }

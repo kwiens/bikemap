@@ -36,16 +36,18 @@ function run(
     trailName: 'Deschutes River Trail',
     _status: 'published',
   },
+  existingRoutes: { id: number; routeId: string }[] = [],
 ) {
   const findByID = vi.fn().mockResolvedValue(trail);
+  const find = vi.fn().mockResolvedValue({ docs: existingRoutes });
   const result = resolveRouteSource({
     collection: { slug: 'routes' },
     context: {},
     data,
     operation: 'create',
-    req: { payload: { findByID } },
+    req: { payload: { find, findByID } },
   } as unknown as HookArgs);
-  return { findByID, result: Promise.resolve(result) };
+  return { find, findByID, result: Promise.resolve(result) };
 }
 
 describe('resolveRouteSource', () => {
@@ -201,6 +203,26 @@ describe('resolveRouteSource', () => {
       expect(resolved.bounds).toEqual([-121.4, 44, -121.39, 44.01]);
       expect(resolved.routeId).toBe('old-mill-loop');
       expect(resolved.sourceTrail).toBeNull();
+    });
+
+    it('picks a free id when another route already uses the name', async () => {
+      const { result } = run(
+        {
+          _status: 'draft',
+          city: 'bend',
+          geometrySource: 'composed',
+          name: 'Old Mill Loop',
+          plan,
+        },
+        undefined,
+        [
+          { id: 1, routeId: 'old-mill-loop' },
+          { id: 2, routeId: 'old-mill-loop-2' },
+        ],
+      );
+      const resolved = (await result) as Record<string, unknown>;
+
+      expect(resolved.routeId).toBe('old-mill-loop-3');
     });
 
     it('lets a draft be saved before it has a line', async () => {

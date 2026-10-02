@@ -166,7 +166,7 @@ describe('edits', () => {
     const straight = setLegMode(plan, 0, 'straight');
 
     expect(straight.plan.legs[0]).toMatchObject({ mode: 'straight' });
-    expect(straight.plan.legs[0].unrouted).toBeUndefined();
+    expect(straight.plan.legs[0].isUnrouted).toBeUndefined();
     expect(straight.reroute).toEqual([]);
     expect(setLegMode(straight.plan, 0, 'network').reroute).toEqual([0]);
   });
@@ -208,7 +208,7 @@ describe('routeLeg', () => {
     const leg = routeLeg(graph, at(0.5, 0), at(1, 0.5), 'network');
 
     expect(leg.coordinates).toEqual([at(0.5, 0), at(1, 0), at(1, 0.5)]);
-    expect(leg.unrouted).toBeUndefined();
+    expect(leg.isUnrouted).toBeUndefined();
     expect(planSteps({ legs: [leg], version: 1, waypoints: [] })).toEqual([
       {
         meters: expect.closeTo(96, -1),
@@ -221,7 +221,7 @@ describe('routeLeg', () => {
     const leg = routeLeg(graph, at(0, 0), at(5, 5), 'network');
 
     expect(leg).toEqual(straightLeg(at(0, 0), at(5, 5), 'network'));
-    expect(leg.unrouted).toBe(true);
+    expect(leg.isUnrouted).toBe(true);
   });
 
   it('measures a plan from its legs', () => {
