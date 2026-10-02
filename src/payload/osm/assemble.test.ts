@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assembleWays, boundsOf, lengthMeters } from './assemble';
+import { assembleWays, boundsOf, lengthMeters, walkingOrder } from './assemble';
 import type { OsmWay } from './overpass';
 
 // Coordinates around Bend, spaced far enough apart to exceed the 12 m join
@@ -81,6 +81,18 @@ describe('assembleWays', () => {
     expect(result.gaps[0].distanceMeters).toBeLessThan(100);
   });
 
+  it('returns disconnected runs in walking order', () => {
+    // Picked far piece first; the near piece's end is ~70 m from its start.
+    const near: [number, number] = [-121.4005, 43.9995];
+    const result = assembleWays([way(1, [A, B]), way(2, [FAR1, near])]);
+
+    expect(result.parts).toEqual([
+      [FAR1, near],
+      [A, B],
+    ]);
+    expect(result.orderedIds).toEqual([2, 1]);
+  });
+
   it('ignores ways with fewer than two positions', () => {
     const result = assembleWays([way(1, [A, B]), way(2, [C])]);
 
@@ -90,6 +102,64 @@ describe('assembleWays', () => {
 
   it('returns nothing for no ways', () => {
     expect(assembleWays([])).toEqual({ gaps: [], orderedIds: [], parts: [] });
+  });
+});
+
+describe('walkingOrder', () => {
+  // East Rim's shape: two pieces ~180 m apart, stored far end first.
+  const north: [number, number][] = [
+    [-121.4, 44.0],
+    [-121.4, 44.02],
+  ];
+  const south: [number, number][] = [
+    [-121.4, 43.98],
+    [-121.4, 43.9984],
+  ];
+
+  it('starts with the piece that leads into the next', () => {
+    expect(walkingOrder([north, south])).toEqual([
+      { index: 1, reversed: false },
+      { index: 0, reversed: false },
+    ]);
+  });
+
+  it('turns a piece stored backwards around', () => {
+    const backwards = [...south].reverse();
+
+    expect(walkingOrder([north, backwards])).toEqual([
+      { index: 1, reversed: true },
+      { index: 0, reversed: false },
+    ]);
+  });
+
+  it('keeps the source direction when a walk and its reverse tie', () => {
+    const reversedNorth = [...north].reverse();
+    const reversedSouth = [...south].reverse();
+
+    expect(walkingOrder([reversedNorth, reversedSouth])).toEqual([
+      { index: 0, reversed: false },
+      { index: 1, reversed: false },
+    ]);
+  });
+
+  it('walks a fork so the only break is the hop back from the short branch', () => {
+    // Electric Avenue's GIS forks: a stem with two pieces leaving its end.
+    // Some piece has to be doubled back from; the walk should do it from the
+    // ~85 m spur rather than from the 1.4 km fork.
+    const spurEnd: [number, number] = [-121.389, 44.0095];
+    const stem: [number, number][] = [A, B];
+    const longFork: [number, number][] = [B, C];
+    const spur: [number, number][] = [B, spurEnd];
+
+    expect(walkingOrder([longFork, spur, stem])).toEqual([
+      { index: 0, reversed: true },
+      { index: 1, reversed: false },
+      { index: 2, reversed: true },
+    ]);
+  });
+
+  it('is empty for no parts', () => {
+    expect(walkingOrder([])).toEqual([]);
   });
 });
 
