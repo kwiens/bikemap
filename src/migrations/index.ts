@@ -3,6 +3,7 @@ import * as migration_20260919_194419 from './20260919_194419';
 import * as migration_20260919_215743 from './20260919_215743';
 import * as migration_20260919_223908_backfill_chattanooga_supplemental_trails from './20260919_223908_backfill_chattanooga_supplemental_trails';
 import * as migration_20260919_224403 from './20260919_224403';
+import * as migration_20261001_221021_add_composed_routes from './20261001_221021_add_composed_routes';
 
 export const migrations = [
   {
@@ -29,5 +30,10 @@ export const migrations = [
     up: migration_20260919_224403.up,
     down: migration_20260919_224403.down,
     name: '20260919_224403',
+  },
+  {
+    up: migration_20261001_221021_add_composed_routes.up,
+    down: migration_20261001_221021_add_composed_routes.down,
+    name: '20261001_221021_add_composed_routes'
   },
 ];

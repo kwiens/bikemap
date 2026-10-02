@@ -31,7 +31,7 @@ export type GeometryParse =
 /** Two points is the minimum that draws a line. */
 export const MIN_POINTS_PER_PART = 2;
 
-function isPosition(value: unknown): value is [number, number] {
+export function isPosition(value: unknown): value is [number, number] {
   if (!Array.isArray(value) || value.length < 2) {
     return false;
   }
@@ -229,10 +229,26 @@ export function cloneParts(parts: [number, number][][]): [number, number][][] {
   );
 }
 
-function safeParse(value: string): unknown {
+/** JSON.parse that yields null instead of throwing. */
+export function safeParse(value: string): unknown {
   try {
     return JSON.parse(value);
   } catch {
     return null;
   }
+}
+
+/**
+ * Drops consecutive duplicate points. A stopped GPS logs the same fix over and
+ * over, and a router can emit a join point twice; one copy draws the same line.
+ */
+export function dropRepeatedPoints<T extends [number, number]>(
+  points: T[],
+): T[] {
+  return points.filter(
+    (point, index) =>
+      index === 0 ||
+      point[0] !== points[index - 1][0] ||
+      point[1] !== points[index - 1][1],
+  );
 }
