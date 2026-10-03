@@ -88,8 +88,27 @@ const config: Config = {
       },
       colors: {
         // App brand colors
-        'app-primary': '#c3f44d',
-        'app-secondary': '#1a434e',
+        'app-primary': 'rgb(var(--app-primary) / <alpha-value>)',
+        'app-secondary': 'rgb(var(--app-secondary) / <alpha-value>)',
+        'app-surface': 'rgb(var(--app-surface) / <alpha-value>)',
+        'app-ink': 'rgb(var(--app-ink) / <alpha-value>)',
+        'app-accent': 'rgb(var(--app-accent) / <alpha-value>)',
+        // Existing components use Tailwind's neutral utilities extensively.
+        // Tint that scale between the editable surface and ink tokens so the
+        // whole UI participates in the theme without losing its hierarchy.
+        white: 'rgb(var(--app-surface) / <alpha-value>)',
+        gray: {
+          50: 'color-mix(in srgb, rgb(var(--app-surface)) 97%, rgb(var(--app-ink)))',
+          100: 'color-mix(in srgb, rgb(var(--app-surface)) 93%, rgb(var(--app-ink)))',
+          200: 'color-mix(in srgb, rgb(var(--app-surface)) 85%, rgb(var(--app-ink)))',
+          300: 'color-mix(in srgb, rgb(var(--app-surface)) 72%, rgb(var(--app-ink)))',
+          400: 'color-mix(in srgb, rgb(var(--app-surface)) 52%, rgb(var(--app-ink)))',
+          500: 'color-mix(in srgb, rgb(var(--app-surface)) 35%, rgb(var(--app-ink)))',
+          600: 'color-mix(in srgb, rgb(var(--app-surface)) 24%, rgb(var(--app-ink)))',
+          700: 'color-mix(in srgb, rgb(var(--app-surface)) 14%, rgb(var(--app-ink)))',
+          800: 'color-mix(in srgb, rgb(var(--app-surface)) 7%, rgb(var(--app-ink)))',
+          900: 'rgb(var(--app-ink) / <alpha-value>)',
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

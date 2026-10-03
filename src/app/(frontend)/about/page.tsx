@@ -54,7 +54,7 @@ const LOGO_DOWNLOADS = [
   {
     label: 'White text',
     file: '/Bike-Chatt_Logo-white-text.svg',
-    bg: 'bg-[#1a434e]',
+    bg: 'bg-app-secondary',
   },
   {
     label: 'Black text',
@@ -72,7 +72,7 @@ const ICON_DOWNLOADS = [
   {
     label: 'White',
     file: '/Bike-Chatt_Logo-white.svg',
-    bg: 'bg-[#1a434e]',
+    bg: 'bg-app-secondary',
   },
   {
     label: 'Black',
@@ -107,7 +107,7 @@ export default async function AboutPage({
         <div className="max-w-2xl mx-auto px-5 h-14 flex items-center">
           <Link
             href={`/${citySearch}`}
-            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#1a434e] transition-colors"
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-app-secondary transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to map
@@ -130,10 +130,10 @@ export default async function AboutPage({
             />
           ) : (
             <div className="mb-6 flex flex-col items-center gap-3">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1a434e] text-[#c3f44d]">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-app-secondary text-app-primary">
                 <MapIcon className="h-8 w-8" />
               </div>
-              <h1 className="text-4xl font-bold tracking-tight text-[#1a434e]">
+              <h1 className="text-4xl font-bold tracking-tight text-app-secondary">
                 {siteConfig.name}
               </h1>
             </div>
@@ -168,13 +168,13 @@ export default async function AboutPage({
 
           <Link
             href={`/export${citySearch}`}
-            className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-[#c3f44d] hover:shadow-sm transition-all group mb-3"
+            className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-sm transition-all group mb-3"
           >
-            <div className="w-10 h-10 rounded-lg bg-[#1a434e] flex items-center justify-center shrink-0">
-              <Printer className="w-5 h-5 text-[#c3f44d]" />
+            <div className="w-10 h-10 rounded-lg bg-app-secondary flex items-center justify-center shrink-0">
+              <Printer className="w-5 h-5 text-app-primary" />
             </div>
             <div>
-              <p className="font-medium text-gray-900 group-hover:text-[#1a434e]">
+              <p className="font-medium text-gray-900 group-hover:text-app-secondary">
                 Print map & route files
               </p>
               <p className="text-sm text-gray-500">
@@ -337,13 +337,13 @@ function ExtLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-[#c3f44d] hover:shadow-sm transition-all group"
+      className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-sm transition-all group"
     >
-      <div className="w-10 h-10 rounded-lg bg-[#1a434e] flex items-center justify-center shrink-0">
-        <span className="text-[#c3f44d]">{icon}</span>
+      <div className="w-10 h-10 rounded-lg bg-app-secondary flex items-center justify-center shrink-0">
+        <span className="text-app-primary">{icon}</span>
       </div>
       <div>
-        <p className="font-medium text-gray-900 group-hover:text-[#1a434e]">
+        <p className="font-medium text-gray-900 group-hover:text-app-secondary">
           {title}
         </p>
         <p className="text-sm text-gray-500">{desc}</p>
@@ -387,7 +387,7 @@ function LogoCard({
         <a
           href={file}
           download
-          className="text-xs text-gray-400 hover:text-[#1a434e] flex items-center gap-1 transition-colors"
+          className="text-xs text-gray-400 hover:text-app-secondary flex items-center gap-1 transition-colors"
         >
           <Download className="w-3 h-3" />
           SVG
