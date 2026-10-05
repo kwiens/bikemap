@@ -38,7 +38,7 @@ describe('buildFrontendThemeCss', () => {
         textColor: '#1a434e',
       }),
     ).toBe(
-      ':root{--app-primary:195 244 77;--app-secondary:26 67 78;--app-surface:255 255 255;--app-ink:26 67 78;--app-accent:165 215 48}',
+      ':root:root{--app-primary:195 244 77;--app-secondary:26 67 78;--app-surface:255 255 255;--app-ink:26 67 78;--app-accent:165 215 48}',
     );
   });
 
@@ -48,6 +48,6 @@ describe('buildFrontendThemeCss', () => {
         primaryColor: 'red',
         sidebarColor: '#1a434e',
       }),
-    ).toBe(':root{--app-secondary:26 67 78}');
+    ).toBe(':root:root{--app-secondary:26 67 78}');
   });
 });

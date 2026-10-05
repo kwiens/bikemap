@@ -45,7 +45,9 @@ export function buildFrontendThemeCss(theme: ThemeDoc): string {
     return isHex(value) ? [`${variable}:${hexToRgbChannels(value)}`] : [];
   });
 
-  return rootRule(declarations);
+  // Next may load the default stylesheet after this inline head style.
+  // Extra specificity keeps saved values authoritative regardless of order.
+  return rootRule(declarations, ':root:root');
 }
 
 function isHex(value: null | string | undefined): value is string {
@@ -58,8 +60,10 @@ function hexToRgbChannels(hex: string): string {
     .join(' ');
 }
 
-function rootRule(declarations: string[]): string {
-  return declarations.length > 0 ? `:root{${declarations.join(';')}}` : '';
+function rootRule(declarations: string[], selector = ':root'): string {
+  return declarations.length > 0
+    ? `${selector}{${declarations.join(';')}}`
+    : '';
 }
 
 export async function getThemeCss(): Promise<string> {
