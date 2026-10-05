@@ -13,7 +13,7 @@
  */
 import { NextResponse } from 'next/server';
 import { cityIds, isCityId } from '@/config/map.config';
-import { getCityTrails } from '@/payload/read/trails';
+import { getCityTrailGeojson } from '@/payload/read/trails';
 
 // Geometry changes when an editor saves, not per request.
 export const revalidate = 60;
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const { geojson, status } = await getCityTrails(city);
+  const { geojson, status } = await getCityTrailGeojson(city);
 
   if (status === 'unavailable') {
     return NextResponse.json(

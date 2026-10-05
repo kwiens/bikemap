@@ -1,12 +1,22 @@
 import type {
-  Access,
   CollectionBeforeDeleteHook,
   CollectionConfig,
+  Field,
   FilterOptions,
 } from 'payload';
 import { resolveTrailGeometry } from '@/payload/hooks/resolveTrailGeometry';
 import { cityOptions, isCityId } from '@/config/map.config';
 import { DEFAULT_KIND_VALUE, UNRATED_VALUE } from '@/data/trail-vocabulary';
+import {
+  accessAssignedCity,
+  canChangeCity,
+  createInAssignedCity,
+} from '@/payload/access/city-scoped';
+import {
+  invalidatePublicTrailDataAfterChange,
+  invalidatePublicTrailDataAfterDelete,
+} from '@/payload/cache/public-trails';
+import { recalculateTrailElevation } from '@/payload/endpoints/recalculate-trail-elevation';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { validateOsmIds } from '@/payload/osm/ids';
 import { slugify } from '@/utils/string';
@@ -31,26 +41,6 @@ import { defaultVocabularyId } from './vocabulary-fields';
  *
  * The stored `geom` is plain JSON rather than a PostGIS column. See docs/adr/0001.
  */
-
-/**
- * Admins edit every city; any other role only the city on its user record.
- *
- * Admin is the only role today, so in practice this is "signed in". The scoping
- * is here rather than deferred because it is the shape that has to hold when a
- * second role arrives — and a rule written then, against live data, is the kind
- * that gets one case wrong.
- */
-const cityScoped: Access = ({ req }) => {
-  const user = req.user;
-  if (!user) {
-    return false;
-  }
-  if (user.role === 'admin') {
-    return true;
-  }
-  // No city on a scoped user means no rows, rather than all rows.
-  return user.city ? { city: { equals: user.city } } : false;
-};
 
 /**
  * Clears a trail's condition reports before the trail goes.
@@ -89,16 +79,18 @@ export const Trails: CollectionConfig = {
   admin: {
     useAsTitle: 'displayName',
     defaultColumns: ['displayName', 'city', 'area', 'rating', 'distance'],
-    group: 'Trails',
+    group: 'Map content',
     listSearchableFields: ['displayName', 'trailName'],
   },
   // Published trails are public; everything else needs a login.
   access: {
-    create: cityScoped,
-    delete: cityScoped,
+    create: createInAssignedCity,
+    delete: accessAssignedCity,
     read: ({ req }) =>
-      req.user ? cityScoped({ req }) : { _status: { equals: 'published' } },
-    update: cityScoped,
+      req.user
+        ? accessAssignedCity({ req })
+        : { _status: { equals: 'published' } },
+    update: accessAssignedCity,
   },
   versions: {
     drafts: true,
@@ -106,9 +98,18 @@ export const Trails: CollectionConfig = {
     maxPerDoc: 50,
   },
   hooks: {
+    afterChange: [invalidatePublicTrailDataAfterChange],
+    afterDelete: [invalidatePublicTrailDataAfterDelete],
     beforeChange: [resolveTrailGeometry],
     beforeDelete: [deleteConditionReports],
   },
+  endpoints: [
+    {
+      handler: recalculateTrailElevation,
+      method: 'post',
+      path: '/:id/recalculate-elevation',
+    },
+  ],
   fields: [
     /**
      * Tabs, and specifically **unnamed** ones.
@@ -120,8 +121,8 @@ export const Trails: CollectionConfig = {
      * were.
      *
      * `geometrySource` is deliberately not in here. It sits in the sidebar,
-     * where it stays visible from every tab — it decides what the Geometry tab
-     * will do on save, and reading it should not require going to look.
+     * where it stays visible from every tab — it decides what the Trail line
+     * tab will do on save, and reading it should not require going to look.
      */
     {
       type: 'tabs',
@@ -159,6 +160,9 @@ export const Trails: CollectionConfig = {
                   type: 'select',
                   required: true,
                   options: cityOptions,
+                  access: {
+                    update: canChangeCity,
+                  },
                   admin: {
                     description:
                       'Which public city map serves this trail. The admin and database are shared across every city.',
@@ -314,9 +318,9 @@ export const Trails: CollectionConfig = {
           ],
         },
         {
-          label: 'Geometry',
+          label: 'Trail line',
           description:
-            'Where the trail runs. Pick the OSM ways it rides on, or adjust the line by hand.',
+            'Choose where the trail appears on the map. Use OpenStreetMap, adjust an existing line, or draw one here.',
           fields: [
             // --- The authoring surface --------------------------------------------
             // One map, three modes: pick OSM ways, move the line's points, or draw it.
@@ -326,7 +330,7 @@ export const Trails: CollectionConfig = {
             {
               name: 'geom',
               type: 'json',
-              label: 'Trail geometry',
+              label: 'Trail line',
               admin: {
                 components: {
                   Field: '@/payload/components/TrailMapEditor#TrailMapEditor',
@@ -352,20 +356,14 @@ export const Trails: CollectionConfig = {
             {
               name: 'rebuildGeometry',
               type: 'checkbox',
+              label: 'Refresh the saved trail line on the next save',
               defaultValue: false,
               admin: {
                 condition: (data) => data?.geometrySource !== 'imported',
                 description:
-                  'Re-derive on the next save even if nothing changed. For an OSM trail that refetches the ways; for an edited one it just re-measures the line.',
+                  'Use this if the line or its measurements look out of date. OpenStreetMap lines are fetched again; drawn lines are measured again.',
               },
             },
-          ],
-        },
-        {
-          label: 'Measurements',
-          description:
-            'Measured from the line on every save. Read-only — a hand edit here would be overwritten by the next one.',
-          fields: [
             {
               name: 'osmReport',
               type: 'json',
@@ -376,72 +374,56 @@ export const Trails: CollectionConfig = {
                 readOnly: true,
               },
             },
-            {
-              type: 'row',
-              fields: [
-                {
-                  name: 'distance',
-                  type: 'number',
-                  admin: {
-                    description: 'Miles, measured from the OSM geometry.',
-                    readOnly: true,
-                    width: '50%',
-                  },
-                },
-                {
-                  name: 'elevationGain',
-                  type: 'number',
-                  admin: {
-                    description: 'Feet, sampled from Mapbox Terrain-RGB.',
-                    readOnly: true,
-                    width: '50%',
-                  },
-                },
-              ],
-            },
-            {
-              type: 'row',
-              fields: [
-                {
-                  name: 'elevationLoss',
-                  type: 'number',
-                  admin: { readOnly: true, width: '33%' },
-                },
-                {
-                  name: 'elevationMin',
-                  type: 'number',
-                  admin: { readOnly: true, width: '33%' },
-                },
-                {
-                  name: 'elevationMax',
-                  type: 'number',
-                  admin: { readOnly: true, width: '33%' },
-                },
-              ],
-            },
-            {
-              name: 'bounds',
-              type: 'json',
-              admin: {
-                description: '[swLng, swLat, neLng, neLat], for zoom-to-fit.',
-                readOnly: true,
-              },
-            },
-            {
-              name: 'elevationProfile',
-              type: 'json',
-              admin: {
-                description:
-                  'The per-point elevation chart, sampled on save. Trails in the checked-in data are served from public/data/elevation instead; this is what a trail created here draws from.',
-                readOnly: true,
-                // Hundreds of [distance, elevation, lng, lat] rows — nothing a
-                // curator can act on, and it makes the form unreadable.
-                hidden: true,
-              },
-            },
           ],
         },
       ],
+    },
+
+    // These values stay in form state for the public map and elevation action,
+    // but the chart below is their one curator-facing surface. Showing raw
+    // read-only numbers in a third tab made them look independently editable.
+    derivedMeasurement('distance'),
+    derivedMeasurement('elevationGain'),
+    derivedMeasurement('elevationLoss'),
+    derivedMeasurement('elevationMin'),
+    derivedMeasurement('elevationMax'),
+    {
+      name: 'bounds',
+      type: 'json',
+      admin: {
+        components: {
+          Field:
+            '@/payload/components/ElevationProfileAdmin#DerivedMeasurementField',
+        },
+        description: '[swLng, swLat, neLng, neLat], for zoom-to-fit.',
+        readOnly: true,
+      },
+    },
+    {
+      name: 'elevationProfile',
+      type: 'json',
+      admin: {
+        description:
+          'The per-point elevation chart, imported with seeded geometry or sampled whenever geometry is rebuilt or edited.',
+        readOnly: true,
+        // Hundreds of [distance, elevation, lng, lat] rows — nothing a
+        // curator can act on, and it makes the form unreadable.
+        hidden: true,
+      },
+    },
+
+    // Keep the chart and its refresh action visible beneath every tab. The
+    // elevation endpoint saves independently, so hiding this in Measurements
+    // made the result—and the fact that it was already persisted—easy to miss.
+    {
+      name: 'elevationProfileAdmin',
+      type: 'ui',
+      admin: {
+        components: {
+          Field:
+            '@/payload/components/ElevationProfileAdmin#ElevationProfileAdmin',
+        },
+      },
     },
 
     // Sidebar, so it stays on screen whichever tab is open: it decides what the
@@ -458,13 +440,40 @@ export const Trails: CollectionConfig = {
         { label: 'Imported — not maintained here', value: 'imported' },
       ],
       admin: {
-        description:
-          'OSM trails rebuild their line from the picked ways on every save. Edited trails keep the line as drawn — the map sets this for you the first time you move a point. Imported trails are left alone entirely.',
+        components: {
+          Field: '@/payload/components/GeometrySourceField#GeometrySourceField',
+        },
         position: 'sidebar',
       },
     },
   ],
 };
+
+/** Stored in the form and available to list columns, rendered by the chart. */
+function derivedMeasurement(
+  name:
+    | 'distance'
+    | 'elevationGain'
+    | 'elevationLoss'
+    | 'elevationMax'
+    | 'elevationMin',
+): Field {
+  return {
+    name,
+    type: 'number',
+    admin: {
+      components: {
+        Field:
+          '@/payload/components/ElevationProfileAdmin#DerivedMeasurementField',
+      },
+      description:
+        name === 'distance'
+          ? 'Miles, measured from the saved geometry.'
+          : 'Feet, sampled from Mapbox Terrain-RGB.',
+      readOnly: true,
+    },
+  };
+}
 
 export interface DerivedFromArgs {
   data?: Record<string, unknown>;

@@ -8,9 +8,6 @@ import { slugify } from '@/utils/string';
 export const MTN_BIKE_LAYER_ID = 'mtb-trails';
 export const MTN_BIKE_SOURCE_ID = 'mtb-trails-source';
 
-export const GODSEY_LAYER_ID = 'Godsey Ridge Trails';
-export const GODSEY_SOURCE_LAYER = 'LineStrings';
-
 // Mountain Bike Trails Interface and Data
 export interface MountainBikeTrail {
   slug?: string; // Canonical source slug when it differs from the display name

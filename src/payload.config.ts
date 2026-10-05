@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { postgresAdapter } from '@payloadcms/db-postgres';
 import { buildConfig } from 'payload';
 import { Organizations } from './payload/collections/Organizations';
+import { Routes } from './payload/collections/Routes';
 import { TrailAreas } from './payload/collections/TrailAreas';
 import { TrailConditions } from './payload/collections/TrailConditions';
 import { TrailConditionTypes } from './payload/collections/TrailConditionTypes';
@@ -13,6 +14,7 @@ import { Users } from './payload/collections/Users';
 import { ConditionReporting } from './payload/globals/ConditionReporting';
 import { resolveDatabaseUrl } from './payload/database';
 import { Theme } from './payload/globals/Theme';
+import { payloadCsrfOrigins, payloadSecret } from './payload/security';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -44,6 +46,7 @@ export default buildConfig({
     },
   },
   collections: [
+    Routes,
     Trails,
     TrailConditions,
     TrailAreas,
@@ -54,7 +57,8 @@ export default buildConfig({
     Users,
   ],
   globals: [ConditionReporting, Theme],
-  secret: process.env.PAYLOAD_SECRET || '',
+  csrf: payloadCsrfOrigins(),
+  secret: payloadSecret(),
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },

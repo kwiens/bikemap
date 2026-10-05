@@ -19,7 +19,9 @@ Content backend (Payload + OSM — see below):
 ```bash
 pnpm db:up              # Start local Postgres via docker compose
 pnpm db:migrate         # Apply migrations
-pnpm db:seed:bend       # Import Bend's trails (Chattanooga has its own script)
+pnpm db:seed:bend       # Import Bend's trails and Casual routes
+pnpm db:seed:bend-routes # Sync only Bend's 8 Casual routes (also runs on deploy)
+pnpm db:seed:chattanooga-routes # Sync 5 legacy Studio-backed route rows
 pnpm generate:types     # Regenerate src/payload-types.ts after a collection change
 pnpm generate:importmap # Regenerate the admin import map after adding a component
 ```
@@ -41,6 +43,11 @@ gh issue view [number]                              # View issue details
 GitHub posts written by an agent start with `🤖` alone on the first line. This
 applies to issue and pull-request bodies, comments, reviews, and review-thread
 replies. Do not add the marker to commits, titles, or file contents.
+
+Pull requests get an automatic Claude code review, an architecture review,
+and a generated architecture summary in the description; `@claude` in a PR
+or issue asks Claude for help. The review instructions and setup live in
+[`.github/claude/README.md`](.github/claude/README.md).
 
 ## Architecture
 
@@ -107,10 +114,10 @@ src/
 
 ### Core Data Flow
 
-1. **Page Entry** (`src/app/(frontend)/page.tsx`): Reads CMS trails on the server, then renders `HomeClient.tsx`, which dynamically imports Map with SSR disabled
+1. **Page Entry** (`src/app/(frontend)/page.tsx`): Reads CMS trails and routes on the server, then renders `HomeClient.tsx`, which dynamically imports Map with SSR disabled
 2. **Map Component** (`src/components/Map.tsx`): Main orchestrator that initializes Mapbox, manages markers, and handles custom events
 3. **Data Sources** (`src/data/`):
-   - `geo_data.ts`: barrel re-exporting the **active city's** data (`bikeRoutes`, `mapFeatures`, `bikeResources`, `mountainBikeTrails`, `elevationBasePath`, ...) — components import from here and stay city-agnostic
+   - `geo_data.ts`: barrel re-exporting the **active city's** static config (`mapFeatures`, `bikeResources`, route/network URLs, and trail-layer config). Published lists come from `route-source.ts` and `trail-source.ts`.
    - `gbfs.ts`: live bike share data (station-based for Chattanooga, free-bike/Veo for Bend — a discriminated `GBFSConfig` union)
 
 ### Event-Driven Communication
@@ -143,7 +150,7 @@ The app uses custom DOM events (`window.dispatchEvent`) for component communicat
 
 ### Map Styling
 
-Routes are styled via Mapbox Studio (referenced by layer IDs like `riverwalk-loop-v3-public`). Route bounds are calculated from layer features at runtime to enable zoom-to-fit.
+Route display metadata comes from Payload and is keyed by stable layer IDs such as `riverwalk-loop-v3-public`. Each Route explicitly chooses imported geometry, a linked Trail, or a legacy Mapbox Studio layer. Chattanooga's imported Riverwalk geometry comes only from Payload; its same-named Studio layer must stay disabled even when the database is unavailable or unseeded.
 
 ### Mountain Bike Trails
 
@@ -168,15 +175,31 @@ pnpm db:seed:chattanooga
 ```
 
 The converter writes `public/data/chattanooga/trails.geojson`, grouping source
-pieces into one `MultiLineString` per raw `Trail` value. The seed matches those
-names against the 224 curated rows and stores geometry as
-`geometrySource: 'imported'`; 218 match. The six Godsey Ridge trails remain in
-the separate `Godsey Ridge Trails` style layer because that geometry was not in
-the regional shapefile. `prepare:chattanooga-measurements` uses the same
-`measureParts` implementation as Payload to regenerate summary metadata and
-the city-scoped static profiles from those exact 218 lines. The seed imports
-the prepared profile alongside each line; never seed after changing the
-GeoJSON without regenerating these artifacts first.
+pieces into one `MultiLineString` per raw `Trail` value and merging
+`public/data/chattanooga/trails-supplemental.geojson`. That data-only supplement
+contains the six permitted Godsey Ridge lines absent from the regional
+shapefile; their coordinates came from the checked-in elevation profiles that
+were originally sampled from the legacy Mapbox layer. The seed matches all 224
+curated rows and stores geometry as `geometrySource: 'imported'`.
+`prepare:chattanooga-measurements` uses the same `measureParts` implementation
+as Payload to regenerate summary metadata and the city-scoped static profiles
+from those exact 224 lines. The seed imports the prepared profile alongside
+each line; never seed after changing the GeoJSON without regenerating these
+artifacts first.
+
+Both public GeoJSON files are **deprecated transition artifacts staged for
+removal**. Payload is authoritative. Keep them only while they provide the
+fresh-database seed input and runtime outage/unseeded fallback. Remove them,
+their converter plumbing, and `geojsonFallbackUrl` together once a
+database-native bootstrap replaces the seed input and the map has an explicit
+database-outage experience.
+
+Production deploys run committed Payload migrations before the new code goes
+live. Migration `20260919_223908_backfill_chattanooga_supplemental_trails`
+backfills the six supplemental lines and profiles into existing Chattanooga
+rows and their latest Payload versions. It preserves both records if either
+copy's geometry source is already `edited`. The city seed remains the
+repeatable full import for a new or rebuilt database.
 
 `ensureMtnBikeSource(map)` attaches `MTN_BIKE_SOURCE_ID` as GeoJSON, reads
 `/api/map/trails?city=chattanooga`, and falls back to the checked-in GeoJSON if
@@ -184,9 +207,10 @@ the database is unavailable or unseeded. `initMtnBikeLayers` filters every
 name-based source to the curated trail list, so retired/non-MTB source features
 cannot appear as unselectable gray lines.
 
-The Godsey Ridge layer (`Godsey Ridge Trails`, source-layer `LineStrings`) is
-still baked into the Mapbox Studio style, so only its casing/glow/hit sublayers
-are added at runtime.
+The legacy Godsey Ridge layer (`Godsey Ridge Trails`, source-layer
+`LineStrings`) is still baked into the Mapbox Studio style, but is hidden at
+runtime because those six trails now render from the database-backed GeoJSON
+with the rest of Chattanooga's trails.
 
 To inspect the database-backed layer in Chrome DevTools:
 
@@ -442,6 +466,15 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
 - `src/payload/osm/build.ts` — orchestrates the OSM path
 - `src/payload/components/TrailMapEditor.tsx` — the one admin map (pick/move/draw)
 - `src/payload/read/trails.ts` — reads trails back out for the public map
+- `src/payload/collections/Routes.ts` + `src/payload/read/routes.ts` — Casual
+  route records and the public map read path. A route either owns imported
+  geometry, selects a same-city Trail and reuses its current measurements, or
+  explicitly names a legacy Mapbox Studio layer that has not been migrated.
+  Casual reads Routes only; linking a Trail is how a curator exposes it there
+  without duplicating its line. Use
+  `pnpm db:import:chattanooga-routes` rather than committing generated route
+  GeoJSON. Bend's seed derives its eight imported routes directly from the
+  committed bike-network source.
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
 - `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind
@@ -457,13 +490,16 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   differ (Bend has OSM-referenced geometry; Chattanooga imports an archived GIS
   snapshot without osmIds), and **only Bend is seeded by default**
 
-**How the public map gets its trails.** `src/app/(frontend)/page.tsx` is a
-server component: it calls `getCityTrails()` (Payload's Local API — a typed
-function call, no HTTP hop) and passes trails into `HomeClient` as props, which
-publishes them to `src/data/trail-source.ts` during render. The page resolves
+**How the public map gets its trails and routes.** `src/app/(frontend)/page.tsx` is a
+server component: it calls `getCityTrailSummaries()` (Payload's Local API — a
+typed function call, no HTTP hop) plus `getCityRoutes()`, and passes both into
+`HomeClient` as props. The client publishes them to `src/data/trail-source.ts`
+and `src/data/route-source.ts` during render. The page resolves
 its city from the request hostname, so it reads `headers()` and renders per
-request; `/api/map/trails` sends `Cache-Control: max-age=60`, so an admin edit
-is live within a minute without a rebuild.
+request. The trail summaries and GeoJSON use separate 24-hour Data Cache entries
+that collection hooks expire after content edits. `/api/map/trails` also sends
+`Cache-Control: max-age=60, stale-while-revalidate=3600`, so existing clients may
+serve one stale response while they refresh after an edit.
 
 Things to know before touching it:
 
@@ -472,10 +508,10 @@ Things to know before touching it:
   import time and never sees the database rows. Anything derived from the list
   must be built lazily and invalidated via `onMountainBikeTrailsChange` — see
   the `trailByName` / `osmIdOwner` lookups in `utils/map.ts`.
-- **`getCityTrails` never throws.** No `DATABASE_URL`, an unreachable database,
-  or an empty result all return an empty list, and `setMountainBikeTrails`
-  ignores an empty list so the checked-in data stays in place. Preserve that —
-  losing the CMS must not take the public map down.
+- **The public trail readers never throw.** No `DATABASE_URL`, an unreachable
+  database, or an empty result all return an empty list, and
+  `setMountainBikeTrails` ignores an empty list so the checked-in data stays in
+  place. Preserve that — losing the CMS must not take the public map down.
 - **Bulk writes must pass `context: { skipOsmRebuild: true }`**, or the
   `beforeChange` hook fires one Overpass request per row and gets the machine
   rate-limited. Trails with `geometrySource: 'imported'` are skipped anyway.
@@ -487,6 +523,14 @@ Things to know before touching it:
   city in both lookups so same-named trails cannot collide. Chattanooga's seed
   imports its prepared profiles directly; `pnpm backfill:elevation` measures
   any trail that still has geometry but no profile, without touching Overpass.
+- **Multi-part lines are measured in walking order, not stored order.**
+  `measureParts` walks every line in `walkingOrder` (`osm/assemble.ts`), so
+  pieces stored out of sequence or backwards (common in the GIS import) don't
+  make the chart leap between far ends of the trail. Gain and
+  loss swap when a piece is walked the other way, so changing that ordering
+  changes stored numbers: regenerate with `pnpm prepare:chattanooga-measurements`
+  and re-measure the database with
+  `pnpm backfill:elevation -- --city=<city> --force --multipart`.
 - **`computeElevation`'s spike filter needs a run cap.** It replaces readings
   further than `ELEVATION_SPIKE_THRESHOLD` (25 m) from a running EMA. On a
   sustained climb the EMA lags by about `step * (1-alpha)/alpha`, and on a ~30%
@@ -546,7 +590,7 @@ Things to know before touching it:
   (The `vocabulary` in `loadVocabulary` / `defaultVocabularyId` /
   `trail-vocabulary.ts` is the data-model term and is unrelated to the nav
   label — don't rename those to match.)
-- **`getTrailSummary` never throws**, same rule as `getCityTrails` and
+- **`getTrailSummary` never throws**, same rule as the public trail readers and
   `getThemeCss` — it feeds the dashboard, which is the first page after signing
   in, so an exception there locks everyone out over a decorative panel. An
   unreachable database renders `—`, never `0`. Note one count is done in JS on
@@ -557,8 +601,8 @@ Things to know before touching it:
   Theme global. Class names like `.btn__content` are internals that move between
   releases. `--theme-elevation-*` resolves to a `--color-base-*` scale that dark
   mode *inverts*, so retinting that ramp themes both modes at once.
-- **`getThemeCss` never throws**, same rule as `getCityTrails` — a theme row
-  must never lock anyone out of the admin. Its `customCss` is injected verbatim,
+- **`getThemeCss` never throws**, same rule as the public trail readers — a
+  theme row must never lock anyone out of the admin. Its `customCss` is injected verbatim,
   so `sanitizeCss` strips `<`/`>`; don't remove that.
 - **The project is ESM** (`"type": "module"` — Payload 3's CLI requires it). New
   root config files must be ESM or `.cjs`.

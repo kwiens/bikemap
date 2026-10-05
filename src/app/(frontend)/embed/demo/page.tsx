@@ -4,6 +4,8 @@ import { siteConfigForHostname } from '@/config/site.config';
 import { getRequestHostname } from '@/utils/request-hostname';
 import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
+import { getCityRoutes } from '@/payload/read/routes';
+import { resolveActiveCityId } from '@/config/map.config';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -11,10 +13,19 @@ export const metadata: Metadata = {
 
 // A mock third-party site showing the embed working in context, plus a
 // snippet builder partners can use to grab their own copy-paste embed code.
-export default async function EmbedDemoPage(): Promise<ReactElement> {
-  const hostname = await getRequestHostname();
-  const config = siteConfigForHostname(hostname);
-  const builderConfig = embedBuilderConfig(hostname);
+export default async function EmbedDemoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ city?: string | string[] }>;
+}): Promise<ReactElement> {
+  const [hostname, query] = await Promise.all([
+    getRequestHostname(),
+    searchParams,
+  ]);
+  const cityId = resolveActiveCityId(hostname, query.city);
+  const config = siteConfigForHostname(hostname, query.city);
+  const { routes } = await getCityRoutes(cityId);
+  const builderConfig = embedBuilderConfig(hostname, routes, query.city);
 
   return (
     <div className="min-h-screen bg-white text-gray-800">

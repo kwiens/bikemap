@@ -208,8 +208,21 @@ export function cityIdForHostname(
   return parseCityIdOrUndefined(hostMap[normalizedHostname]);
 }
 
-export function resolveActiveCityId(hostname?: string): CityId {
+/** Resolve a `?city=` value. Repeated params follow URLSearchParams.get() and
+ * use the first value so the server and browser cannot select different cities. */
+export function cityIdForQuery(value: unknown): CityId | undefined {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return typeof candidate === 'string'
+    ? parseCityIdOrUndefined(candidate)
+    : undefined;
+}
+
+export function resolveActiveCityId(
+  hostname?: string,
+  cityQuery: unknown = getBrowserCityQuery(),
+): CityId {
   return (
+    cityIdForQuery(cityQuery) ??
     cityIdForHostname(hostname ?? getBrowserHostname()) ??
     parseCityId(process.env.NEXT_PUBLIC_CITY_ID)
   );
@@ -226,21 +239,32 @@ function getBrowserHostname(): string | undefined {
   return window.location.hostname;
 }
 
+function getBrowserCityQuery(): string | undefined {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  return new URLSearchParams(window.location.search).get('city') ?? undefined;
+}
+
 function normalizeHostname(hostname: string): string {
   return hostname.toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
 }
 
-// Resolved once at module load, from the browser's hostname when there is one.
+// Resolved once at module load, from the browser's ?city override or hostname
+// when there is one.
 // There is no window on the server, so on any server surface this is the env
 // default city and nothing else: code that must honour host routing has to
-// resolve from the request itself, via `resolveActiveCityId(hostname)` or
-// `mapConfigForHostname(hostname)`.
+// resolve from the request itself, via `resolveActiveCityId(hostname, city)` or
+// `mapConfigForHostname(hostname, city)`.
 export const activeCityId = resolveActiveCityId();
 
 // Export the active configuration. A fork can swap this for its own MapConfig,
 // while this app can select one of the stored city configs via env.
 export const mapConfig = cityConfigs[activeCityId];
 
-export function mapConfigForHostname(hostname: string | undefined): MapConfig {
-  return cityConfigs[resolveActiveCityId(hostname)];
+export function mapConfigForHostname(
+  hostname: string | undefined,
+  cityQuery?: unknown,
+): MapConfig {
+  return cityConfigs[resolveActiveCityId(hostname, cityQuery)];
 }

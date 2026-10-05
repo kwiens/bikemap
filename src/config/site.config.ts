@@ -59,8 +59,9 @@ export const siteConfig = siteConfigs[activeCityId];
 
 export function siteConfigForHostname(
   hostname: string | undefined,
+  cityQuery?: unknown,
 ): SiteConfig {
-  return siteConfigs[resolveActiveCityId(hostname)];
+  return siteConfigs[resolveActiveCityId(hostname, cityQuery)];
 }
 
 function descriptionForCity(cityId: CityId): string {

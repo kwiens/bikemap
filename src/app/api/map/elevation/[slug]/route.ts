@@ -62,7 +62,11 @@ export async function GET(
 
   return NextResponse.json(profile, {
     headers: {
-      'Cache-Control': 'public, max-age=60, stale-while-revalidate=3600',
+      // Keep the shared cache cheap without pinning a pre-recalculation profile
+      // in a rider's browser. The admin endpoint invalidates this route after a
+      // successful write; max-age=0 makes the next browser request consult it.
+      'Cache-Control':
+        'public, max-age=0, s-maxage=60, stale-while-revalidate=3600',
     },
   });
 }

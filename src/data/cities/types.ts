@@ -3,7 +3,6 @@ import type { BikeRoute } from '@/data/bike-routes';
 import type { LocalResource } from '@/data/local-resources';
 import type { MapFeature } from '@/data/map-features';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
-import type { TrailMeta } from '@/data/trail-metadata';
 
 export type CityId = 'chattanooga' | 'bend';
 
@@ -20,7 +19,6 @@ export interface CuratedTrailLayerConfig {
   // the primary URL itself rather than handing it to Mapbox, which has no
   // answer to a failure. See `loadCuratedGeojson`.
   geojsonFallbackUrl?: string;
-  metadata?: Record<string, TrailMeta>;
   // How a curated trail entry maps to features in this layer:
   //  - 'name'  (default): match trailProp against the trail's name
   //  - 'osmId': match the OSM_ID property against the trail's `osmIds` set.
@@ -42,14 +40,16 @@ export interface CityData {
   bikeResources: BikeResource[];
   localResources: LocalResource[];
   mountainBikeTrails: MountainBikeTrail[];
-  trailMetadata: Record<string, TrailMeta>;
   mountainBike: MountainBikeCityConfig;
   regionFor: (recArea: string) => string;
   // Static GeoJSON URL for the classified bike-network overlay (Casual mode).
   // Undefined for cities without one (the toggle is hidden).
   bikeNetworkUrl?: string;
-  // Static GeoJSON URL for curated routes whose geometry isn't in the Mapbox
-  // Studio style (attached at runtime, keyed by route id). Undefined for cities
-  // whose routes are Studio layers (e.g. Chattanooga).
+  // GeoJSON URL for curated routes attached at runtime and keyed by route id.
+  // It may be a static file or a database-backed map API.
   bikeRoutesUrl?: string;
+  // Route ids permanently owned by bikeRoutesUrl, including while its database
+  // row is absent. Published DB routes with imported or Trail geometry join
+  // this set automatically; none fall back to same-named Studio layers.
+  inlineBikeRouteIds?: string[];
 }

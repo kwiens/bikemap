@@ -1,0 +1,73 @@
+name: Architecture Review
+
+# Judges whether a pull request fits how the app is built, following
+# .github/claude/architecture-review.md. Runs once when a PR is opened or
+# marked ready, and posts one comment only when it has findings. Re-run it on
+# demand with:
+#   gh workflow run architecture-review.yml -f pr=<number>
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to review
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  architecture-review:
+    name: Architecture Review
+    # Fork PRs don't receive repository secrets; bot-opened PRs have no design
+    # to judge. A manual run skips both checks.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.pull_request.draft == false
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.event.pull_request.user.type != 'Bot')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: architecture-review-${{ github.event.pull_request.number || inputs.pr }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.pr && format('refs/pull/{0}/head', inputs.pr) || '' }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out review instructions from the default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .ci-trusted
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - name: Review the architecture
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          display_report: true
+          prompt: |
+            Do an architecture review of pull request #${{ github.event.pull_request.number || inputs.pr }} in ${{ github.repository }}.
+            Read .ci-trusted/.github/claude/architecture-review.md and follow it exactly.
+
+            You are running in CI. Review only: do not modify files or push.
+            Post the review as a single PR comment with `gh pr comment`, using
+            the output format in the instructions. If there is nothing worth
+            raising, post no comment at all.
+          claude_args: |
+            --model opus
+            --allowedTools "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*)"

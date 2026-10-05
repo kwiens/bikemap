@@ -31,22 +31,17 @@ import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
 import { useEmbed } from '@/components/EmbedContext';
 import type { EmbedLayer } from '@/utils/embed';
-import {
-  bikeNetworkUrl,
-  bikeResources,
-  bikeRoutes,
-  mapFeatures,
-} from '@/data/geo_data';
+import { bikeNetworkUrl, bikeResources, mapFeatures } from '@/data/geo_data';
+import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
-
-const hasRoutesSection =
-  bikeRoutes.length > 0 ||
-  mapFeatures.length > 0 ||
-  bikeResources.length > 0 ||
-  Boolean(mapConfig.gbfs);
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
+  const hasRoutesSection =
+    getBikeRoutes().length > 0 ||
+    mapFeatures.length > 0 ||
+    bikeResources.length > 0 ||
+    Boolean(mapConfig.gbfs);
   const { isEmbed, options: embedOptions } = useEmbed();
   // Track state in this parent component
   const [isOpen, setIsOpen] = useState(() =>
