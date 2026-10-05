@@ -365,11 +365,15 @@ describe('embed mode', () => {
     delete (window as unknown as { __mapReady?: boolean }).__mapReady;
   });
 
-  it('is Casual-only: no MTB pill, routes section renders, trails does not', () => {
+  it('renders the Casual section without route-family tabs', () => {
     const { container } = renderEmbed();
 
-    expect(screen.queryByText('MTB')).not.toBeInTheDocument();
-    expect(screen.queryByText('Casual')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'MTB' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Casual' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('bike-routes')).toBeInTheDocument();
     expect(
       screen.queryByTestId('mountain-bike-trails'),
@@ -377,7 +381,18 @@ describe('embed mode', () => {
     // No Information section in embed mode
     expect(screen.queryByTestId('info')).not.toBeInTheDocument();
     // Compact header label instead of the pill
-    expect(container.textContent).toContain(siteConfig.name);
+    expect(container.textContent).toContain(
+      `${siteConfig.name} · Casual routes`,
+    );
+  });
+
+  it('renders the MTB section selected by the host page', () => {
+    const { container } = renderEmbed({ mode: 'mtb' });
+
+    expect(screen.getByTestId('mountain-bike-trails')).toBeInTheDocument();
+    expect(screen.queryByTestId('bike-routes')).not.toBeInTheDocument();
+    expect(screen.getByText('Nationwide trails')).toBeInTheDocument();
+    expect(container.textContent).toContain(`${siteConfig.name} · MTB routes`);
   });
 
   it('sidebar starts closed (-translate-x-full) when sidebarOpen is false', () => {

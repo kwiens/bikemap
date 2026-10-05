@@ -322,6 +322,21 @@ export function findClosestProfileIndex(
   return bestIdx;
 }
 
+function trailSelectionUrl(isEmbed: boolean, name?: string): string {
+  if (!isEmbed) {
+    return name
+      ? `?trail=${encodeURIComponent(profileSlug(name))}`
+      : window.location.pathname;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  params.delete('route');
+  params.delete('trail');
+  if (name) params.set('trail', profileSlug(name));
+  const search = params.toString();
+  return `${window.location.pathname}${search ? `?${search}` : ''}`;
+}
+
 export function ElevationProfile() {
   // Embeds never carry the settings cookie (that's the whole premise of
   // embed mode), so `getSetting('sidebarOpen')` always misses there and the
@@ -359,11 +374,7 @@ export function ElevationProfile() {
       setProfileSource('trail');
       rideIdRef.current = null;
       setTrailName(name);
-      window.history.replaceState(
-        null,
-        '',
-        `?trail=${encodeURIComponent(profileSlug(name))}`,
-      );
+      window.history.replaceState(null, '', trailSelectionUrl(isEmbed, name));
     };
     // OSM trails ship a ready-built profile (no curated JSON to load by name),
     // and aren't restorable by slug on reload, so no URL state is written.
@@ -397,7 +408,7 @@ export function ElevationProfile() {
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
-        window.history.replaceState(null, '', window.location.pathname);
+        window.history.replaceState(null, '', trailSelectionUrl(isEmbed));
       }
     };
     const handleTrailDeselect = () => {
@@ -405,7 +416,7 @@ export function ElevationProfile() {
         sourceRef.current = null;
         setProfileSource(null);
         setTrailName(null);
-        window.history.replaceState(null, '', window.location.pathname);
+        window.history.replaceState(null, '', trailSelectionUrl(isEmbed));
       }
     };
     const handleRouteDeselect = () => {
@@ -413,7 +424,7 @@ export function ElevationProfile() {
         sourceRef.current = null;
         setProfileSource(null);
         setTrailName(null);
-        window.history.replaceState(null, '', window.location.pathname);
+        window.history.replaceState(null, '', trailSelectionUrl(isEmbed));
       }
     };
     const handleSidebarToggle = (e: Event) => {
@@ -453,7 +464,7 @@ export function ElevationProfile() {
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
-        window.history.replaceState(null, '', window.location.pathname);
+        window.history.replaceState(null, '', trailSelectionUrl(isEmbed));
       }
     };
     const handleRecordingStart = () => {
@@ -530,7 +541,7 @@ export function ElevationProfile() {
         handleRecordingStop,
       );
     };
-  }, []);
+  }, [isEmbed]);
 
   // Listen for GPS location updates and find closest point on trail
   useEffect(() => {

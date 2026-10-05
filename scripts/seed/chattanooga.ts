@@ -18,10 +18,11 @@
  *     public/data/chattanooga/trails.geojson, generated from the permitted
  *     regional-trails shapefile by
  *     scripts/prepare_chattanooga_trails.py and matched by raw `Trail` name.
- *     A checked-in supplemental GeoJSON supplies permitted lines missing from
- *     that shapefile. Summary measurements and static profiles are regenerated
- *     from the combined lines by scripts/prepare_chattanooga_measurements.ts,
- *     and the seed imports each profile with its line.
+ *     A checked-in supplemental GeoJSON supplies permitted lines and documented
+ *     source-gap corrections missing from that shapefile. Summary measurements
+ *     and static profiles are regenerated from the combined lines by
+ *     scripts/prepare_chattanooga_measurements.ts, and the seed imports each
+ *     profile with its line.
  *
  * These import as `geometrySource: 'imported'`, so the OSM rebuild hook leaves
  * the archived line alone. Once a trail has been matched to way ids, set its

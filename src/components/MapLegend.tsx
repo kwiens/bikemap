@@ -51,7 +51,9 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
     () => {
-      if (isEmbed) return 'routes';
+      if (isEmbed) {
+        return embedOptions.mode === 'mtb' ? 'trails' : 'routes';
+      }
       const saved = getSetting('activeTab');
       if (saved === 'routes' && hasRoutesSection) return saved;
       if (saved === 'trails') return saved;
@@ -59,16 +61,19 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       return hasRoutesSection ? 'routes' : 'trails';
     },
   );
-  // Embed mode is Casual-only — no MTB tab, so tab switching is a no-op.
+  // Embed mode is fixed to the route family chosen by the host page, so tab
+  // switching remains a no-op there.
   const switchTab = (tab: 'routes' | 'trails') => {
     if (isEmbed) return;
     if (tab === 'routes' && !hasRoutesSection) return;
     setActiveSection(tab);
     setSetting('activeTab', tab);
   };
-  // What section actually renders — embed mode always shows Casual/routes
-  // regardless of activeSection (kept only so non-embed logic is untouched).
-  const visibleSection = isEmbed ? 'routes' : activeSection;
+  const visibleSection = isEmbed
+    ? embedOptions.mode === 'mtb'
+      ? 'trails'
+      : 'routes'
+    : activeSection;
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
@@ -459,10 +464,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         )}
       >
         {isEmbed ? (
-          /* Embed mode is Casual-only — a compact label instead of the pill */
+          /* The host fixes the embed mode, so a compact label replaces tabs. */
           <div className="flex items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
             <span className="text-sm font-medium text-gray-700">
-              {siteConfig.name}
+              {siteConfig.name} ·{' '}
+              {embedOptions.mode === 'mtb' ? 'MTB routes' : 'Casual routes'}
             </span>
           </div>
         ) : (

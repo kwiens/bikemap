@@ -18,8 +18,10 @@ import {
   loadProfile,
   profilePointToXY,
 } from './ElevationProfile';
+import { EmbedProvider } from '@/components/EmbedContext';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { MAP_EVENTS } from '@/events';
+import { parseEmbedOptions } from '@/utils/embed';
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -467,5 +469,43 @@ describe('ElevationProfile selection source', () => {
       );
       expect(screen.getByText('+123 ft climbing')).toBeInTheDocument();
     });
+  });
+});
+
+describe('ElevationProfile embed URL state', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('rewrites only the trail and keeps the embed configuration', () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 404 } as Response);
+    window.history.replaceState(
+      null,
+      '',
+      '/embed?mode=mtb&zoom=12&route=riverwalk&trail=old-trail',
+    );
+
+    render(
+      <EmbedProvider options={parseEmbedOptions(window.location.search)}>
+        <ElevationProfile />
+      </EmbedProvider>,
+    );
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
+          detail: { trailName: 'Big Forest' },
+        }),
+      );
+    });
+    expect(window.location.pathname).toBe('/embed');
+    expect(
+      Object.fromEntries(new URLSearchParams(window.location.search)),
+    ).toEqual({ mode: 'mtb', zoom: '12', trail: 'big-forest' });
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+    });
+    expect(window.location.search).toBe('?mode=mtb&zoom=12');
   });
 });

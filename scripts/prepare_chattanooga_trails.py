@@ -6,7 +6,7 @@ Payload stores ordinary WGS84 GeoJSON in its ``geom`` JSON field, so this
 script reprojects every named feature, groups source pieces by ``Trail``, and
 writes one MultiLineString feature per trail. A checked-in supplemental
 FeatureCollection supplies permitted lines that are absent from the regional
-shapefile; the converter merges it without knowing about individual trails.
+shapefile and endpoint-matched connectors for documented source gaps.
 
 Usage:
 
@@ -77,11 +77,12 @@ def main() -> None:
     collection, report = build_feature_collection(rows, transformer.transform)
     supplemental_features = load_supplemental_features(args.supplemental.resolve())
     regional_trails = report["trails"]
-    supplemental_parts = merge_supplemental_features(
-        collection, supplemental_features
+    merge_supplemental_features(collection, supplemental_features)
+    report["parts"] = sum(
+        len(feature["geometry"]["coordinates"])
+        for feature in collection["features"]
     )
-    report["parts"] += supplemental_parts
-    report["trails"] += len(supplemental_features)
+    report["trails"] = len(collection["features"])
 
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -91,8 +92,9 @@ def main() -> None:
 
     print(
         f"Wrote {report['trails']} trails: {regional_trails} from "
-        f"{report['source_records']} shapefile records and "
-        f"{len(supplemental_features)} from {args.supplemental} "
+        f"{report['source_records']} shapefile records, with "
+        f"{len(supplemental_features)} supplemental features from "
+        f"{args.supplemental} "
         f"({report['parts']} line parts) to {output}"
     )
     if report["blank_records"]:
@@ -246,21 +248,88 @@ def load_supplemental_features(source: Path) -> list[dict]:
     return features
 
 
-def merge_supplemental_features(collection: dict, features: list[dict]) -> int:
-    """Append supplemental trails, rejecting duplicate names."""
+def merge_supplemental_features(collection: dict, features: list[dict]) -> None:
+    """Append missing trails or connect a documented gap in an existing trail."""
     existing = {
-        feature["properties"]["Trail"] for feature in collection["features"]
+        feature["properties"]["Trail"]: feature
+        for feature in collection["features"]
     }
     supplemental_names: set[str] = set()
     for feature in features:
         trail = feature["properties"]["Trail"]
-        if trail in existing or trail in supplemental_names:
+        if trail in supplemental_names:
             raise ValueError(f"Duplicate trail in supplemental GeoJSON: {trail}")
         supplemental_names.add(trail)
 
-    collection["features"].extend(features)
+        if feature["properties"].get("supplementalMode") == "connect":
+            if trail not in existing:
+                raise ValueError(
+                    f"Cannot connect missing regional trail from supplemental "
+                    f"GeoJSON: {trail}"
+                )
+            connect_feature_parts(existing[trail], feature)
+        elif trail in existing:
+            raise ValueError(f"Duplicate trail in supplemental GeoJSON: {trail}")
+        else:
+            collection["features"].append(feature)
+            existing[trail] = feature
+
     collection["features"].sort(key=lambda feature: feature["properties"]["Trail"])
-    return sum(len(feature["geometry"]["coordinates"]) for feature in features)
+
+
+def connect_feature_parts(regional_feature: dict, supplemental_feature: dict) -> None:
+    """Join exactly two regional parts through one endpoint-matched connector."""
+    connectors = supplemental_feature["geometry"]["coordinates"]
+    if len(connectors) != 1:
+        raise ValueError(
+            f"Connecting supplemental trail must contain exactly one line: "
+            f"{supplemental_feature['properties']['Trail']}"
+        )
+
+    connector = connectors[0]
+    parts = regional_feature["geometry"]["coordinates"]
+    first = orient_part_at_endpoint(parts, connector[0], endpoint="end")
+    second = orient_part_at_endpoint(parts, connector[-1], endpoint="start")
+    if first is None or second is None or first[0] == second[0]:
+        raise ValueError(
+            f"Connector does not join two regional part endpoints: "
+            f"{supplemental_feature['properties']['Trail']}"
+        )
+
+    first_index, first_part = first
+    second_index, second_part = second
+    connected = [
+        *first_part,
+        *connector[1:],
+        *second_part[1:],
+    ]
+    insert_at = min(first_index, second_index)
+    remaining = [
+        part
+        for index, part in enumerate(parts)
+        if index not in {first_index, second_index}
+    ]
+    remaining.insert(insert_at, connected)
+    regional_feature["geometry"]["coordinates"] = remaining
+
+
+def orient_part_at_endpoint(
+    parts: list[Line], position: Position, *, endpoint: str
+) -> tuple[int, Line] | None:
+    """Return the unique part oriented to put position at the requested endpoint."""
+    matches: list[tuple[int, Line]] = []
+    for index, part in enumerate(parts):
+        if endpoint == "end":
+            if part[-1] == position:
+                matches.append((index, part))
+            elif part[0] == position:
+                matches.append((index, list(reversed(part))))
+        elif part[0] == position:
+            matches.append((index, part))
+        elif part[-1] == position:
+            matches.append((index, list(reversed(part))))
+
+    return matches[0] if len(matches) == 1 else None
 
 
 def add_value(target: set[str], value: object) -> None:
