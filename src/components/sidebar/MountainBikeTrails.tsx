@@ -115,8 +115,8 @@ function TrailRow({
       className={cn(
         'p-2 rounded cursor-pointer transition-all duration-200 border border-transparent',
         selectedTrail === trail.trailName
-          ? 'bg-blue-600/10 border-blue-600'
-          : 'hover:bg-blue-600/5 hover:border-blue-500',
+          ? 'bg-app-primary/15 border-app-primary'
+          : 'hover:bg-app-primary/10 hover:border-app-primary',
         selectedTrail && selectedTrail !== trail.trailName && 'opacity-70',
       )}
     >
@@ -247,7 +247,7 @@ export function MountainBikeTrails({
           <input
             ref={searchRef}
             type="text"
-            className="w-full py-2 pr-8 pl-3 border border-gray-300 rounded-lg text-sm text-app-secondary bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30 placeholder:text-gray-400"
+            className="w-full py-2 pr-8 pl-3 border border-gray-300 rounded-lg text-sm text-app-surface bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30 placeholder:text-gray-400"
             placeholder="Search trails..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -289,7 +289,7 @@ export function MountainBikeTrails({
             return (
               <React.Fragment key={region}>
                 <div
-                  className="text-xs font-bold text-gray-700 cursor-pointer rounded pt-2.5 pb-1 px-1 flex items-center whitespace-nowrap hover:bg-blue-600/5 hover:text-blue-600"
+                  className="text-xs font-bold text-gray-700 cursor-pointer rounded pt-2.5 pb-1 px-1 flex items-center whitespace-nowrap hover:bg-app-primary/15 hover:text-app-primary"
                   {...pressableProps(() => {
                     toggleSet(setExpandedRegions, region);
                     onAreaSelect(region);
@@ -318,7 +318,7 @@ export function MountainBikeTrails({
                       <React.Fragment key={area}>
                         {!singleArea && (
                           <div
-                            className="text-[11px] font-semibold uppercase text-gray-500 tracking-wide cursor-pointer rounded py-2 pb-1 px-1 pl-4 flex items-baseline hover:bg-blue-600/5 hover:text-blue-600"
+                            className="text-[11px] font-semibold uppercase text-gray-500 tracking-wide cursor-pointer rounded py-2 pb-1 px-1 pl-4 flex items-baseline hover:bg-app-primary/15 hover:text-app-primary"
                             {...pressableProps(() => handleAreaClick(area))}
                             role="button"
                             tabIndex={0}

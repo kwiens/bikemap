@@ -957,7 +957,10 @@ export async function loadCuratedGeojson(
   url: string,
   fallbackUrl: string,
 ): Promise<void> {
-  const primary = await fetchFeatureCollection(url);
+  // The API is allowed to be unavailable: this source explicitly carries a
+  // static fallback. Logging that expected 503 as an error makes Next's dev
+  // overlay report a failure even when the fallback loads successfully.
+  const primary = await fetchFeatureCollection(url, false);
   const data = primary?.features.length
     ? primary
     : ((await fetchFeatureCollection(fallbackUrl)) ?? primary);
@@ -979,17 +982,22 @@ export async function loadCuratedGeojson(
 
 async function fetchFeatureCollection(
   url: string,
+  shouldLogFailure = true,
 ): Promise<GeoJSON.FeatureCollection | null> {
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      console.error(`Trail GeoJSON at ${url} returned ${response.status}.`);
+      if (shouldLogFailure) {
+        console.error(`Trail GeoJSON at ${url} returned ${response.status}.`);
+      }
       return null;
     }
     const data = (await response.json()) as GeoJSON.FeatureCollection;
     return Array.isArray(data?.features) ? data : null;
   } catch (error) {
-    console.error(`Failed to load trail GeoJSON from ${url}:`, error);
+    if (shouldLogFailure) {
+      console.error(`Failed to load trail GeoJSON from ${url}:`, error);
+    }
     return null;
   }
 }

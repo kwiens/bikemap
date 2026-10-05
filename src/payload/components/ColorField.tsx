@@ -27,6 +27,9 @@ export function ColorField({ field, path }: TextFieldClientProps) {
   const { setValue, showError, value } = useField<string>({ path });
   const current = value ?? '';
   const label = typeof field?.label === 'string' ? field.label : path;
+  const description = field?.admin?.description
+    ? String(field.admin.description)
+    : undefined;
 
   // The label points at the hex box rather than the swatch: it is the field's
   // source of truth, and it is the one you can type into.
@@ -34,9 +37,7 @@ export function ColorField({ field, path }: TextFieldClientProps) {
 
   return (
     <FieldShell
-      description={
-        field?.admin?.description ? String(field.admin.description) : undefined
-      }
+      description={description}
       htmlFor={inputId}
       label={label}
       path={path}
