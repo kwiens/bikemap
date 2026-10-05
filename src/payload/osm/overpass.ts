@@ -29,14 +29,14 @@ export interface OverpassOptions {
   timeoutSeconds?: number;
 }
 
-const DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+export const DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
 // Overpass rejects requests without one (HTTP 406). Identify the app so
 // operators can see who's calling.
 const USER_AGENT =
   'open-bike-map/1.0 (+https://github.com/kwiens/bikemap; trail editor)';
 
-interface OverpassElement {
+export interface OverpassElement {
   geometry?: { lat: number; lon: number }[];
   id: number;
   tags?: Record<string, string>;
@@ -93,7 +93,7 @@ function retryAfterMs(header: string | null): number | null {
   return Math.min(seconds * 1000, MAX_BACKOFF_MS);
 }
 
-async function requestWithRetry(
+export async function requestWithRetry(
   endpoint: string,
   query: string,
   options: OverpassOptions,

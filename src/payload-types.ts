@@ -132,7 +132,7 @@ export interface UserAuthOperations {
   };
 }
 /**
- * Every published Route appears in Casual mode. Its geometry may come from an import, an existing Trail, or a current Mapbox Studio layer.
+ * Every published Route appears in Casual mode. Build one on the map from trails and roads, or reuse an import, an existing Trail, or a current Mapbox Studio layer.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "routes".
@@ -150,9 +150,9 @@ export interface Route {
   routeId?: string | null;
   kind?: ('ride' | 'greenway' | 'path' | 'trail') | null;
   /**
-   * Imported and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.
+   * Built, Imported, and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.
    */
-  geometrySource: 'imported' | 'trail' | 'studio';
+  geometrySource: 'composed' | 'imported' | 'trail' | 'studio';
   /**
    * Select a curated trail to expose it in the Casual routes tab.
    */
@@ -186,6 +186,15 @@ export interface Route {
    * Optional bounds where route arrows need their direction flipped.
    */
   reverseArrowBounds?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  plan?:
     | {
         [k: string]: unknown;
       }
@@ -602,6 +611,7 @@ export interface RoutesSelect<T extends boolean = true> {
   reverseDirection?: T;
   bounds?: T;
   reverseArrowBounds?: T;
+  plan?: T;
   geom?: T;
   sourcePath?: T;
   sourceSha256?: T;
