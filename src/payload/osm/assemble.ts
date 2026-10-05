@@ -173,6 +173,9 @@ export interface PartStep {
  */
 const GAP_TIE_M = 1;
 
+/** Keep the all-start search bounded, including for imported GPX segments. */
+const MAX_OPTIMIZED_PARTS = 100;
+
 /**
  * Orders and orients a trail's parts so each one starts where the last ended.
  *
@@ -186,13 +189,29 @@ const GAP_TIE_M = 1;
  * Every part and orientation is tried as the start, then the nearest free end
  * is followed greedily; the walk with the least total gap wins. A walk and its
  * exact reverse always tie, so ties go to whichever keeps more length in its
- * source direction. Cost is O(n³) in the number of parts; the most fragmented
- * trail in either city has 22.
+ * source direction. Cost is O(n³) in the number of parts, so this search is
+ * limited to 100 parts (the most fragmented current trail has 22). Larger
+ * imports keep their supplied sequence, choosing each direction from the
+ * previous endpoint in one linear pass. Every part is retained.
  */
 export function walkingOrder(parts: [number, number][][]): PartStep[] {
   const usable = parts
     .map((part, index) => ({ index, lengthMeters: lengthMeters([part]), part }))
     .filter(({ part }) => part.length > 0);
+
+  if (usable.length > MAX_OPTIMIZED_PARTS) {
+    const steps: PartStep[] = [];
+    let tail: [number, number] | undefined;
+    for (const { index, part } of usable) {
+      const reversed =
+        tail !== undefined &&
+        distanceBetween(tail, part[part.length - 1]) <
+          distanceBetween(tail, part[0]);
+      steps.push({ index, reversed });
+      tail = endOf(part, reversed);
+    }
+    return steps;
+  }
 
   const walks: Walk[] = [];
   for (const first of usable) {
