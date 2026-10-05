@@ -7,9 +7,12 @@ import {
 import { cn } from '@/lib/utils';
 import { regionOf } from '@/data/trail-region';
 import { getMountainBikeTrails } from '@/data/trail-source';
+import { useTrailConditions } from '@/components/TrailConditionsProvider';
+import { ConditionBadge } from './ConditionBadge';
 import { pressableProps } from './a11y';
 import type { MountainBikeTrailsProps } from './types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
+import { slugForTrail } from '@/data/mountain-bike-trails';
 
 /**
  * Groups the current trail list region -> area -> trails, with a trail count
@@ -92,6 +95,9 @@ function TrailRow({
   selectedTrail: string | null;
   onTrailSelect: (name: string) => void;
 }) {
+  // Keyed by slug, not name: two complexes can both have a "Larry".
+  const { latest } = useTrailConditions();
+  const condition = latest[slugForTrail(trail)];
   const hasDistance = (trail.distance ?? 0) > 0;
   const hasElevationGain = (trail.elevationGain ?? 0) > 0;
   const hasElevationLoss = (trail.elevationLoss ?? 0) > 0;
@@ -128,6 +134,7 @@ function TrailRow({
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
           {trail.displayName}
         </span>
+        <ConditionBadge report={condition} />
         {hasDistance || hasElevationGain || hasElevationLoss ? (
           <span className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap text-[11px] text-gray-500">
             {hasDistance ? `${trail.distance} mi` : ''}
