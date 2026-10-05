@@ -337,8 +337,8 @@ export function createBikeRentalMarker(
       <p><strong>Type:</strong> ${escapeHtml(location.rentalType)}</p>
       <p><strong>Price:</strong> ${escapeHtml(location.price)}</p>
       <p><strong>Hours:</strong> ${escapeHtml(location.hours)}</p>
-      ${location.availableBikes !== undefined ? `<p><strong>Available Bikes:</strong> ${location.availableBikes}</p>` : ''}
-      ${location.availableDocks !== undefined ? `<p><strong>Available Docks:</strong> ${location.availableDocks}</p>` : ''}
+      ${location.availableBikes !== undefined ? `<p><strong>Available Bikes:</strong> ${escapeHtml(String(location.availableBikes))}</p>` : ''}
+      ${location.availableDocks !== undefined ? `<p><strong>Available Docks:</strong> ${escapeHtml(String(location.availableDocks))}</p>` : ''}
       ${hasRange ? `<p><strong>Range:</strong> ~${formatDistance(rangeMeters)} left</p>` : ''}
       ${location.isChargingStation ? '<p><strong>Charging Station Available</strong></p>' : ''}
       ${

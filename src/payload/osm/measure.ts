@@ -11,7 +11,13 @@
  * estimate distance while you drag, but the number that gets *stored* comes
  * from here, sampled against the same DEM at the same zoom every time.
  */
-import { boundsOf, lengthMeters } from './assemble';
+import {
+  boundsOf,
+  gapsBetweenParts,
+  lengthMeters,
+  walkingOrder,
+  type AssemblyGap,
+} from './assemble';
 import { sampleTerrainParts, type TerrainPoint } from './terrain';
 import { M_TO_FT, METERS_TO_MILES } from './units';
 import { computeElevation, pointsToElevationProfile } from '@/utils/ride-stats';
@@ -22,6 +28,11 @@ export interface Measurements {
   bounds: [number, number, number, number] | null;
   /** Miles. */
   distance: number;
+  /**
+   * Breaks between consecutive parts in walking order, worst first. Part
+   * indices refer to the `parts` that were passed in, not the walk.
+   */
+  gaps: AssemblyGap[];
   /** Feet. Null when no terrain could be read. */
   elevationGain: number | null;
   elevationLoss: number | null;
@@ -47,6 +58,7 @@ export const EMPTY_MEASUREMENTS: Measurements = {
   elevationLoss: null,
   elevationMax: null,
   elevationMin: null,
+  gaps: [],
   profile: null,
   warnings: [],
 };
@@ -55,17 +67,32 @@ export const EMPTY_MEASUREMENTS: Measurements = {
  * Measures connected runs of coordinates.
  *
  * Gaps between parts are not walked, so a trail in two pieces measures the sum
- * of the pieces rather than including the hop between them.
+ * of the pieces rather than including the hop between them. The parts are put
+ * in walking order first, whatever order they were stored in: the profile
+ * follows that order, and so do gain and loss, which swap when a part is
+ * walked the other way.
  */
 export async function measureParts(
   parts: [number, number][][],
   name: string,
   options: MeasureOptions = {},
 ): Promise<Measurements> {
-  const usable = parts.filter((part) => part.length >= 2);
-  if (usable.length === 0) {
+  // Blanking short parts keeps their slots, so step indices stay indices into
+  // `parts` and the gaps below can be reported against the stored line.
+  const steps = walkingOrder(
+    parts.map((part) => (part.length >= 2 ? part : [])),
+  );
+  if (steps.length === 0) {
     return { ...EMPTY_MEASUREMENTS };
   }
+  const usable = steps.map(({ index, reversed }) =>
+    reversed ? [...parts[index]].reverse() : parts[index],
+  );
+  const gaps = gapsBetweenParts(usable).map((gap) => ({
+    ...gap,
+    fromPart: steps[gap.fromPart].index,
+    toPart: steps[gap.toPart].index,
+  }));
 
   const warnings: string[] = [];
   const meters = lengthMeters(usable);
@@ -102,6 +129,7 @@ export async function measureParts(
     elevationLoss: loss,
     elevationMax: max,
     elevationMin: min,
+    gaps,
     profile,
     warnings,
   };
