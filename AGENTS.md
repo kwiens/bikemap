@@ -44,6 +44,11 @@ GitHub posts written by an agent start with `🤖` alone on the first line. This
 applies to issue and pull-request bodies, comments, reviews, and review-thread
 replies. Do not add the marker to commits, titles, or file contents.
 
+Pull requests get an automatic Claude code review, an architecture review,
+and a generated architecture summary in the description; `@claude` in a PR
+or issue asks Claude for help. The review instructions and setup live in
+[`.github/claude/README.md`](.github/claude/README.md).
+
 ## Architecture
 
 This is a Next.js App Router application displaying an interactive Mapbox map of bike routes, trails, and resources. It is **multi-city**: Chattanooga, TN ([bikechatt.com](https://bikechatt.com)) and Bend, OR (ridebend.org) run from the same codebase, selected per-request by hostname (or `NEXT_PUBLIC_CITY_ID` in development).
@@ -523,6 +528,14 @@ Things to know before touching it:
   city in both lookups so same-named trails cannot collide. Chattanooga's seed
   imports its prepared profiles directly; `pnpm backfill:elevation` measures
   any trail that still has geometry but no profile, without touching Overpass.
+- **Multi-part lines are measured in walking order, not stored order.**
+  `measureParts` walks every line in `walkingOrder` (`osm/assemble.ts`), so
+  pieces stored out of sequence or backwards (common in the GIS import) don't
+  make the chart leap between far ends of the trail. Gain and
+  loss swap when a piece is walked the other way, so changing that ordering
+  changes stored numbers: regenerate with `pnpm prepare:chattanooga-measurements`
+  and re-measure the database with
+  `pnpm backfill:elevation -- --city=<city> --force --multipart`.
 - **`computeElevation`'s spike filter needs a run cap.** It replaces readings
   further than `ELEVATION_SPIKE_THRESHOLD` (25 m) from a running EMA. On a
   sustained climb the EMA lags by about `step * (1-alpha)/alpha`, and on a ~30%

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildFrameAncestors, embedHeaders } from './embed-headers';
+import {
+  buildContentSecurityPolicy,
+  buildFrameAncestors,
+  embedHeaders,
+} from './embed-headers';
 
 describe('buildFrameAncestors', () => {
   it('opens framing when the var is unset, empty, or whitespace', () => {
@@ -87,6 +91,30 @@ describe('buildFrameAncestors', () => {
   });
 });
 
+describe('buildContentSecurityPolicy', () => {
+  it('restricts executable and network resources while allowing map services', () => {
+    const policy = buildContentSecurityPolicy("frame-ancestors 'self'", false);
+
+    expect(policy).toContain("default-src 'self'");
+    expect(policy).toContain("object-src 'none'");
+    expect(policy).toContain("script-src-attr 'none'");
+    expect(policy).toContain("worker-src 'self' blob:");
+    expect(policy).toContain('https://api.mapbox.com');
+    expect(policy).toContain('https://*.tiles.mapbox.com');
+    expect(policy).toContain('https://tiles.openstreetmap.us');
+    expect(policy).toContain("frame-ancestors 'self'");
+    expect(policy).toContain('upgrade-insecure-requests');
+    expect(policy).not.toContain("'unsafe-eval'");
+  });
+
+  it('permits Next development evals without upgrading localhost requests', () => {
+    const policy = buildContentSecurityPolicy("frame-ancestors 'self'", true);
+
+    expect(policy).toContain("'unsafe-eval'");
+    expect(policy).not.toContain('upgrade-insecure-requests');
+  });
+});
+
 describe('embedHeaders', () => {
   it('emits two mutually exclusive rules', () => {
     const headers = embedHeaders(undefined);
@@ -101,21 +129,22 @@ describe('embedHeaders', () => {
   });
 
   it('applies the allowlist to /embed and self to everything else', () => {
-    const headers = embedHeaders('https://a.example https://b.example');
+    const headers = embedHeaders('https://a.example https://b.example', false);
 
     expect(headers[0].source).toBe('/embed');
-    expect(headers[0].headers[0].value).toBe(
+    expect(headers[0].headers[0].value).toContain(
       "frame-ancestors 'self' https://a.example https://b.example",
     );
 
     // The catch-all must never inherit the permissive directive.
-    expect(headers[1].headers[0].value).toBe("frame-ancestors 'self'");
+    expect(headers[1].headers[0].value).toContain("frame-ancestors 'self'");
+    expect(headers[1].headers[0].value).not.toContain('https://a.example');
   });
 
   it('leaves the rest of the site locked down when embedding is open', () => {
     const headers = embedHeaders(undefined);
-    expect(headers[0].headers[0].value).toBe('frame-ancestors *');
-    expect(headers[1].headers[0].value).toBe("frame-ancestors 'self'");
+    expect(headers[0].headers[0].value).toContain('frame-ancestors *');
+    expect(headers[1].headers[0].value).toContain("frame-ancestors 'self'");
   });
 });
 
