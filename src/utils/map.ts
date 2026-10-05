@@ -12,6 +12,7 @@ import {
   STYLE_OWNED_ROUTE_LAYER_IDS,
   STYLE_OWNED_ROUTE_TILESET_IDS,
   STYLE_STRAY_LAYER_IDS,
+  STYLE_STRAY_TILESET_IDS,
 } from '@/data/mapbox-style';
 import {
   OSM_TRAILS_SOURCE_ID,
@@ -116,8 +117,6 @@ export const BIKE_ROUTE_LAYER_ID = 'bike-routes';
 export const BIKE_ROUTE_CASING_LAYER_ID = 'bike-routes-casing';
 export const LINE_HIT_TOLERANCE_PX = 12;
 
-const styleRouteTilesetIds = new Set(STYLE_OWNED_ROUTE_TILESET_IDS);
-
 function routePropertyExpression(
   routes: BikeRoute[],
   property: 'color' | 'defaultWidth',
@@ -130,11 +129,13 @@ function routePropertyExpression(
   return expression as mapboxgl.Expression;
 }
 
-/** Remove Studio-owned route layers and their dedicated vector tilesets. */
-export function removeStyleOwnedBikeRoutes(
+function removeStyleData(
   style: mapboxgl.StyleSpecification,
+  layerIds: readonly string[],
+  tilesetIds: readonly string[],
 ): mapboxgl.StyleSpecification {
-  const routeLayerIds = new Set(STYLE_OWNED_ROUTE_LAYER_IDS);
+  const removedLayerIds = new Set(layerIds);
+  const removedTilesetIds = new Set(tilesetIds);
   const composite = style.sources.composite;
   let nextComposite = composite;
 
@@ -152,7 +153,7 @@ export function removeStyleOwnedBikeRoutes(
     const query = queryIndex === -1 ? '' : composite.url.slice(queryIndex);
     const keptSources = sourceList
       .split(',')
-      .filter((sourceId) => !styleRouteTilesetIds.has(sourceId));
+      .filter((sourceId) => !removedTilesetIds.has(sourceId));
 
     nextComposite = {
       ...composite,
@@ -166,22 +167,35 @@ export function removeStyleOwnedBikeRoutes(
       ...style.sources,
       ...(nextComposite ? { composite: nextComposite } : {}),
     },
-    layers: style.layers.filter((layer) => !routeLayerIds.has(layer.id)),
+    layers: style.layers.filter((layer) => !removedLayerIds.has(layer.id)),
   };
 }
 
-/** Fetch the optimized Studio style once so unused route tilesets can be pruned. */
-export async function loadBikeRouteOptimizedStyle(
+/** Remove Studio-owned route layers and their dedicated vector tilesets. */
+export function removeStyleOwnedBikeRoutes(
+  style: mapboxgl.StyleSpecification,
+): mapboxgl.StyleSpecification {
+  return removeStyleData(
+    style,
+    STYLE_OWNED_ROUTE_LAYER_IDS,
+    STYLE_OWNED_ROUTE_TILESET_IDS,
+  );
+}
+
+/** Remove orphan trail layers and their dedicated vector tilesets. */
+export function removeStrayTrailDataFromStyle(
+  style: mapboxgl.StyleSpecification,
+): mapboxgl.StyleSpecification {
+  return removeStyleData(style, STYLE_STRAY_LAYER_IDS, STYLE_STRAY_TILESET_IDS);
+}
+
+/** Fetch the optimized Studio style once and prune data unused by this city. */
+export async function loadOptimizedMapStyle(
   styleUrl: string,
   accessToken: string,
   pruneStudioRoutes: boolean,
   signal?: AbortSignal,
 ): Promise<mapboxgl.StyleSpecification | string> {
-  // A city without runtime route GeoJSON still needs its Studio-owned route
-  // layers. In that case Mapbox can load the configured optimized style
-  // directly, and the legacy layer setup in Map.tsx remains functional.
-  if (!pruneStudioRoutes) return styleUrl;
-
   const match = /^mapbox:\/\/styles\/([^/]+)\/([^?]+)/.exec(styleUrl);
   if (!match) return styleUrl;
 
@@ -197,15 +211,17 @@ export async function loadBikeRouteOptimizedStyle(
     if (!response.ok) {
       throw new Error(`Mapbox style request failed (${response.status})`);
     }
-    const style = (await response.json()) as mapboxgl.StyleSpecification;
-    return removeStyleOwnedBikeRoutes(style);
+    let style = (await response.json()) as mapboxgl.StyleSpecification;
+    style = removeStrayTrailDataFromStyle(style);
+    if (pruneStudioRoutes) style = removeStyleOwnedBikeRoutes(style);
+    return style;
   } catch (error) {
     // Teardown deliberately aborts this request. Do not turn that into a
     // fallback style load (or a warning) in the effect that is going away.
     if (signal?.aborted) throw error;
 
     console.warn(
-      'Could not prune Studio-owned route tilesets; using the configured style.',
+      'Could not prune unused Studio data; using the configured style.',
       error,
     );
     return styleUrl;

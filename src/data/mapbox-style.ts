@@ -34,6 +34,12 @@ export const STYLE_STRAY_LAYER_IDS = [
   'Godsey Ridge Trails',
 ];
 
+// The dedicated TPL tileset behind the orphan layer above. PR #100 moved the
+// curated regional trails to Payload/GeoJSON, and this separate paved-greenway
+// snapshot is not used by any city. Remove it from the composite source before
+// Mapbox starts requesting tiles; the Godsey Ridge tileset remains in place.
+export const STYLE_STRAY_TILESET_IDS = ['swuller.cvsl09xq'];
+
 /** Hide route layers the active city's static style manifest does not own. */
 export function hiddenStyleLayerIdsFor(city: CityData): string[] {
   const ownRouteIds = new Set(city.bikeRoutes.map((route) => route.id));
