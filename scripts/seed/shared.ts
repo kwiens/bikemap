@@ -7,6 +7,7 @@
  * actually common is only this: connecting to Payload, translating a
  * `MountainBikeTrail` into a row, and upserting it.
  */
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getPayload, type Payload } from 'payload';
@@ -24,11 +25,38 @@ import {
   UNRATED_VALUE,
 } from '../../src/data/trail-vocabulary';
 import type { Trail } from '../../src/payload-types';
+import {
+  measurementsFromElevationProfile,
+  parseElevationProfile,
+} from '../../src/utils/elevation-profile';
 
 export const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../..',
 );
+
+/**
+ * Reads a generated profile from a bundled city's static fallback. Keeping
+ * this shared makes every bundled city seed the database and its fallback from
+ * the same artifact, including style-owned trails whose line is not in Payload.
+ */
+export async function loadElevationProfile(
+  city: CityId,
+  slug: string,
+): Promise<ElevationProfile> {
+  const filename = path.join(
+    repoRoot,
+    'public/data/elevation',
+    city,
+    `${slug}.json`,
+  );
+  const raw = await readFile(filename, 'utf8');
+  const profile = parseElevationProfile(JSON.parse(raw));
+  if (!profile) {
+    throw new Error(`Invalid ${city} elevation profile: ${filename}`);
+  }
+  return profile;
+}
 
 /**
  * The vocabulary rows a trail points at, resolved once and reused.
@@ -223,8 +251,8 @@ export interface UpsertArgs {
    */
   geometrySource: 'imported' | 'osm';
   /**
-   * Prepared profile for an imported line. Omit when a later backfill owns it;
-   * pass null when the import owns profiles but this row has no source line.
+   * Prepared profile for the seeded trail. It may outlive the source line in a
+   * style-owned layer; omit it only when a later backfill owns generation.
    */
   elevationProfile?: ElevationProfile | null;
   trail: MountainBikeTrail;
@@ -273,16 +301,23 @@ export async function upsertTrail(
     slug: slugForTrail(trail),
     trailName: trail.trailName,
   };
+  const profileMeasurements = elevationProfile
+    ? measurementsFromElevationProfile(elevationProfile)
+    : null;
 
   // The line, the ways it was built from, and every number derived from it.
   // Withheld from a hand-edited row: these only make sense together.
   const geometry = {
-    bounds: trail.defaultBounds ?? null,
-    distance: trail.distance ?? null,
-    elevationGain: trail.elevationGain ?? null,
-    elevationLoss: trail.elevationLoss ?? null,
-    elevationMax: trail.elevationMax ?? null,
-    elevationMin: trail.elevationMin ?? null,
+    bounds: profileMeasurements?.bounds ?? trail.defaultBounds ?? null,
+    distance: profileMeasurements?.distance ?? trail.distance ?? null,
+    elevationGain:
+      profileMeasurements?.elevationGain ?? trail.elevationGain ?? null,
+    elevationLoss:
+      profileMeasurements?.elevationLoss ?? trail.elevationLoss ?? null,
+    elevationMax:
+      profileMeasurements?.elevationMax ?? trail.elevationMax ?? null,
+    elevationMin:
+      profileMeasurements?.elevationMin ?? trail.elevationMin ?? null,
     ...(elevationProfile !== undefined
       ? {
           elevationProfile:

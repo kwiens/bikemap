@@ -5,9 +5,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BikeRoutes } from './BikeRoutes';
 
-// Mock the geo_data module
-vi.mock('@/data/geo_data', () => ({
-  bikeRoutes: [
+vi.mock('@/data/route-source', () => ({
+  getBikeRoutes: () => [
     {
       id: 'route-1',
       name: 'Test Route 1',

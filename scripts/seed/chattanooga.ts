@@ -14,12 +14,14 @@
  *     here can be rebuilt from OSM. Whether they *can* be matched is the open
  *     question in ADR-0001 — `scripts/align_bend_geometry.py` against Tennessee
  *     is the experiment that would answer it.
- *   - Geometry comes from public/data/chattanooga/trails.geojson, generated
- *     from the permitted regional-trails shapefile by
+ *   - Geometry currently comes from the deprecated transition artifact at
+ *     public/data/chattanooga/trails.geojson, generated from the permitted
+ *     regional-trails shapefile by
  *     scripts/prepare_chattanooga_trails.py and matched by raw `Trail` name.
- *     Summary measurements and static profiles are regenerated from those
- *     exact lines by scripts/prepare_chattanooga_measurements.ts, and the seed
- *     imports the profile with the line so no legacy measurement can leak in.
+ *     A checked-in supplemental GeoJSON supplies permitted lines missing from
+ *     that shapefile. Summary measurements and static profiles are regenerated
+ *     from the combined lines by scripts/prepare_chattanooga_measurements.ts,
+ *     and the seed imports each profile with its line.
  *
  * These import as `geometrySource: 'imported'`, so the OSM rebuild hook leaves
  * the archived line alone. Once a trail has been matched to way ids, set its
@@ -31,10 +33,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chattanoogaData } from '../../src/data/cities/chattanooga';
-import {
-  type ElevationProfile,
-  slugForTrail,
-} from '../../src/data/mountain-bike-trails';
+import { slugForTrail } from '../../src/data/mountain-bike-trails';
 import {
   connect,
   parseArgs,
@@ -42,15 +41,16 @@ import {
   repoRoot,
   run,
   emptyVocabulary,
+  loadElevationProfile,
   loadVocabulary,
   upsertArea,
   upsertTrail,
   type MultiLineString,
 } from './shared';
 
+// Staged for removal with the static fallback once fresh databases have a
+// database-native bootstrap path.
 const GEOJSON = 'public/data/chattanooga/trails.geojson';
-const PROFILE_DIR = 'public/data/elevation/chattanooga';
-
 /** Raw `Trail` value -> imported MultiLineString. */
 async function loadGeometry(): Promise<Map<string, MultiLineString>> {
   const raw = await readFile(path.join(repoRoot, GEOJSON), 'utf8');
@@ -73,16 +73,6 @@ async function loadGeometry(): Promise<Map<string, MultiLineString>> {
   return byName;
 }
 
-async function loadProfile(slug: string): Promise<ElevationProfile> {
-  const filename = path.join(repoRoot, PROFILE_DIR, `${slug}.json`);
-  const raw = await readFile(filename, 'utf8');
-  const profile = JSON.parse(raw) as ElevationProfile;
-  if (!Array.isArray(profile.profile) || profile.profile.length === 0) {
-    throw new Error(`Invalid Chattanooga elevation profile: ${filename}`);
-  }
-  return profile;
-}
-
 run(async () => {
   const { dryRun } = parseArgs(process.argv.slice(2));
   const payload = await connect();
@@ -91,12 +81,13 @@ run(async () => {
   const trails = chattanoogaData.mountainBikeTrails;
   const profiles = new Map(
     await Promise.all(
-      trails
-        .filter((trail) => geometry.has(trail.trailName))
-        .map(
-          async (trail) =>
-            [trail.trailName, await loadProfile(slugForTrail(trail))] as const,
-        ),
+      trails.map(
+        async (trail) =>
+          [
+            trail.trailName,
+            await loadElevationProfile('chattanooga', slugForTrail(trail)),
+          ] as const,
+      ),
     ),
   );
   payload.logger.info(

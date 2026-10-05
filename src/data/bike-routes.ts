@@ -17,7 +17,12 @@ export interface BikeRoute {
   hideArrows?: boolean; // Don't show directional arrows on this route
   defaultBounds?: [number, number, number, number]; // [swLng, swLat, neLng, neLat] fallback
   bounds?: mapboxgl.LngLatBounds; // Runtime-calculated bounds
+  kind?: RouteKind; // Editorial classification; does not change map behavior
+  geometrySource?: RouteGeometrySource; // Public geometry authority selected in Payload
 }
+
+export type RouteKind = 'ride' | 'greenway' | 'path' | 'trail';
+export type RouteGeometrySource = 'imported' | 'studio' | 'trail';
 
 export const bikeRoutes: BikeRoute[] = [
   {
@@ -28,6 +33,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    kind: 'ride',
     distance: 7.7,
     reverseDirection: true,
     // The source geometry reverses direction around the 5th/Lookout half of
@@ -48,6 +54,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    kind: 'ride',
     distance: 5.4,
     defaultBounds: [-85.307614, 35.037548, -85.281097, 35.061733],
   },
@@ -60,6 +67,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    kind: 'greenway',
     distance: 14.1,
     defaultBounds: [-85.328424, 35.009749, -85.230088, 35.102443],
   },
@@ -71,6 +79,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    kind: 'greenway',
     distance: 9.9,
     hideArrows: true,
     defaultBounds: [-85.260157, 35.042472, -85.212365, 35.089989],
@@ -83,6 +92,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    kind: 'ride',
     distance: 6.5,
     defaultBounds: [-85.320807, 35.060177, -85.300536, 35.089277],
   },
@@ -94,6 +104,7 @@ export const bikeRoutes: BikeRoute[] = [
     icon: faRoute,
     defaultWidth: 8,
     opacity: 1.0,
+    kind: 'ride',
     distance: 2.3,
     defaultBounds: [-85.333107, 35.052837, -85.305119, 35.062845],
   },

@@ -1,7 +1,7 @@
 import type * as GeoJSON from 'geojson';
 import mapboxgl from 'mapbox-gl';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
-import { mountainBikeConfig, trailMetadata } from '@/data/geo_data';
+import { mountainBikeConfig } from '@/data/geo_data';
 import { regionOf } from '@/data/trail-region';
 import {
   getMountainBikeTrails,
@@ -281,7 +281,9 @@ export function syncRouteArrowLayer(
     type: 'FeatureCollection',
     features: applyArrowDirectionOverrides(
       removeOverlappingSegments(features),
-      route.reverseArrowBounds,
+      // The database importer has already normalized multipart directions.
+      // Studio-owned geometry still needs its legacy bounds repair.
+      layer.id === BIKE_ROUTE_LAYER_ID ? [] : route.reverseArrowBounds,
     ),
   };
   const arrowSourceId = `${route.id}-arrows-source`;
@@ -366,7 +368,7 @@ export function updateRouteOpacity(
 
   routes.forEach((route) => {
     const isSelected = route.id === selectedId;
-    if (!hasCombinedLayer) {
+    if (map.getLayer(route.id)) {
       try {
         map.setPaintProperty(
           route.id,
@@ -423,13 +425,14 @@ export function calculateRouteBounds(
   const sourceId = layer.source;
   const sourceLayer = layer['source-layer'];
 
-  if (!sourceId || !sourceLayer) {
+  if (!sourceId) {
     return null;
   }
 
-  // Query all features in this layer
+  const filter = 'filter' in layer ? layer.filter : undefined;
   const features = map.querySourceFeatures(sourceId, {
-    sourceLayer: sourceLayer,
+    ...(sourceLayer ? { sourceLayer } : {}),
+    ...(filter ? { filter } : {}),
   });
 
   if (features.length === 0) {
@@ -745,10 +748,6 @@ interface TrailLayerConfig {
   // Maps the raw feature-property value (e.g. tileset 'Trail' name) to the
   // line color. Falls back to UNRATED_COLOR for anything unlisted.
   colorMap: Record<string, string>;
-  // Maps the user-facing displayName to the raw feature value used for
-  // selection/highlight match expressions. Identity for layers whose tileset
-  // trail names already match our displayNames.
-  toRawName: (displayName: string) => string;
 }
 
 // These two lookups are derived from the trail list, which now arrives from the
@@ -827,7 +826,7 @@ function trailMatchExpr(
     const ids = (trailByName().get(trailName)?.osmIds ?? []).map(String);
     return ['in', ['to-string', ['get', 'OSM_ID']], ['literal', ids]];
   }
-  return ['==', ['get', cfg.trailProp], cfg.toRawName(trailName)];
+  return ['==', ['get', cfg.trailProp], trailName];
 }
 
 // Reverse lookup for osmId-matched layers: which curated trail owns this way?
@@ -846,8 +845,8 @@ function areaMatchExpr(
     const ids = trails.flatMap((t) => t.osmIds ?? []).map(String);
     return ['in', ['to-string', ['get', 'OSM_ID']], ['literal', ids]];
   }
-  const rawNames = trails.map((t) => cfg.toRawName(t.trailName));
-  return ['in', ['get', cfg.trailProp], ['literal', rawNames]];
+  const names = trails.map((trail) => trail.trailName);
+  return ['in', ['get', cfg.trailProp], ['literal', names]];
 }
 
 function buildColorExpression(
@@ -865,37 +864,21 @@ function buildColorExpression(
 
 function buildTrailLayerConfig(): TrailLayerConfig[] {
   return mountainBikeConfig.layers.map((layer) => {
-    const metadata = layer.metadata ?? {};
-    const hasMetadata = Object.keys(metadata).length > 0;
     let colorMap: Record<string, string>;
     if (layer.matchBy === 'osmId') {
       // Color keyed by OSM_ID, using the deterministic per-way owner so a
       // shared way is colored as the same trail a click would select.
       colorMap = {};
       for (const [id, trail] of osmIdOwner()) colorMap[id] = trail.color;
-    } else if (hasMetadata) {
-      colorMap = Object.fromEntries(
-        Object.entries(metadata).map(([rawName, meta]) => [
-          rawName,
-          RATING_COLORS[meta.rating] ?? UNRATED_COLOR,
-        ]),
-      );
     } else {
       colorMap = Object.fromEntries(
         getMountainBikeTrails().map((trail) => [trail.trailName, trail.color]),
       );
     }
-    const displayToRaw = Object.fromEntries(
-      Object.entries(metadata).map(([rawName, meta]) => [
-        meta.displayName,
-        rawName,
-      ]),
-    );
 
     return {
       ...layer,
       colorMap,
-      toRawName: (name: string) => displayToRaw[name] ?? name,
     };
   });
 }
@@ -1293,18 +1276,42 @@ export function setBikeNetworkVisible(
 
 // --- Inline (GeoJSON-backed) bike routes -------------------------------------
 
-// Attach every curated route from one static GeoJSON source. Color, width, and
+// Attach curated routes from one loaded GeoJSON source. Color, width, and
 // selection state are data-driven so the renderer only evaluates one casing
 // and one route layer regardless of how many routes a city has. Idempotent.
 export function ensureInlineRoutes(
   map: mapboxgl.Map,
-  url: string,
+  collection: GeoJSON.FeatureCollection | null,
   routes: BikeRoute[],
 ): void {
   try {
+    const routeIds = new Set(routes.map((route) => route.id));
+    for (const route of routes) {
+      for (const layerId of [`${route.id}-casing`, route.id]) {
+        const existing = map.getLayer(layerId);
+        if (existing) {
+          map.removeLayer(layerId);
+        }
+      }
+    }
+
+    if (!collection) {
+      return;
+    }
+    const data: GeoJSON.FeatureCollection = {
+      ...collection,
+      features: collection.features.filter((feature) => {
+        const id = feature.properties?.id;
+        return typeof id === 'string' && routeIds.has(id);
+      }),
+    };
+    if (data.features.length === 0) {
+      return;
+    }
+
     ensureSource(map, BIKE_ROUTE_SOURCE_ID, {
       type: 'geojson',
-      data: url,
+      data,
       maxzoom: 14,
       tolerance: 0.5,
       promoteId: 'id',
@@ -1652,8 +1659,8 @@ export function initMtnBikeLayers(map: mapboxgl.Map): void {
         ['literal', curatedIds],
       ];
     } else {
-      const curatedNames = getMountainBikeTrails().map((trail) =>
-        cfg.toRawName(trail.trailName),
+      const curatedNames = getMountainBikeTrails().map(
+        (trail) => trail.trailName,
       );
       const curatedFilter: mapboxgl.FilterSpecification = [
         'in',
@@ -1889,10 +1896,7 @@ export function detectTrailAtPoint(
     return trailNameForOsmId(rawName);
   }
 
-  // Map through city metadata for display names when a tileset uses raw GIS
-  // values (e.g. Godsey Ridge in Chattanooga).
-  const meta = trailMetadata[rawName];
-  return meta?.displayName ?? rawName;
+  return rawName;
 }
 
 // Geocoding utility

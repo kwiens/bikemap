@@ -1,8 +1,10 @@
 # Data files
 
-All content shown on the map lives in `src/data/` as plain, typed TypeScript
-arrays — no database, no CMS, no admin panel. To change what a deployment
-shows, edit an array and ship a PR.
+Seed metadata and checked-in trail fallbacks live in `src/data/` as typed
+TypeScript arrays. Published trail and route content comes from Payload,
+while other content can remain explicitly configured to use static files or
+Mapbox Studio layers. Payload-owned route geometry has no implicit Studio
+fallback.
 
 Each file exports a typed array; the `interface` at the top of the file is the
 contract. `icon` fields are Font Awesome `IconDefinition` values imported from
@@ -25,12 +27,17 @@ The MTB trail array lives in its own `mountain-bike-trails.data.ts` so the
 
 ## BikeRoute (`bike-routes.ts`)
 
-Routes are line layers styled in Mapbox Studio; the entry here wires a layer to
-its sidebar card.
+The TypeScript arrays are import metadata, not the public Casual list. Published
+Route records supply both display metadata and geometry through
+`/api/map/routes?city=<city>`. Imported and Trail-backed routes have no Studio
+or checked-in route-GeoJSON fallback. A Route may select a same-city Trail, in
+which case the read path uses that Trail's current geometry, distance, and
+bounds. Chattanooga's five not-yet-migrated routes explicitly select their
+existing Studio layers; their cards still come from Payload.
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | `string` | **Must equal the Mapbox Studio layer ID** for this route |
+| `id` | `string` | Must equal the GeoJSON feature `id` or Mapbox Studio layer ID |
 | `name` | `string` | Display name |
 | `color` | `string` | Hex; should match the layer's color in Studio |
 | `description` | `string` | Sidebar copy |
@@ -38,6 +45,7 @@ its sidebar card.
 | `defaultWidth` | `number` | Line width in px |
 | `opacity` | `number` | 0–1 |
 | `distance` | `number` | Miles |
+| `kind?` | `ride \| greenway \| path \| trail` | Editorial route classification |
 | `defaultBounds?` | `[swLng, swLat, neLng, neLat]` | Zoom-to-fit fallback when runtime bounds aren't available |
 | `bounds?` | `mapboxgl.LngLatBounds` | Computed at runtime — do not hand-author |
 
@@ -81,6 +89,9 @@ pointless, they get overwritten. See [DEPLOYING.md](DEPLOYING.md) for setup.
 
 | Script | Writes |
 |---|---|
+| `import-chattanooga-routes.ts` | Normalizes the verified Riverwalk shapefile and upserts it into Payload without writing generated GIS data to Git |
+| `prepare_chattanooga_routes.py` | Streams normalized route GeoJSON to the importer, or writes an explicitly requested temporary output |
+| `fix_route_directions.py` | Detects and repairs inconsistent multipart loop direction |
 | `add_trail_elevation.py` | `MountainBikeTrail` elevation stats (`elevationGain/Loss/Min/Max`, `distance`) + per-trail `public/data/elevation/chattanooga/{slug}.json` |
 | `add_trail_bounds.py` | `MountainBikeTrail.defaultBounds` and `distance` |
 | `validate_trails.py` | Read-only — flags geometry/elevation anomalies |

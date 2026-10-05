@@ -132,6 +132,20 @@ function requireEveryPartInProfile(
   }
 }
 
+function requireEveryCuratedTrail(
+  geometry: Map<string, MultiLineString>,
+): void {
+  const missing = mountainBikeTrails
+    .filter((trail) => !geometry.has(trail.trailName))
+    .map((trail) => trail.trailName);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `GIS GeoJSON is missing ${missing.length} curated Chattanooga trail${missing.length === 1 ? '' : 's'}: ${missing.join(', ')}. No files were written.`,
+    );
+  }
+}
+
 async function prepareTrails(
   geometry: Map<string, MultiLineString>,
   token: string,
@@ -218,10 +232,8 @@ async function main(): Promise<void> {
   }
 
   const geometry = await loadGeometry();
+  requireEveryCuratedTrail(geometry);
   const prepared = await prepareTrails(geometry, token);
-  if (prepared.length === 0) {
-    throw new Error('No curated Chattanooga trails matched the GIS GeoJSON.');
-  }
 
   await writeArtifacts(prepared);
   console.log(

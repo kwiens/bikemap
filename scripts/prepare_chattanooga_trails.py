@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Convert Chattanooga's regional trail shapefile to import-ready GeoJSON.
+"""Convert Chattanooga's curated trail sources to import-ready GeoJSON.
 
 The source archived from PR #67 is an ESRI shapefile in NAD83 / UTM zone 16N.
 Payload stores ordinary WGS84 GeoJSON in its ``geom`` JSON field, so this
 script reprojects every named feature, groups source pieces by ``Trail``, and
-writes one MultiLineString feature per trail.
+writes one MultiLineString feature per trail. A checked-in supplemental
+FeatureCollection supplies permitted lines that are absent from the regional
+shapefile; the converter merges it without knowing about individual trails.
 
 Usage:
 
@@ -13,6 +15,12 @@ Usage:
 
 The sibling .dbf, .prj, and .cpg files must be present. Output defaults to
 ``public/data/chattanooga/trails.geojson`` and can be changed with ``--output``.
+The supplemental input defaults to
+``public/data/chattanooga/trails-supplemental.geojson``.
+
+Both GeoJSON files are deprecated transition artifacts. Payload is the
+authoritative runtime source; retain these files only until fresh-database
+bootstrap and outage handling no longer depend on a public static fallback.
 """
 
 from __future__ import annotations
@@ -28,11 +36,23 @@ from pyproj import CRS, Transformer
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = REPO_ROOT / "public/data/chattanooga/trails.geojson"
+DEFAULT_SUPPLEMENTAL = (
+    REPO_ROOT / "public/data/chattanooga/trails-supplemental.geojson"
+)
 COORDINATE_PRECISION = 7
 SUPPORTED_SHAPE_TYPES = {
     shapefile.POLYLINE,
     shapefile.POLYLINEM,
     shapefile.POLYLINEZ,
+}
+DEPRECATED_DATASET_META = {
+    "deprecated": True,
+    "status": "staged-for-removal",
+    "reason": "Payload is the authoritative trail source.",
+    "removeWhen": (
+        "Fresh databases bootstrap without this file and the runtime static "
+        "fallback has been removed."
+    ),
 }
 
 Position = list[float]
@@ -55,6 +75,13 @@ def main() -> None:
     transformer = Transformer.from_crs(source_crs, "EPSG:4326", always_xy=True)
     rows = read_source_rows(source)
     collection, report = build_feature_collection(rows, transformer.transform)
+    supplemental_features = load_supplemental_features(args.supplemental.resolve())
+    regional_trails = report["trails"]
+    supplemental_parts = merge_supplemental_features(
+        collection, supplemental_features
+    )
+    report["parts"] += supplemental_parts
+    report["trails"] += len(supplemental_features)
 
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -63,8 +90,10 @@ def main() -> None:
     )
 
     print(
-        f"Wrote {report['trails']} trails from {report['source_records']} source "
-        f"records ({report['parts']} line parts) to {output}"
+        f"Wrote {report['trails']} trails: {regional_trails} from "
+        f"{report['source_records']} shapefile records and "
+        f"{len(supplemental_features)} from {args.supplemental} "
+        f"({report['parts']} line parts) to {output}"
     )
     if report["blank_records"]:
         print(f"Skipped {report['blank_records']} unnamed/null source records.")
@@ -78,6 +107,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_OUTPUT,
         help=f"Output GeoJSON path (default: {DEFAULT_OUTPUT})",
+    )
+    parser.add_argument(
+        "--supplemental",
+        type=Path,
+        default=DEFAULT_SUPPLEMENTAL,
+        help=f"Supplemental GeoJSON path (default: {DEFAULT_SUPPLEMENTAL})",
     )
     return parser.parse_args()
 
@@ -161,7 +196,11 @@ def build_feature_collection(
             }
         )
 
-    collection = {"type": "FeatureCollection", "features": features}
+    collection = {
+        "type": "FeatureCollection",
+        "_meta": DEPRECATED_DATASET_META,
+        "features": features,
+    }
     report = {
         "blank_records": blank_records,
         "parts": sum(len(feature["geometry"]["coordinates"]) for feature in features),
@@ -169,6 +208,59 @@ def build_feature_collection(
         "trails": len(features),
     }
     return collection, report
+
+
+def load_supplemental_features(source: Path) -> list[dict]:
+    """Read named MultiLineStrings that supplement the regional shapefile."""
+    collection = json.loads(source.read_text())
+    if (
+        not isinstance(collection, dict)
+        or collection.get("type") != "FeatureCollection"
+        or not isinstance(collection.get("features"), list)
+    ):
+        raise ValueError(f"{source} is not a GeoJSON FeatureCollection.")
+
+    features: list[dict] = []
+    for index, feature in enumerate(collection["features"], start=1):
+        if not isinstance(feature, dict):
+            raise ValueError(f"{source} feature {index} is not a GeoJSON Feature.")
+        properties = feature.get("properties")
+        geometry = feature.get("geometry")
+        trail = properties.get("Trail") if isinstance(properties, dict) else None
+        coordinates = (
+            geometry.get("coordinates") if isinstance(geometry, dict) else None
+        )
+        if (
+            feature.get("type") != "Feature"
+            or not isinstance(trail, str)
+            or not trail.strip()
+            or not isinstance(geometry, dict)
+            or geometry.get("type") != "MultiLineString"
+            or not isinstance(coordinates, list)
+            or not coordinates
+            or any(not isinstance(part, list) or len(part) < 2 for part in coordinates)
+        ):
+            raise ValueError(f"{source} feature {index} is not a named MultiLineString.")
+        features.append(feature)
+
+    return features
+
+
+def merge_supplemental_features(collection: dict, features: list[dict]) -> int:
+    """Append supplemental trails, rejecting duplicate names."""
+    existing = {
+        feature["properties"]["Trail"] for feature in collection["features"]
+    }
+    supplemental_names: set[str] = set()
+    for feature in features:
+        trail = feature["properties"]["Trail"]
+        if trail in existing or trail in supplemental_names:
+            raise ValueError(f"Duplicate trail in supplemental GeoJSON: {trail}")
+        supplemental_names.add(trail)
+
+    collection["features"].extend(features)
+    collection["features"].sort(key=lambda feature: feature["properties"]["Trail"])
+    return sum(len(feature["geometry"]["coordinates"]) for feature in features)
 
 
 def add_value(target: set[str], value: object) -> None:

@@ -51,11 +51,12 @@ vs Chattanooga. Biggest gaps below.
     `ensureBendNetworkSource`/`setBendNetworkVisible` render 2 stacked layers,
     toggled from the Casual sidebar (`BikeNetworkLayer` + legend), city-gated by
     `bikeNetworkUrl`.
-  - **8 greenway routes** — `scripts/build_bend_routes.py` →
-    `public/data/bend/routes.geojson` + `bend/bike-routes.data.ts`;
-    `ensureInlineRoutes` attaches per-route line/casing/hit layers from GeoJSON
-    (keyed by `id`) so the existing route select/zoom/click flow works unchanged.
-    City-gated by `bikeRoutesUrl`. OSM/Bend Bikes credit on the About page.
+  - **8 greenway routes** — `scripts/build_bend_routes.py` generates
+    `bend/bike-routes.data.ts`; `pnpm db:seed:bend` derives their normalized
+    geometry directly from `public/data/bend/bike-network.geojson` and stores
+    it in Payload. `ensureInlineRoutes` attaches the database GeoJSON so the
+    existing route select/zoom/click flow works unchanged. OSM/Bend Bikes
+    credit appears on the About page.
 - [ ] **Non-Chattanooga base style.** We currently *hide* Chattanooga route
   layers when Bend is active (`hiddenStyleLayerIds`). Bend needs its own Studio
   style or a neutral shared base.

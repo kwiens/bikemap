@@ -1,11 +1,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { mapConfigForHostname } from '@/config/map.config';
+import { cityIdForQuery, mapConfigForHostname } from '@/config/map.config';
 import { getRequestHostname } from '@/utils/request-hostname';
 import { siteConfigForHostname } from '@/config/site.config';
 import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
+import { getCityRoutes } from '@/payload/read/routes';
 import {
   ArrowLeft,
   MessageCircle,
@@ -27,8 +28,16 @@ function GithubIcon({ className }: { className?: string }) {
   );
 }
 
-export async function generateMetadata(): Promise<Metadata> {
-  const siteConfig = siteConfigForHostname(await getRequestHostname());
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ city?: string | string[] }>;
+}): Promise<Metadata> {
+  const [hostname, query] = await Promise.all([
+    getRequestHostname(),
+    searchParams,
+  ]);
+  const siteConfig = siteConfigForHostname(hostname, query.city);
 
   return {
     title: `About — ${siteConfig.name}`,
@@ -72,14 +81,24 @@ const ICON_DOWNLOADS = [
   },
 ] as const;
 
-export default async function AboutPage() {
-  const hostname = await getRequestHostname();
-  const siteConfig = siteConfigForHostname(hostname);
-  const mapConfig = mapConfigForHostname(hostname);
+export default async function AboutPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ city?: string | string[] }>;
+}) {
+  const [hostname, query] = await Promise.all([
+    getRequestHostname(),
+    searchParams,
+  ]);
+  const cityOverride = cityIdForQuery(query.city);
+  const citySearch = cityOverride ? `?city=${cityOverride}` : '';
+  const siteConfig = siteConfigForHostname(hostname, query.city);
+  const mapConfig = mapConfigForHostname(hostname, query.city);
   const region = mapConfig.region.displayName;
   const showBikeChattAssets = siteConfig.cityId === 'chattanooga';
   const isBend = siteConfig.cityId === 'bend';
-  const builderConfig = embedBuilderConfig(hostname);
+  const { routes } = await getCityRoutes(siteConfig.cityId);
+  const builderConfig = embedBuilderConfig(hostname, routes, query.city);
 
   return (
     <div className="min-h-screen bg-gray-50 fixed inset-0 overflow-y-auto z-[9999]">
@@ -87,7 +106,7 @@ export default async function AboutPage() {
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200">
         <div className="max-w-2xl mx-auto px-5 h-14 flex items-center">
           <Link
-            href="/"
+            href={`/${citySearch}`}
             className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#1a434e] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -148,7 +167,7 @@ export default async function AboutPage() {
           </h2>
 
           <Link
-            href="/export"
+            href={`/export${citySearch}`}
             className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-[#c3f44d] hover:shadow-sm transition-all group mb-3"
           >
             <div className="w-10 h-10 rounded-lg bg-[#1a434e] flex items-center justify-center shrink-0">

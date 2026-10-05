@@ -38,7 +38,8 @@ What it buys:
 ```bash
 docker compose up -d      # Postgres on :5432
 pnpm db:migrate           # create the schema
-pnpm db:seed:bend         # import Bend's 182 trails
+pnpm db:seed:bend         # import Bend's 182 trails and 8 Casual routes
+pnpm db:seed:bend-routes  # sync only the 8 routes
 pnpm dev                  # /admin — first visit creates the admin user
 ```
 
@@ -100,8 +101,13 @@ boundaries, so what gets *stored* comes from Overpass. This is the same choice
 
 - **Trail geometry** — one map with three modes (below). The whole authoring
   surface.
-- **Derived from OSM** — read-only build report, distance, elevation, bounds.
-  Hand edits would be overwritten on the next save.
+- **Measurements** — the build report plus a rendered elevation profile with
+  distance, climb, descent, and range. The raw derived fields stay hidden and
+  read-only because hand edits would be overwritten on the next measurement.
+- **Recalculate / repopulate elevation** — measures the last saved line again
+  without refetching OSM. For a style-owned trail with no CMS line, it restores
+  the checked-in profile instead. Unsaved edits must be saved first, and a
+  failed terrain or profile request leaves existing values untouched.
 - **Rebuild geometry** — force a refresh when a trail changed upstream.
 
 The build report is the important one, because referencing OSM has real failure
@@ -122,7 +128,7 @@ same view:
 | Mode | What it does |
 |---|---|
 | **Pick ways** | Click an OSM trail to add it, click again to remove. The default. |
-| **Move points** | Click the line to select it, then drag a point, drag a midpoint to insert one, or **right-click** a point to remove it. `Delete` removes the whole selected piece. |
+| **Move points** | Click the line to select it, then drag a point, drag a midpoint to insert one, or choose **Remove point** and click a point. Right-click also removes a point. `Delete` removes the whole selected piece. |
 | **Draw** | Click along the trail to extend it; Enter finishes a piece, Escape cancels. How a trail that isn't in OSM gets geometry. |
 
 One map rather than one per field, because picking a way and adjusting the
@@ -217,6 +223,7 @@ comparable:
 
 | Gesture | Removes | Undoable by Terra Draw |
 |---|---|---|
+| **Remove point**, then click a point | that one point | yes |
 | **Right-click** a point | that one point | yes |
 | **`Delete`** | the whole selected piece | **no** |
 
@@ -226,10 +233,12 @@ Two traps here, both of which this editor fell into:
    removes the entire piece — the click is irrelevant, `Delete` acts on the
    selected *feature*. The hint used to describe exactly this as the way to
    remove a point, so following the on-screen instructions destroyed a section
-   of trail. Deleting a single coordinate is `onRightClick` in Terra Draw's
-   select mode, gated on the `coordinates.deletable` flag; the base adapter
-   registers a `contextmenu` listener and `preventDefault`s it, so the browser
-   menu stays shut and right-click is safe to use here.
+   of trail. The editor's explicit **Remove point** tool updates the clicked
+   coordinate through Terra Draw's geometry API, including on touch devices.
+   The right-click shortcut uses `onRightClick` in Terra Draw's select mode,
+   gated on the `coordinates.deletable` flag; the base adapter registers a
+   `contextmenu` listener and `preventDefault`s it, so the browser menu stays
+   shut and right-click is safe to use here.
 2. **Terra Draw cannot undo deleting a feature, and does not admit it.** After
    `Delete`, `canUndo()` returns true and `undo()` returns true — and the piece
    stays gone. Its history records coordinate edits, not the store's feature
@@ -349,11 +358,11 @@ The map at `/` is a **server component**. It reads Payload through the Local API
 as props:
 
 ```
-app/(frontend)/page.tsx   getCityTrails(cityId)         ← Local API, per request
+app/(frontend)/page.tsx   getCityTrailSummaries + getCityRoutes ← Local API, cached
         ↓ props
-HomeClient.tsx            setMountainBikeTrails(trails) ← during render
+HomeClient.tsx            set trails + routes           ← during render
         ↓
-data/trail-source.ts      getMountainBikeTrails()       ← what every consumer reads
+data/{trail,route}-source.ts                            ← what consumers read
 ```
 
 Consumers call `getMountainBikeTrails()` rather than importing an array, because
@@ -365,6 +374,18 @@ Geometry follows the same path: both cities point their regional curated layer
 at `/api/map/trails?city=<city>` and keep the GeoJSON used by the seed as a
 static fallback.
 
+Casual mode always reads Route records. A Route can either own imported
+geometry or select an existing same-city Trail; the latter resolves the trail's
+current geometry, distance, and bounds at read time. This keeps the two sidebar
+concepts distinct while making “show this trail in Casual” a single Route admin
+record instead of a second copy of the line.
+
+Migration-capable builds run `db:seed:bend-routes` immediately after schema
+migrations. The sync skips unchanged rows and preserves any row a curator has
+switched to a Trail, so routine deploys neither add route versions nor undo an
+editorial link. Chattanooga's route import remains manual because its source
+GIS is external to the repository.
+
 ### Seeding
 
 One script per city, because their pipelines genuinely differ:
@@ -372,8 +393,9 @@ One script per city, because their pipelines genuinely differ:
 | | `pnpm db:seed:bend` | `pnpm db:seed:chattanooga` |
 |---|---|---|
 | Trails | 182 | 224 |
+| Casual routes | 8, derived from `bike-network.geojson` | imported separately with `pnpm db:import:chattanooga-routes` |
 | Geometry | `public/data/bend/trails.geojson`, by slug | `public/data/chattanooga/trails.geojson`, by raw `Trail` name |
-| Prepared profile | none — run the backfill | imported from `public/data/elevation/chattanooga`, measured from the same GIS line |
+| Prepared profile | imported from `public/data/elevation/bend`, generated from the same OSM line | imported from `public/data/elevation/chattanooga`, measured from the same GIS line |
 | `osmIds` | yes | none |
 | `geometrySource` | `osm` — rebuildable from OSM | `imported` — the rebuild hook skips it |
 
@@ -390,7 +412,7 @@ rate-limited. Re-running either is safe: rows match on `(trailName, city)`.
 
 ### It degrades rather than breaks
 
-`getCityTrails` **never throws**, and it distinguishes three outcomes so callers
+The public trail readers **never throw**, and they distinguish three outcomes so callers
 don't confuse them:
 
 | `status` | Meaning | API returns |
@@ -414,10 +436,16 @@ when the API fails or answers with no features.
 
 The page renders per request: it resolves its city from the request host, so one
 deployment can serve several cities and a render cached across hosts would hand
-a visitor another city's trails. `/api/map/trails` sends
-`Cache-Control: max-age=60, stale-while-revalidate=3600`, so an edit in `/admin`
-is live within a minute without a rebuild. Trail edits are rare and the payload
-is a few hundred rows, so the query is cheap enough to run per request.
+a visitor another city's trails. The database reads are cached separately for
+24 hours: one small projection supplies sidebar summaries, while another
+supplies only map geometry. Trail, complex, rating, and kind hooks immediately
+expire the affected entries after an edit, so the next server read refills them.
+
+Next's default Data Cache caps an entry at 2 MiB. Chattanooga's GeoJSON is close
+to that size, so the geometry entry is gzip-compressed internally and expanded
+before the API responds. `/api/map/trails` also sends `Cache-Control: public,
+max-age=60, stale-while-revalidate=3600`; existing clients may serve one stale
+response while they refresh after an edit.
 
 ## Admin appearance
 
@@ -485,7 +513,7 @@ page. The markup mirrors `DefaultNavClient` in `@payloadcms/next`.
 |---|---|
 | **Details** | Trail name, complex, steward, rating, kind — plus an **Advanced** section, collapsed, for the fields that fill themselves in |
 | **Geometry** | The map editor, the picked ways, the rebuild checkbox |
-| **Measurements** | Distance, elevation, bounds, the build report — all read-only |
+| **Measurements** | Elevation chart, formatted totals, rebuild action, and the read-only build report |
 
 `geometrySource` sits in the **sidebar** rather than in a tab, because it
 decides what the Geometry tab will do on the next save and reading it should not
@@ -512,8 +540,8 @@ with no line, trails with no elevation chart, trails whose last build warned, an
 the five most recently edited. It is additive — Payload's collection cards still
 render below it, so the normal way into a collection survives this failing.
 
-Two things it has to keep doing. `getTrailSummary` **never throws**, like
-`getCityTrails` and `getThemeCss`: the dashboard is the first page after signing
+Two things it has to keep doing. `getTrailSummary` **never throws**, like the
+public trail readers and `getThemeCss`: the dashboard is the first page after signing
 in, so an exception there is an admin nobody can get into, over a decorative
 panel. And an unreachable database shows `—`, never `0` — a zero is a claim.
 
@@ -623,7 +651,7 @@ a rating a curator added comes back as `unrated`.
 One admin and one global database serve every city. The `city` picker is visible
 on trails, complexes, and stewards; trails and complexes require an explicit
 choice so the server's fallback city cannot misfile global-admin edits.
-`getCityTrails` filters on it, the seeds set it per city, and user access is
+The public trail readers filter on it, the seeds set it per city, and user access is
 scoped by it. The dashboard shows a separate, city-filtered summary for every
 configured city.
 
@@ -638,7 +666,7 @@ The profile was never missing — `measureParts` samples the terrain on every sa
 to *produce* the distance and elevation totals, and used to discard the
 per-point series it computed on the way. It is stored now and read back by
 `src/payload/read/elevation.ts`, under the same never-throws rule as
-`getCityTrails`: no database means no chart from this path, not a broken page.
+the public trail readers: no database means no chart from this path, not a broken page.
 The lookup is scoped to a city the caller passes, which keeps it unambiguous
 without making slugs globally unique — two cities may both have a "Ridge Trail",
 and only one is being served. The city comes from the request (`?city=`, or the
@@ -661,14 +689,29 @@ Three reasons, in order of how much they cost:
 3. **They come from a different pipeline** — see below.
 
 So a trail with no database row falls back to its checked-in file rather than
-losing its chart. Chattanooga's generated profiles are measured from the same
-GIS geometry as the static map fallback, and the seed imports that profile with
-the line. Deployments with or without the database therefore show the same
+losing its chart. Each bundled city's generated profiles are measured from the
+same geometry as its static map fallback, and its seed imports that profile
+with the line. Deployments with or without the database therefore show the same
 path, distance, and elevation statistics.
+
+Chattanooga's six Godsey Ridge trails are the exception on geometry ownership:
+their lines remain in the style-owned layer, but their checked-in profiles are
+still imported into Payload. The admin can display those charts; its
+**Repopulate elevation** action can restore one if the database predates the
+profile-importing seed. True terrain recalculation still requires stored
+geometry.
 
 `pnpm backfill:elevation` measures every trail that has geometry but no profile.
 It samples terrain only — the geometry is already in the row — so it needs no
 Overpass and is safe to run over every trail at once, and safe to re-run.
+
+For one trail, the **Measurements** tab shows the stored profile directly. With
+saved geometry, **Recalculate elevation** runs the same `measureParts` pipeline
+against that line, then updates the distance, bounds, elevation totals, and
+per-point profile together. Without geometry, **Repopulate elevation** restores
+the checked-in city-scoped profile and derives the same summary fields from it.
+Both preserve a trail's draft or published status and use normal Payload update
+access; neither publishes a draft or bypasses city scoping.
 
 ### The two pipelines do not agree, and the Python one is wrong about mountains
 

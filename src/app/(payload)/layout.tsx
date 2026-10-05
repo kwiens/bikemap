@@ -11,6 +11,9 @@ import { getThemeCss } from '@/payload/read/theme';
 import { importMap } from './admin/importMap';
 
 import '@payloadcms/next/css';
+// Custom admin components use the repository's Tailwind utilities without
+// importing Tailwind's reset over Payload's own component styling.
+import './tailwind.css';
 // Must come after Payload's stylesheet — see the note in custom.css about why
 // this needs no !important.
 import './custom.css';

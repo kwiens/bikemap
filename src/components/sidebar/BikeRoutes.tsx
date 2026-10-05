@@ -1,10 +1,11 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { bikeRoutes } from '@/data/geo_data';
+import { getBikeRoutes } from '@/data/route-source';
 import { pressableProps } from './a11y';
 import type { BikeRoutesProps } from './types';
 
 export function BikeRoutes({ selectedRoute, onRouteSelect }: BikeRoutesProps) {
+  const bikeRoutes = getBikeRoutes();
   if (bikeRoutes.length === 0) {
     return null;
   }

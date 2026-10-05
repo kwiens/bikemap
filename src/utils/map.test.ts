@@ -27,6 +27,7 @@ import {
   removeStyleOwnedBikeRoutes,
   queryNearbyLineFeatures,
   ensureOsmTrailsSource,
+  ensureInlineRoutes,
   setOsmTrailsVisible,
   OSM_BIKE_TRAIL_FILTER,
   OSM_POI_FILTER,
@@ -40,7 +41,6 @@ import {
 } from '@/data/osm-trails';
 import type { BikeRoute, MountainBikeTrail } from '@/data/geo_data';
 import { MTN_BIKE_LAYER_ID } from '@/data/geo_data';
-import { TRAIL_METADATA, RATING_COLORS } from '@/data/trail-metadata';
 import {
   STYLE_OWNED_ROUTE_LAYER_IDS,
   STYLE_OWNED_ROUTE_TILESET_IDS,
@@ -465,6 +465,51 @@ describe('Mapbox Geo Integration', () => {
       );
     });
 
+    it('does not reapply Studio direction fixes to normalized database geometry', () => {
+      const coordinates = [
+        [-85.3, 35],
+        [-85.31, 35.01],
+      ];
+      const mockMap = {
+        querySourceFeatures: vi.fn().mockReturnValue([
+          {
+            type: 'Feature',
+            properties: { id: route.id },
+            geometry: { type: 'LineString', coordinates },
+          },
+        ]),
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getLayer: vi.fn().mockReturnValue(undefined),
+        addLayer: vi.fn(),
+      } as unknown as mapboxgl.Map;
+
+      syncRouteArrowLayer(
+        mockMap,
+        {
+          ...route,
+          reverseArrowBounds: [[-86, 34, -85, 36]],
+        },
+        {
+          id: BIKE_ROUTE_LAYER_ID,
+          type: 'line',
+          source: 'bike-routes-source',
+        } as mapboxgl.AnyLayer,
+      );
+
+      expect(mockMap.addSource).toHaveBeenCalledWith('route1-arrows-source', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [
+            expect.objectContaining({
+              geometry: { type: 'LineString', coordinates },
+            }),
+          ],
+        },
+      });
+    });
+
     it('should skip routes configured to hide arrows', () => {
       const mockMap = {
         querySourceFeatures: vi.fn(),
@@ -763,7 +808,7 @@ describe('Mapbox Geo Integration', () => {
     it('should skip arrow layers that do not exist', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
-        getLayer: vi.fn().mockReturnValue(undefined),
+        getLayer: vi.fn((id: string) => (id === 'route1' ? { id } : undefined)),
       } as unknown as mapboxgl.Map;
 
       const routes: BikeRoute[] = [
@@ -896,6 +941,111 @@ describe('Mapbox Geo Integration', () => {
     });
   });
 
+  describe('ensureInlineRoutes', () => {
+    it('replaces a style-backed route with the configured GeoJSON source', () => {
+      const layers = new Map<string, mapboxgl.AnyLayer>([
+        [
+          'route1',
+          {
+            id: 'route1',
+            type: 'line',
+            source: 'composite',
+          } as mapboxgl.AnyLayer,
+        ],
+      ]);
+      const mockMap = {
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getStyle: vi.fn().mockReturnValue({
+          layers: [{ id: 'labels', type: 'symbol' }],
+        }),
+        getLayer: vi.fn((id: string) => layers.get(id)),
+        removeLayer: vi.fn((id: string) => layers.delete(id)),
+        addLayer: vi.fn((layer: mapboxgl.AnyLayer) => {
+          layers.set(layer.id, layer);
+        }),
+      } as unknown as mapboxgl.Map;
+      const route: BikeRoute = {
+        id: 'route1',
+        name: 'Route 1',
+        color: '#2563EB',
+        description: 'Test route',
+        icon: {} as IconDefinition,
+        defaultWidth: 8,
+        opacity: 1,
+        distance: 5,
+      };
+
+      const collection: GeoJSON.FeatureCollection = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { id: 'route1' },
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-85.3, 35],
+                [-85.31, 35.01],
+              ],
+            },
+          },
+        ],
+      };
+
+      ensureInlineRoutes(mockMap, collection, [route]);
+
+      expect(mockMap.removeLayer).toHaveBeenCalledWith('route1');
+      expect(mockMap.addSource).toHaveBeenCalledWith('bike-routes-source', {
+        type: 'geojson',
+        data: collection,
+        maxzoom: 14,
+        promoteId: 'id',
+        tolerance: 0.5,
+      });
+      expect(mockMap.addLayer).toHaveBeenCalledTimes(2);
+      expect(layers.get(BIKE_ROUTE_LAYER_ID)).toMatchObject({
+        id: BIKE_ROUTE_LAYER_ID,
+        source: 'bike-routes-source',
+      });
+    });
+
+    it('removes a runtime-owned Studio route when the database has no geometry', () => {
+      const layers = new Map<string, mapboxgl.AnyLayer>([
+        [
+          'route1',
+          {
+            id: 'route1',
+            type: 'line',
+            source: 'composite',
+          } as mapboxgl.AnyLayer,
+        ],
+      ]);
+      const mockMap = {
+        getSource: vi.fn().mockReturnValue(undefined),
+        addSource: vi.fn(),
+        getLayer: vi.fn((id: string) => layers.get(id)),
+        removeLayer: vi.fn((id: string) => layers.delete(id)),
+      } as unknown as mapboxgl.Map;
+      const route: BikeRoute = {
+        id: 'route1',
+        name: 'Route 1',
+        color: '#2563EB',
+        description: 'Test route',
+        icon: {} as IconDefinition,
+        defaultWidth: 8,
+        opacity: 1,
+        distance: 5,
+      };
+
+      ensureInlineRoutes(mockMap, null, [route]);
+
+      expect(mockMap.removeLayer).toHaveBeenCalledWith('route1');
+      expect(mockMap.addSource).not.toHaveBeenCalled();
+      expect(layers.has('route1')).toBe(false);
+    });
+  });
+
   describe('calculateRouteBounds', () => {
     it('should calculate bounds for LineString features', () => {
       const mockMap = {
@@ -981,6 +1131,44 @@ describe('Mapbox Geo Integration', () => {
       const bounds = calculateRouteBounds(mockMap, mockRoute, mockLayer);
 
       expect(bounds).not.toBeNull();
+    });
+
+    it('filters shared GeoJSON sources to the requested inline route', () => {
+      const mockMap = {
+        querySourceFeatures: vi.fn().mockReturnValue([
+          {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [-85.3, 35.0],
+                [-85.31, 35.01],
+              ],
+            },
+          },
+        ]),
+      } as unknown as mapboxgl.Map;
+      const mockRoute = {
+        id: 'test-route',
+      } as BikeRoute;
+      const filter: mapboxgl.FilterSpecification = [
+        '==',
+        ['get', 'id'],
+        'test-route',
+      ];
+      const mockLayer = {
+        id: 'test-route',
+        type: 'line',
+        source: 'inline-routes-source',
+        filter,
+      } as mapboxgl.AnyLayer;
+
+      expect(
+        calculateRouteBounds(mockMap, mockRoute, mockLayer),
+      ).not.toBeNull();
+      expect(mockMap.querySourceFeatures).toHaveBeenCalledWith(
+        'inline-routes-source',
+        { filter },
+      );
     });
 
     it('should return null when layer has no source', () => {
@@ -1178,7 +1366,7 @@ describe('updateMtnBikeOpacity', () => {
   });
 
   it('should handle missing casing and glow layers gracefully', () => {
-    const mainLayers = new Set([MTN_BIKE_LAYER_ID, 'Godsey Ridge Trails']);
+    const mainLayers = new Set([MTN_BIKE_LAYER_ID]);
     const mockMap = {
       setPaintProperty: vi.fn(),
       getLayer: vi.fn((id: string) =>
@@ -1190,8 +1378,8 @@ describe('updateMtnBikeOpacity', () => {
       updateMtnBikeOpacity(mockMap, 'Five Points');
     }).not.toThrow();
 
-    // 2 properties per main layer, 2 layers = 4 calls (no casing/glow)
-    expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(4);
+    // 2 properties on the main layer (no casing/glow).
+    expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(2);
     expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
       MTN_BIKE_LAYER_ID,
       'line-opacity',
@@ -1304,26 +1492,17 @@ describe('highlightMtnBikeArea', () => {
 });
 
 describe('TRAIL_LAYERS', () => {
-  it('has entries for both mountain-bike and Godsey Ridge layers', () => {
-    expect(TRAIL_LAYERS.length).toBeGreaterThanOrEqual(2);
+  it('uses one database-backed layer for every Chattanooga trail', () => {
+    expect(TRAIL_LAYERS).toHaveLength(1);
     expect(
       TRAIL_LAYERS.find((l) => l.layerId === MTN_BIKE_LAYER_ID),
     ).toBeDefined();
-    expect(
-      TRAIL_LAYERS.find((l) => l.layerId === 'Godsey Ridge Trails'),
-    ).toBeDefined();
   });
 
-  it('mountain-bike layer reads the Trail property and identity-maps names', () => {
+  it('mountain-bike layer reads exact curated names from the Trail property', () => {
     const cfg = TRAIL_LAYERS.find((l) => l.layerId === MTN_BIKE_LAYER_ID);
     expect(cfg?.trailProp).toBe('Trail');
-    expect(cfg?.toRawName('Five Points')).toBe('Five Points');
-  });
-
-  it('Godsey layer reads the Name property and resolves display names', () => {
-    const cfg = TRAIL_LAYERS.find((l) => l.layerId === 'Godsey Ridge Trails');
-    expect(cfg?.trailProp).toBe('Name');
-    expect(cfg?.toRawName('Godsey Ridge Green')).toBe('Green as built');
+    expect(cfg?.matchBy).toBe('name');
   });
 });
 
@@ -1434,31 +1613,6 @@ describe('loadCuratedGeojson', () => {
   });
 });
 
-describe('TRAIL_METADATA', () => {
-  it('has entries for all Godsey Ridge trails', () => {
-    const godseyNames = [
-      'Green as built',
-      'Blue as built 1',
-      'Blue as built 2',
-      'Exper_Spur_As_built_21626',
-      'Expert_As_Built_1',
-      'Expert_As_Built_2',
-    ];
-    for (const name of godseyNames) {
-      expect(TRAIL_METADATA[name]).toBeDefined();
-      expect(TRAIL_METADATA[name].displayName).toContain('Godsey Ridge');
-    }
-  });
-
-  it('all ratings have corresponding colors', () => {
-    for (const meta of Object.values(TRAIL_METADATA)) {
-      if (meta.rating) {
-        expect(RATING_COLORS[meta.rating]).toBeDefined();
-      }
-    }
-  });
-});
-
 describe('initMtnBikeColors', () => {
   it('sets line-color on all existing trail layers', () => {
     const mockMap = {
@@ -1491,7 +1645,7 @@ describe('initMtnBikeColors', () => {
 });
 
 describe('hideStrayStyleLayers', () => {
-  it('hides the baked-in TPL trails layer when present', () => {
+  it('hides baked-in trail layers superseded by app-managed data', () => {
     const mockMap = {
       getLayer: vi.fn().mockReturnValue({ id: 'test' }),
       setLayoutProperty: vi.fn(),
@@ -1499,11 +1653,13 @@ describe('hideStrayStyleLayers', () => {
 
     hideStrayStyleLayers(mockMap);
 
-    expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
-      'Chatt_TPL_Trails-public',
-      'visibility',
-      'none',
-    );
+    for (const layerId of STYLE_STRAY_LAYER_IDS) {
+      expect(mockMap.setLayoutProperty).toHaveBeenCalledWith(
+        layerId,
+        'visibility',
+        'none',
+      );
+    }
   });
 
   it('does nothing when the stray layer is absent from the style', () => {
@@ -1554,7 +1710,6 @@ describe('optimized Studio trail cleanup', () => {
     const composite = result.sources.composite as { url: string };
 
     expect(result.layers.map((layer) => layer.id)).toEqual([
-      'Godsey Ridge Trails',
       'riverwalk-loop-v3-public',
     ]);
     expect(composite.url).not.toContain(STYLE_STRAY_TILESET_IDS[0]);
@@ -1607,33 +1762,6 @@ describe('optimized Studio trail cleanup', () => {
   });
 });
 
-describe('updateMtnBikeOpacity with Godsey Ridge trail', () => {
-  it('reverse-maps display name to raw feature value for metadata layers', () => {
-    const allLayers = new Set([
-      MTN_BIKE_LAYER_ID,
-      'Godsey Ridge Trails',
-      `${MTN_BIKE_LAYER_ID} Casing`,
-      `${MTN_BIKE_LAYER_ID} Glow`,
-      'Godsey Ridge Trails Casing',
-      'Godsey Ridge Trails Glow',
-    ]);
-    const mockMap = {
-      setPaintProperty: vi.fn(),
-      setLayoutProperty: vi.fn(),
-      getLayer: vi.fn((id: string) => (allLayers.has(id) ? { id } : undefined)),
-    } as unknown as mapboxgl.Map;
-
-    updateMtnBikeOpacity(mockMap, 'Godsey Ridge Green');
-
-    // The Godsey layer should use the raw name 'Green as built' in the expression
-    expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-      'Godsey Ridge Trails',
-      'line-opacity',
-      ['case', ['==', ['get', 'Name'], 'Green as built'], 0.9, 0.5],
-    );
-  });
-});
-
 describe('detectTrailAtPoint', () => {
   function createMockMap(
     overrides: Record<string, unknown> = {},
@@ -1667,23 +1795,6 @@ describe('detectTrailAtPoint', () => {
       ],
       { layers: expect.arrayContaining([MTN_BIKE_LAYER_ID]) },
     );
-  });
-
-  it('returns display name for Godsey Ridge trails via TRAIL_METADATA', () => {
-    const mockMap = createMockMap({
-      queryRenderedFeatures: vi.fn().mockReturnValue([
-        {
-          layer: { id: 'Godsey Ridge Trails' },
-          properties: { Name: 'Green as built' },
-        },
-      ]),
-    });
-
-    const result = detectTrailAtPoint(mockMap, [-85.3, 35.0]);
-    // TRAIL_METADATA maps 'Green as built' -> displayName
-    const expected =
-      TRAIL_METADATA['Green as built']?.displayName ?? 'Green as built';
-    expect(result).toBe(expected);
   });
 
   it('returns null when no features found', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { slugify } from '@/utils/string';
-import { derivedFrom } from './Trails';
+import { derivedFrom, Trails } from './Trails';
 
 // `displayName` and `slug` fill themselves in from the trail name. The admin
 // does it live as you type; this is the same rule for every other way a trail
@@ -147,5 +147,27 @@ describe('derivedFrom on an existing document', () => {
         value: undefined,
       }),
     ).toBe('pointe-break');
+  });
+});
+
+describe('trail admin layout', () => {
+  it('keeps the elevation profile outside the tabs so it is always visible', () => {
+    const tabs = Trails.fields.find((field) => field.type === 'tabs');
+    if (!tabs || tabs.type !== 'tabs') {
+      throw new Error('Trail tabs are missing.');
+    }
+
+    expect(
+      Trails.fields.some(
+        (field) => 'name' in field && field.name === 'elevationProfileAdmin',
+      ),
+    ).toBe(true);
+    expect(
+      tabs.tabs
+        .flatMap((tab) => tab.fields)
+        .some(
+          (field) => 'name' in field && field.name === 'elevationProfileAdmin',
+        ),
+    ).toBe(false);
   });
 });

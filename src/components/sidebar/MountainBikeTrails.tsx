@@ -92,9 +92,22 @@ function TrailRow({
   selectedTrail: string | null;
   onTrailSelect: (name: string) => void;
 }) {
+  const hasDistance = (trail.distance ?? 0) > 0;
+  const hasElevationGain = (trail.elevationGain ?? 0) > 0;
+  const hasElevationLoss = (trail.elevationLoss ?? 0) > 0;
+  const elevationGain = trail.elevationGain ?? 0;
+  const elevationLoss = trail.elevationLoss ?? 0;
+  const [isElevationFocused, setIsElevationFocused] = useState(false);
+  const [isElevationHovered, setIsElevationHovered] = useState(false);
+  const isShowingElevationDetail = isElevationFocused || isElevationHovered;
+
   return (
     <div
       {...pressableProps(() => onTrailSelect(trail.trailName))}
+      onBlur={() => setIsElevationFocused(false)}
+      onFocus={() => setIsElevationFocused(true)}
+      onMouseEnter={() => setIsElevationHovered(true)}
+      onMouseLeave={() => setIsElevationHovered(false)}
       data-selected={selectedTrail === trail.trailName || undefined}
       data-faded={
         (selectedTrail && selectedTrail !== trail.trailName) || undefined
@@ -112,20 +125,53 @@ function TrailRow({
           className={shapeFor(trail.rating)}
           style={{ backgroundColor: trail.color }}
         />
-        <span className="font-medium text-[13px]">{trail.displayName}</span>
-        {trail.distance || trail.elevationGain ? (
-          <span className="text-[11px] text-gray-500 ml-auto shrink-0">
-            {trail.distance ? `${trail.distance} mi` : ''}
-            {trail.distance && trail.elevationGain ? ' \u00B7 ' : ''}
-            {trail.elevationGain ? (
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+          {trail.displayName}
+        </span>
+        {hasDistance || hasElevationGain || hasElevationLoss ? (
+          <span className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap text-[11px] text-gray-500">
+            {hasDistance ? `${trail.distance} mi` : ''}
+            {hasDistance && (hasElevationGain || hasElevationLoss)
+              ? ' \u00B7 '
+              : ''}
+            {hasElevationGain ? (
               <>
+                <span className="sr-only">
+                  Climb {elevationGain} ft
+                  {hasElevationLoss ? `, Descent ${elevationLoss} ft` : null}
+                </span>
+                <span aria-hidden="true" className="inline-flex items-center">
+                  <span className="inline-block text-[14px] leading-none align-[-1px]">
+                    {'\u2191'}
+                  </span>
+                  {elevationGain} ft
+                  {hasElevationLoss ? (
+                    <span
+                      className={cn(
+                        'inline-flex max-w-0 items-center overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-200',
+                        isShowingElevationDetail && 'max-w-[6rem] opacity-100',
+                      )}
+                    >
+                      {' \u00B7 '}
+                      <span className="inline-block text-[14px] leading-none align-[-1px]">
+                        {'\u2193'}
+                      </span>
+                      {elevationLoss} ft
+                    </span>
+                  ) : null}
+                </span>
+              </>
+            ) : null}
+            {!hasElevationGain && hasElevationLoss ? (
+              <>
+                <span className="sr-only">Descent</span>{' '}
                 <span
                   aria-hidden="true"
                   className="inline-block text-[14px] leading-none align-[-1px]"
                 >
-                  {'\u2191'}
+                  {'\u2193'}
                 </span>
-                {trail.elevationGain} ft
+                {elevationLoss} ft
               </>
             ) : null}
           </span>

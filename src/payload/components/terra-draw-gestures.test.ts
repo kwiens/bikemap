@@ -23,6 +23,7 @@ import {
   TerraDrawSessionUndoRedo,
 } from 'terra-draw';
 import { TerraDrawMapboxGLAdapter } from 'terra-draw-mapbox-gl-adapter';
+import { removeSelectedLinePointAt } from './terra-draw-point-removal';
 
 /** Only as much of a Mapbox map as the adapter reaches for. */
 type AdapterMap = ConstructorParameters<
@@ -47,7 +48,7 @@ const PIECE: [number, number][] = Array.from(
  * projection is flat so a lng/lat maps to a predictable pixel — which is what
  * lets a "click" land on a specific point of the line.
  */
-function harness() {
+function harness(piece = PIECE) {
   const listeners = new Map<string, Set<(event: unknown) => void>>();
   const canvas: Record<string, unknown> = {
     addEventListener(type: string, fn: (event: unknown) => void) {
@@ -138,7 +139,7 @@ function harness() {
   draw.setMode(SELECT);
   draw.addFeatures([
     {
-      geometry: { coordinates: PIECE, type: 'LineString' },
+      geometry: { coordinates: piece, type: 'LineString' },
       properties: { mode: LINESTRING },
       type: 'Feature',
     },
@@ -163,6 +164,13 @@ function harness() {
     pieces: () => lines().length,
     points: () =>
       (lines()[0]?.geometry.coordinates as unknown[] | undefined)?.length ?? 0,
+    removePoint(point: [number, number]) {
+      return removeSelectedLinePointAt(
+        draw,
+        { lat: point[1], lng: point[0] },
+        20,
+      );
+    },
     leftClick(point: [number, number]) {
       fire('pointerdown', at(point));
       fire('pointerup', at(point));
@@ -186,6 +194,35 @@ beforeEach(() => {
 });
 
 describe('removing a point', () => {
+  it('can be done with the explicit point-removal tool', () => {
+    expect(h.removePoint(PIECE[13])).toBe('removed');
+
+    expect(h.points()).toBe(PIECE.length - 1);
+    expect(h.pieces()).toBe(1);
+  });
+
+  it('keeps an explicit point removal in undo history', () => {
+    h.removePoint(PIECE[13]);
+    h.draw.undo();
+
+    expect(h.points()).toBe(PIECE.length);
+  });
+
+  it('can redo an explicit point removal', () => {
+    h.removePoint(PIECE[13]);
+    h.draw.undo();
+    h.draw.redo();
+
+    expect(h.points()).toBe(PIECE.length - 1);
+  });
+
+  it('does not collapse a line below its two-point minimum', () => {
+    const short = harness(PIECE.slice(0, 2));
+
+    expect(short.removePoint(PIECE[0])).toBe('minimum-points');
+    expect(short.points()).toBe(2);
+  });
+
   it('is right-click, not click-then-Delete', () => {
     // The gesture the hint names. Anything else here means the hint is lying to
     // curators about which of their edits is reversible.

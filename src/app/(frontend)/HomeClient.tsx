@@ -7,7 +7,9 @@ import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
 import { WelcomeModal } from '@/components/WelcomeModal';
 import { activeCityId } from '@/config/map.config';
 import type { CityId } from '@/data/cities/types';
+import type { BikeRoute } from '@/data/bike-routes';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
+import { setBikeRoutes } from '@/data/route-source';
 import { setMountainBikeTrails } from '@/data/trail-source';
 import { useUrlDeepLink } from '@/hooks/useUrlDeepLink';
 
@@ -23,10 +25,13 @@ const BikeMap = dynamic(() => import('@/components/Map'), {
 
 export default function HomeClient({
   cityId,
+  routes,
   trails,
 }: {
   /** The city the server resolved from the request host. */
   cityId: CityId;
+  /** Published Payload routes. Routes intentionally have no static fallback. */
+  routes: BikeRoute[];
   /** Trails read from Payload on the server. Empty means "use the checked-in
    *  data", which is what happens with no database configured. */
   trails: MountainBikeTrail[];
@@ -39,6 +44,7 @@ export default function HomeClient({
   // request host, this module from `window.location`. A response served for
   // another host must not replace this city's trails, so they have to agree.
   if (cityId === activeCityId) {
+    setBikeRoutes(routes);
     setMountainBikeTrails(trails);
   }
 

@@ -6,6 +6,11 @@
     // Run manually when source icons change.
     "scripts/generate-icons.mjs"
   ],
+  "ignoreDependencies": [
+    // pnpm auto-installs Vite as Vitest's peer. This keeps Vite's optional
+    // esbuild peer on a compatible version instead of Payload's older copy.
+    "esbuild"
+  ],
   // Do not report a helper that is exported for tests and also used by the
   // production module that defines it.
   "ignoreExportsUsedInFile": true
