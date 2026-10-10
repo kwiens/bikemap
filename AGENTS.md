@@ -542,15 +542,37 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   snapshot without osmIds), and **only Bend is seeded by default**
 
 **How the public map gets its trails and routes.** `src/app/(frontend)/page.tsx` is a
-server component: it calls `getCityTrailSummaries()` (Payload's Local API — a
-typed function call, no HTTP hop) plus `getCityRoutes()`, and passes both into
-`HomeClient` as props. The client publishes them to `src/data/trail-source.ts`
-and `src/data/route-source.ts` during render. The page resolves
-its city from the request hostname, so it reads `headers()` and renders per
-request. The trail summaries and GeoJSON use separate 24-hour Data Cache entries
-that collection hooks expire after content edits. `/api/map/trails` also sends
-`Cache-Control: max-age=60, stale-while-revalidate=3600`, so existing clients may
-serve one stale response while they refresh after an edit.
+server component: it calls `getCityContent()` (`src/payload/read/city-content.ts`),
+which reads every published object type through Payload's Local API in parallel
+(a typed function call, no HTTP hop) and returns one `CityContent` bundle.
+`HomeClient` hands it to `publishCityContent()` (`src/data/city-content.ts`)
+during render, which writes each list into its content store
+(`src/data/trail-source.ts`, `src/data/route-source.ts`, both built on
+`createContentStore` in `src/data/content-store.ts`). The page resolves its
+city from the request hostname, so it reads `headers()` and renders per
+request. The trail summaries and GeoJSON use separate 24-hour Data Cache
+entries that collection hooks expire after content edits. `/api/map/trails`
+also sends `Cache-Control: max-age=60, stale-while-revalidate=3600`, so
+existing clients may serve one stale response while they refresh after an
+edit.
+
+**Adding a Payload object type to the public map** (trailheads, events, …):
+
+1. Add a collection and a `src/payload/read/<type>.ts` reader that never
+   throws. If the reader goes through `unstable_cache` (as the trail readers
+   do), also add `afterChange` / `afterDelete` hooks that revalidate its tag —
+   see `src/payload/cache/` — or the admin's edits won't show for 24 hours.
+   `getCityRoutes` is uncached; pick deliberately.
+2. Create a store with `createContentStore(fallback?)` next to the type's data
+   module (a fallback keeps the checked-in data when the database hands back
+   nothing; no fallback means the database is the only truth).
+3. Add the list to `CityContentData` and the store to `contentStores` in
+   `city-content.ts`, and read it in `getCityContent`. The return type
+   requires every list, so forgetting the read is a type error.
+4. Consumers call the store's `get()` at render time and rebuild anything
+   derived through `subscribe`.
+
+`HomeClient`, `page.tsx` and the embed need no change.
 
 Things to know before touching it:
 

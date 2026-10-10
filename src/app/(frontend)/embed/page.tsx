@@ -16,5 +16,5 @@ export default async function EmbedPage({
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
   const { routes } = await getCityRoutes(cityId);
-  return <EmbedClient cityId={cityId} routes={routes} />;
+  return <EmbedClient content={{ cityId, routes }} />;
 }

@@ -6,17 +6,16 @@
  * map as props. An editor's change is live on the next request, with no
  * rebuild and no client-side fetch waterfall.
  *
- * If there is no database — or it's unreachable — `getCityTrailSummaries`
- * returns an empty list and the client falls back to the checked-in data in
- * `src/data/`. The public map keeps working either way.
+ * If there is no database — or it's unreachable — `getCityContent` returns
+ * empty lists and the client falls back to the checked-in data in `src/data/`.
+ * The public map keeps working either way.
  */
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
 import { getRequestHostname } from '@/utils/request-hostname';
 import { resolveActiveCityId } from '@/config/map.config';
 import { siteConfigForHostname } from '@/config/site.config';
-import { getCityTrailSummaries } from '@/payload/read/trails';
-import { getCityRoutes } from '@/payload/read/routes';
+import { getCityContent } from '@/payload/read/city-content';
 import HomeClient from './HomeClient';
 
 export async function generateMetadata({
@@ -53,10 +52,7 @@ export default async function Home({
     searchParams,
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
-  const [{ trails }, { routes }] = await Promise.all([
-    getCityTrailSummaries(cityId),
-    getCityRoutes(cityId),
-  ]);
+  const content = await getCityContent(cityId);
 
-  return <HomeClient cityId={cityId} routes={routes} trails={trails} />;
+  return <HomeClient content={content} />;
 }
