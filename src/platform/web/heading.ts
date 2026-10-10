@@ -21,6 +21,19 @@ function compassHeadingOf(event: DeviceOrientationEvent): number | null {
   return null;
 }
 
+/**
+ * Which orientation event carries a north-referenced heading. Android Chrome
+ * has `deviceorientationabsolute`; its plain `deviceorientation` reports
+ * `alpha` relative to an arbitrary start, so listening to both would mix a
+ * compass with a gyro and the smoother would average them. iOS has only the
+ * plain event, with `webkitCompassHeading` on it.
+ */
+function headingEventName(): string {
+  return 'ondeviceorientationabsolute' in window
+    ? 'deviceorientationabsolute'
+    : 'deviceorientation';
+}
+
 export function createWebHeading(): HeadingService {
   const isSupported = () =>
     typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
@@ -47,19 +60,9 @@ export function createWebHeading(): HeadingService {
         const heading = compassHeadingOf(event as DeviceOrientationEvent);
         if (heading !== null) onHeading(heading);
       };
-      // The absolute variant is north-referenced where it exists (Android
-      // Chrome); the plain event is the fallback and the only one on iOS.
-      const eventNames = [
-        ...('ondeviceorientationabsolute' in window
-          ? ['deviceorientationabsolute']
-          : []),
-        'deviceorientation',
-      ];
-      for (const name of eventNames) window.addEventListener(name, handler);
-      return () => {
-        for (const name of eventNames)
-          window.removeEventListener(name, handler);
-      };
+      const eventName = headingEventName();
+      window.addEventListener(eventName, handler);
+      return () => window.removeEventListener(eventName, handler);
     },
   };
 }

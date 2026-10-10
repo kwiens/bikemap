@@ -15,15 +15,16 @@ describe('native bridge protocol', () => {
     });
   });
 
-  it('decodes JSON strings and objects alike', () => {
-    const event = {
+  it('decodes JSON strings and objects alike, stripping the envelope', () => {
+    const message = {
       source: 'bikemap',
       v: PROTOCOL_VERSION,
       type: 'heading/reading',
       headingDegrees: 90,
     };
-    expect(decodePageEvent(JSON.stringify(event))).toEqual(event);
-    expect(decodePageEvent(event)).toEqual(event);
+    const event = { type: 'heading/reading', headingDegrees: 90 };
+    expect(decodePageEvent(JSON.stringify(message))).toEqual(event);
+    expect(decodePageEvent(message)).toEqual(event);
   });
 
   it('ignores anything that is not one of our messages', () => {
@@ -40,6 +41,84 @@ describe('native bridge protocol', () => {
         type: 'geolocation/watch',
       }),
     ).toBeNull();
+  });
+
+  it('drops events whose payload is malformed', () => {
+    const envelope = { source: 'bikemap', v: PROTOCOL_VERSION };
+    const fix = {
+      lng: -85.3,
+      lat: 35.0,
+      accuracy: 5,
+      altitude: null,
+      altitudeAccuracy: null,
+      speed: null,
+      heading: null,
+      timestamp: 1,
+    };
+    expect(
+      decodePageEvent({ ...envelope, type: 'geolocation/fix', watchId: 1 }),
+    ).toBeNull();
+    expect(
+      decodePageEvent({
+        ...envelope,
+        type: 'geolocation/fix',
+        watchId: 1,
+        fix: { ...fix, lng: '-85.3' },
+      }),
+    ).toBeNull();
+    expect(
+      decodePageEvent({
+        ...envelope,
+        type: 'geolocation/fix',
+        watchId: 'one',
+        fix,
+      }),
+    ).toBeNull();
+    expect(
+      decodePageEvent({
+        ...envelope,
+        type: 'geolocation/error',
+        watchId: 1,
+        error: { code: 'lost', message: '' },
+      }),
+    ).toBeNull();
+    expect(
+      decodePageEvent({
+        ...envelope,
+        type: 'heading/reading',
+        headingDegrees: 'north',
+      }),
+    ).toBeNull();
+    expect(
+      decodePageEvent({
+        ...envelope,
+        type: 'heading/permission',
+        requestId: 1,
+        granted: 'yes',
+      }),
+    ).toBeNull();
+
+    // Well-formed payloads come back with only the known fields.
+    expect(
+      decodePageEvent({
+        ...envelope,
+        type: 'geolocation/fix',
+        watchId: 1,
+        fix: { ...fix, extra: true },
+      }),
+    ).toEqual({ type: 'geolocation/fix', watchId: 1, fix });
+    expect(
+      decodePageEvent({
+        ...envelope,
+        type: 'geolocation/currentError',
+        requestId: 2,
+        error: { code: 'timeout' },
+      }),
+    ).toEqual({
+      type: 'geolocation/currentError',
+      requestId: 2,
+      error: { code: 'timeout', message: '' },
+    });
   });
 
   it('accepts only a host speaking the current protocol', () => {

@@ -28,11 +28,21 @@ function hostWindow(): HostWindow | undefined {
     : undefined;
 }
 
-/** The host info injected before load, or null outside the shell. */
-export function detectNativeHost(): NativeHostInfo | null {
+/**
+ * Whether the page is inside the native shell at all, compatible or not.
+ * This decides shell-only UI (no install prompt, no service worker): an old
+ * app build whose protocol no longer matches still is the installed app.
+ */
+export function isInsideNativeShell(): boolean {
   const w = hostWindow();
-  if (!w?.ReactNativeWebView) return null;
-  const info = w.__bikemapNative;
+  return Boolean(w?.ReactNativeWebView && w.__bikemapNative);
+}
+
+/** The host info injected before load, or null outside the shell or when the
+ *  host speaks a protocol version this page does not. */
+export function detectNativeHost(): NativeHostInfo | null {
+  if (!isInsideNativeShell()) return null;
+  const info = hostWindow()?.__bikemapNative;
   return isCompatibleHost(info) ? info : null;
 }
 
@@ -43,10 +53,14 @@ export interface BridgeTransport {
 }
 
 /**
- * The real transport. Events are accepted both through
+ * The real transport. Events are accepted through
  * `window.__bikemapNative.receive(json)` and as `message` events on window
- * or document (react-native-webview delivers `postMessage` from the host
+ * or document (react-native-webview delivers the host's `postMessage`
  * differently per OS), so the host can use whichever it has.
+ *
+ * A `message` event posted by another window (an iframe on the page) carries
+ * that window as `event.source`; the host's deliveries carry none. Those are
+ * dropped, so no frame can hand the recorder a forged position.
  */
 export function createReactNativeWebViewTransport(): BridgeTransport {
   const handlers = new Set<(event: PageEvent) => void>();
@@ -60,7 +74,11 @@ export function createReactNativeWebViewTransport(): BridgeTransport {
   const w = hostWindow();
   if (w) {
     w.__bikemapNative = { ...w.__bikemapNative, receive: deliver };
-    const onMessage = (event: Event) => deliver((event as MessageEvent).data);
+    const onMessage = (event: Event) => {
+      const message = event as MessageEvent;
+      if (message.source) return;
+      deliver(message.data);
+    };
     window.addEventListener('message', onMessage);
     document.addEventListener('message', onMessage);
   }

@@ -9,7 +9,12 @@
  * docs/guides/native-shell.md — change this file and that guide together.
  */
 
-import type { PositionError, PositionFix, PositionOptions } from '../types';
+import type {
+  PositionError,
+  PositionErrorCode,
+  PositionFix,
+  PositionOptions,
+} from '../types';
 
 export const PROTOCOL_VERSION = 1;
 export const MESSAGE_SOURCE = 'bikemap';
@@ -76,19 +81,123 @@ export function encodeCommand(command: HostCommand): string {
   return JSON.stringify(message);
 }
 
-const PAGE_EVENT_TYPES = new Set<PageEvent['type']>([
-  'geolocation/fix',
-  'geolocation/error',
-  'geolocation/current',
-  'geolocation/currentError',
-  'heading/reading',
-  'heading/permission',
-]);
+// ---------------------------------------------------------------------------
+// Decoding. Each event's payload is checked field by field: a host bug (a fix
+// without coordinates, a string where a number should be) must be dropped
+// here, not thrown from the location marker or written into a ride.
+
+type Dict = Record<string, unknown>;
+
+function isDict(value: unknown): value is Dict {
+  return typeof value === 'object' && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isNullableNumber(value: unknown): value is number | null {
+  return value === null || isFiniteNumber(value);
+}
+
+const ERROR_CODES: readonly PositionErrorCode[] = [
+  'permission-denied',
+  'unavailable',
+  'timeout',
+];
+
+function parseFix(value: unknown): PositionFix | null {
+  if (!isDict(value)) return null;
+  if (
+    !isFiniteNumber(value.lng) ||
+    !isFiniteNumber(value.lat) ||
+    !isFiniteNumber(value.accuracy) ||
+    !isFiniteNumber(value.timestamp) ||
+    !isNullableNumber(value.altitude) ||
+    !isNullableNumber(value.altitudeAccuracy) ||
+    !isNullableNumber(value.speed) ||
+    !isNullableNumber(value.heading)
+  ) {
+    return null;
+  }
+  return {
+    lng: value.lng,
+    lat: value.lat,
+    accuracy: value.accuracy,
+    altitude: value.altitude,
+    altitudeAccuracy: value.altitudeAccuracy,
+    speed: value.speed,
+    heading: value.heading,
+    timestamp: value.timestamp,
+  };
+}
+
+function parseError(value: unknown): PositionError | null {
+  if (!isDict(value)) return null;
+  if (!ERROR_CODES.includes(value.code as PositionErrorCode)) return null;
+  return {
+    code: value.code as PositionErrorCode,
+    message: typeof value.message === 'string' ? value.message : '',
+  };
+}
+
+function parseEvent(message: Dict): PageEvent | null {
+  switch (message.type) {
+    case 'geolocation/fix': {
+      const fix = parseFix(message.fix);
+      if (!isFiniteNumber(message.watchId) || !fix) return null;
+      return { type: 'geolocation/fix', watchId: message.watchId, fix };
+    }
+    case 'geolocation/error': {
+      const error = parseError(message.error);
+      if (!isFiniteNumber(message.watchId) || !error) return null;
+      return { type: 'geolocation/error', watchId: message.watchId, error };
+    }
+    case 'geolocation/current': {
+      const fix = parseFix(message.fix);
+      if (!isFiniteNumber(message.requestId) || !fix) return null;
+      return {
+        type: 'geolocation/current',
+        requestId: message.requestId,
+        fix,
+      };
+    }
+    case 'geolocation/currentError': {
+      const error = parseError(message.error);
+      if (!isFiniteNumber(message.requestId) || !error) return null;
+      return {
+        type: 'geolocation/currentError',
+        requestId: message.requestId,
+        error,
+      };
+    }
+    case 'heading/reading':
+      if (!isFiniteNumber(message.headingDegrees)) return null;
+      return {
+        type: 'heading/reading',
+        headingDegrees: message.headingDegrees,
+      };
+    case 'heading/permission':
+      if (
+        !isFiniteNumber(message.requestId) ||
+        typeof message.granted !== 'boolean'
+      ) {
+        return null;
+      }
+      return {
+        type: 'heading/permission',
+        requestId: message.requestId,
+        granted: message.granted,
+      };
+    default:
+      return null;
+  }
+}
 
 /**
  * Parse something received from the host. Returns null for anything that is
- * not one of our messages — the WebView channel is shared, and a host bug
- * must not become a page crash.
+ * not one of our messages, or one whose payload is malformed — the WebView
+ * channel is shared, and a host bug must not become a page crash.
  */
 export function decodePageEvent(raw: unknown): PageEvent | null {
   let data: unknown = raw;
@@ -99,21 +208,15 @@ export function decodePageEvent(raw: unknown): PageEvent | null {
       return null;
     }
   }
-  if (typeof data !== 'object' || data === null) return null;
-  const message = data as Partial<PageEventMessage>;
-  if (message.source !== MESSAGE_SOURCE) return null;
-  if (message.v !== PROTOCOL_VERSION) return null;
-  if (!message.type || !PAGE_EVENT_TYPES.has(message.type)) return null;
-  return message as PageEvent;
+  if (!isDict(data)) return null;
+  if (data.source !== MESSAGE_SOURCE || data.v !== PROTOCOL_VERSION) {
+    return null;
+  }
+  return parseEvent(data);
 }
 
 /** True when the injected host info describes a protocol we can speak. */
 export function isCompatibleHost(info: unknown): info is NativeHostInfo {
-  if (typeof info !== 'object' || info === null) return false;
-  const candidate = info as Partial<NativeHostInfo>;
-  return (
-    candidate.protocolVersion === PROTOCOL_VERSION &&
-    typeof candidate.capabilities === 'object' &&
-    candidate.capabilities !== null
-  );
+  if (!isDict(info)) return false;
+  return info.protocolVersion === PROTOCOL_VERSION && isDict(info.capabilities);
 }

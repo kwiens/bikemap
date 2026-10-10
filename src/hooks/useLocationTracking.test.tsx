@@ -236,8 +236,15 @@ describe('useLocationTracking', () => {
 
     act(() => platform.fail({ code: 'timeout', message: '' }));
     expect(markerInstances[0].remove).not.toHaveBeenCalled();
+    expect(platform.unsubscribe).not.toHaveBeenCalled();
     act(() => platform.fail({ code: 'permission-denied', message: '' }));
     expect(markerInstances[0].remove).toHaveBeenCalled();
+    // The subscription ends with the error, so the next opt-in subscribes
+    // again and the shared watch restarts the hardware.
+    expect(platform.unsubscribe).toHaveBeenCalledTimes(1);
+    act(() => result.current.setTracking(false));
+    act(() => result.current.setTracking(true));
+    expect(platform.services.positions.subscribe).toHaveBeenCalledTimes(2);
   });
 
   it('releases the watch, the compass and the marker on unmount', async () => {

@@ -5,6 +5,7 @@ import { PROTOCOL_VERSION } from './protocol';
 import {
   createReactNativeWebViewTransport,
   detectNativeHost,
+  isInsideNativeShell,
 } from './transport';
 
 type HostGlobals = {
@@ -31,8 +32,12 @@ describe('detectNativeHost', () => {
 
   it('needs both the WebView channel and compatible host info', () => {
     w.ReactNativeWebView = { postMessage: vi.fn() };
+    expect(isInsideNativeShell()).toBe(false);
     expect(detectNativeHost()).toBeNull();
     w.__bikemapNative = { ...HOST, protocolVersion: PROTOCOL_VERSION + 1 };
+    // An incompatible shell is still the shell (no install prompt there),
+    // but its services are not used.
+    expect(isInsideNativeShell()).toBe(true);
     expect(detectNativeHost()).toBeNull();
     w.__bikemapNative = { ...HOST };
     expect(detectNativeHost()).toEqual(HOST);
@@ -79,9 +84,17 @@ describe('createReactNativeWebViewTransport', () => {
     document.dispatchEvent(
       new MessageEvent('message', { data: JSON.stringify(reading) }),
     );
-    // Unrelated traffic on the channel is ignored.
+    // Unrelated traffic on the channel is ignored, and so is a well-formed
+    // message posted by another window (an iframe), which carries a source.
     window.dispatchEvent(new MessageEvent('message', { data: 'hello' }));
-    expect(seen).toEqual([reading, reading, reading]);
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: JSON.stringify(reading),
+        source: window,
+      }),
+    );
+    const event = { type: 'heading/reading', headingDegrees: 10 };
+    expect(seen).toEqual([event, event, event]);
 
     off();
     (w.__bikemapNative.receive as (data: string) => void)(

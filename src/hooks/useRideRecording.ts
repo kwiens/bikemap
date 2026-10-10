@@ -166,7 +166,10 @@ export function useRideRecording(
 
   // Shared: start GPS watch, elapsed timer, and periodic save
   const startGpsWatchAndTimers = useCallback(() => {
-    stopPositionsRef.current = positions.subscribe(
+    // Set if the provider fails inside subscribe(), before we hold its stop
+    // function: cleanup() has already run, so the rest of startup must not.
+    let failedDuringSubscribe = false;
+    const stopPositions = positions.subscribe(
       (fix) => {
         const speed = fix.speed ?? 0;
         const AUTO_PAUSE_SPEED = 0.5; // m/s (~1.1 mph)
@@ -310,6 +313,17 @@ export function useRideRecording(
         // A timeout is transient; the watch keeps going. Permission denied or
         // no provider means the ride cannot continue.
         if (error.code === 'timeout') return;
+        failedDuringSubscribe = true;
+        // Keep what was recorded so far: the periodic save may be up to ten
+        // seconds behind, and cleanup() would otherwise clear the in-progress
+        // record and lose the ride. The recovery banner offers "Save it".
+        if (pointsRef.current.length >= 2) {
+          saveInProgress({
+            startTime: startTimeRef.current,
+            points: pointsRef.current,
+          }).catch(() => {});
+          preserveProgressRef.current = true;
+        }
         cleanup();
         onNotify?.(
           error.code === 'permission-denied'
@@ -318,6 +332,11 @@ export function useRideRecording(
         );
       },
     );
+    if (failedDuringSubscribe) {
+      stopPositions();
+      return;
+    }
+    stopPositionsRef.current = stopPositions;
 
     // Start elapsed time counter
     timerRef.current = setInterval(() => {
@@ -492,7 +511,7 @@ export function useRideRecording(
         console.error('Failed to save ride:', error);
         preserveProgressRef.current = true;
         cleanup();
-        onNotify?.('Could not save your ride — it can be recovered below.');
+        onNotify?.('Could not save your ride — open Rides to recover it.');
         return null;
       }
       cleanup({ rideId: ride.id });

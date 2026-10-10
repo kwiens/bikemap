@@ -115,10 +115,20 @@ describe('createWebGeolocation', () => {
     const service = createWebGeolocation();
     expect(service.isSupported()).toBe(false);
     const onError = vi.fn();
-    service.watchPosition(() => {}, onError)();
+    const stop = service.watchPosition(() => {}, onError);
+    // Delivered after the caller holds its stop function, never inside
+    // watchPosition itself.
+    expect(onError).not.toHaveBeenCalled();
+    await Promise.resolve();
     expect(onError).toHaveBeenCalledWith(
       expect.objectContaining({ code: 'unavailable' }),
     );
+    stop();
+    // Stopping first suppresses the delivery.
+    const onErrorStopped = vi.fn();
+    service.watchPosition(() => {}, onErrorStopped)();
+    await Promise.resolve();
+    expect(onErrorStopped).not.toHaveBeenCalled();
     await expect(service.getCurrentPosition()).rejects.toMatchObject({
       code: 'unavailable',
     });
