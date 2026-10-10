@@ -83,7 +83,6 @@ export type PageEvent =
   | { type: 'share/result'; requestId: number; ok: boolean };
 
 export type HostCommandMessage = Envelope & HostCommand;
-export type PageEventMessage = Envelope & PageEvent;
 
 export function encodeCommand(command: HostCommand): string {
   const message: HostCommandMessage = {
