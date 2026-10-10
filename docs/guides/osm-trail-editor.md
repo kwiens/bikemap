@@ -358,10 +358,11 @@ The map at `/` is a **server component**. It reads Payload through the Local API
 as props:
 
 ```
-app/(frontend)/page.tsx   getCityTrailSummaries + getCityRoutes ← Local API, cached
-        ↓ props
-HomeClient.tsx            set trails + routes           ← during render
+app/(frontend)/page.tsx   getCityContent()              ← Local API; trails cached
+        ↓ one `content` prop     (payload/read/city-content.ts reads every type in parallel)
+HomeClient.tsx            publishCityContent(content)   ← during render
         ↓
+data/city-content.ts      one content store per type    ← createContentStore
 data/{trail,route}-source.ts                            ← what consumers read
 ```
 

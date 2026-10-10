@@ -43,6 +43,10 @@ export interface CityContent extends Partial<CityContentData> {
   cityId: CityId;
 }
 
+/** What the full page reads: every list, so a type added to `CityContentData`
+ *  but not to `getCityContent` is a type error, not a silently empty store. */
+export type FullCityContent = CityContentData & { cityId: CityId };
+
 /**
  * Publish server-read content into the stores, during render, before any
  * consumer reads. They don't change for the life of the page, so this needs

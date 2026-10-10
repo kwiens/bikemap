@@ -550,18 +550,29 @@ during render, which writes each list into its content store
 (`src/data/trail-source.ts`, `src/data/route-source.ts`, both built on
 `createContentStore` in `src/data/content-store.ts`). The page resolves its
 city from the request hostname, so it reads `headers()` and renders per
-request.
+request. The trail summaries and GeoJSON use separate 24-hour Data Cache
+entries that collection hooks expire after content edits. `/api/map/trails`
+also sends `Cache-Control: max-age=60, stale-while-revalidate=3600`, so
+existing clients may serve one stale response while they refresh after an
+edit.
 
 **Adding a Payload object type to the public map** (trailheads, events, …):
-add a collection and a `src/payload/read/<type>.ts` reader that never throws;
-create a store with `createContentStore(fallback?)` next to the type's data
-module; add the list to `CityContentData` and the store to `contentStores` in
-`city-content.ts`; read it in `getCityContent`. Consumers call the store's
-`get()` at render time and rebuild anything derived through `subscribe`.
-`HomeClient`, `page.tsx` and the embed need no change. The trail summaries and GeoJSON use separate 24-hour Data Cache entries
-that collection hooks expire after content edits. `/api/map/trails` also sends
-`Cache-Control: max-age=60, stale-while-revalidate=3600`, so existing clients may
-serve one stale response while they refresh after an edit.
+
+1. Add a collection and a `src/payload/read/<type>.ts` reader that never
+   throws. If the reader goes through `unstable_cache` (as the trail readers
+   do), also add `afterChange` / `afterDelete` hooks that revalidate its tag —
+   see `src/payload/cache/` — or the admin's edits won't show for 24 hours.
+   `getCityRoutes` is uncached; pick deliberately.
+2. Create a store with `createContentStore(fallback?)` next to the type's data
+   module (a fallback keeps the checked-in data when the database hands back
+   nothing; no fallback means the database is the only truth).
+3. Add the list to `CityContentData` and the store to `contentStores` in
+   `city-content.ts`, and read it in `getCityContent`. The return type
+   requires every list, so forgetting the read is a type error.
+4. Consumers call the store's `get()` at render time and rebuild anything
+   derived through `subscribe`.
+
+`HomeClient`, `page.tsx` and the embed need no change.
 
 Things to know before touching it:
 

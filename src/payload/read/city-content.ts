@@ -1,6 +1,6 @@
 import 'server-only';
 
-import type { CityContent } from '@/data/city-content';
+import type { FullCityContent } from '@/data/city-content';
 import type { CityId } from '@/data/cities/types';
 import { getCityRoutes } from './routes';
 import { getCityTrailSummaries } from './trails';
@@ -14,7 +14,7 @@ import { getCityTrailSummaries } from './trails';
  * A new Payload object type joins here (and in `CityContentData`), not in the
  * page.
  */
-export async function getCityContent(cityId: CityId): Promise<CityContent> {
+export async function getCityContent(cityId: CityId): Promise<FullCityContent> {
   const [{ trails }, { routes }] = await Promise.all([
     getCityTrailSummaries(cityId),
     getCityRoutes(cityId),
