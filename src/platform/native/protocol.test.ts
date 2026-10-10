@@ -121,6 +121,21 @@ describe('native bridge protocol', () => {
     });
   });
 
+  it('validates share results', () => {
+    const envelope = { source: 'bikemap', v: PROTOCOL_VERSION };
+    expect(
+      decodePageEvent({ ...envelope, type: 'share/result', requestId: 1 }),
+    ).toBeNull();
+    expect(
+      decodePageEvent({
+        ...envelope,
+        type: 'share/result',
+        requestId: 1,
+        ok: true,
+      }),
+    ).toEqual({ type: 'share/result', requestId: 1, ok: true });
+  });
+
   it('accepts only a host speaking the current protocol', () => {
     expect(
       isCompatibleHost({

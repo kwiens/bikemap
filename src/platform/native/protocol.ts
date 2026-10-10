@@ -24,6 +24,9 @@ export interface NativeCapabilities {
   geolocation: boolean;
   keepAwake: boolean;
   heading: boolean;
+  /** Share sheet for GPX files and links. Added after v1 shipped its first
+   *  hosts, so it is optional and defaults to off. */
+  share?: boolean;
 }
 
 /**
@@ -54,7 +57,15 @@ export type HostCommand =
   | { type: 'keepAwake/release' }
   | { type: 'heading/requestPermission'; requestId: number }
   | { type: 'heading/watch' }
-  | { type: 'heading/clearWatch' };
+  | { type: 'heading/clearWatch' }
+  | {
+      type: 'share/file';
+      requestId: number;
+      filename: string;
+      mimeType: string;
+      content: string;
+    }
+  | { type: 'share/link'; requestId: number; url: string };
 
 /** Host → page. */
 export type PageEvent =
@@ -67,7 +78,9 @@ export type PageEvent =
       error: PositionError;
     }
   | { type: 'heading/reading'; headingDegrees: number }
-  | { type: 'heading/permission'; requestId: number; granted: boolean };
+  | { type: 'heading/permission'; requestId: number; granted: boolean }
+  /** `ok` is false when the rider dismissed the sheet or sharing failed. */
+  | { type: 'share/result'; requestId: number; ok: boolean };
 
 export type HostCommandMessage = Envelope & HostCommand;
 export type PageEventMessage = Envelope & PageEvent;
@@ -188,6 +201,18 @@ function parseEvent(message: Dict): PageEvent | null {
         type: 'heading/permission',
         requestId: message.requestId,
         granted: message.granted,
+      };
+    case 'share/result':
+      if (
+        !isFiniteNumber(message.requestId) ||
+        typeof message.ok !== 'boolean'
+      ) {
+        return null;
+      }
+      return {
+        type: 'share/result',
+        requestId: message.requestId,
+        ok: message.ok,
       };
     default:
       return null;

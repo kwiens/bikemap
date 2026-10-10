@@ -21,9 +21,13 @@ script runs:
 ```js
 window.__bikemapNative = {
   protocolVersion: 1,
-  capabilities: { geolocation: true, keepAwake: true, heading: true },
+  capabilities: { geolocation: true, keepAwake: true, heading: true, share: true },
 };
 ```
+
+`share` is optional (defaults to off). Without it the page keeps the browser
+behaviour — a blob download for GPX and the clipboard for links — neither of
+which works well inside a WebView, so claim it.
 
 The page only treats itself as embedded when **both** `window.ReactNativeWebView`
 (provided by `react-native-webview`) and a compatible `__bikemapNative` are
@@ -130,6 +134,17 @@ Pairs with `activateKeepAwakeAsync()` / `deactivateKeepAwake()` from
 
 Pairs with `Location.watchHeadingAsync` (`magHeading`) from `expo-location`.
 
+### Share
+
+| Page → host | Meaning |
+|---|---|
+| `{ type: "share/file", requestId, filename, mimeType, content }` | Offer a generated file (a GPX track, text content) through the share sheet. Write it to the cache directory with `expo-file-system` and hand it to `expo-sharing`. |
+| `{ type: "share/link", requestId, url }` | Share a link to what is on screen (a trail or route deep link). |
+
+| Host → page | Meaning |
+|---|---|
+| `{ type: "share/result", requestId, ok }` | The sheet closed. `ok: false` when it was dismissed or sharing failed; the page then shows "Could not export GPX" / "Could not share link". There is no page-side timeout: a sheet stays open as long as the rider likes, so always answer. |
+
 ## 4. Minimal host sketch
 
 ```tsx
@@ -164,10 +179,14 @@ async function handle(ref, subs, msg) {
       break;
     case 'keepAwake/acquire': await activateKeepAwakeAsync('bikemap'); break;
     case 'keepAwake/release': deactivateKeepAwake('bikemap'); break;
-    // getCurrent, heading/* follow the same pattern.
+    // getCurrent, heading/* and share/* follow the same pattern.
   }
 }
 ```
+
+A complete host — every message, permissions, background location, the share
+sheet — is in [`examples/expo-shell/`](../../examples/expo-shell/README.md).
+Copy it into an Expo app rather than starting from the sketch above.
 
 ## 5. Testing the page side without a device
 

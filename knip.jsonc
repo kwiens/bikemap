@@ -6,6 +6,8 @@
     // Run manually when source icons change.
     "scripts/generate-icons.mjs"
   ],
+  // A separate Expo project; it is not part of this package's graph.
+  "ignore": ["examples/**"],
   "ignoreDependencies": [
     // pnpm auto-installs Vite as Vitest's peer. This keeps Vite's optional
     // esbuild peer on a compatible version instead of Payload's older copy.

@@ -95,6 +95,25 @@ export interface HeadingService {
   watchHeading(onHeading: (headingDegrees: number) => void): Unsubscribe;
 }
 
+export interface ExportFile {
+  filename: string;
+  mimeType: string;
+  content: string;
+}
+
+/** What happened to a share: the caller words its toast from this. */
+export type ShareOutcome = 'downloaded' | 'copied' | 'shared' | 'failed';
+
+export interface ShareService {
+  isSupported(): boolean;
+  /** Hand a generated file (a GPX) to the rider: a download in a browser,
+   *  the share sheet in the shell. */
+  exportFile(file: ExportFile): Promise<ShareOutcome>;
+  /** Share a link to what is on screen: the clipboard in a browser, the
+   *  share sheet in the shell. */
+  shareLink(url: string): Promise<ShareOutcome>;
+}
+
 export interface PlatformServices {
   /** Which side fulfils the services. UI may differ (e.g. no install prompt
    *  inside the native shell). */
@@ -103,4 +122,5 @@ export interface PlatformServices {
   positions: PositionWatch;
   keepAwake: KeepAwakeService;
   heading: HeadingService;
+  share: ShareService;
 }
