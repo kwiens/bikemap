@@ -377,6 +377,37 @@ describe('useRideRecording', () => {
     }
   });
 
+  it('keeps the in-progress record for recovery when GPS fails fatally mid-ride', async () => {
+    const { saveInProgress, clearInProgress } = await import(
+      '@/utils/ride-storage'
+    );
+    const { result } = renderHook(() => useRideRecording());
+
+    act(() => {
+      result.current.startRecording();
+    });
+    act(() => {
+      simulatePosition(-85.3, 35.0);
+      simulatePosition(-85.31, 35.01);
+    });
+    act(() => {
+      errorCallback?.({
+        code: 2,
+        message: 'Position unavailable',
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3,
+      });
+    });
+
+    expect(saveInProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ points: expect.any(Array) }),
+    );
+    expect(clearInProgress).not.toHaveBeenCalled();
+    expect(result.current.hasRecovery).toBe(true);
+    expect(result.current.isRecording).toBe(false);
+  });
+
   it('dispatches RIDE_RECORDING_STOP exactly once per stop, with the ride id', async () => {
     const events: CustomEvent[] = [];
     const handler = (e: Event) => events.push(e as CustomEvent);
@@ -459,10 +490,48 @@ describe('useRideRecording', () => {
     expect(ride).toBeNull();
     expect(onNotify).toHaveBeenCalledTimes(1);
     expect(onNotify).toHaveBeenCalledWith(
-      'Could not save your ride — it can be recovered below.',
+      'Could not save your ride — open Rides to recover it.',
     );
     expect(result.current.hasRecovery).toBe(true);
     consoleError.mockRestore();
+  });
+
+  it('aborts startup cleanly when the device has no geolocation', async () => {
+    Object.defineProperty(navigator, 'geolocation', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+    const lifecycle: string[] = [];
+    const handler = (e: Event) => lifecycle.push(e.type);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    const onNotify = vi.fn();
+
+    try {
+      const { result } = renderHook(() => useRideRecording(onNotify));
+      await act(async () => {
+        result.current.startRecording();
+      });
+      expect(result.current.isRecording).toBe(false);
+      expect(onNotify).toHaveBeenCalledWith(
+        'GPS unavailable — check your device settings',
+      );
+      // The map saw a start and then a stop, in that order — never a stop
+      // followed by a start, which would leave it in recording mode.
+      expect(lifecycle).toEqual([
+        MAP_EVENTS.RIDE_RECORDING_START,
+        MAP_EVENTS.RIDE_RECORDING_STOP,
+      ]);
+      // And a second attempt is not blocked by a leaked subscription.
+      await act(async () => {
+        result.current.startRecording();
+      });
+      expect(onNotify).toHaveBeenCalledTimes(2);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    }
   });
 
   it('checks for crash recovery on mount', async () => {
