@@ -74,7 +74,14 @@ import {
 import { loadRide } from '@/utils/ride-storage';
 import { splitRideSegments } from '@/data/ride';
 import { mapConfig } from '@/config/map.config';
-import { MAP_EVENTS } from '@/events';
+import {
+  MAP_EVENTS,
+  type MapEventDetails,
+  type RideRecordingUpdateDetail,
+  dispatchMapEvent,
+  onMapEvent,
+} from '@/events';
+import { useMapEvent } from '@/hooks/useMapEvent';
 import { clearMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
 import { fetchRouteCollection, runtimeRouteIds } from '@/utils/route-source';
@@ -131,7 +138,8 @@ const MapboxMap = memo(function MapboxMap() {
   const osmSelectionCleanup = useRef<(() => void) | null>(null);
   // GPS heading/speed for velocity-aware compass smoothing
   const gpsHeading = useRef<{ heading: number; speed: number } | null>(null);
-  const pendingLocationListener = useRef<((e: Event) => void) | null>(null);
+  // Unsubscribes the one-shot "fly to first fix" listener; see setLocationWatch.
+  const pendingLocationUnsubscribe = useRef<(() => void) | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
   // Set when init throws or the style errors — a token can be present but
   // revoked, which `hasMapboxToken` (a build-time constant) cannot detect.
@@ -188,9 +196,8 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Handle ride select — show ride on map
   const handleRideSelect = useCallback(
-    async (event: CustomEvent) => {
+    async ({ rideId }: MapEventDetails['ride-select']) => {
       if (!map.current) return;
-      const { rideId } = event.detail;
       const ride = await loadRide(rideId);
       if (!ride) return;
 
@@ -228,22 +235,19 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Set up ride select/deselect event listeners
   useEffect(() => {
-    const selectHandler = (e: Event) => handleRideSelect(e as CustomEvent);
-    const deselectHandler = () => handleRideDeselect();
     const liveSegments: [number, number][][] = [[]];
     let updateSkip = 0;
     const DETECT_INTERVAL_MS = 3000;
     const DETECT_CONFIRM_COUNT = 3; // ~9s before first auto-select
     const DETECT_SWITCH_COUNT = 5; // ~15s before switching or clearing
 
-    const updateHandler = (e: Event) => {
+    const updateHandler = (detail: RideRecordingUpdateDetail) => {
       if (!map.current) return;
-      const detail = (e as CustomEvent).detail;
 
       // Batch restore (continueRide) — replace all segments and render once
       if (detail.segments) {
         liveSegments.length = 0;
-        liveSegments.push(...(detail.segments as [number, number][][]));
+        liveSegments.push(...detail.segments);
         updateRideLayer(map.current, liveSegments);
         return;
       }
@@ -287,14 +291,13 @@ const MapboxMap = memo(function MapboxMap() {
 
       if (detected !== null && detected !== autoDetectedTrailRef.current) {
         autoDetectedTrailRef.current = detected;
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-            detail: { trailName: detected, autoDetected: true },
-          }),
-        );
+        dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, {
+          trailName: detected,
+          autoDetected: true,
+        });
       } else if (detected === null && autoDetectedTrailRef.current !== null) {
         autoDetectedTrailRef.current = null;
-        window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+        dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
       }
     };
     const stopHandler = () => {
@@ -311,19 +314,14 @@ const MapboxMap = memo(function MapboxMap() {
       if (map.current) removeRideLayer(map.current);
     };
 
-    window.addEventListener(MAP_EVENTS.RIDE_SELECT, selectHandler);
-    window.addEventListener(MAP_EVENTS.RIDE_DESELECT, deselectHandler);
-    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_UPDATE, updateHandler);
-    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, stopHandler);
-
+    const unsubscribes = [
+      onMapEvent(MAP_EVENTS.RIDE_SELECT, handleRideSelect),
+      onMapEvent(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect),
+      onMapEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, updateHandler),
+      onMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, stopHandler),
+    ];
     return () => {
-      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, selectHandler);
-      window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, deselectHandler);
-      window.removeEventListener(
-        MAP_EVENTS.RIDE_RECORDING_UPDATE,
-        updateHandler,
-      );
-      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, stopHandler);
+      for (const unsubscribe of unsubscribes) unsubscribe();
     };
   }, [handleRideSelect, handleRideDeselect]);
 
@@ -390,14 +388,10 @@ const MapboxMap = memo(function MapboxMap() {
         }
 
         // Broadcast location for elevation profile tracking
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.LOCATION_UPDATE, {
-            detail: {
-              lng: position.coords.longitude,
-              lat: position.coords.latitude,
-            },
-          }),
-        );
+        dispatchMapEvent(MAP_EVENTS.LOCATION_UPDATE, {
+          lng: position.coords.longitude,
+          lat: position.coords.latitude,
+        });
       },
       (error) => {
         // Timeouts (code 3) are routine indoors/under tree cover — keep the
@@ -433,12 +427,10 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Handle route selection events - outside the map initialization
   const handleRouteSelect = useCallback(
-    (event: CustomEvent) => {
+    ({ routeId }: MapEventDetails['route-select']) => {
       if (!map.current) {
         return;
       }
-
-      const { routeId } = event.detail;
 
       // Find the selected route to get its name
       const selectedRoute = bikeRoutes.find((route) => route.id === routeId);
@@ -469,10 +461,8 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Handle trail selection events
   const handleTrailSelect = useCallback(
-    (event: CustomEvent) => {
+    ({ trailName, autoDetected }: MapEventDetails['trail-select']) => {
       if (!map.current) return;
-
-      const { trailName, autoDetected } = event.detail;
       const trail = getMountainBikeTrails().find(
         (t) => t.trailName === trailName,
       );
@@ -548,10 +538,8 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Handle area (rec area heading) selection — zoom to area bounds
   const handleAreaSelect = useCallback(
-    (event: CustomEvent) => {
+    ({ areaName }: MapEventDetails['area-select']) => {
       if (!map.current) return;
-
-      const { areaName } = event.detail;
       const bounds = getAreaBounds(getMountainBikeTrails(), areaName);
 
       showToast(areaName);
@@ -573,9 +561,7 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Handle layer toggle events
   const handleLayerToggle = useCallback(
-    async (event: CustomEvent) => {
-      const { layer, visible } = event.detail;
-
+    async ({ layer, visible }: MapEventDetails['layer-toggle']) => {
       // Record the desired state before the map-exists guard below. These refs
       // are what style.load replays, so writing them after the bail-out made
       // that recovery unreachable for the toggles it was meant to catch.
@@ -586,9 +572,7 @@ const MapboxMap = memo(function MapboxMap() {
         layer === 'bikeResources' ||
         layer === 'bikeRentals'
       ) {
-        markerLayersVisibleRef.current[
-          layer as keyof typeof markerLayersVisibleRef.current
-        ] = visible;
+        markerLayersVisibleRef.current[layer] = visible;
         if (layer === 'bikeRentals') bikeRentalsVisibleRef.current = visible;
       }
 
@@ -625,7 +609,7 @@ const MapboxMap = memo(function MapboxMap() {
       // deep link) selected while that request was still in flight.
       updateRouteOpacity(map.current, bikeRoutes, null, restingRouteOpacity());
       if (visible) {
-        window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
+        dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
       }
 
       if (layer === 'bikeRentals') {
@@ -693,230 +677,159 @@ const MapboxMap = memo(function MapboxMap() {
   );
 
   // Handler for centering on a specific location
-  const handleCenterLocation = useCallback(async (event: CustomEvent) => {
-    if (!map.current) {
-      return;
-    }
+  const handleCenterLocation = useCallback(
+    async ({ location }: MapEventDetails['center-location']) => {
+      if (!map.current) {
+        return;
+      }
 
-    const { location } = event.detail;
+      // A bounds payload (e.g. the dockless fleet summary) fits the whole extent
+      // rather than flying to a single point. maxZoom keeps a tight/one-vehicle
+      // fleet from zooming all the way in.
+      if (location.bounds) {
+        const corners = (
+          location.bounds as [[number, number], [number, number]]
+        ).flat();
+        // A non-finite corner (malformed feed coord) would make fitBounds throw.
+        if (corners.every((n) => Number.isFinite(n))) {
+          pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
+          map.current.fitBounds(location.bounds, {
+            padding: 60,
+            maxZoom: 16,
+            duration: 1000,
+            essential: true,
+          });
+        }
+        return;
+      }
 
-    // A bounds payload (e.g. the dockless fleet summary) fits the whole extent
-    // rather than flying to a single point. maxZoom keeps a tight/one-vehicle
-    // fleet from zooming all the way in.
-    if (location.bounds) {
-      const corners = (
-        location.bounds as [[number, number], [number, number]]
-      ).flat();
-      // A non-finite corner (malformed feed coord) would make fitBounds throw.
-      if (corners.every((n) => Number.isFinite(n))) {
+      let coordinates: [number, number] | null = null;
+
+      // If we have latitude and longitude, use them directly
+      if (location.latitude && location.longitude) {
+        coordinates = [location.longitude, location.latitude];
+      }
+      // If we have an address, geocode it
+      else if (location.address && mapboxgl.accessToken) {
+        coordinates = await geocodeAddress(
+          location.address,
+          mapboxgl.accessToken,
+        );
+      }
+
+      if (coordinates) {
         pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-        map.current.fitBounds(location.bounds, {
-          padding: 60,
-          maxZoom: 16,
-          duration: 1000,
+        map.current.flyTo({
+          center: coordinates,
+          zoom: 17,
           essential: true,
+          duration: 1000,
         });
-      }
-      return;
-    }
 
-    let coordinates: [number, number] | null = null;
+        // Create a temporary highlight marker using React component
+        const marker = createHighlightMarker(coordinates[0], coordinates[1]);
 
-    // If we have latitude and longitude, use them directly
-    if (location.latitude && location.longitude) {
-      coordinates = [location.longitude, location.latitude];
-    }
-    // If we have an address, geocode it
-    else if (location.address && mapboxgl.accessToken) {
-      coordinates = await geocodeAddress(
-        location.address,
-        mapboxgl.accessToken,
-      );
-    }
+        // Only add to map if it exists
+        if (map.current) {
+          marker.addTo(map.current);
+        }
 
-    if (coordinates) {
-      pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-      map.current.flyTo({
-        center: coordinates,
-        zoom: 17,
-        essential: true,
-        duration: 1000,
-      });
+        // Remove the highlight marker after animation
+        setTimeout(() => {
+          marker.remove();
+        }, 3000);
 
-      // Create a temporary highlight marker using React component
-      const marker = createHighlightMarker(coordinates[0], coordinates[1]);
+        // Read marker-layer visibility from the ref, not state: the LAYER_TOGGLE
+        // dispatches below run their handler synchronously, so the ref reflects
+        // the just-enabled layer while this closure's state is still stale.
+        const markersVisible = markerLayersVisibleRef.current;
 
-      // Only add to map if it exists
-      if (map.current) {
-        marker.addTo(map.current);
-      }
+        // Check if this location is an attraction - show the markers if they're not already shown
+        const isAttraction = findLocationInArray(mapFeatures, coordinates);
 
-      // Remove the highlight marker after animation
-      setTimeout(() => {
-        marker.remove();
-      }, 3000);
+        if (isAttraction && !markersVisible.attractions) {
+          // Toggle attractions layer on
+          dispatchMapEvent(MAP_EVENTS.LAYER_TOGGLE, {
+            layer: 'attractions',
+            visible: true,
+          });
+        }
 
-      // Read marker-layer visibility from the ref, not state: the LAYER_TOGGLE
-      // dispatches below run their handler synchronously, so the ref reflects
-      // the just-enabled layer while this closure's state is still stale.
-      const markersVisible = markerLayersVisibleRef.current;
+        // Check if this location is a bike resource - show the markers if they're not already shown
+        const isBikeResource = findLocationInArray(bikeResources, coordinates);
 
-      // Check if this location is an attraction - show the markers if they're not already shown
-      const isAttraction = findLocationInArray(mapFeatures, coordinates);
+        if (isBikeResource && !markersVisible.bikeResources) {
+          // Toggle bike resources layer on
+          dispatchMapEvent(MAP_EVENTS.LAYER_TOGGLE, {
+            layer: 'bikeResources',
+            visible: true,
+          });
+        }
 
-      if (isAttraction && !markersVisible.attractions) {
-        // Toggle attractions layer on
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-            detail: { layer: 'attractions', visible: true },
-          }),
-        );
-      }
-
-      // Check if this location is a bike resource - show the markers if they're not already shown
-      const isBikeResource = findLocationInArray(bikeResources, coordinates);
-
-      if (isBikeResource && !markersVisible.bikeResources) {
-        // Toggle bike resources layer on
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-            detail: { layer: 'bikeResources', visible: true },
-          }),
-        );
-      }
-
-      // Check if this location is a bike rental - show the markers if they're not already shown
-      const isBikeRental = bikeRentalMarkers.current.findByCoordinates(
-        coordinates[0],
-        coordinates[1],
-      );
-
-      if (isBikeRental && !markersVisible.bikeRentals) {
-        // Toggle bike rentals layer on
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-            detail: { layer: 'bikeRentals', visible: true },
-          }),
-        );
-      }
-
-      // Check if this is an attraction, bike resource, or bike rental and show the popup
-      if (markerLayersVisibleRef.current.attractions) {
-        const attractionMarker = attractionMarkers.current.findByCoordinates(
+        // Check if this location is a bike rental - show the markers if they're not already shown
+        const isBikeRental = bikeRentalMarkers.current.findByCoordinates(
           coordinates[0],
           coordinates[1],
         );
-        if (attractionMarker) {
-          attractionMarkers.current.openPopupFor(attractionMarker);
+
+        if (isBikeRental && !markersVisible.bikeRentals) {
+          // Toggle bike rentals layer on
+          dispatchMapEvent(MAP_EVENTS.LAYER_TOGGLE, {
+            layer: 'bikeRentals',
+            visible: true,
+          });
+        }
+
+        // Check if this is an attraction, bike resource, or bike rental and show the popup
+        if (markerLayersVisibleRef.current.attractions) {
+          const attractionMarker = attractionMarkers.current.findByCoordinates(
+            coordinates[0],
+            coordinates[1],
+          );
+          if (attractionMarker) {
+            attractionMarkers.current.openPopupFor(attractionMarker);
+          }
+        }
+
+        if (markerLayersVisibleRef.current.bikeResources) {
+          const bikeMarker = bikeResourceMarkers.current.findByCoordinates(
+            coordinates[0],
+            coordinates[1],
+          );
+          if (bikeMarker) {
+            bikeResourceMarkers.current.openPopupFor(bikeMarker);
+          }
+        }
+
+        if (markerLayersVisibleRef.current.bikeRentals) {
+          const rentalMarker = bikeRentalMarkers.current.findByCoordinates(
+            coordinates[0],
+            coordinates[1],
+          );
+          if (rentalMarker) {
+            bikeRentalMarkers.current.openPopupFor(rentalMarker);
+          }
         }
       }
+    },
+    [],
+  );
 
-      if (markerLayersVisibleRef.current.bikeResources) {
-        const bikeMarker = bikeResourceMarkers.current.findByCoordinates(
-          coordinates[0],
-          coordinates[1],
-        );
-        if (bikeMarker) {
-          bikeResourceMarkers.current.openPopupFor(bikeMarker);
-        }
-      }
-
-      if (markerLayersVisibleRef.current.bikeRentals) {
-        const rentalMarker = bikeRentalMarkers.current.findByCoordinates(
-          coordinates[0],
-          coordinates[1],
-        );
-        if (rentalMarker) {
-          bikeRentalMarkers.current.openPopupFor(rentalMarker);
-        }
-      }
-    }
-  }, []);
-
-  // Set up event listeners for map layers and location centering
-  useEffect(() => {
-    // Create stable wrapper functions that don't change between renders
-    const layerToggleHandler = (e: Event) =>
-      handleLayerToggle(e as CustomEvent);
-    const centerLocationHandler = (e: Event) =>
-      handleCenterLocation(e as CustomEvent);
-
-    window.addEventListener(MAP_EVENTS.LAYER_TOGGLE, layerToggleHandler);
-    window.addEventListener(MAP_EVENTS.CENTER_LOCATION, centerLocationHandler);
-
-    return () => {
-      window.removeEventListener(MAP_EVENTS.LAYER_TOGGLE, layerToggleHandler);
-      window.removeEventListener(
-        MAP_EVENTS.CENTER_LOCATION,
-        centerLocationHandler,
-      );
-    };
-  }, [handleLayerToggle, handleCenterLocation]);
-
-  // Set up route-select event listener outside the map initialization
-  useEffect(() => {
-    // Create stable wrapper function that doesn't change between renders
-    const routeSelectHandler = (e: Event) =>
-      handleRouteSelect(e as CustomEvent);
-
-    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, routeSelectHandler);
-
-    return () => {
-      window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, routeSelectHandler);
-    };
-  }, [handleRouteSelect]);
-
+  // Sidebar → map commands. useMapEvent reads the latest handler through a
+  // ref, so a handler whose dependencies change doesn't re-register (and
+  // miss an event in the gap).
+  useMapEvent(MAP_EVENTS.LAYER_TOGGLE, handleLayerToggle);
+  useMapEvent(MAP_EVENTS.CENTER_LOCATION, handleCenterLocation);
+  useMapEvent(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
   // Reset route opacities whenever a route is deselected (empty-map click,
   // sidebar deselect, rides panel, ...). Without this the map kept the last
   // selection's dim/highlight forever.
-  useEffect(() => {
-    window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
-    return () => {
-      window.removeEventListener(
-        MAP_EVENTS.ROUTE_DESELECT,
-        handleRouteDeselect,
-      );
-    };
-  }, [handleRouteDeselect]);
-
-  // Set up trail-select and trail-deselect event listeners
-  useEffect(() => {
-    const trailSelectHandler = (e: Event) =>
-      handleTrailSelect(e as CustomEvent);
-    const trailDeselectHandler = () => handleTrailDeselect();
-
-    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, trailSelectHandler);
-    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, trailDeselectHandler);
-
-    return () => {
-      window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, trailSelectHandler);
-      window.removeEventListener(
-        MAP_EVENTS.TRAIL_DESELECT,
-        trailDeselectHandler,
-      );
-    };
-  }, [handleTrailSelect, handleTrailDeselect]);
-
-  // Set up area-select event listener
-  useEffect(() => {
-    const areaSelectHandler = (e: Event) => handleAreaSelect(e as CustomEvent);
-
-    window.addEventListener(MAP_EVENTS.AREA_SELECT, areaSelectHandler);
-
-    return () => {
-      window.removeEventListener(MAP_EVENTS.AREA_SELECT, areaSelectHandler);
-    };
-  }, [handleAreaSelect]);
-
-  // Listen for toast events from other components
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { message } = (e as CustomEvent).detail;
-      showToast(message);
-    };
-    window.addEventListener(MAP_EVENTS.TOAST, handler);
-    return () => window.removeEventListener(MAP_EVENTS.TOAST, handler);
-  }, [showToast]);
+  useMapEvent(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
+  useMapEvent(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
+  useMapEvent(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
+  useMapEvent(MAP_EVENTS.AREA_SELECT, handleAreaSelect);
+  // Toasts from other components (sidebar, rides panel, elevation pane).
+  useMapEvent(MAP_EVENTS.TOAST, ({ message }) => showToast(message));
 
   // Elevation profile hover marker
   useEffect(() => {
@@ -930,28 +843,29 @@ const MapboxMap = memo(function MapboxMap() {
     el.style.border = '2px solid white';
     el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.4)';
 
-    const handler = (e: Event) => {
-      const { lng, lat } = (e as CustomEvent).detail;
-      if (lng === null || lat === null) {
-        if (marker) {
-          marker.remove();
-          marker = null;
+    const unsubscribe = onMapEvent(
+      MAP_EVENTS.ELEVATION_HOVER,
+      ({ lng, lat }) => {
+        if (lng === null || lat === null) {
+          if (marker) {
+            marker.remove();
+            marker = null;
+          }
+          return;
         }
-        return;
-      }
-      if (!map.current) return;
-      if (!marker) {
-        marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([lng, lat])
-          .addTo(map.current);
-      } else {
-        marker.setLngLat([lng, lat]);
-      }
-    };
+        if (!map.current) return;
+        if (!marker) {
+          marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([lng, lat])
+            .addTo(map.current);
+        } else {
+          marker.setLngLat([lng, lat]);
+        }
+      },
+    );
 
-    window.addEventListener(MAP_EVENTS.ELEVATION_HOVER, handler);
     return () => {
-      window.removeEventListener(MAP_EVENTS.ELEVATION_HOVER, handler);
+      unsubscribe();
       if (marker) marker.remove();
     };
   }, []);
@@ -1260,14 +1174,8 @@ const MapboxMap = memo(function MapboxMap() {
                   : routeFeature.layer?.id;
               if (bikeRoutes.some((route) => route.id === routeId)) {
                 e.preventDefault();
-                window.dispatchEvent(
-                  new CustomEvent(MAP_EVENTS.TRAIL_DESELECT),
-                );
-                window.dispatchEvent(
-                  new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
-                    detail: { routeId },
-                  }),
-                );
+                dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
+                dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId });
                 return;
               }
             }
@@ -1292,17 +1200,13 @@ const MapboxMap = memo(function MapboxMap() {
                   : null;
               if (trailName) {
                 e.preventDefault();
-                window.dispatchEvent(
-                  new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-                    detail: { trailName },
-                  }),
-                );
+                dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, { trailName });
                 return;
               }
             }
 
-            window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-            window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+            dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
+            dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
           });
 
           // Register the OSM trail click handler AFTER the curated route + MTB
@@ -1337,11 +1241,10 @@ const MapboxMap = memo(function MapboxMap() {
           // Debug: click map to simulate GPS location
           if (mapConfig.debug.simulateLocation) {
             newMap.on('click', (e) => {
-              window.dispatchEvent(
-                new CustomEvent(MAP_EVENTS.LOCATION_UPDATE, {
-                  detail: { lng: e.lngLat.lng, lat: e.lngLat.lat },
-                }),
-              );
+              dispatchMapEvent(MAP_EVENTS.LOCATION_UPDATE, {
+                lng: e.lngLat.lng,
+                lat: e.lngLat.lat,
+              });
             });
           }
 
@@ -1431,13 +1334,8 @@ const MapboxMap = memo(function MapboxMap() {
 
       // A first-fix listener may still be pending if tracking was enabled but
       // GPS never fired — remove it so it can't fly a torn-down map.
-      if (pendingLocationListener.current) {
-        window.removeEventListener(
-          MAP_EVENTS.LOCATION_UPDATE,
-          pendingLocationListener.current,
-        );
-        pendingLocationListener.current = null;
-      }
+      pendingLocationUnsubscribe.current?.();
+      pendingLocationUnsubscribe.current = null;
 
       if (map.current) {
         map.current.remove();
@@ -1474,19 +1372,18 @@ const MapboxMap = memo(function MapboxMap() {
           duration: 1000,
         });
       } else if (map.current) {
-        const onFirstLocation = (e: Event) => {
-          pendingLocationListener.current = null;
-          const { lng, lat } = (e as CustomEvent).detail;
-          map.current?.flyTo({
-            center: [lng, lat],
-            essential: true,
-            duration: 1000,
-          });
-        };
-        pendingLocationListener.current = onFirstLocation;
-        window.addEventListener(MAP_EVENTS.LOCATION_UPDATE, onFirstLocation, {
-          once: true,
-        });
+        pendingLocationUnsubscribe.current = onMapEvent(
+          MAP_EVENTS.LOCATION_UPDATE,
+          ({ lng, lat }) => {
+            pendingLocationUnsubscribe.current = null;
+            map.current?.flyTo({
+              center: [lng, lat],
+              essential: true,
+              duration: 1000,
+            });
+          },
+          { once: true },
+        );
 
         // Ask for a cached/coarse fix so the dot paints on tap instead of
         // waiting for the watchPosition (maximumAge: 0) to acquire a fresh
@@ -1506,14 +1403,10 @@ const MapboxMap = memo(function MapboxMap() {
               position.coords.accuracy,
               map.current.getZoom(),
             );
-            window.dispatchEvent(
-              new CustomEvent(MAP_EVENTS.LOCATION_UPDATE, {
-                detail: {
-                  lng: position.coords.longitude,
-                  lat: position.coords.latitude,
-                },
-              }),
-            );
+            dispatchMapEvent(MAP_EVENTS.LOCATION_UPDATE, {
+              lng: position.coords.longitude,
+              lat: position.coords.latitude,
+            });
           },
           () => {},
           { enableHighAccuracy: false, maximumAge: 60_000, timeout: 5_000 },
@@ -1557,13 +1450,8 @@ const MapboxMap = memo(function MapboxMap() {
         locationWatch.current = undefined;
       }
       // Cancel pending GPS-first-fix listener so it doesn't flyTo after disable
-      if (pendingLocationListener.current) {
-        window.removeEventListener(
-          MAP_EVENTS.LOCATION_UPDATE,
-          pendingLocationListener.current,
-        );
-        pendingLocationListener.current = null;
-      }
+      pendingLocationUnsubscribe.current?.();
+      pendingLocationUnsubscribe.current = null;
       if (compassCleanup.current) {
         compassCleanup.current();
         compassCleanup.current = null;
@@ -1687,49 +1575,39 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Enable location tracking when recording starts, disable when it stops
   // Also toggle CSS class on map container for Mapbox control positioning
-  useEffect(() => {
-    const handleStart = () => {
-      recordingOwnsTrackingRef.current = !watchingLocationRef.current;
-      setRecordingActive(true);
-      setLocationWatch(true);
-      mapContainer.current?.classList.add('recording-active');
-      // Enable trail auto-detection
-      isRecordingRef.current = true;
-      autoDetectEnabledRef.current = true;
-      autoDetectedTrailRef.current = null;
-      detectCandidateRef.current = null;
-      detectConfirmCountRef.current = 0;
-      lastDetectTimeRef.current = 0;
-    };
-    const handleStop = () => {
-      setRecordingActive(false);
-      // Only undo what recording did: a rider who had tracking on before, or
-      // who switched it on (or into compass mode) during the ride, keeps it.
-      if (recordingOwnsTrackingRef.current) setLocationWatch(false);
-      recordingOwnsTrackingRef.current = false;
-      mapContainer.current?.classList.remove('recording-active');
-      // Clean up auto-detected trail selection
-      isRecordingRef.current = false;
-      if (autoDetectedTrailRef.current !== null) {
-        window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
-      }
-      autoDetectEnabledRef.current = false;
-      autoDetectedTrailRef.current = null;
-      detectCandidateRef.current = null;
-      detectConfirmCountRef.current = 0;
-    };
+  const handleRecordingStart = () => {
+    recordingOwnsTrackingRef.current = !watchingLocationRef.current;
+    setRecordingActive(true);
+    setLocationWatch(true);
+    mapContainer.current?.classList.add('recording-active');
+    // Enable trail auto-detection
+    isRecordingRef.current = true;
+    autoDetectEnabledRef.current = true;
+    autoDetectedTrailRef.current = null;
+    detectCandidateRef.current = null;
+    detectConfirmCountRef.current = 0;
+    lastDetectTimeRef.current = 0;
+  };
+  const handleRecordingStop = () => {
+    setRecordingActive(false);
+    // Only undo what recording did: a rider who had tracking on before, or
+    // who switched it on (or into compass mode) during the ride, keeps it.
+    if (recordingOwnsTrackingRef.current) setLocationWatch(false);
+    recordingOwnsTrackingRef.current = false;
+    mapContainer.current?.classList.remove('recording-active');
+    // Clean up auto-detected trail selection
+    isRecordingRef.current = false;
+    if (autoDetectedTrailRef.current !== null) {
+      dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
+    }
+    autoDetectEnabledRef.current = false;
+    autoDetectedTrailRef.current = null;
+    detectCandidateRef.current = null;
+    detectConfirmCountRef.current = 0;
+  };
 
-    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_START, handleStart);
-    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handleStop);
-    return () => {
-      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handleStart);
-      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handleStop);
-    };
-    // setLocationWatch is stable-by-refs (reads only refs + stable setters) and
-    // this listener wiring must run exactly once; the real fix is the deferred
-    // GPS/compass hook extraction.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, handleRecordingStart);
+  useMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, handleRecordingStop);
 
   return (
     <>

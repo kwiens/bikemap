@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type mapboxgl from 'mapbox-gl';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, onMapEvent } from '@/events';
 
 interface UseMapResizeOptions {
   map: React.MutableRefObject<mapboxgl.Map | null>;
@@ -27,15 +27,15 @@ export function useMapResize({ map }: UseMapResizeOptions) {
     };
 
     window.addEventListener('resize', handleResize);
-    window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
+    const unsubscribe = onMapEvent(
+      MAP_EVENTS.SIDEBAR_TOGGLE,
+      handleSidebarToggle,
+    );
 
     return () => {
       if (sidebarResizeTimer) clearTimeout(sidebarResizeTimer);
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener(
-        MAP_EVENTS.SIDEBAR_TOGGLE,
-        handleSidebarToggle,
-      );
+      unsubscribe();
     };
   }, [map]);
 }

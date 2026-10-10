@@ -3,7 +3,7 @@ import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { onMapReady } from '@/utils/map-ready';
 
 interface UrlDeepLinkOptions {
@@ -43,22 +43,16 @@ export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
           (t) => slugForTrail(t) === trailSlug,
         );
         if (found) {
-          window.dispatchEvent(
-            new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-              detail: { trailName: found.trailName },
-            }),
-          );
+          dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, {
+            trailName: found.trailName,
+          });
         }
       } else if (routeSlug) {
         const found = getBikeRoutes().find(
           (r) => slugify(r.name) === routeSlug,
         );
         if (found) {
-          window.dispatchEvent(
-            new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
-              detail: { routeId: found.id },
-            }),
-          );
+          dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId: found.id });
         }
       }
     };

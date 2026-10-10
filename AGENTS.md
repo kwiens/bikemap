@@ -122,7 +122,13 @@ src/
 
 ### Event-Driven Communication
 
-The app uses custom DOM events (`window.dispatchEvent`) for component communication. **All event names live in `src/events.ts` (`MAP_EVENTS`)** — never use string literals. The full set:
+The app uses custom DOM events on `window` for component communication. **All event names live in `src/events.ts` (`MAP_EVENTS`) and every payload shape in `MapEventDetails`** — never use string literals, and never call `new CustomEvent` / `addEventListener` for these directly. Use the typed helpers:
+
+- `dispatchMapEvent(MAP_EVENTS.X, detail)` — the detail is checked against `MapEventDetails`; detail-less events take one argument.
+- `onMapEvent(MAP_EVENTS.X, (detail) => …)` — returns the unsubscribe function (return it from a `useEffect`, or collect several for a manual teardown).
+- `useMapEvent(MAP_EVENTS.X, handler)` (`src/hooks/useMapEvent.ts`) — subscribes for a component's lifetime and reads the latest handler through a ref, so callers pass a plain closure and never re-register.
+
+Adding an event means adding its name to `MAP_EVENTS` **and** its detail type to `MapEventDetails`. The full set:
 
 | Event | Purpose |
 |-------|---------|
@@ -142,7 +148,7 @@ The app uses custom DOM events (`window.dispatchEvent`) for component communicat
 | `toast` | Show a toast via the map's toast host |
 | `map-ready` | Map fully initialized (also sets `window.__mapReady` for late listeners) |
 
-**Important**: `route-select` and `trail-select` are bidirectional — both Map and MapLegend listen. When clicking on the map, the map dispatches and MapLegend updates its selection state; when clicking in the sidebar, MapLegend dispatches and Map handles the visual update. Event payloads are untyped (`CustomEvent.detail`) — check the dispatching site for the shape.
+**Important**: `route-select` and `trail-select` are bidirectional — both Map and MapLegend listen. When clicking on the map, the map dispatches and MapLegend updates its selection state; when clicking in the sidebar, MapLegend dispatches and Map handles the visual update. Payload shapes are in `MapEventDetails` (`src/events.ts`).
 
 ### Marker System
 
@@ -420,7 +426,7 @@ Coverage spans ~30 test files: map utilities (`src/utils/map.test.ts`), config/c
 
 **Synthetic events don't trigger Mapbox layer clicks.** Mapbox's internal event system requires real user interactions to detect clicks on map layers. When testing:
 - You cannot programmatically click on route lines using `MouseEvent`
-- Use `window.dispatchEvent(new CustomEvent('route-select', { detail: { routeId } }))` to simulate what the map would do
+- Use `dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId })` to simulate what the map would do (from DevTools or a test, the raw `window.dispatchEvent(new CustomEvent('route-select', { detail: { routeId } }))` is equivalent — that is the only place raw dispatch belongs)
 - The Chrome DevTools MCP server can take screenshots but cannot trigger Mapbox layer events
 
 ### Browser Testing

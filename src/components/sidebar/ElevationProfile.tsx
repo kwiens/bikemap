@@ -14,7 +14,8 @@ import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
 import { downloadFile } from '@/utils/format';
 import { buildProfileGpx } from '@/utils/gpx';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
+import { useMapEvent } from '@/hooks/useMapEvent';
 import { loadRide } from '@/utils/ride-storage';
 import { rideToElevationProfile } from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -352,202 +353,128 @@ export function ElevationProfile() {
 
   const [collapsed, setCollapsed] = useState(false);
 
-  useEffect(() => {
-    const handleTrailSelect = (e: Event) => {
-      const { trailName: name } = (e as CustomEvent).detail;
-      sourceRef.current = 'trail';
-      setProfileSource('trail');
-      rideIdRef.current = null;
-      setTrailName(name);
-      window.history.replaceState(
-        null,
-        '',
-        `?trail=${encodeURIComponent(profileSlug(name))}`,
-      );
-    };
-    // OSM trails ship a ready-built profile (no curated JSON to load by name),
-    // and aren't restorable by slug on reload, so no URL state is written.
-    // Seed the cache so the trailName effect takes its cache-hit path instead of
-    // fetching a non-existent /data/elevation/<city>/<slug>.json and clearing us.
-    const handleOsmTrailSelect = (e: Event) => {
-      const { profile: osmProfile } = (e as CustomEvent).detail as {
-        profile: ElevationProfileData;
-      };
-      sourceRef.current = 'osm';
-      setProfileSource('osm');
-      rideIdRef.current = null;
-      // Cache keys are namespaced by source: an OSM way sharing a curated
-      // trail's name must not shadow the curated /data/elevation JSON.
-      profileCache.set(`osm:${osmProfile.trail}`, osmProfile);
-      setTrailName(osmProfile.trail);
-      setProfile(osmProfile);
-      profileRef.current = osmProfile;
-      setHoverIndex(null);
-      setLocationIndex(null);
-      setLoading(false);
-    };
-    const handleRouteSelect = () => {
-      // Routes never show an elevation profile, so selecting one must clear
-      // whatever profile is currently displayed (trail or ride) — otherwise a
-      // map route-click leaves the previous trail's chart visible. (sourceRef is
-      // only ever 'trail' or 'ride', so the old `=== 'route'` guard never hit.)
-      if (sourceRef.current !== null) {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        setProfile(null);
-        profileRef.current = null;
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    };
-    const handleTrailDeselect = () => {
-      if (sourceRef.current === 'trail' || sourceRef.current === 'osm') {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    };
-    const handleRouteDeselect = () => {
-      if (sourceRef.current === 'route') {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    };
-    const handleSidebarToggle = (e: Event) => {
-      setSidebarOpen((e as CustomEvent).detail.isOpen);
-    };
-    const handleRidesPanelToggle = (e: Event) => {
-      setRidesPanelOpen((e as CustomEvent).detail.isOpen);
-    };
-    let latestRideId: string | null = null;
-    const handleRideSelect = async (e: Event) => {
-      const { rideId } = (e as CustomEvent).detail;
-      latestRideId = rideId;
-      const ride = await loadRide(rideId);
-      if (!ride || latestRideId !== rideId) return; // stale check
-      const elevProfile = rideToElevationProfile(ride);
-      sourceRef.current = 'ride';
-      setProfileSource('ride');
-      rideIdRef.current = rideId;
-      if (elevProfile) {
-        setTrailName(ride.name);
-        profileCache.set(`ride:${ride.name}`, elevProfile);
-        setProfile(elevProfile);
-        profileRef.current = elevProfile;
-        setHoverIndex(null);
-        setLocationIndex(null);
-        setLoading(false);
-      } else {
-        setTrailName(null);
-        setProfile(null);
-        profileRef.current = null;
-      }
-    };
-    const handleRideDeselect = () => {
-      if (sourceRef.current === 'ride') {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        setProfile(null);
-        profileRef.current = null;
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    };
-    const handleRecordingStart = () => {
-      // Hide elevation profile during recording — not enough data for a
-      // meaningful chart and the panel just gets in the way.
+  // The ride whose loadRide() is in flight. Any other selection, deselect or
+  // a recording start nulls it, so a slow IndexedDB read can't paint a ride
+  // over whatever came next.
+  const latestRideIdRef = useRef<string | null>(null);
+
+  const clearProfile = () => {
+    latestRideIdRef.current = null;
+    sourceRef.current = null;
+    setProfileSource(null);
+    setTrailName(null);
+    setProfile(null);
+    profileRef.current = null;
+  };
+  const clearUrlState = () => {
+    window.history.replaceState(null, '', window.location.pathname);
+  };
+
+  useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName: name }) => {
+    latestRideIdRef.current = null;
+    sourceRef.current = 'trail';
+    setProfileSource('trail');
+    rideIdRef.current = null;
+    setTrailName(name);
+    window.history.replaceState(
+      null,
+      '',
+      `?trail=${encodeURIComponent(profileSlug(name))}`,
+    );
+  });
+
+  // OSM trails ship a ready-built profile (no curated JSON to load by name),
+  // and aren't restorable by slug on reload, so no URL state is written.
+  // Seed the cache so the trailName effect takes its cache-hit path instead of
+  // fetching a non-existent /data/elevation/<city>/<slug>.json and clearing us.
+  useMapEvent(MAP_EVENTS.OSM_TRAIL_SELECT, ({ profile: osmProfile }) => {
+    latestRideIdRef.current = null;
+    sourceRef.current = 'osm';
+    setProfileSource('osm');
+    rideIdRef.current = null;
+    // Cache keys are namespaced by source: an OSM way sharing a curated
+    // trail's name must not shadow the curated /data/elevation JSON.
+    profileCache.set(`osm:${osmProfile.trail}`, osmProfile);
+    setTrailName(osmProfile.trail);
+    setProfile(osmProfile);
+    profileRef.current = osmProfile;
+    setHoverIndex(null);
+    setLocationIndex(null);
+    setLoading(false);
+  });
+
+  // Routes never show an elevation profile, so selecting one must clear
+  // whatever profile is currently displayed (trail or ride) — otherwise a map
+  // route-click leaves the previous trail's chart visible.
+  useMapEvent(MAP_EVENTS.ROUTE_SELECT, () => {
+    if (sourceRef.current !== null) {
+      clearProfile();
+      clearUrlState();
+    }
+  });
+
+  useMapEvent(MAP_EVENTS.TRAIL_DESELECT, () => {
+    if (sourceRef.current === 'trail' || sourceRef.current === 'osm') {
       sourceRef.current = null;
       setProfileSource(null);
       setTrailName(null);
+      clearUrlState();
+    }
+  });
+
+  useMapEvent(MAP_EVENTS.SIDEBAR_TOGGLE, ({ isOpen }) =>
+    setSidebarOpen(isOpen),
+  );
+  useMapEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, ({ isOpen }) =>
+    setRidesPanelOpen(isOpen),
+  );
+
+  useMapEvent(MAP_EVENTS.RIDE_SELECT, async ({ rideId }) => {
+    latestRideIdRef.current = rideId;
+    const ride = await loadRide(rideId);
+    if (!ride || latestRideIdRef.current !== rideId) return;
+    const elevProfile = rideToElevationProfile(ride);
+    sourceRef.current = 'ride';
+    setProfileSource('ride');
+    rideIdRef.current = rideId;
+    if (elevProfile) {
+      setTrailName(ride.name);
+      profileCache.set(`ride:${ride.name}`, elevProfile);
+      setProfile(elevProfile);
+      profileRef.current = elevProfile;
+      setHoverIndex(null);
+      setLocationIndex(null);
+      setLoading(false);
+    } else {
+      setTrailName(null);
       setProfile(null);
       profileRef.current = null;
-    };
-    const handleRecordingStop = () => {
-      if (sourceRef.current === 'ride') {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        setProfile(null);
-        profileRef.current = null;
-      }
-    };
+    }
+  });
 
-    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
-    window.addEventListener(MAP_EVENTS.OSM_TRAIL_SELECT, handleOsmTrailSelect);
-    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
-    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
-    window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
-    window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
-    window.addEventListener(
-      MAP_EVENTS.RIDES_PANEL_TOGGLE,
-      handleRidesPanelToggle,
-    );
-    window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
-    window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
-    window.addEventListener(
-      MAP_EVENTS.RIDE_RECORDING_START,
-      handleRecordingStart,
-    );
-    window.addEventListener(
-      MAP_EVENTS.RIDE_RECORDING_STOP,
-      handleRecordingStop,
-    );
+  useMapEvent(MAP_EVENTS.RIDE_DESELECT, () => {
+    if (sourceRef.current === 'ride') {
+      clearProfile();
+      clearUrlState();
+    }
+  });
 
-    return () => {
-      window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
-      window.removeEventListener(
-        MAP_EVENTS.OSM_TRAIL_SELECT,
-        handleOsmTrailSelect,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.TRAIL_DESELECT,
-        handleTrailDeselect,
-      );
-      window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
-      window.removeEventListener(
-        MAP_EVENTS.ROUTE_DESELECT,
-        handleRouteDeselect,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.SIDEBAR_TOGGLE,
-        handleSidebarToggle,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.RIDES_PANEL_TOGGLE,
-        handleRidesPanelToggle,
-      );
-      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
-      window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
-      window.removeEventListener(
-        MAP_EVENTS.RIDE_RECORDING_START,
-        handleRecordingStart,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.RIDE_RECORDING_STOP,
-        handleRecordingStop,
-      );
-    };
-  }, []);
+  // Hide the elevation profile during recording — not enough data for a
+  // meaningful chart and the panel just gets in the way.
+  useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, clearProfile);
+  useMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, () => {
+    if (sourceRef.current === 'ride') clearProfile();
+  });
 
-  // Listen for GPS location updates and find closest point on trail
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { lng, lat } = (e as CustomEvent).detail;
-      if (!profileRef.current) {
-        setLocationIndex(null);
-        return;
-      }
-      const idx = findClosestProfileIndex(profileRef.current.profile, lng, lat);
-      setLocationIndex((prev) => (prev === idx ? prev : idx));
-    };
-
-    window.addEventListener(MAP_EVENTS.LOCATION_UPDATE, handler);
-    return () =>
-      window.removeEventListener(MAP_EVENTS.LOCATION_UPDATE, handler);
-  }, []);
+  // Follow the rider along the displayed profile.
+  useMapEvent(MAP_EVENTS.LOCATION_UPDATE, ({ lng, lat }) => {
+    if (!profileRef.current) {
+      setLocationIndex(null);
+      return;
+    }
+    const idx = findClosestProfileIndex(profileRef.current.profile, lng, lat);
+    setLocationIndex((prev) => (prev === idx ? prev : idx));
+  });
 
   useEffect(() => {
     if (!trailName) {
@@ -632,11 +559,7 @@ export function ElevationProfile() {
       setHoverIndex(idx);
 
       const pt = profile.profile[idx];
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.ELEVATION_HOVER, {
-          detail: { lng: pt[2], lat: pt[3] },
-        }),
-      );
+      dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: pt[2], lat: pt[3] });
     },
     [profile],
   );
@@ -659,11 +582,7 @@ export function ElevationProfile() {
 
   const clearHover = useCallback(() => {
     setHoverIndex(null);
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.ELEVATION_HOVER, {
-        detail: { lng: null, lat: null },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: null, lat: null });
   }, []);
 
   const grades = useMemo(
@@ -725,11 +644,13 @@ export function ElevationProfile() {
           <button
             type="button"
             onClick={() => {
-              window.dispatchEvent(
-                new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
-                  detail: { rideId: rideIdRef.current, openPanel: true },
-                }),
-              );
+              const rideId = rideIdRef.current;
+              if (rideId) {
+                dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, {
+                  rideId,
+                  openPanel: true,
+                });
+              }
             }}
             className="text-[13px] font-semibold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis bg-transparent border-none cursor-pointer p-0 hover:text-blue-700 hover:underline"
           >
@@ -751,18 +672,12 @@ export function ElevationProfile() {
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(window.location.href);
-                window.dispatchEvent(
-                  new CustomEvent(MAP_EVENTS.TOAST, {
-                    detail: { message: 'Link copied' },
-                  }),
-                );
+                dispatchMapEvent(MAP_EVENTS.TOAST, { message: 'Link copied' });
               } catch (error) {
                 console.error('Failed to copy link:', error);
-                window.dispatchEvent(
-                  new CustomEvent(MAP_EVENTS.TOAST, {
-                    detail: { message: 'Could not copy link' },
-                  }),
-                );
+                dispatchMapEvent(MAP_EVENTS.TOAST, {
+                  message: 'Could not copy link',
+                });
               }
             }}
             title="Copy link"

@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBicycle } from '@fortawesome/free-solid-svg-icons';
 import type { RecordedRide, RideSummary } from '@/data/ride';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
+import { useMapEvent } from '@/hooks/useMapEvent';
 import {
   getRideSummaries,
   getStorageUsage,
@@ -44,18 +45,11 @@ export function RideHistory({
     refreshSummaries();
   }, [refreshSummaries]);
 
-  useEffect(() => {
-    const refresh = () => refreshSummaries();
-
-    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, refresh);
-    window.addEventListener(MAP_EVENTS.RIDE_SELECT, refresh);
-    window.addEventListener(MAP_EVENTS.RIDE_DESELECT, refresh);
-    return () => {
-      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, refresh);
-      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, refresh);
-      window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, refresh);
-    };
-  }, [refreshSummaries]);
+  // A finished recording adds a ride; select/deselect may follow a rename or
+  // delete in RideDetail.
+  useMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, refreshSummaries);
+  useMapEvent(MAP_EVENTS.RIDE_SELECT, refreshSummaries);
+  useMapEvent(MAP_EVENTS.RIDE_DESELECT, refreshSummaries);
 
   useEffect(() => {
     if (selectedRideId) {
@@ -68,11 +62,11 @@ export function RideHistory({
   }, [selectedRideId]);
 
   const handleDetailClose = () => {
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
+    dispatchMapEvent(MAP_EVENTS.RIDE_DESELECT);
   };
 
   const handleDeleted = () => {
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
+    dispatchMapEvent(MAP_EVENTS.RIDE_DESELECT);
   };
 
   if (selectedRide) {
