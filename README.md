@@ -156,7 +156,7 @@ Pull requests welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for dev set
 
 Open Bike Map is already a Progressive Web App — it installs to the home screen, runs offline-friendly via a service worker, and ships custom splash screens. But that doesn't match how most riders look for a bike app: they search the App Store or Google Play.
 
-The plan is a thin native wrapper around the existing web app — most likely [Capacitor](https://capacitorjs.com/) — shipping the same codebase to the iOS App Store and Google Play alongside the web PWA. Beyond discoverability, it buys better background GPS for long rides, more reliable wake lock, native share sheets for GPX export, and a path to push notifications. The web app stays the source of truth; the wrapper is mechanical.
+The plan is a thin Expo (React Native) shell around the existing web app, shipping the same codebase to the iOS App Store and Google Play alongside the web PWA. The shell hosts the map in a WebView and provides what the web can't do well: background GPS for long rides, a reliable keep-awake, the device compass, and native share sheets. The map asks for those over a small JSON bridge — see [`docs/guides/native-shell.md`](docs/guides/native-shell.md) for the contract — and falls back to the Web APIs anywhere the shell doesn't provide them. The web app stays the source of truth; the shell is mechanical.
 
 ### Other things on the roadmap
 

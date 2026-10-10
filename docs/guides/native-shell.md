@@ -55,7 +55,14 @@ The page also accepts `message` events on `window` and `document` (how
 delivery works.
 
 Every message has `source: "bikemap"` and `v: 1`. The page ignores anything on
-the channel without them, so the host may share it with other traffic.
+the channel without them, so the host may share it with other traffic. It also
+checks each event's payload (a fix needs finite `lng`, `lat`, `accuracy` and
+`timestamp`; an error needs one of the three codes; a heading needs a number)
+and drops anything malformed rather than letting it reach the map or a ride.
+
+A `message` event that was posted by another *window* (an iframe on the page)
+is ignored: the host's deliveries arrive with no `event.source`, a frame's
+never do. Prefer `receive()`, which cannot be reached from a frame at all.
 
 ## 3. Messages
 
@@ -69,7 +76,7 @@ and the host must honour it.
 |---|---|
 | `{ type: "geolocation/watch", watchId, options }` | Start streaming fixes. `options`: `{ highAccuracy?, maximumAgeMs?, timeoutMs? }`. Use the app's background-location permission if it has one; the ride recorder relies on fixes continuing while the screen is off. |
 | `{ type: "geolocation/clearWatch", watchId }` | Stop that watch. |
-| `{ type: "geolocation/getCurrent", requestId, options }` | One fix, not part of any watch. Used for a cached coarse fix on a cold start (`highAccuracy: false, maximumAgeMs: 60000`) and as a nudge after returning from the background. Answer within `options.timeoutMs` (default 10 s on the page). |
+| `{ type: "geolocation/getCurrent", requestId, options }` | One fix, not part of any watch. Used for a cached coarse fix on a cold start (`highAccuracy: false, maximumAgeMs: 60000`) and as a nudge after returning from the background. Treat `options.timeoutMs` as the GPS budget; the page waits that long plus 2 s for the bridge (10 s when no timeout is given) before giving up. |
 
 | Host → page | Meaning |
 |---|---|

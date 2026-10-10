@@ -99,9 +99,16 @@ describe('createNativePlatform', () => {
     });
     await expect(second).rejects.toMatchObject({ code: 'unavailable' });
 
+    // The page waits the GPS budget plus bridge slack, so a host answering
+    // right at its own deadline still counts.
     const third = platform.positions.requestFix({ timeoutMs: 1_000 });
     vi.advanceTimersByTime(1_000);
-    await expect(third).rejects.toMatchObject({ code: 'timeout' });
+    bridge.emit({ type: 'geolocation/current', requestId: 3, fix: FIX });
+    await expect(third).resolves.toEqual(FIX);
+
+    const fourth = platform.positions.requestFix({ timeoutMs: 1_000 });
+    vi.advanceTimersByTime(3_000);
+    await expect(fourth).rejects.toMatchObject({ code: 'timeout' });
   });
 
   it('counts keep-awake holders so the host sees one acquire and one release', () => {

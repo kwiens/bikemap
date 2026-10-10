@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { siteConfig } from '@/config/site.config';
-import { usePlatform } from '@/platform/context';
+import { isInsideNativeShell } from '@/platform/native/transport';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -43,8 +43,9 @@ function setDismissedFlag(): void {
 }
 
 export function PwaInstallPrompt(): React.ReactElement | null {
-  // Inside the native shell the app is already installed.
-  const isNativeShell = usePlatform().kind === 'native';
+  // Inside the native shell the app is already installed — whatever protocol
+  // version the shell speaks, so this is presence, not `usePlatform().kind`.
+  const isNativeShell = isInsideNativeShell();
   const deferredPrompt = React.useRef<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = React.useState(false);
   const [isIos, setIsIos] = React.useState(false);

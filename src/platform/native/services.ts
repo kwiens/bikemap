@@ -18,6 +18,9 @@ import {
 // Responses that never arrive (host crash, dropped message) must not hang a
 // caller forever; a timeout surfaces as the same error the Web API would give.
 const RESPONSE_TIMEOUT_MS = 10_000;
+// A one-off fix is given the GPS timeout the caller asked for plus the bridge
+// round trip, so a host that answers right at its own deadline still counts.
+const BRIDGE_SLACK_MS = 2_000;
 
 function createNativeGeolocation(
   transport: BridgeTransport,
@@ -51,14 +54,19 @@ function createNativeGeolocation(
       const requestId = nextRequestId++;
       return new Promise<PositionFix>((resolve, reject) => {
         let stop: Unsubscribe = () => {};
-        const timer = setTimeout(() => {
-          stop();
-          const error: PositionError = {
-            code: 'timeout',
-            message: 'The native host did not answer in time',
-          };
-          reject(error);
-        }, options.timeoutMs ?? RESPONSE_TIMEOUT_MS);
+        const timer = setTimeout(
+          () => {
+            stop();
+            const error: PositionError = {
+              code: 'timeout',
+              message: 'The native host did not answer in time',
+            };
+            reject(error);
+          },
+          options.timeoutMs !== undefined
+            ? options.timeoutMs + BRIDGE_SLACK_MS
+            : RESPONSE_TIMEOUT_MS,
+        );
         stop = transport.onEvent((event) => {
           if (
             event.type === 'geolocation/current' &&
