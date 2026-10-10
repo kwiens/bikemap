@@ -426,7 +426,7 @@ Coverage spans ~30 test files: map utilities (`src/utils/map.test.ts`), config/c
 
 **Synthetic events don't trigger Mapbox layer clicks.** Mapbox's internal event system requires real user interactions to detect clicks on map layers. When testing:
 - You cannot programmatically click on route lines using `MouseEvent`
-- Use `window.dispatchEvent(new CustomEvent('route-select', { detail: { routeId } }))` to simulate what the map would do
+- Use `dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId })` to simulate what the map would do (from DevTools or a test, the raw `window.dispatchEvent(new CustomEvent('route-select', { detail: { routeId } }))` is equivalent — that is the only place raw dispatch belongs)
 - The Chrome DevTools MCP server can take screenshots but cannot trigger Mapbox layer events
 
 ### Browser Testing

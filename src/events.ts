@@ -10,6 +10,7 @@
 
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
 import type { LocationProps } from '@/components/sidebar/types';
+import type { EmbedLayer, MARKER_LAYERS } from '@/utils/embed';
 import type { RideStyle } from '@/utils/settings';
 
 export const MAP_EVENTS = {
@@ -40,9 +41,11 @@ export const MAP_EVENTS = {
 export type MapEventName = (typeof MAP_EVENTS)[keyof typeof MAP_EVENTS];
 
 /** Marker layers are a radio group in the map; the two line overlays toggle
- *  independently. See `handleLayerToggle` in Map.tsx. */
-export type MarkerLayerId = 'attractions' | 'bikeResources' | 'bikeRentals';
-export type MapLayerId = MarkerLayerId | 'osmTrails' | 'bikeNetwork';
+ *  independently (see `handleLayerToggle` in Map.tsx). The lists live in
+ *  `utils/embed.ts`, which also exposes them to host pages; only `osmTrails`
+ *  cannot be preset from an embed. */
+export type MarkerLayerId = (typeof MARKER_LAYERS)[number];
+export type MapLayerId = EmbedLayer | 'osmTrails';
 
 export type LngLat = [lng: number, lat: number];
 

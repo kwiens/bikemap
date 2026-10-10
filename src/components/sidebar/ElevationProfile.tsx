@@ -353,7 +353,13 @@ export function ElevationProfile() {
 
   const [collapsed, setCollapsed] = useState(false);
 
+  // The ride whose loadRide() is in flight. Any other selection, deselect or
+  // a recording start nulls it, so a slow IndexedDB read can't paint a ride
+  // over whatever came next.
+  const latestRideIdRef = useRef<string | null>(null);
+
   const clearProfile = () => {
+    latestRideIdRef.current = null;
     sourceRef.current = null;
     setProfileSource(null);
     setTrailName(null);
@@ -365,6 +371,7 @@ export function ElevationProfile() {
   };
 
   useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName: name }) => {
+    latestRideIdRef.current = null;
     sourceRef.current = 'trail';
     setProfileSource('trail');
     rideIdRef.current = null;
@@ -381,6 +388,7 @@ export function ElevationProfile() {
   // Seed the cache so the trailName effect takes its cache-hit path instead of
   // fetching a non-existent /data/elevation/<city>/<slug>.json and clearing us.
   useMapEvent(MAP_EVENTS.OSM_TRAIL_SELECT, ({ profile: osmProfile }) => {
+    latestRideIdRef.current = null;
     sourceRef.current = 'osm';
     setProfileSource('osm');
     rideIdRef.current = null;
@@ -421,8 +429,6 @@ export function ElevationProfile() {
     setRidesPanelOpen(isOpen),
   );
 
-  // Guards against a slow loadRide resolving after a newer selection.
-  const latestRideIdRef = useRef<string | null>(null);
   useMapEvent(MAP_EVENTS.RIDE_SELECT, async ({ rideId }) => {
     latestRideIdRef.current = rideId;
     const ride = await loadRide(rideId);
