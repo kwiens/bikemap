@@ -16,6 +16,7 @@ import { downloadFile } from '@/utils/format';
 import { buildProfileGpx } from '@/utils/gpx';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
+import { useLayout } from '@/hooks/useLayout';
 import { loadRide } from '@/utils/ride-storage';
 import { rideToElevationProfile } from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -26,9 +27,7 @@ import {
   faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
-import { getSetting } from '@/utils/settings';
 import { activeCityId } from '@/config/map.config';
-import { useEmbed } from '@/components/EmbedContext';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
 
 const CHART_HEIGHT = 100;
@@ -324,15 +323,9 @@ export function findClosestProfileIndex(
 }
 
 export function ElevationProfile() {
-  // Embeds never carry the settings cookie (that's the whole premise of
-  // embed mode), so `getSetting('sidebarOpen')` always misses there and the
-  // `?? true` fallback would wrongly assume the sidebar is open. MapLegend
-  // seeds its own `isOpen` from `embedOptions.sidebarOpen` in that case (see
-  // MapLegend.tsx) and only ever dispatches SIDEBAR_TOGGLE on a user toggle,
-  // never for the initial value — so we have to seed from the same embed
-  // option here to agree with it initially. Outside embed mode this is
-  // byte-for-byte the previous behavior.
-  const { isEmbed, options: embedOptions } = useEmbed();
+  // Which side panels are open decides where the pane sits (and, on a
+  // phone, whether it shows at all).
+  const { sidebarOpen, ridesPanelOpen } = useLayout();
   const [trailName, setTrailName] = useState<string | null>(null);
   const [profileSource, setProfileSource] = useState<ProfileSource>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
@@ -340,10 +333,6 @@ export function ElevationProfile() {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [locationIndex, setLocationIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
-  const [sidebarOpen, setSidebarOpen] = useState(() =>
-    isEmbed ? embedOptions.sidebarOpen : (getSetting('sidebarOpen') ?? true),
-  );
-  const [ridesPanelOpen, setRidesPanelOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   // Track whether current profile is from a route, trail, or ride selection
   const sourceRef = useRef<ProfileSource>(null);
@@ -413,13 +402,6 @@ export function ElevationProfile() {
       clearUrlState();
     }
   });
-
-  useMapEvent(MAP_EVENTS.SIDEBAR_TOGGLE, ({ isOpen }) =>
-    setSidebarOpen(isOpen),
-  );
-  useMapEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, ({ isOpen }) =>
-    setRidesPanelOpen(isOpen),
-  );
 
   // Guards against a slow loadRide resolving after a newer selection.
   const latestRideIdRef = useRef<string | null>(null);
