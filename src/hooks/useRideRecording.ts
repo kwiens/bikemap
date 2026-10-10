@@ -4,11 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RecordedRide, RidePoint, StoredRidePoint } from '../data/ride';
 import { generateRideName, splitRideSegments } from '../data/ride';
-
-type NotifyCallback = (message: string) => void;
-
-// If no GPS point arrives for this long, the app was likely backgrounded
-const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
 import { MAP_EVENTS } from '../events';
 import {
   computeBounds,
@@ -30,6 +25,11 @@ import {
   clearInProgress,
   loadInProgress,
 } from '../utils/ride-storage';
+
+type NotifyCallback = (message: string) => void;
+
+// If no GPS point arrives for this long, the app was likely backgrounded
+const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
 
 async function tryDemCorrection(points: StoredRidePoint[]) {
   try {
@@ -130,7 +130,13 @@ export function useRideRecording(
     return () => window.removeEventListener('beforeunload', handler);
   }, [isRecording]);
 
-  const cleanup = useCallback(() => {
+  // The single exit from a recording session. Every path out — Finish, a too
+  // short ride, a failed save, a fatal GPS error — ends here, and this is the
+  // only place RIDE_RECORDING_STOP is dispatched: the map relies on that event
+  // to drop the live track, release the wake lock, stop trail auto-detect and
+  // restore its controls. A path that skipped it left the map stuck in
+  // recording mode with no recorder behind it.
+  const cleanup = useCallback((stopDetail: { rideId?: string } = {}) => {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
@@ -146,8 +152,6 @@ export function useRideRecording(
     if (preserveProgressRef.current) {
       preserveProgressRef.current = false;
       setHasRecovery(true); // re-show recovery banner so user can retry or save
-      // Clear the map's live ride layer so a retry doesn't double-append points
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
     } else {
       void clearInProgress();
     }
@@ -157,6 +161,9 @@ export function useRideRecording(
     setLiveDistance(0);
     setLiveElevationGain(0);
     segmentBreakRef.current = false;
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP, { detail: stopDetail }),
+    );
   }, []);
 
   // Shared: start GPS watch, elapsed timer, and periodic save
@@ -475,7 +482,7 @@ export function useRideRecording(
     try {
       if (pointsRef.current.length < 2) {
         cleanup();
-        window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
+        onNotify?.('Ride too short to save — keep recording longer');
         return null;
       }
 
@@ -494,21 +501,15 @@ export function useRideRecording(
       } catch (error) {
         // Save failed (quota, private browsing, ...) — still tear down the
         // watch/timers/UI, but keep the in-progress record so the recovery
-        // banner offers a retry. cleanup() dispatches RIDE_RECORDING_STOP on
-        // this path.
+        // banner offers a retry.
         console.error('Failed to save ride:', error);
         preserveProgressRef.current = true;
         cleanup();
         onNotify?.('Could not save your ride — it can be recovered below.');
         return null;
       }
-      cleanup();
-
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP, {
-          detail: { rideId: ride.id },
-        }),
-      );
+      cleanup({ rideId: ride.id });
+      onNotify?.('Ride saved!');
 
       return ride;
     } finally {

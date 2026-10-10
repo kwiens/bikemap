@@ -342,6 +342,129 @@ describe('useRideRecording', () => {
     );
   });
 
+  it('dispatches RIDE_RECORDING_STOP when GPS fails fatally mid-ride', () => {
+    // The map tears down its recording mode (live track, wake lock, trail
+    // auto-detect) on this event. A fatal GPS error used to skip it and leave
+    // the map recording with no recorder behind it.
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+
+    try {
+      const { result } = renderHook(() => useRideRecording());
+
+      act(() => {
+        result.current.startRecording();
+      });
+      act(() => {
+        simulatePosition(-85.3, 35.0);
+      });
+      act(() => {
+        errorCallback?.({
+          code: 2,
+          message: 'Position unavailable',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        });
+      });
+
+      expect(events).toHaveLength(1);
+      expect(events[0].detail).toEqual({});
+      expect(result.current.isRecording).toBe(false);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    }
+  });
+
+  it('dispatches RIDE_RECORDING_STOP exactly once per stop, with the ride id', async () => {
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+
+    try {
+      const { result } = renderHook(() => useRideRecording());
+
+      act(() => {
+        result.current.startRecording();
+      });
+      act(() => {
+        simulatePosition(-85.3, 35.0);
+        simulatePosition(-85.31, 35.01);
+      });
+
+      let rideId: string | undefined;
+      await act(async () => {
+        rideId = (await result.current.stopRecording())?.id;
+      });
+
+      expect(rideId).toBeDefined();
+      expect(events).toHaveLength(1);
+      expect(events[0].detail).toEqual({ rideId });
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    }
+  });
+
+  it('reports the stop outcome through onNotify', async () => {
+    const onNotify = vi.fn();
+    const { result } = renderHook(() => useRideRecording(onNotify));
+
+    act(() => {
+      result.current.startRecording();
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+    expect(onNotify).toHaveBeenLastCalledWith(
+      'Ride too short to save — keep recording longer',
+    );
+
+    act(() => {
+      result.current.startRecording();
+    });
+    act(() => {
+      simulatePosition(-85.3, 35.0);
+      simulatePosition(-85.31, 35.01);
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+    expect(onNotify).toHaveBeenLastCalledWith('Ride saved!');
+  });
+
+  it('keeps the save-failure message when the save throws', async () => {
+    const { saveRide } = await import('@/utils/ride-storage');
+    (saveRide as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('quota'),
+    );
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const onNotify = vi.fn();
+    const { result } = renderHook(() => useRideRecording(onNotify));
+
+    act(() => {
+      result.current.startRecording();
+    });
+    act(() => {
+      simulatePosition(-85.3, 35.0);
+      simulatePosition(-85.31, 35.01);
+    });
+    let ride: unknown;
+    await act(async () => {
+      ride = await result.current.stopRecording();
+    });
+
+    expect(ride).toBeNull();
+    expect(onNotify).toHaveBeenCalledTimes(1);
+    expect(onNotify).toHaveBeenCalledWith(
+      'Could not save your ride — it can be recovered below.',
+    );
+    expect(result.current.hasRecovery).toBe(true);
+    consoleError.mockRestore();
+  });
+
   it('checks for crash recovery on mount', async () => {
     const { loadInProgress } = await import('@/utils/ride-storage');
     (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue({

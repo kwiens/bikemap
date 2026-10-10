@@ -173,10 +173,17 @@ const MapboxMap = memo(function MapboxMap() {
     showToast,
   } = useToast();
   useMapResize({ map });
-  // Keep screen awake while location tracking or recording is active.
-  // Both are needed: recording keeps the lock even when the user drags the map
-  // (which sets watchingLocation=false to stop auto-centering).
+  // Keep the screen awake while location tracking or recording is active.
+  // Both are needed: a rider can turn tracking off mid-ride and the recording
+  // must still hold the lock.
   useWakeLock(watchingLocation || recordingActive);
+  // Mirrors `watchingLocation` for the recording start/stop handlers, whose
+  // effect runs once and would otherwise read the mount-time value.
+  const watchingLocationRef = useRef(false);
+  watchingLocationRef.current = watchingLocation;
+  // Whether the rider had tracking on before recording started, so stopping
+  // restores their choice instead of always switching tracking off.
+  const trackingBeforeRecordingRef = useRef(false);
 
   // Handle ride select — show ride on map
   const handleRideSelect = useCallback(
@@ -1679,6 +1686,7 @@ const MapboxMap = memo(function MapboxMap() {
   // Also toggle CSS class on map container for Mapbox control positioning
   useEffect(() => {
     const handleStart = () => {
+      trackingBeforeRecordingRef.current = watchingLocationRef.current;
       setRecordingActive(true);
       setLocationWatch(true);
       mapContainer.current?.classList.add('recording-active');
@@ -1692,7 +1700,10 @@ const MapboxMap = memo(function MapboxMap() {
     };
     const handleStop = () => {
       setRecordingActive(false);
-      setLocationWatch(false);
+      // Recording turned tracking on for the rider; only turn it back off if
+      // it was off before. Someone following themselves in compass mode keeps
+      // doing so after Finish.
+      if (!trackingBeforeRecordingRef.current) setLocationWatch(false);
       mapContainer.current?.classList.remove('recording-active');
       // Clean up auto-detected trail selection
       isRecordingRef.current = false;
@@ -1725,11 +1736,14 @@ const MapboxMap = memo(function MapboxMap() {
 
       <EmbedAttribution />
 
-      {/* Route selection toast */}
+      {/* The app's one toast host. Everything else dispatches MAP_EVENTS.TOAST.
+          It sits above the sidebar and rides panel (z-950) because a toast is
+          feedback for an action the rider just took in one of them — on a
+          phone the open panel covers the map, and a toast behind it is lost. */}
       {toastMessage && (
         <div
           className={cn(
-            'absolute left-1/2 -translate-x-1/2 bg-black/65 text-white px-6 py-3 rounded-lg text-base font-medium z-[800] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none animate-toast-fade-in top-[calc(1.25rem+env(safe-area-inset-top))]',
+            'absolute left-1/2 -translate-x-1/2 bg-black/65 text-white px-6 py-3 rounded-lg text-base font-medium z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none animate-toast-fade-in top-[calc(1.25rem+env(safe-area-inset-top))]',
             toastFadingOut && 'animate-toast-fade-out',
           )}
         >

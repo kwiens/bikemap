@@ -28,11 +28,6 @@ let mockHook = createMockHook();
 
 vi.mock('@/hooks', () => ({
   useRideRecording: () => mockHook,
-  useToast: () => ({
-    message: null,
-    isFadingOut: false,
-    showToast: vi.fn(),
-  }),
 }));
 
 vi.mock('./sidebar/RideHistory', () => ({
@@ -140,6 +135,54 @@ describe('RidesPanel', () => {
     openPanel();
     fireEvent.click(screen.getByText('Discard'));
     expect(mockHook.dismissRecovery).toHaveBeenCalled();
+  });
+
+  it('sends recovery feedback to the global toast host', async () => {
+    mockHook.hasRecovery = true;
+    mockHook.recoverRide = vi.fn().mockResolvedValue({ id: 'ride-1' });
+    const toasts: string[] = [];
+    const handler = (e: Event) =>
+      toasts.push((e as CustomEvent).detail.message);
+    window.addEventListener(MAP_EVENTS.TOAST, handler);
+
+    try {
+      render(<RidesPanel />);
+      openPanel();
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save it'));
+      });
+      expect(toasts).toEqual(['Ride recovered!']);
+      // No in-panel copy: the panel can be closed while recording.
+      expect(screen.queryByText('Ride recovered!')).toBeNull();
+    } finally {
+      window.removeEventListener(MAP_EVENTS.TOAST, handler);
+    }
+  });
+
+  it('selects the saved ride after Finish and leaves the message to the recorder', async () => {
+    mockHook.isRecording = true;
+    mockHook.stopRecording = vi.fn().mockResolvedValue({ id: 'ride-2' });
+    const selected: string[] = [];
+    const toasts: string[] = [];
+    const onSelect = (e: Event) =>
+      selected.push((e as CustomEvent).detail.rideId);
+    const onToast = (e: Event) =>
+      toasts.push((e as CustomEvent).detail.message);
+    window.addEventListener(MAP_EVENTS.RIDE_SELECT, onSelect);
+    window.addEventListener(MAP_EVENTS.TOAST, onToast);
+
+    try {
+      render(<RidesPanel />);
+      openPanel();
+      await act(async () => {
+        fireEvent.click(screen.getByText('Finish'));
+      });
+      expect(selected).toEqual(['ride-2']);
+      expect(toasts).toEqual([]);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, onSelect);
+      window.removeEventListener(MAP_EVENTS.TOAST, onToast);
+    }
   });
 
   it('dispatches RIDES_PANEL_TOGGLE on toggle', () => {
