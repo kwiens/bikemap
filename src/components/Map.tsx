@@ -173,10 +173,18 @@ const MapboxMap = memo(function MapboxMap() {
     showToast,
   } = useToast();
   useMapResize({ map });
-  // Keep screen awake while location tracking or recording is active.
-  // Both are needed: recording keeps the lock even when the user drags the map
-  // (which sets watchingLocation=false to stop auto-centering).
+  // Keep the screen awake while location tracking or recording is active.
+  // Both are needed: a rider can turn tracking off mid-ride and the recording
+  // must still hold the lock.
   useWakeLock(watchingLocation || recordingActive);
+  // Mirrors `watchingLocation` for the recording start/stop handlers, whose
+  // effect runs once and would otherwise read the mount-time value.
+  const watchingLocationRef = useRef(false);
+  watchingLocationRef.current = watchingLocation;
+  // True while a recording is the only reason tracking is on. Cleared the
+  // moment the rider touches the locate button themselves, so Finish only
+  // switches tracking off when nobody chose it.
+  const recordingOwnsTrackingRef = useRef(false);
 
   // Handle ride select — show ride on map
   const handleRideSelect = useCallback(
@@ -1632,6 +1640,8 @@ const MapboxMap = memo(function MapboxMap() {
   // The permission request for iOS is done inline (not in a nested async) so it
   // stays within the user-gesture context that Safari requires.
   const toggleWatchLocation = async () => {
+    // The rider is choosing a tracking mode; it is theirs from here on.
+    recordingOwnsTrackingRef.current = false;
     if (!watchingLocation) {
       // off → tracking
       setLocationWatch(true);
@@ -1679,6 +1689,7 @@ const MapboxMap = memo(function MapboxMap() {
   // Also toggle CSS class on map container for Mapbox control positioning
   useEffect(() => {
     const handleStart = () => {
+      recordingOwnsTrackingRef.current = !watchingLocationRef.current;
       setRecordingActive(true);
       setLocationWatch(true);
       mapContainer.current?.classList.add('recording-active');
@@ -1692,7 +1703,10 @@ const MapboxMap = memo(function MapboxMap() {
     };
     const handleStop = () => {
       setRecordingActive(false);
-      setLocationWatch(false);
+      // Only undo what recording did: a rider who had tracking on before, or
+      // who switched it on (or into compass mode) during the ride, keeps it.
+      if (recordingOwnsTrackingRef.current) setLocationWatch(false);
+      recordingOwnsTrackingRef.current = false;
       mapContainer.current?.classList.remove('recording-active');
       // Clean up auto-detected trail selection
       isRecordingRef.current = false;
@@ -1725,11 +1739,14 @@ const MapboxMap = memo(function MapboxMap() {
 
       <EmbedAttribution />
 
-      {/* Route selection toast */}
+      {/* The app's one toast host. Everything else dispatches MAP_EVENTS.TOAST.
+          It sits above the sidebar and rides panel (z-950) because a toast is
+          feedback for an action the rider just took in one of them — on a
+          phone the open panel covers the map, and a toast behind it is lost. */}
       {toastMessage && (
         <div
           className={cn(
-            'absolute left-1/2 -translate-x-1/2 bg-black/65 text-white px-6 py-3 rounded-lg text-base font-medium z-[800] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none animate-toast-fade-in top-[calc(1.25rem+env(safe-area-inset-top))]',
+            'absolute left-1/2 -translate-x-1/2 bg-black/65 text-white px-6 py-3 rounded-lg text-base font-medium z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none animate-toast-fade-in top-[calc(1.25rem+env(safe-area-inset-top))]',
             toastFadingOut && 'animate-toast-fade-out',
           )}
         >

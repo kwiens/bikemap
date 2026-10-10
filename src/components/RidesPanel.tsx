@@ -12,7 +12,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
 import { cn } from '@/lib/utils';
-import { useRideRecording, useToast } from '@/hooks';
+import { useRideRecording } from '@/hooks';
 import { formatElapsed, formatDistance, formatElevation } from '@/utils/format';
 import { RideHistory } from './sidebar/RideHistory';
 
@@ -27,11 +27,16 @@ export function RidesPanel() {
   const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const {
-    message: toastMessage,
-    isFadingOut: toastFadingOut,
-    showToast,
-  } = useToast();
+
+  // Recording feedback goes through the map's toast host rather than a toast
+  // of our own: while recording from the HUD this panel is closed (translated
+  // off-screen), so anything rendered inside it — including a GPS failure —
+  // was invisible exactly when it mattered.
+  const notify = useCallback((message: string) => {
+    window.dispatchEvent(
+      new CustomEvent(MAP_EVENTS.TOAST, { detail: { message } }),
+    );
+  }, []);
 
   const {
     isRecording,
@@ -47,7 +52,7 @@ export function RidesPanel() {
     recoverRide,
     continueRide,
     dismissRecovery,
-  } = useRideRecording(showToast);
+  } = useRideRecording(notify);
 
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
@@ -68,19 +73,19 @@ export function RidesPanel() {
   const handleRecoverRide = useCallback(async () => {
     const ride = await recoverRide();
     if (ride) {
-      showToast('Ride recovered!');
+      notify('Ride recovered!');
       window.dispatchEvent(
         new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
           detail: { rideId: ride.id },
         }),
       );
     }
-  }, [recoverRide, showToast]);
+  }, [recoverRide, notify]);
 
   const handleContinueRide = useCallback(async () => {
     await continueRide();
-    showToast('Ride resumed — keep going!');
-  }, [continueRide, showToast]);
+    notify('Ride resumed — keep going!');
+  }, [continueRide, notify]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -149,23 +154,22 @@ export function RidesPanel() {
     [isOpen, toggle],
   );
 
+  // The recorder reports the outcome (saved / too short / save failed) through
+  // `notify` itself, so only the follow-up selection lives here.
   const handleRecordClick = useCallback(async () => {
     if (isRecording) {
       const ride = await stopRecording();
       if (ride) {
-        showToast('Ride saved!');
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
             detail: { rideId: ride.id },
           }),
         );
-      } else {
-        showToast('Ride too short to save — keep recording longer');
       }
     } else {
       startRecording();
     }
-  }, [isRecording, stopRecording, startRecording, showToast]);
+  }, [isRecording, stopRecording, startRecording]);
 
   return (
     <>
@@ -244,17 +248,6 @@ export function RidesPanel() {
         </div>
 
         <div className="relative flex-1 overflow-y-auto px-4 py-3">
-          {toastMessage && (
-            <div
-              className={cn(
-                'absolute top-2 left-4 right-4 px-3 py-2 bg-gray-700 text-white rounded-md text-[13px] text-center animate-toast-slide-in z-10 pointer-events-none',
-                toastFadingOut &&
-                  'opacity-0 transition-opacity duration-300 ease-in',
-              )}
-            >
-              {toastMessage}
-            </div>
-          )}
           {hasRecovery && !isRecording && (
             <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
               <p className="font-medium text-amber-800 mb-2">

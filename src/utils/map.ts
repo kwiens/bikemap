@@ -1777,7 +1777,21 @@ export function highlightMtnBikeArea(
 // Recorded ride layer management
 const RIDE_SOURCE_ID = 'recorded-ride';
 const RIDE_LINE_ID = 'recorded-ride-line';
+const RIDE_CASING_ID = 'recorded-ride-casing';
 const RIDE_LINE_COLOR = '#ff6b35';
+
+function rideGeometry(
+  segments: [number, number][][],
+): GeoJSON.Feature<GeoJSON.MultiLineString> {
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'MultiLineString',
+      coordinates: segments.filter((segment) => segment.length >= 2),
+    },
+  };
+}
 
 export function addRideLayer(
   map: mapboxgl.Map,
@@ -1787,16 +1801,23 @@ export function addRideLayer(
 
   map.addSource(RIDE_SOURCE_ID, {
     type: 'geojson',
-    data: {
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'MultiLineString',
-        coordinates: segments.filter((segment) => segment.length >= 2),
-      },
-    },
+    data: rideGeometry(segments),
   });
 
+  // A white casing keeps the track legible where it runs along a route of a
+  // similar colour (the orange ride line over the red Zoo Loop, for one): the
+  // two lines otherwise merge into a single wider stroke.
+  map.addLayer({
+    id: RIDE_CASING_ID,
+    type: 'line',
+    source: RIDE_SOURCE_ID,
+    layout: ROUND_LINE,
+    paint: {
+      'line-color': '#ffffff',
+      'line-width': 8,
+      'line-opacity': 0.9,
+    },
+  });
   map.addLayer({
     id: RIDE_LINE_ID,
     type: 'line',
@@ -1805,7 +1826,7 @@ export function addRideLayer(
     paint: {
       'line-color': RIDE_LINE_COLOR,
       'line-width': 4,
-      'line-opacity': 0.85,
+      'line-opacity': 0.95,
     },
   });
 }
@@ -1818,14 +1839,7 @@ export function updateRideLayer(
     | mapboxgl.GeoJSONSource
     | undefined;
   if (source) {
-    source.setData({
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'MultiLineString',
-        coordinates: segments.filter((segment) => segment.length >= 2),
-      },
-    });
+    source.setData(rideGeometry(segments));
   } else {
     addRideLayer(map, segments);
   }
@@ -1833,6 +1847,7 @@ export function updateRideLayer(
 
 export function removeRideLayer(map: mapboxgl.Map): void {
   if (map.getLayer(RIDE_LINE_ID)) map.removeLayer(RIDE_LINE_ID);
+  if (map.getLayer(RIDE_CASING_ID)) map.removeLayer(RIDE_CASING_ID);
   if (map.getSource(RIDE_SOURCE_ID)) map.removeSource(RIDE_SOURCE_ID);
 }
 
