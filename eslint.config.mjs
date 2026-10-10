@@ -21,6 +21,8 @@ export default defineConfig([
     'src/payload-types.ts',
     'src/migrations/**',
     'src/app/(payload)/admin/importMap.js',
+    // A separate Expo project with its own dependencies and tsconfig.
+    'examples/**',
   ]),
   js.configs.recommended,
   tseslint.configs.recommended,

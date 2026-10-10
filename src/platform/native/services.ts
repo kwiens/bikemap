@@ -6,6 +6,8 @@ import type {
   PlatformServices,
   PositionError,
   PositionFix,
+  ShareOutcome,
+  ShareService,
   Unsubscribe,
 } from '../types';
 import { createWebPlatform } from '../web';
@@ -154,6 +156,45 @@ function createNativeHeading(transport: BridgeTransport): HeadingService {
   };
 }
 
+function createNativeShare(transport: BridgeTransport): ShareService {
+  let nextRequestId = 1;
+
+  // A share sheet stays open as long as the rider likes, so there is no
+  // timeout: the promise settles when the host reports back.
+  function awaitResult(requestId: number): Promise<ShareOutcome> {
+    return new Promise((resolve) => {
+      const stop = transport.onEvent((event) => {
+        if (event.type === 'share/result' && event.requestId === requestId) {
+          stop();
+          resolve(event.ok ? 'shared' : 'failed');
+        }
+      });
+    });
+  }
+
+  return {
+    isSupported: () => true,
+    exportFile({ filename, mimeType, content }) {
+      const requestId = nextRequestId++;
+      const result = awaitResult(requestId);
+      transport.send({
+        type: 'share/file',
+        requestId,
+        filename,
+        mimeType,
+        content,
+      });
+      return result;
+    },
+    shareLink(url) {
+      const requestId = nextRequestId++;
+      const result = awaitResult(requestId);
+      transport.send({ type: 'share/link', requestId, url });
+      return result;
+    },
+  };
+}
+
 /**
  * Services fulfilled by the native host over the bridge. A capability the
  * host does not claim keeps the browser implementation, so a shell that only
@@ -177,5 +218,6 @@ export function createNativePlatform(
     heading: host.capabilities.heading
       ? createNativeHeading(transport)
       : web.heading,
+    share: host.capabilities.share ? createNativeShare(transport) : web.share,
   };
 }

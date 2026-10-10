@@ -12,11 +12,12 @@ import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
-import { downloadFile } from '@/utils/format';
 import { buildProfileGpx } from '@/utils/gpx';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
 import { useLayout } from '@/hooks/useLayout';
+import { usePlatform } from '@/platform/context';
+import type { ExportFile } from '@/platform/types';
 import { loadRide } from '@/utils/ride-storage';
 import { rideToElevationProfile } from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -283,13 +284,16 @@ export function downsampleStops(
 // Profile data cache to avoid refetching on revisit
 const profileCache = new Map<string, ElevationProfileData>();
 
-function downloadGpx(profile: ElevationProfileData): void {
-  const gpx = buildProfileGpx(
-    profile.trail,
-    profile.profile,
-    profile.geometryGapDetails,
-  );
-  downloadFile(gpx, `${slugify(profile.trail)}.gpx`, 'application/gpx+xml');
+function gpxExport(profile: ElevationProfileData): ExportFile {
+  return {
+    filename: `${slugify(profile.trail)}.gpx`,
+    mimeType: 'application/gpx+xml',
+    content: buildProfileGpx(
+      profile.trail,
+      profile.profile,
+      profile.geometryGapDetails,
+    ),
+  };
 }
 
 // Find the closest profile point to a given lng/lat using squared Euclidean distance
@@ -326,6 +330,7 @@ export function ElevationProfile() {
   // Which side panels are open decides where the pane sits (and, on a
   // phone, whether it shows at all).
   const { sidebarOpen, ridesPanelOpen } = useLayout();
+  const { share } = usePlatform();
   const [trailName, setTrailName] = useState<string | null>(null);
   const [profileSource, setProfileSource] = useState<ProfileSource>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
@@ -652,24 +657,29 @@ export function ElevationProfile() {
             type="button"
             className={ACTION_BTN_CLASS}
             onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(window.location.href);
+              const outcome = await share.shareLink(window.location.href);
+              if (outcome === 'copied') {
                 dispatchMapEvent(MAP_EVENTS.TOAST, { message: 'Link copied' });
-              } catch (error) {
-                console.error('Failed to copy link:', error);
+              } else if (outcome === 'failed') {
                 dispatchMapEvent(MAP_EVENTS.TOAST, {
-                  message: 'Could not copy link',
+                  message: 'Could not share link',
                 });
               }
             }}
-            title="Copy link"
+            title="Share link"
           >
             <FontAwesomeIcon icon={faShareAlt} />
           </button>
           <button
             type="button"
             className={ACTION_BTN_CLASS}
-            onClick={() => downloadGpx(profile)}
+            onClick={async () => {
+              if ((await share.exportFile(gpxExport(profile))) === 'failed') {
+                dispatchMapEvent(MAP_EVENTS.TOAST, {
+                  message: 'Could not export GPX',
+                });
+              }
+            }}
             title="Download GPX"
           >
             <FontAwesomeIcon icon={faDownload} />

@@ -1,0 +1,17 @@
+{
+  "name": "bikemap-expo-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reference React Native WebView host for the bike map's native bridge (protocol v1). Copy src/ into an Expo app.",
+  "peerDependencies": {
+    "expo": "*",
+    "expo-clipboard": "*",
+    "expo-file-system": "*",
+    "expo-keep-awake": "*",
+    "expo-location": "*",
+    "expo-sharing": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-webview": "*"
+  }
+}

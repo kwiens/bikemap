@@ -38,7 +38,12 @@ function fakeTransport() {
 
 const ALL = {
   protocolVersion: PROTOCOL_VERSION,
-  capabilities: { geolocation: true, keepAwake: true, heading: true },
+  capabilities: {
+    geolocation: true,
+    keepAwake: true,
+    heading: true,
+    share: true,
+  },
 };
 
 describe('createNativePlatform', () => {
@@ -146,6 +151,35 @@ describe('createNativePlatform', () => {
     bridge.emit({ type: 'heading/reading', headingDegrees: 34 });
     expect(readings).toEqual([33]);
     expect(bridge.sent.at(-1)).toEqual({ type: 'heading/clearWatch' });
+  });
+
+  it('sends files and links to the share sheet and settles on the result', async () => {
+    const bridge = fakeTransport();
+    const platform = createNativePlatform(ALL, bridge.transport);
+
+    const file = platform.share.exportFile({
+      filename: 'ride.gpx',
+      mimeType: 'application/gpx+xml',
+      content: '<gpx/>',
+    });
+    expect(bridge.sent[0]).toEqual({
+      type: 'share/file',
+      requestId: 1,
+      filename: 'ride.gpx',
+      mimeType: 'application/gpx+xml',
+      content: '<gpx/>',
+    });
+    bridge.emit({ type: 'share/result', requestId: 1, ok: true });
+    await expect(file).resolves.toBe('shared');
+
+    const link = platform.share.shareLink('https://bikechatt.com/?trail=x');
+    expect(bridge.sent[1]).toEqual({
+      type: 'share/link',
+      requestId: 2,
+      url: 'https://bikechatt.com/?trail=x',
+    });
+    bridge.emit({ type: 'share/result', requestId: 2, ok: false });
+    await expect(link).resolves.toBe('failed');
   });
 
   it('keeps the browser implementation for capabilities the host does not claim', () => {
