@@ -3,6 +3,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
+import {
+  getLayout,
+  isMobileViewport,
+  setSidebarOpen,
+  toggleSidebar,
+  useLayout,
+  useSeedLayout,
+} from '@/hooks/useLayout';
+import { useOutsideTap } from '@/hooks/useOutsideTap';
 import { onMapReady } from '@/utils/map-ready';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -44,10 +53,14 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     bikeResources.length > 0 ||
     Boolean(mapConfig.gbfs);
   const { isEmbed, options: embedOptions } = useEmbed();
-  // Track state in this parent component
-  const [isOpen, setIsOpen] = useState(() =>
-    isEmbed ? embedOptions.sidebarOpen : (getSetting('sidebarOpen') ?? true),
-  );
+  // Embeds never carry the settings cookie, so they take the host page's
+  // option instead.
+  useSeedLayout(() => ({
+    sidebarOpen: isEmbed
+      ? embedOptions.sidebarOpen
+      : (getSetting('sidebarOpen') ?? true),
+  }));
+  const { sidebarOpen: isOpen } = useLayout();
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
@@ -79,34 +92,22 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
-  const isOpenRef = useRef(isOpen);
-  isOpenRef.current = isOpen;
+  // Third-party frames drop the settings cookie anyway (no SameSite=None).
+  const toggle = useCallback(
+    () => toggleSidebar({ persist: !isEmbed }),
+    [isEmbed],
+  );
 
-  const toggle = useCallback(() => {
-    const next = !isOpenRef.current;
-    setIsOpen(next);
-    // Third-party frames drop this cookie anyway (no SameSite=None) — skip it.
-    if (!isEmbed) setSetting('sidebarOpen', next);
-    dispatchMapEvent(MAP_EVENTS.SIDEBAR_TOGGLE, { isOpen: next });
-  }, [isEmbed]);
-
-  // Handle clicks/taps outside the sidebar (mobile only)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (window.innerWidth > 768) return;
-      if (!isOpen) return;
-      if (toggleButtonRef.current?.contains(event.target as Node)) return;
-      if (sidebarRef.current?.contains(event.target as Node)) return;
-
-      toggle();
-    };
-
-    // Use capture phase so we see the event before it reaches sidebar children
-    document.addEventListener('pointerdown', handleClickOutside);
-    return () => {
-      document.removeEventListener('pointerdown', handleClickOutside);
-    };
-  }, [isOpen, toggle]);
+  // On a phone the sidebar overlays the map, so it gets out of the way after
+  // a selection or a tap on the map. Neither is a preference worth saving.
+  const closeOnMobile = useCallback(() => {
+    if (isMobileViewport()) setSidebarOpen(false);
+  }, []);
+  useOutsideTap(
+    [sidebarRef, toggleButtonRef],
+    () => getLayout().sidebarOpen,
+    closeOnMobile,
+  );
 
   // Selections made on the map itself. Only state changes here — the map
   // already handled the visual update before dispatching.
@@ -136,13 +137,9 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       // Dispatch event for map to update route opacity
       dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId });
       dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
-
-      // Close sidebar on mobile after selection
-      if (window.innerWidth <= 768 && isOpen) {
-        toggle();
-      }
+      closeOnMobile();
     },
-    [isOpen, toggle],
+    [closeOnMobile],
   );
 
   // Function to handle trail selection
@@ -153,12 +150,9 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
       dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, { trailName });
       dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
-
-      if (window.innerWidth <= 768 && isOpen) {
-        toggle();
-      }
+      closeOnMobile();
     },
-    [isOpen, toggle],
+    [closeOnMobile],
   );
 
   // Function to handle area (rec area heading) selection
@@ -305,29 +299,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const centerOnLocation = useCallback(
     (location: LocationProps) => {
       // Dispatch event for map to center and show pin
-      dispatchMapEvent(MAP_EVENTS.CENTER_LOCATION, {
-        location: location,
-      });
-
-      // Close sidebar on mobile after selection
-      if (window.innerWidth <= 768 && isOpen) {
-        toggle();
-      }
+      dispatchMapEvent(MAP_EVENTS.CENTER_LOCATION, { location });
+      closeOnMobile();
     },
-    [isOpen, toggle],
+    [closeOnMobile],
   );
-
-  // Close when rides panel opens. Dispatch SIDEBAR_TOGGLE too — the elevation
-  // pane and map-resize hook track sidebar state solely via that event, so a
-  // silent close would leave them laid out for an open sidebar. (Unlike
-  // toggle(), this doesn't persist the closed state: the panel closing the
-  // sidebar isn't a user preference.)
-  useMapEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, ({ isOpen: panelOpen }) => {
-    if (panelOpen && isOpenRef.current) {
-      setIsOpen(false);
-      dispatchMapEvent(MAP_EVENTS.SIDEBAR_TOGGLE, { isOpen: false });
-    }
-  });
 
   return (
     <>
