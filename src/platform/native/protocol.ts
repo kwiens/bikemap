@@ -70,7 +70,6 @@ export type PageEvent =
   | { type: 'heading/permission'; requestId: number; granted: boolean };
 
 export type HostCommandMessage = Envelope & HostCommand;
-export type PageEventMessage = Envelope & PageEvent;
 
 export function encodeCommand(command: HostCommand): string {
   const message: HostCommandMessage = {
