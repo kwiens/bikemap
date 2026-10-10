@@ -313,17 +313,24 @@ export function useRideRecording(
         }
       },
       (error) => {
-        const messages: Record<number, string> = {
-          1: 'Location permission denied — cannot record ride',
-          2: 'GPS unavailable — check your device settings',
-          3: 'GPS timed out — trying again...',
-        };
-        const msg = messages[error.code] ?? 'GPS error';
-        if (error.code !== 3) {
-          // Timeout is transient; permission/unavailable are fatal
-          cleanup();
-          onNotify?.(msg);
+        // Timeout is transient; permission/unavailable are fatal.
+        if (error.code === 3) return;
+        // Keep what was recorded so far: the periodic save may be up to ten
+        // seconds behind, and cleanup() would otherwise clear the in-progress
+        // record and lose the ride. The recovery banner offers "Save it".
+        if (pointsRef.current.length >= 2) {
+          saveInProgress({
+            startTime: startTimeRef.current,
+            points: pointsRef.current,
+          }).catch(() => {});
+          preserveProgressRef.current = true;
         }
+        cleanup();
+        onNotify?.(
+          error.code === 1
+            ? 'Location permission denied — cannot record ride'
+            : 'GPS unavailable — check your device settings',
+        );
       },
       {
         enableHighAccuracy: true,
@@ -505,7 +512,7 @@ export function useRideRecording(
         console.error('Failed to save ride:', error);
         preserveProgressRef.current = true;
         cleanup();
-        onNotify?.('Could not save your ride — it can be recovered below.');
+        onNotify?.('Could not save your ride — open Rides to recover it.');
         return null;
       }
       cleanup({ rideId: ride.id });
