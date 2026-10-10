@@ -28,30 +28,47 @@ export function createPositionWatch(
   let stopWatch: Unsubscribe | null = null;
   let latest: PositionFix | null = null;
 
-  function start() {
-    stopWatch = geolocation.watchPosition(
-      (fix) => {
-        latest = fix;
-        for (const subscriber of subscribers) subscriber.onFix(fix);
-      },
-      (error) => {
-        for (const subscriber of subscribers) subscriber.onError?.(error);
-      },
-      options,
-    );
-  }
-
   function stop() {
     stopWatch?.();
     stopWatch = null;
     latest = null;
   }
 
+  function start() {
+    // A provider may fail synchronously, inside watchPosition, before it has
+    // handed back its stop function. Note that and discard the handle.
+    let diedWhileStarting = false;
+    let starting = true;
+    const handle = geolocation.watchPosition(
+      (fix) => {
+        latest = fix;
+        for (const subscriber of subscribers) subscriber.onFix(fix);
+      },
+      (error) => {
+        for (const subscriber of subscribers) subscriber.onError?.(error);
+        // Browsers end the underlying watch for good after a denied
+        // permission or a lost provider. Drop ours too, so the next
+        // subscriber starts the hardware afresh instead of joining a stream
+        // that will never speak again.
+        if (error.code === 'timeout') return;
+        if (starting) diedWhileStarting = true;
+        else stop();
+      },
+      options,
+    );
+    starting = false;
+    if (diedWhileStarting) {
+      handle();
+    } else {
+      stopWatch = handle;
+    }
+  }
+
   return {
     subscribe(onFix, onError) {
       const subscriber: Subscriber = { onFix, onError };
       subscribers.add(subscriber);
-      if (subscribers.size === 1) start();
+      if (!stopWatch) start();
       let active = true;
       return () => {
         if (!active) return;

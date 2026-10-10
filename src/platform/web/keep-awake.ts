@@ -12,40 +12,51 @@ function wakeLockApi(): WakeLock | undefined {
 export function createWebKeepAwake(): KeepAwakeService {
   let holders = 0;
   let lock: WakeLockSentinel | null = null;
+  // The request in flight, if any. A visibilitychange or a holder leaving and
+  // returning while it is pending must not start a second request: both
+  // would resolve, only one would be tracked, and the other would keep the
+  // screen on until the page was hidden.
+  let pending: Promise<void> | null = null;
   let reacquireTimer: ReturnType<typeof setTimeout> | null = null;
 
-  async function acquireLock(): Promise<void> {
-    if (holders === 0) return;
-    if (lock && !lock.released) return;
+  function acquireLock(): Promise<void> {
+    if (pending) return pending;
+    if (holders === 0) return Promise.resolve();
+    if (lock && !lock.released) return Promise.resolve();
     const api = wakeLockApi();
-    if (!api) return;
-    try {
-      const next = await api.request('screen');
-      if (holders === 0) {
-        // Every holder let go while the request was in flight.
-        void next.release().catch(() => {});
-        return;
-      }
-      lock = next;
-      next.addEventListener(
-        'release',
-        () => {
-          // Our own release() nulls `lock` first, so only an OS-initiated
-          // release gets here with the sentinel still current.
-          if (lock !== next) return;
-          lock = null;
-          if (holders > 0 && document.visibilityState === 'visible') {
-            reacquireTimer = setTimeout(
-              () => void acquireLock(),
-              REACQUIRE_DELAY_MS,
-            );
-          }
-        },
-        { once: true },
-      );
-    } catch {
-      // Denied (low battery, permissions policy): the ride still records.
-    }
+    if (!api) return Promise.resolve();
+    pending = api.request('screen').then(
+      (next) => {
+        pending = null;
+        if (holders === 0) {
+          // Every holder let go while the request was in flight.
+          void next.release().catch(() => {});
+          return;
+        }
+        lock = next;
+        next.addEventListener(
+          'release',
+          () => {
+            // Our own release() nulls `lock` first, so only an OS-initiated
+            // release gets here with the sentinel still current.
+            if (lock !== next) return;
+            lock = null;
+            if (holders > 0 && document.visibilityState === 'visible') {
+              reacquireTimer = setTimeout(
+                () => void acquireLock(),
+                REACQUIRE_DELAY_MS,
+              );
+            }
+          },
+          { once: true },
+        );
+      },
+      () => {
+        // Denied (low battery, permissions policy): the ride still records.
+        pending = null;
+      },
+    );
+    return pending;
   }
 
   function handleVisibility() {

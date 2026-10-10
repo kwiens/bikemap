@@ -496,6 +496,44 @@ describe('useRideRecording', () => {
     consoleError.mockRestore();
   });
 
+  it('aborts startup cleanly when the device has no geolocation', async () => {
+    Object.defineProperty(navigator, 'geolocation', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+    const lifecycle: string[] = [];
+    const handler = (e: Event) => lifecycle.push(e.type);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    const onNotify = vi.fn();
+
+    try {
+      const { result } = renderHook(() => useRideRecording(onNotify));
+      await act(async () => {
+        result.current.startRecording();
+      });
+      expect(result.current.isRecording).toBe(false);
+      expect(onNotify).toHaveBeenCalledWith(
+        'GPS unavailable — check your device settings',
+      );
+      // The map saw a start and then a stop, in that order — never a stop
+      // followed by a start, which would leave it in recording mode.
+      expect(lifecycle).toEqual([
+        MAP_EVENTS.RIDE_RECORDING_START,
+        MAP_EVENTS.RIDE_RECORDING_STOP,
+      ]);
+      // And a second attempt is not blocked by a leaked subscription.
+      await act(async () => {
+        result.current.startRecording();
+      });
+      expect(onNotify).toHaveBeenCalledTimes(2);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    }
+  });
+
   it('checks for crash recovery on mount', async () => {
     const { loadInProgress } = await import('@/utils/ride-storage');
     (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue({

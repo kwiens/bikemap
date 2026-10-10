@@ -58,8 +58,15 @@ export function createWebGeolocation(): GeolocationService {
     watchPosition(onFix, onError, options) {
       const api = geolocation();
       if (!api) {
-        onError(UNAVAILABLE);
-        return () => {};
+        // Delivered after the caller has its stop function, like a real
+        // provider's first error, so no subscriber tears down mid-subscribe.
+        let cancelled = false;
+        queueMicrotask(() => {
+          if (!cancelled) onError(UNAVAILABLE);
+        });
+        return () => {
+          cancelled = true;
+        };
       }
       const watchId = api.watchPosition(
         (position) => onFix(toFix(position)),

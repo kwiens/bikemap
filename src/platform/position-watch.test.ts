@@ -88,6 +88,55 @@ describe('createPositionWatch', () => {
     expect(geo.service.watchPosition).toHaveBeenCalledTimes(2);
   });
 
+  it('drops the hardware after a fatal error so the next subscriber restarts it', () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+    const errors: string[] = [];
+    watch.subscribe(
+      () => {},
+      (error) => errors.push(error.code),
+    );
+    geo.emit(FIX);
+    geo.fail({ code: 'timeout', message: '' });
+    expect(geo.stop).not.toHaveBeenCalled();
+
+    geo.fail({ code: 'permission-denied', message: '' });
+    expect(errors).toEqual(['timeout', 'permission-denied']);
+    expect(geo.stop).toHaveBeenCalledTimes(1);
+    expect(watch.latest()).toBeNull();
+
+    // The first subscriber is still attached; a second one brings the
+    // hardware back for both.
+    watch.subscribe(() => {});
+    expect(geo.service.watchPosition).toHaveBeenCalledTimes(2);
+  });
+
+  it('survives a provider that fails synchronously inside watchPosition', () => {
+    const stop = vi.fn();
+    const service: GeolocationService = {
+      isSupported: () => false,
+      watchPosition: vi.fn((_fix, onError) => {
+        onError({ code: 'unavailable', message: 'no api' });
+        return stop;
+      }),
+      getCurrentPosition: vi.fn(),
+    };
+    const watch = createPositionWatch(service);
+    const errors: string[] = [];
+    const off = watch.subscribe(
+      () => {},
+      (error) => errors.push(error.code),
+    );
+    expect(errors).toEqual(['unavailable']);
+    // The dead handle was discarded, and unsubscribing does not call it again.
+    expect(stop).toHaveBeenCalledTimes(1);
+    off();
+    expect(stop).toHaveBeenCalledTimes(1);
+    // A later subscriber tries the hardware afresh.
+    watch.subscribe(() => {});
+    expect(service.watchPosition).toHaveBeenCalledTimes(2);
+  });
+
   it('returns a requested fix without broadcasting it', async () => {
     const geo = fakeGeolocation();
     const watch = createPositionWatch(geo.service);

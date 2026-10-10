@@ -30,6 +30,15 @@ type MockLock = ReturnType<typeof createMockLock>;
 describe('createWebKeepAwake', () => {
   let requestMock: ReturnType<typeof vi.fn>;
   let currentLock: MockLock;
+  // Handles taken during a test, released afterwards: a service whose holder
+  // never lets go keeps its visibilitychange listener on `document` and would
+  // answer the next test's events.
+  const handles: Array<() => void> = [];
+  const acquire = (service: ReturnType<typeof createWebKeepAwake>) => {
+    const release = service.acquire();
+    handles.push(release);
+    return release;
+  };
 
   beforeEach(() => {
     currentLock = createMockLock();
@@ -42,12 +51,13 @@ describe('createWebKeepAwake', () => {
   });
 
   afterEach(() => {
+    for (const release of handles.splice(0)) release();
     vi.useRealTimers();
   });
 
   it('requests a screen lock on acquire and releases it on release', async () => {
     const service = createWebKeepAwake();
-    const release = service.acquire();
+    const release = acquire(service);
     await vi.waitFor(() => expect(requestMock).toHaveBeenCalledWith('screen'));
 
     release();
@@ -56,8 +66,8 @@ describe('createWebKeepAwake', () => {
 
   it('shares one lock between holders and releases when the last lets go', async () => {
     const service = createWebKeepAwake();
-    const releaseTracking = service.acquire();
-    const releaseRecording = service.acquire();
+    const releaseTracking = acquire(service);
+    const releaseRecording = acquire(service);
     await vi.waitFor(() => expect(requestMock).toHaveBeenCalledTimes(1));
 
     releaseTracking();
@@ -72,7 +82,7 @@ describe('createWebKeepAwake', () => {
   it('re-acquires after a delay when the OS releases it', async () => {
     vi.useFakeTimers();
     const service = createWebKeepAwake();
-    service.acquire();
+    acquire(service);
     await vi.waitFor(() => expect(requestMock).toHaveBeenCalledTimes(1));
 
     requestMock.mockResolvedValue(createMockLock());
@@ -85,7 +95,7 @@ describe('createWebKeepAwake', () => {
 
   it('does not re-request while the lock is still held on visibilitychange', async () => {
     const service = createWebKeepAwake();
-    service.acquire();
+    acquire(service);
     await vi.waitFor(() => expect(requestMock).toHaveBeenCalledTimes(1));
 
     Object.defineProperty(document, 'visibilityState', {
@@ -97,6 +107,34 @@ describe('createWebKeepAwake', () => {
     expect(requestMock).toHaveBeenCalledTimes(1);
   });
 
+  it('sends one request while a request is still pending', async () => {
+    let resolveRequest: (lock: MockLock) => void = () => {};
+    requestMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
+    const service = createWebKeepAwake();
+    const release = acquire(service);
+    // A visibility change and a holder leaving and returning both arrive
+    // before the first request resolves.
+    Object.defineProperty(document, 'visibilityState', {
+      value: 'visible',
+      writable: true,
+      configurable: true,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    release();
+    const releaseAgain = acquire(service);
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    resolveRequest(currentLock);
+    await vi.waitFor(() => expect(currentLock.release).not.toHaveBeenCalled());
+    releaseAgain();
+    expect(currentLock.release).toHaveBeenCalledTimes(1);
+  });
+
   it('releases a lock that resolved after every holder let go', async () => {
     let resolveRequest: (lock: MockLock) => void = () => {};
     requestMock.mockImplementation(
@@ -106,7 +144,7 @@ describe('createWebKeepAwake', () => {
         }),
     );
     const service = createWebKeepAwake();
-    const release = service.acquire();
+    const release = acquire(service);
     release();
     resolveRequest(currentLock);
     await vi.waitFor(() => expect(currentLock.release).toHaveBeenCalled());
@@ -120,7 +158,7 @@ describe('createWebKeepAwake', () => {
     });
     const service = createWebKeepAwake();
     expect(service.isSupported()).toBe(false);
-    const release = service.acquire();
+    const release = acquire(service);
     release();
     expect(requestMock).not.toHaveBeenCalled();
   });
