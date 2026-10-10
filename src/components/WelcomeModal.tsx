@@ -11,7 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { siteConfig } from '@/config/site.config';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { getSetting, setSetting, type RideStyle } from '@/utils/settings';
 
 const features: {
@@ -82,11 +82,7 @@ export function WelcomeModal() {
   const choose = (style: RideStyle) => {
     localStorage.setItem(STORAGE_KEY, '1');
     setSetting('rideStyle', style);
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.RIDE_STYLE_CHOSEN, {
-        detail: { style },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.RIDE_STYLE_CHOSEN, { style });
     setExiting(true);
     setTimeout(() => {
       setVisible(false);

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RecordedRide, RidePoint, StoredRidePoint } from '../data/ride';
 import { generateRideName, splitRideSegments } from '../data/ride';
-import { MAP_EVENTS } from '../events';
+import { MAP_EVENTS, dispatchMapEvent } from '../events';
 import {
   computeBounds,
   computeDistance,
@@ -161,9 +161,7 @@ export function useRideRecording(
     setLiveDistance(0);
     setLiveElevationGain(0);
     segmentBreakRef.current = false;
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP, { detail: stopDetail }),
-    );
+    dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, stopDetail);
   }, []);
 
   // Shared: start GPS watch, elapsed timer, and periodic save
@@ -218,14 +216,10 @@ export function useRideRecording(
         // GPS is confirmed working — safe to clear progress on future cleanup
         preserveProgressRef.current = false;
 
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-            detail: {
-              point: [point.lng, point.lat] as [number, number],
-              segmentStart: startsNewSegment,
-            },
-          }),
-        );
+        dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
+          point: [point.lng, point.lat] as [number, number],
+          segmentStart: startsNewSegment,
+        });
 
         // Compute horizontal distance once and reuse for both
         // distance tracking and elevation min-distance filter. The first
@@ -353,7 +347,7 @@ export function useRideRecording(
       }
     }, 10_000);
 
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
+    dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_START);
   }, [cleanup, onNotify]);
 
   const startRecording = useCallback(() => {
@@ -608,11 +602,7 @@ export function useRideRecording(
     const segments = splitRideSegments(data.points).map((segment) =>
       segment.map((pt) => [pt.lng, pt.lat] as [number, number]),
     );
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-        detail: { segments },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, { segments });
 
     startGpsWatchAndTimers();
   }, [isRecording, startGpsWatchAndTimers]);

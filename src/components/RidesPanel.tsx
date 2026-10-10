@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
+import { useMapEvent } from '@/hooks/useMapEvent';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTimes,
@@ -33,9 +34,7 @@ export function RidesPanel() {
   // off-screen), so anything rendered inside it — including a GPS failure —
   // was invisible exactly when it mattered.
   const notify = useCallback((message: string) => {
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.TOAST, { detail: { message } }),
-    );
+    dispatchMapEvent(MAP_EVENTS.TOAST, { message });
   }, []);
 
   const {
@@ -63,22 +62,14 @@ export function RidesPanel() {
   const toggle = useCallback(() => {
     const next = !isOpenRef.current;
     setIsOpen(next);
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, {
-        detail: { isOpen: next },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, { isOpen: next });
   }, []);
 
   const handleRecoverRide = useCallback(async () => {
     const ride = await recoverRide();
     if (ride) {
       notify('Ride recovered!');
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
-          detail: { rideId: ride.id },
-        }),
-      );
+      dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId: ride.id });
     }
   }, [recoverRide, notify]);
 
@@ -87,21 +78,13 @@ export function RidesPanel() {
     notify('Ride resumed — keep going!');
   }, [continueRide, notify]);
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { isOpen: sidebarOpen } = (e as CustomEvent).detail;
-      if (sidebarOpen && isOpenRef.current) {
-        setIsOpen(false);
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, {
-            detail: { isOpen: false },
-          }),
-        );
-      }
-    };
-    window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handler);
-    return () => window.removeEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handler);
-  }, []);
+  // The sidebar and this panel are mutually exclusive.
+  useMapEvent(MAP_EVENTS.SIDEBAR_TOGGLE, ({ isOpen: sidebarOpen }) => {
+    if (sidebarOpen && isOpenRef.current) {
+      setIsOpen(false);
+      dispatchMapEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, { isOpen: false });
+    }
+  });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
@@ -116,37 +99,21 @@ export function RidesPanel() {
       document.removeEventListener('pointerdown', handleClickOutside);
   }, [isOpen, toggle]);
 
-  useEffect(() => {
-    const handleSelect = (e: Event) => {
-      const { rideId, openPanel } = (e as CustomEvent).detail;
-      setSelectedRideId(rideId);
-      if (openPanel && !isOpenRef.current) {
-        setIsOpen(true);
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, {
-            detail: { isOpen: true },
-          }),
-        );
-      }
-    };
-    const handleDeselect = () => setSelectedRideId(null);
-
-    window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleSelect);
-    window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleDeselect);
-    return () => {
-      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleSelect);
-      window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleDeselect);
-    };
-  }, []);
+  useMapEvent(MAP_EVENTS.RIDE_SELECT, ({ rideId, openPanel }) => {
+    setSelectedRideId(rideId);
+    if (openPanel && !isOpenRef.current) {
+      setIsOpen(true);
+      dispatchMapEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, { isOpen: true });
+    }
+  });
+  useMapEvent(MAP_EVENTS.RIDE_DESELECT, () => setSelectedRideId(null));
 
   const handleRideSelect = useCallback(
     (rideId: string) => {
       setSelectedRideId(rideId);
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.RIDE_SELECT, { detail: { rideId } }),
-      );
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+      dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId });
+      dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
+      dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
       if (window.innerWidth <= 768 && isOpen) {
         toggle();
       }
@@ -160,11 +127,7 @@ export function RidesPanel() {
     if (isRecording) {
       const ride = await stopRecording();
       if (ride) {
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
-            detail: { rideId: ride.id },
-          }),
-        );
+        dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId: ride.id });
       }
     } else {
       startRecording();
