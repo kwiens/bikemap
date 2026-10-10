@@ -189,9 +189,10 @@ const MapboxMap = memo(function MapboxMap() {
   // effect runs once and would otherwise read the mount-time value.
   const watchingLocationRef = useRef(false);
   watchingLocationRef.current = watchingLocation;
-  // Whether the rider had tracking on before recording started, so stopping
-  // restores their choice instead of always switching tracking off.
-  const trackingBeforeRecordingRef = useRef(false);
+  // True while a recording is the only reason tracking is on. Cleared the
+  // moment the rider touches the locate button themselves, so Finish only
+  // switches tracking off when nobody chose it.
+  const recordingOwnsTrackingRef = useRef(false);
 
   // Handle ride select — show ride on map
   const handleRideSelect = useCallback(
@@ -1527,6 +1528,8 @@ const MapboxMap = memo(function MapboxMap() {
   // The permission request for iOS is done inline (not in a nested async) so it
   // stays within the user-gesture context that Safari requires.
   const toggleWatchLocation = async () => {
+    // The rider is choosing a tracking mode; it is theirs from here on.
+    recordingOwnsTrackingRef.current = false;
     if (!watchingLocation) {
       // off → tracking
       setLocationWatch(true);
@@ -1573,7 +1576,7 @@ const MapboxMap = memo(function MapboxMap() {
   // Enable location tracking when recording starts, disable when it stops
   // Also toggle CSS class on map container for Mapbox control positioning
   const handleRecordingStart = () => {
-    trackingBeforeRecordingRef.current = watchingLocationRef.current;
+    recordingOwnsTrackingRef.current = !watchingLocationRef.current;
     setRecordingActive(true);
     setLocationWatch(true);
     mapContainer.current?.classList.add('recording-active');
@@ -1587,10 +1590,10 @@ const MapboxMap = memo(function MapboxMap() {
   };
   const handleRecordingStop = () => {
     setRecordingActive(false);
-    // Recording turned tracking on for the rider; only turn it back off if
-    // it was off before. Someone following themselves in compass mode keeps
-    // doing so after Finish.
-    if (!trackingBeforeRecordingRef.current) setLocationWatch(false);
+    // Only undo what recording did: a rider who had tracking on before, or
+    // who switched it on (or into compass mode) during the ride, keeps it.
+    if (recordingOwnsTrackingRef.current) setLocationWatch(false);
+    recordingOwnsTrackingRef.current = false;
     mapContainer.current?.classList.remove('recording-active');
     // Clean up auto-detected trail selection
     isRecordingRef.current = false;
