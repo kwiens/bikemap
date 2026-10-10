@@ -310,6 +310,16 @@ export function useRideRecording(
         // A timeout is transient; the watch keeps going. Permission denied or
         // no provider means the ride cannot continue.
         if (error.code === 'timeout') return;
+        // Keep what was recorded so far: the periodic save may be up to ten
+        // seconds behind, and cleanup() would otherwise clear the in-progress
+        // record and lose the ride. The recovery banner offers "Save it".
+        if (pointsRef.current.length >= 2) {
+          saveInProgress({
+            startTime: startTimeRef.current,
+            points: pointsRef.current,
+          }).catch(() => {});
+          preserveProgressRef.current = true;
+        }
         cleanup();
         onNotify?.(
           error.code === 'permission-denied'
@@ -492,7 +502,7 @@ export function useRideRecording(
         console.error('Failed to save ride:', error);
         preserveProgressRef.current = true;
         cleanup();
-        onNotify?.('Could not save your ride — it can be recovered below.');
+        onNotify?.('Could not save your ride — open Rides to recover it.');
         return null;
       }
       cleanup({ rideId: ride.id });
