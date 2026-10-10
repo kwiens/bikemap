@@ -96,7 +96,8 @@ src/
 │   ├── types.ts           # compass) — see "Platform services" below
 │   ├── context.tsx        # PlatformProvider / usePlatform (default: web)
 │   ├── position-watch.ts  # One shared, ref-counted GPS stream
-│   └── web/               # Browser implementations
+│   ├── web/               # Browser implementations
+│   └── native/            # React Native WebView bridge (Expo shell)
 ├── utils/
 │   ├── map.ts             # Map layer plumbing, selection, bounds, geocoding
 │   ├── terrain-rgb.ts     # Shared Terrain-RGB decode + tile math
@@ -378,9 +379,13 @@ compass. Everything that touches a device capability goes through
 - **`web/`** wraps the Web APIs. Nothing outside `src/platform` may call
   `navigator.geolocation`, `navigator.wakeLock` or listen to
   `deviceorientation` directly.
-- **`usePlatform()`** (`context.tsx`) returns the services. No provider means
-  the browser; a host supplying native services wraps the map in
-  `PlatformProvider`.
+- **`usePlatform()`** (`context.tsx`) returns the services. Without a provider
+  the platform is detected: the Expo shell injects `window.__bikemapNative`
+  before load and the page talks to it over the React Native WebView message
+  channel (`src/platform/native/`, protocol in `protocol.ts`, host-side
+  contract in [`docs/guides/native-shell.md`](docs/guides/native-shell.md));
+  anything else is the browser. Change `protocol.ts` and that guide together.
+  A capability the host doesn't claim keeps its web implementation.
 - **`positions` is one shared, ref-counted GPS stream.** `useLocationTracking`
   (the dot, follow-me and compass mode) and `useRideRecording` both subscribe
   to it, so recording never starts a second watch. The first subscriber

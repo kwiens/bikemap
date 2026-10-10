@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { siteConfig } from '@/config/site.config';
+import { usePlatform } from '@/platform/context';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -42,12 +43,14 @@ function setDismissedFlag(): void {
 }
 
 export function PwaInstallPrompt(): React.ReactElement | null {
+  // Inside the native shell the app is already installed.
+  const isNativeShell = usePlatform().kind === 'native';
   const deferredPrompt = React.useRef<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = React.useState(false);
   const [isIos, setIsIos] = React.useState(false);
 
   React.useEffect(() => {
-    if (getDismissedFlag() || isStandaloneMode()) {
+    if (isNativeShell || getDismissedFlag() || isStandaloneMode()) {
       return;
     }
 
@@ -78,7 +81,7 @@ export function PwaInstallPrompt(): React.ReactElement | null {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, []);
+  }, [isNativeShell]);
 
   const handleInstallClick = async () => {
     const promptEvent = deferredPrompt.current;
