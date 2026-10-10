@@ -377,6 +377,37 @@ describe('useRideRecording', () => {
     }
   });
 
+  it('keeps the in-progress record for recovery when GPS fails fatally mid-ride', async () => {
+    const { saveInProgress, clearInProgress } = await import(
+      '@/utils/ride-storage'
+    );
+    const { result } = renderHook(() => useRideRecording());
+
+    act(() => {
+      result.current.startRecording();
+    });
+    act(() => {
+      simulatePosition(-85.3, 35.0);
+      simulatePosition(-85.31, 35.01);
+    });
+    act(() => {
+      errorCallback?.({
+        code: 2,
+        message: 'Position unavailable',
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3,
+      });
+    });
+
+    expect(saveInProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ points: expect.any(Array) }),
+    );
+    expect(clearInProgress).not.toHaveBeenCalled();
+    expect(result.current.hasRecovery).toBe(true);
+    expect(result.current.isRecording).toBe(false);
+  });
+
   it('dispatches RIDE_RECORDING_STOP exactly once per stop, with the ride id', async () => {
     const events: CustomEvent[] = [];
     const handler = (e: Event) => events.push(e as CustomEvent);
@@ -459,7 +490,7 @@ describe('useRideRecording', () => {
     expect(ride).toBeNull();
     expect(onNotify).toHaveBeenCalledTimes(1);
     expect(onNotify).toHaveBeenCalledWith(
-      'Could not save your ride — it can be recovered below.',
+      'Could not save your ride — open Rides to recover it.',
     );
     expect(result.current.hasRecovery).toBe(true);
     consoleError.mockRestore();
