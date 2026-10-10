@@ -90,7 +90,13 @@ src/
 │   ├── bike-network.ts    # Classified bike-network overlay constants
 │   ├── ride.ts            # Ride recording types
 │   └── gbfs.ts            # Live bike share API integration (station + free-bike)
-├── hooks/                 # useRideRecording, useWakeLock, useMapResize, useToast
+├── hooks/                 # useRideRecording, useLocationTracking, useKeepAwake,
+│                          # useLayout, useMapEvent, useMapResize, useToast
+├── platform/              # Device services behind interfaces (GPS, keep-awake,
+│   ├── types.ts           # compass) — see "Platform services" below
+│   ├── context.tsx        # PlatformProvider / usePlatform (default: web)
+│   ├── position-watch.ts  # One shared, ref-counted GPS stream
+│   └── web/               # Browser implementations
 ├── utils/
 │   ├── map.ts             # Map layer plumbing, selection, bounds, geocoding
 │   ├── terrain-rgb.ts     # Shared Terrain-RGB decode + tile math
@@ -357,6 +363,36 @@ clicked way, those stats drive the pane's **headline numbers** (via
   totals become the pane's headline stats; on a miss the totals are computed from
   the real-time samples instead.
 
+### Platform services (GPS, keep-awake, compass)
+
+The map runs in a browser today and inside an Expo (React Native WebView) shell
+later, where the native side provides background location, keep-awake and the
+compass. Everything that touches a device capability goes through
+`src/platform/`:
+
+- **`types.ts`** defines the contracts: `GeolocationService`, `PositionWatch`,
+  `KeepAwakeService`, `HeadingService`, bundled as `PlatformServices` with a
+  `kind: 'web' | 'native'`. Fixes are the app's own `PositionFix`, never a DOM
+  `GeolocationPosition`; errors are `'permission-denied' | 'unavailable' |
+  'timeout'`.
+- **`web/`** wraps the Web APIs. Nothing outside `src/platform` may call
+  `navigator.geolocation`, `navigator.wakeLock` or listen to
+  `deviceorientation` directly.
+- **`usePlatform()`** (`context.tsx`) returns the services. No provider means
+  the browser; a host supplying native services wraps the map in
+  `PlatformProvider`.
+- **`positions` is one shared, ref-counted GPS stream.** `useLocationTracking`
+  (the dot, follow-me and compass mode) and `useRideRecording` both subscribe
+  to it, so recording never starts a second watch. The first subscriber
+  starts the hardware, the last stops it. `positions.requestFix()` returns a
+  one-off fix without broadcasting it — a cached coarse fix paints the dot on a
+  cold start but must never become a ride track point.
+- **`useKeepAwake(active)`** holds the platform's screen lock; holders are
+  counted, so tracking and recording can each hold it.
+- The GPS watch starts on the first explicit opt-in (locate button or Record),
+  never on map load, and stays on for the life of the map once started so a
+  rider can turn following off and still see where they are.
+
 ### Mapbox UI Overlays
 
 - The Mapbox canvas (`.map-container`) uses `position: absolute` with `z-index: 500` and covers the full viewport. It will obscure any sibling or child elements with a lower z-index.
@@ -424,7 +460,7 @@ All component styling uses Tailwind utility classes. The only remaining custom C
 
 Tests are in `*.test.ts` or `*.test.tsx` files adjacent to their source files. Run with `pnpm test:run`.
 
-Coverage spans ~30 test files: map utilities (`src/utils/map.test.ts`), config/city selection (`src/config/map.config.test.ts`), GBFS (`src/data/gbfs.test.ts`), ride recording/stats/storage (`src/hooks/useRideRecording.test.ts`, `src/utils/ride-*.test.ts`, `src/utils/elevation-accuracy.test.ts`), elevation (`dem`, `osm-elevation`, `gpx`), and components (`MapLegend`, `RidesPanel`, sidebar components). `src/components/Map.tsx` has no tests (known gap — see the deferred GPS/compass hook extraction).
+Coverage spans ~90 test files: map utilities (`src/utils/map.test.ts`), config/city selection (`src/config/map.config.test.ts`), GBFS (`src/data/gbfs.test.ts`), ride recording/stats/storage (`src/hooks/useRideRecording.test.ts`, `src/utils/ride-*.test.ts`, `src/utils/elevation-accuracy.test.ts`), elevation (`dem`, `osm-elevation`, `gpx`), location tracking and the platform services (`src/hooks/useLocationTracking.test.tsx`, `src/platform/**`), and components (`MapLegend`, `RidesPanel`, sidebar components). `src/components/Map.tsx` itself has no tests; its GPS, compass and recording glue lives in tested hooks.
 
 ### Mapbox Testing Limitations
 

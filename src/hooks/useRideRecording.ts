@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RecordedRide, RidePoint, StoredRidePoint } from '../data/ride';
 import { generateRideName, splitRideSegments } from '../data/ride';
 import { MAP_EVENTS, dispatchMapEvent } from '../events';
+import { usePlatform } from '@/platform/context';
+import type { PositionError, Unsubscribe } from '@/platform/types';
 import {
   computeBounds,
   computeDistance,
@@ -60,6 +62,9 @@ interface UseRideRecordingReturn {
 export function useRideRecording(
   onNotify?: NotifyCallback,
 ): UseRideRecordingReturn {
+  // Fixes come from the platform's shared watch (the location marker uses the
+  // same one), so recording never starts a second GPS watch.
+  const { positions } = usePlatform();
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [hasRecovery, setHasRecovery] = useState(false);
@@ -87,7 +92,7 @@ export function useRideRecording(
     undefined,
   );
   const pointsRef = useRef<RidePoint[]>([]);
-  const watchIdRef = useRef<number | null>(null);
+  const stopPositionsRef = useRef<Unsubscribe | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(
     undefined,
   );
@@ -108,17 +113,14 @@ export function useRideRecording(
         }
       }
 
-      // Request an immediate position fix to minimize the gap
-      navigator.geolocation.getCurrentPosition(
-        () => {}, // watchPosition will pick up the next point
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 },
-      );
+      // Nudge the hardware for an immediate fix to shorten the gap; the
+      // watch delivers the next point.
+      positions.requestFix().catch(() => {});
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility);
-  }, [isRecording, onNotify]);
+  }, [isRecording, onNotify, positions]);
 
   // Warn before closing tab while recording
   useEffect(() => {
@@ -137,10 +139,8 @@ export function useRideRecording(
   // restore its controls. A path that skipped it left the map stuck in
   // recording mode with no recorder behind it.
   const cleanup = useCallback((stopDetail: { rideId?: string } = {}) => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
+    stopPositionsRef.current?.();
+    stopPositionsRef.current = null;
     if (timerRef.current !== undefined) {
       clearInterval(timerRef.current);
       timerRef.current = undefined;
@@ -166,9 +166,12 @@ export function useRideRecording(
 
   // Shared: start GPS watch, elapsed timer, and periodic save
   const startGpsWatchAndTimers = useCallback(() => {
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const speed = position.coords.speed ?? 0;
+    // Set if the provider fails inside subscribe(), before we hold its stop
+    // function: cleanup() has already run, so the rest of startup must not.
+    let failedDuringSubscribe = false;
+    const stopPositions = positions.subscribe(
+      (fix) => {
+        const speed = fix.speed ?? 0;
         const AUTO_PAUSE_SPEED = 0.5; // m/s (~1.1 mph)
         const AUTO_PAUSE_COUNT = 3; // consecutive low-speed readings
 
@@ -203,12 +206,12 @@ export function useRideRecording(
         segmentBreakRef.current = false;
 
         const point: RidePoint = {
-          lng: position.coords.longitude,
-          lat: position.coords.latitude,
-          altitude: position.coords.altitude,
-          accuracy: position.coords.accuracy,
-          speed: position.coords.speed,
-          timestamp: position.timestamp,
+          lng: fix.lng,
+          lat: fix.lat,
+          altitude: fix.altitude,
+          accuracy: fix.accuracy,
+          speed: fix.speed,
+          timestamp: fix.timestamp,
           ...(startsNewSegment && { segmentStart: true }),
         };
         pointsRef.current.push(point);
@@ -244,7 +247,7 @@ export function useRideRecording(
         }
 
         // Filter 1: skip readings with poor altitude accuracy
-        const altAccuracy = position.coords.altitudeAccuracy;
+        const altAccuracy = fix.altitudeAccuracy;
         const altValue = point.altitude;
 
         if (startsNewSegment) {
@@ -306,9 +309,11 @@ export function useRideRecording(
           }
         }
       },
-      (error) => {
-        // Timeout is transient; permission/unavailable are fatal.
-        if (error.code === 3) return;
+      (error: PositionError) => {
+        // A timeout is transient; the watch keeps going. Permission denied or
+        // no provider means the ride cannot continue.
+        if (error.code === 'timeout') return;
+        failedDuringSubscribe = true;
         // Keep what was recorded so far: the periodic save may be up to ten
         // seconds behind, and cleanup() would otherwise clear the in-progress
         // record and lose the ride. The recovery banner offers "Save it".
@@ -321,17 +326,17 @@ export function useRideRecording(
         }
         cleanup();
         onNotify?.(
-          error.code === 1
+          error.code === 'permission-denied'
             ? 'Location permission denied — cannot record ride'
             : 'GPS unavailable — check your device settings',
         );
       },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 5000,
-      },
     );
+    if (failedDuringSubscribe) {
+      stopPositions();
+      return;
+    }
+    stopPositionsRef.current = stopPositions;
 
     // Start elapsed time counter
     timerRef.current = setInterval(() => {
@@ -355,7 +360,7 @@ export function useRideRecording(
     }, 10_000);
 
     dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_START);
-  }, [cleanup, onNotify]);
+  }, [cleanup, onNotify, positions]);
 
   const startRecording = useCallback(() => {
     if (isRecording) return;
@@ -622,8 +627,7 @@ export function useRideRecording(
   // Cleanup on unmount — use refs directly to avoid stale closure from cleanup()
   useEffect(() => {
     return () => {
-      if (watchIdRef.current !== null)
-        navigator.geolocation.clearWatch(watchIdRef.current);
+      stopPositionsRef.current?.();
       if (timerRef.current !== undefined) clearInterval(timerRef.current);
       if (saveIntervalRef.current !== undefined)
         clearInterval(saveIntervalRef.current);
