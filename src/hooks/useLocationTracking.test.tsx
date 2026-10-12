@@ -247,6 +247,87 @@ describe('useLocationTracking', () => {
     expect(platform.services.positions.subscribe).toHaveBeenCalledTimes(2);
   });
 
+  it('unsubscribes and permits a locate retry after a synchronous fatal error', async () => {
+    vi.useFakeTimers();
+    const platform = fakePlatform();
+    vi.mocked(platform.services.positions.subscribe).mockImplementationOnce(
+      (_fix, onError) => {
+        onError?.({ code: 'unavailable', message: 'no provider' });
+        return platform.unsubscribe;
+      },
+    );
+    const { result } = renderTracking(platform);
+    await act(() => result.current.cycleMode());
+    expect(platform.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(result.current.isTracking).toBe(false);
+    expect(platform.requestFix).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+
+    await act(() => result.current.cycleMode());
+    expect(platform.services.positions.subscribe).toHaveBeenCalledTimes(2);
+    expect(result.current.isTracking).toBe(true);
+  });
+
+  it('ignores a cold-start fix after the live watch fails', async () => {
+    const platform = fakePlatform();
+    let resolveFix!: (fix: PositionFix) => void;
+    platform.requestFix.mockReturnValue(
+      new Promise<PositionFix>((resolve) => {
+        resolveFix = resolve;
+      }),
+    );
+    const { result, map } = renderTracking(platform);
+    act(() => result.current.setTracking(true));
+    act(() => platform.fail({ code: 'permission-denied', message: '' }));
+    await act(async () => resolveFix(FIX));
+    expect(markerInstances).toHaveLength(0);
+    expect(map.flyTo).not.toHaveBeenCalled();
+    expect(result.current.isTracking).toBe(false);
+  });
+
+  it('ignores a cold-start fix after unmount', async () => {
+    const platform = fakePlatform();
+    let resolveFix!: (fix: PositionFix) => void;
+    platform.requestFix.mockReturnValue(
+      new Promise<PositionFix>((resolve) => {
+        resolveFix = resolve;
+      }),
+    );
+    const { result, unmount, map } = renderTracking(platform);
+    act(() => result.current.setTracking(true));
+    unmount();
+    await act(async () => resolveFix(FIX));
+    expect(markerInstances).toHaveLength(0);
+    expect(map.flyTo).not.toHaveBeenCalled();
+  });
+
+  it.each(['stopped', 'unmounted'])(
+    'does not start compass after permission resolves for a %s session',
+    async (session) => {
+      const platform = fakePlatform();
+      let resolvePermission!: (allowed: boolean) => void;
+      platform.requestPermission.mockReturnValue(
+        new Promise<boolean>((resolve) => {
+          resolvePermission = resolve;
+        }),
+      );
+      const { result, unmount } = renderTracking(platform);
+      act(() => result.current.setTracking(true));
+      let cycle!: Promise<void>;
+      act(() => {
+        cycle = result.current.cycleMode();
+      });
+      if (session === 'unmounted') unmount();
+      else act(() => result.current.setTracking(false));
+      await act(async () => {
+        resolvePermission(true);
+        await cycle;
+      });
+      expect(platform.services.heading.watchHeading).not.toHaveBeenCalled();
+      expect(result.current.isCompassMode).toBe(false);
+    },
+  );
+
   it('releases the watch, the compass and the marker on unmount', async () => {
     const platform = fakePlatform();
     const { result, unmount } = renderTracking(platform);
