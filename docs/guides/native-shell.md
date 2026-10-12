@@ -11,6 +11,10 @@ leaves the others on their web implementations.
 The page side lives in `src/platform/native/`. The protocol's single source of
 truth is [`src/platform/native/protocol.ts`](../../src/platform/native/protocol.ts);
 this guide restates it for the native implementer. **Change them together.**
+Version 1 is provisional until it has been exercised by a real Expo host. The
+host implementation is not yet linked from this repository; add its location
+here when it exists. Once native builds ship, incompatible protocol changes
+must increment `PROTOCOL_VERSION`.
 
 ## 1. Announce the host before the page loads
 
@@ -25,16 +29,15 @@ window.__bikemapNative = {
 };
 ```
 
-The page only treats itself as embedded when **both** `window.ReactNativeWebView`
+The page uses native services when **both** `window.ReactNativeWebView`
 (provided by `react-native-webview`) and a compatible `__bikemapNative` are
-present. A different `protocolVersion` is ignored and the page falls back to
-the browser APIs, so an old app build against a new site keeps working.
+present, reporting `kind: 'native'` from `usePlatform()`. A different
+`protocolVersion` falls back to browser APIs, so an old app build against a
+new site keeps working.
 
-When embedded, the page also:
-
-- skips the "Add to home screen" prompt and service-worker registration;
-- reports `kind: 'native'` from `usePlatform()`, for any further UI
-  differences.
+The presence of both globals suppresses the "Add to home screen" prompt and
+service-worker registration regardless of protocol compatibility: an older
+shell is still an installed app.
 
 ## 2. Channel
 
