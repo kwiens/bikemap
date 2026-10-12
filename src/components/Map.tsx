@@ -1634,7 +1634,11 @@ const MapboxMap = memo(function MapboxMap() {
 
       <ElevationProfile />
 
-      {/* Location tracking toggle */}
+      {/* Location tracking toggle. It sits in the top-right control stack
+          under Mapbox's zoom/compass buttons (see .mapboxgl-ctrl-top-right in
+          map.css) and follows them down on a phone while recording. It used
+          to sit at the bottom right, where the elevation pane covered it the
+          moment a trail or ride was selected. */}
       {mapConfig.debug.showLocationTracker && (
         <div
           onClick={toggleWatchLocation}
@@ -1647,7 +1651,9 @@ const MapboxMap = memo(function MapboxMap() {
           role="button"
           tabIndex={0}
           className={cn(
-            'fixed bottom-[60px] right-4 w-10 h-10 rounded-full cursor-pointer z-[501] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-colors duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
+            'fixed right-[18px] top-[calc(184px+env(safe-area-inset-top))] w-10 h-10 rounded-full cursor-pointer z-[501] shadow-[0_2px_4px_rgba(0,0,0,0.2)] text-white flex items-center justify-center bg-white transition-[background-color,top] duration-200 [&_svg]:w-5 active:bg-[#e5e5e5]',
+            recordingActive &&
+              'max-md:top-[calc(244px+env(safe-area-inset-top))]',
             watchingLocation &&
               !compassMode &&
               'bg-[rgb(165,240,255)] active:bg-[rgb(145,220,235)]',
