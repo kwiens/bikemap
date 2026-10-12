@@ -184,9 +184,9 @@ async function handle(ref, subs, msg) {
 }
 ```
 
-A complete host — every message, permissions, background location, the share
-sheet — is in [`examples/expo-shell/`](../../examples/expo-shell/README.md).
-Copy it into an Expo app rather than starting from the sketch above.
+The real host lives in this repository at `native/` (an Expo app with its own
+pnpm root; see its README). Its bridge host (`native/src/bridge/host.ts`)
+is the reference for every message above, including the share sheet.
 
 ## 5. Testing the page side without a device
 
