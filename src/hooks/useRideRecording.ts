@@ -80,6 +80,7 @@ export function useRideRecording(
   const pauseStartRef = useRef(0);
   const lowSpeedCountRef = useRef(0); // consecutive low-speed GPS readings
   const preserveProgressRef = useRef(false); // keep in-progress data if GPS fails during continue
+  const gpsSessionRef = useRef(0); // invalidate callbacks already queued by a cleared watch
   const stoppingRef = useRef(false); // synchronous re-entry guard for stopRecording
   const segmentBreakRef = useRef(false); // next GPS point follows a manual pause — don't bridge it
 
@@ -130,13 +131,8 @@ export function useRideRecording(
     return () => window.removeEventListener('beforeunload', handler);
   }, [isRecording]);
 
-  // The single exit from a recording session. Every path out — Finish, a too
-  // short ride, a failed save, a fatal GPS error — ends here, and this is the
-  // only place RIDE_RECORDING_STOP is dispatched: the map relies on that event
-  // to drop the live track, release the wake lock, stop trail auto-detect and
-  // restore its controls. A path that skipped it left the map stuck in
-  // recording mode with no recorder behind it.
-  const cleanup = useCallback((stopDetail: { rideId?: string } = {}) => {
+  const releaseGpsWatchAndTimers = useCallback(() => {
+    gpsSessionRef.current += 1;
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
@@ -149,27 +145,43 @@ export function useRideRecording(
       clearInterval(saveIntervalRef.current);
       saveIntervalRef.current = undefined;
     }
-    if (preserveProgressRef.current) {
-      preserveProgressRef.current = false;
-      setHasRecovery(true); // re-show recovery banner so user can retry or save
-    } else {
-      void clearInProgress();
-    }
-    setIsRecording(false);
-    setIsPaused(false);
-    setElapsedTime(0);
-    setLiveDistance(0);
-    setLiveElevationGain(0);
-    segmentBreakRef.current = false;
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP, { detail: stopDetail }),
-    );
   }, []);
+
+  // The single exit from a recording session. Every path out — Finish, a too
+  // short ride, a failed save, a fatal GPS error — ends here, and this is the
+  // only place RIDE_RECORDING_STOP is dispatched: the map relies on that event
+  // to drop the live track, release the wake lock, stop trail auto-detect and
+  // restore its controls. A path that skipped it left the map stuck in
+  // recording mode with no recorder behind it.
+  const cleanup = useCallback(
+    (stopDetail: { rideId?: string } = {}) => {
+      releaseGpsWatchAndTimers();
+      if (preserveProgressRef.current) {
+        preserveProgressRef.current = false;
+        setHasRecovery(true); // re-show recovery banner so user can retry or save
+      } else {
+        void clearInProgress();
+        setHasRecovery(false);
+      }
+      setIsRecording(false);
+      setIsPaused(false);
+      setElapsedTime(0);
+      setLiveDistance(0);
+      setLiveElevationGain(0);
+      segmentBreakRef.current = false;
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP, { detail: stopDetail }),
+      );
+    },
+    [releaseGpsWatchAndTimers],
+  );
 
   // Shared: start GPS watch, elapsed timer, and periodic save
   const startGpsWatchAndTimers = useCallback(() => {
+    const session = ++gpsSessionRef.current;
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
+        if (session !== gpsSessionRef.current) return;
         const speed = position.coords.speed ?? 0;
         const AUTO_PAUSE_SPEED = 0.5; // m/s (~1.1 mph)
         const AUTO_PAUSE_COUNT = 3; // consecutive low-speed readings
@@ -313,6 +325,7 @@ export function useRideRecording(
         }
       },
       (error) => {
+        if (session !== gpsSessionRef.current) return;
         // Timeout is transient; permission/unavailable are fatal.
         if (error.code === 3) return;
         // Keep what was recorded so far: the periodic save may be up to ten
@@ -364,7 +377,7 @@ export function useRideRecording(
   }, [cleanup, onNotify]);
 
   const startRecording = useCallback(() => {
-    if (isRecording) return;
+    if (isRecording || stoppingRef.current) return;
 
     pointsRef.current = [];
     startTimeRef.current = Date.now();
@@ -485,6 +498,10 @@ export function useRideRecording(
     // duplicate ride. The ref guards synchronously.
     if (!isRecording || stoppingRef.current) return null;
     stoppingRef.current = true;
+    const endTime = Date.now();
+    // Freeze the session before any asynchronous work. Queued GPS callbacks
+    // must not append points or dispatch a second stop while Finish is saving.
+    releaseGpsWatchAndTimers();
 
     try {
       if (pointsRef.current.length < 2) {
@@ -494,11 +511,17 @@ export function useRideRecording(
       }
 
       const points = [...pointsRef.current];
+      // Finish can happen before the periodic checkpoint. Persist the final
+      // snapshot so a failed save can recover even a ride under ten seconds.
+      await saveInProgress({
+        startTime: startTimeRef.current,
+        points,
+      }).catch(() => {});
       const { corrected, deduplicated } = await tryDemCorrection(points);
       const ride = buildRide(
         points,
         startTimeRef.current,
-        Date.now(),
+        endTime,
         corrected,
         deduplicated,
       );
@@ -522,7 +545,7 @@ export function useRideRecording(
     } finally {
       stoppingRef.current = false;
     }
-  }, [isRecording, cleanup, onNotify]);
+  }, [isRecording, cleanup, onNotify, releaseGpsWatchAndTimers]);
 
   useEffect(() => {
     void loadInProgress()
@@ -561,7 +584,7 @@ export function useRideRecording(
   }, []);
 
   const continueRide = useCallback(async () => {
-    if (isRecording) return;
+    if (isRecording || stoppingRef.current) return;
     const data = await loadInProgress();
     if (!data || data.points.length < 2) {
       await clearInProgress();
@@ -629,16 +652,10 @@ export function useRideRecording(
     setHasRecovery(false);
   }, []);
 
-  // Cleanup on unmount — use refs directly to avoid stale closure from cleanup()
+  // Keep the checkpoint on unmount, but invalidate queued GPS callbacks.
   useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null)
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      if (timerRef.current !== undefined) clearInterval(timerRef.current);
-      if (saveIntervalRef.current !== undefined)
-        clearInterval(saveIntervalRef.current);
-    };
-  }, []);
+    return releaseGpsWatchAndTimers;
+  }, [releaseGpsWatchAndTimers]);
 
   return {
     isRecording,

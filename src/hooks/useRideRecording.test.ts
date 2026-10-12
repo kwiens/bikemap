@@ -464,8 +464,82 @@ describe('useRideRecording', () => {
     expect(onNotify).toHaveBeenLastCalledWith('Ride saved!');
   });
 
-  it('keeps the save-failure message when the save throws', async () => {
-    const { saveRide } = await import('@/utils/ride-storage');
+  it('freezes GPS and ignores queued errors while Finish is saving', async () => {
+    const { saveInProgress, saveRide } = await import('@/utils/ride-storage');
+    let finishCheckpoint!: () => void;
+    vi.mocked(saveInProgress).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishCheckpoint = resolve;
+        }),
+    );
+    const onNotify = vi.fn();
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    try {
+      const { result } = renderHook(() => useRideRecording(onNotify));
+      act(() => {
+        result.current.startRecording();
+      });
+      act(() => {
+        simulatePosition(-85.3, 35.0);
+        simulatePosition(-85.31, 35.01);
+      });
+      let stopping!: ReturnType<typeof result.current.stopRecording>;
+      act(() => {
+        stopping = result.current.stopRecording();
+      });
+      expect(geo.clearWatch).toHaveBeenCalledWith(42);
+      act(() => {
+        simulatePosition(-85.32, 35.02);
+        errorCallback?.({ code: 2 } as GeolocationPositionError);
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(events).toHaveLength(0);
+      expect(onNotify).not.toHaveBeenCalled();
+      expect(saveInProgress).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        finishCheckpoint();
+        await stopping;
+      });
+      const savedRide = vi.mocked(saveRide).mock.calls[0][0];
+      expect(savedRide.points).toHaveLength(2);
+      expect(savedRide.endTime).toBe(savedRide.points[1].timestamp);
+      expect(events).toHaveLength(1);
+      expect(events[0].detail).toEqual({ rideId: 'test-uuid' });
+      expect(onNotify).toHaveBeenCalledExactlyOnceWith('Ride saved!');
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    }
+  });
+
+  it('ignores callbacks from a failed GPS session after starting another ride', () => {
+    const onNotify = vi.fn();
+    const { result } = renderHook(() => useRideRecording(onNotify));
+    act(() => {
+      result.current.startRecording();
+    });
+    const oldError = errorCallback;
+    act(() => {
+      oldError?.({ code: 2 } as GeolocationPositionError);
+    });
+    act(() => {
+      result.current.startRecording();
+    });
+    onNotify.mockClear();
+    act(() => {
+      oldError?.({ code: 1 } as GeolocationPositionError);
+    });
+    expect(result.current.isRecording).toBe(true);
+    expect(onNotify).not.toHaveBeenCalled();
+    expect(geo.clearWatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('checkpoints a short ride and keeps recovery when the save throws', async () => {
+    const { saveRide, saveInProgress, clearInProgress } = await import(
+      '@/utils/ride-storage'
+    );
     (saveRide as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error('quota'),
     );
@@ -488,6 +562,15 @@ describe('useRideRecording', () => {
     });
 
     expect(ride).toBeNull();
+    expect(saveInProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        points: expect.arrayContaining([
+          expect.objectContaining({ lng: -85.3 }),
+          expect.objectContaining({ lng: -85.31 }),
+        ]),
+      }),
+    );
+    expect(clearInProgress).not.toHaveBeenCalled();
     expect(onNotify).toHaveBeenCalledTimes(1);
     expect(onNotify).toHaveBeenCalledWith(
       'Could not save your ride — open Rides to recover it.',
