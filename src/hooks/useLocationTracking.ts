@@ -81,6 +81,9 @@ export function useLocationTracking({
   // Set when tracking is enabled before any fix exists: the next fix flies
   // the map there (iOS cold start otherwise leaves the map where it was).
   const flyToNextFix = useRef(false);
+  // Invalidate pending device requests when their tracking session ends.
+  const coldStartRequest = useRef(0);
+  const compassRequest = useRef(0);
   const stopHeading = useRef<Unsubscribe | null>(null);
   const compassHeading = useRef<number | null>(null);
   // Course over ground from the last moving fix: at speed it beats the
@@ -127,9 +130,18 @@ export function useLocationTracking({
     [map],
   );
 
+  const stopCompass = useCallback(() => {
+    compassRequest.current += 1;
+    stopHeading.current?.();
+    stopHeading.current = null;
+    compassHeading.current = null;
+    setIsCompassMode(false);
+  }, []);
+
   const ensureWatching = useCallback(() => {
-    if (stopPositions.current) return;
-    stopPositions.current = positions.subscribe(
+    if (stopPositions.current) return true;
+    let hasFailed = false;
+    const unsubscribe = positions.subscribe(
       (fix) => {
         gpsHeading.current =
           fix.speed !== null && fix.heading !== null && fix.speed > 0
@@ -144,20 +156,30 @@ export function useLocationTracking({
         // the next recording) starts the hardware again rather than joining
         // a stream the browser has already closed.
         if (error.code === 'timeout') return;
+        hasFailed = true;
+        coldStartRequest.current += 1;
+        flyToNextFix.current = false;
+        gpsHeading.current = null;
+        setIsTracking(false);
+        stopCompass();
+        if (recenterTimer.current) {
+          clearInterval(recenterTimer.current);
+          recenterTimer.current = null;
+        }
         marker.current?.remove();
         marker.current = null;
         stopPositions.current?.();
         stopPositions.current = null;
       },
     );
-  }, [positions, paintFix]);
-
-  const stopCompass = useCallback(() => {
-    stopHeading.current?.();
-    stopHeading.current = null;
-    compassHeading.current = null;
-    setIsCompassMode(false);
-  }, []);
+    // The error callback can run before subscribe returns its handle.
+    if (hasFailed) {
+      unsubscribe();
+      return false;
+    }
+    stopPositions.current = unsubscribe;
+    return true;
+  }, [positions, paintFix, stopCompass]);
 
   const startCompass = useCallback(() => {
     const smoother = new HeadingSmoother();
@@ -184,7 +206,7 @@ export function useLocationTracking({
     (on: boolean) => {
       setIsTracking(on);
       if (on) {
-        ensureWatching();
+        if (!ensureWatching()) return;
         const currentMap = map.current;
         if (currentMap && marker.current) {
           const { lng, lat } = marker.current.getLngLat();
@@ -195,11 +217,14 @@ export function useLocationTracking({
           });
         } else if (currentMap) {
           flyToNextFix.current = true;
+          const request = ++coldStartRequest.current;
           positions
             .requestFix(COLD_START_FIX)
             .then((fix) => {
               // The live watch may have painted first.
-              if (!marker.current) paintFix(fix);
+              if (request === coldStartRequest.current && !marker.current) {
+                paintFix(fix);
+              }
             })
             .catch(() => {});
         }
@@ -221,6 +246,7 @@ export function useLocationTracking({
           liveMap.jumpTo(camera);
         }, RECENTER_INTERVAL_MS);
       } else {
+        coldStartRequest.current += 1;
         if (recenterTimer.current) {
           clearInterval(recenterTimer.current);
           recenterTimer.current = null;
@@ -249,7 +275,10 @@ export function useLocationTracking({
     if (!isTrackingRef.current) {
       setTracking(true);
     } else if (!isCompassModeRef.current) {
-      if (!(await heading.requestPermission())) {
+      const request = ++compassRequest.current;
+      const isAllowed = await heading.requestPermission();
+      if (request !== compassRequest.current) return;
+      if (!isAllowed) {
         setTracking(false);
         return;
       }
@@ -262,6 +291,9 @@ export function useLocationTracking({
   // Teardown with the map.
   useEffect(() => {
     return () => {
+      coldStartRequest.current += 1;
+      compassRequest.current += 1;
+      flyToNextFix.current = false;
       stopPositions.current?.();
       stopPositions.current = null;
       if (recenterTimer.current) clearInterval(recenterTimer.current);
