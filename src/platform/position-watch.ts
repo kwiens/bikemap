@@ -28,31 +28,47 @@ export function createPositionWatch(
   let stopWatch: Unsubscribe | null = null;
   let latest: PositionFix | null = null;
 
+  // Bumped on every start and stop. A browser can still deliver a callback
+  // for a watch that has been cleared (one already queued, or a provider
+  // that fires late), and a fatal error's fan-out can unsubscribe and
+  // re-subscribe synchronously. Without the generation check either one
+  // reaches the current subscribers or stops the hardware they now own.
+  let generation = 0;
+
   function stop() {
+    generation += 1;
     stopWatch?.();
     stopWatch = null;
     latest = null;
   }
 
   function start() {
+    const startedGeneration = ++generation;
+    const isCurrent = () => startedGeneration === generation;
     // A provider may fail synchronously, inside watchPosition, before it has
     // handed back its stop function. Note that and discard the handle.
     let diedWhileStarting = false;
     let starting = true;
     const handle = geolocation.watchPosition(
       (fix) => {
+        if (!isCurrent()) return;
         latest = fix;
         for (const subscriber of subscribers) subscriber.onFix(fix);
       },
       (error) => {
+        if (!isCurrent()) return;
         for (const subscriber of subscribers) subscriber.onError?.(error);
         // Browsers end the underlying watch for good after a denied
         // permission or a lost provider. Drop ours too, so the next
         // subscriber starts the hardware afresh instead of joining a stream
         // that will never speak again.
         if (error.code === 'timeout') return;
-        if (starting) diedWhileStarting = true;
-        else stop();
+        if (starting) {
+          diedWhileStarting = true;
+          generation += 1;
+        } else if (isCurrent()) {
+          stop();
+        }
       },
       options,
     );

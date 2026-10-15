@@ -137,6 +137,73 @@ describe('createPositionWatch', () => {
     expect(service.watchPosition).toHaveBeenCalledTimes(2);
   });
 
+  it('ignores late callbacks from a watch it has already stopped', () => {
+    const calls: Array<{
+      fix: (fix: PositionFix) => void;
+      fail: (error: PositionError) => void;
+      stop: ReturnType<typeof vi.fn>;
+    }> = [];
+    const service: GeolocationService = {
+      isSupported: () => true,
+      watchPosition: vi.fn((fix, fail) => {
+        const stop = vi.fn();
+        calls.push({ fix, fail, stop });
+        return stop;
+      }),
+      getCurrentPosition: vi.fn(),
+    };
+    const watch = createPositionWatch(service);
+    const fixes: PositionFix[] = [];
+    const errors: string[] = [];
+    watch.subscribe(
+      (fix) => fixes.push(fix),
+      (error) => errors.push(error.code),
+    );
+    calls[0].fail({ code: 'unavailable', message: '' });
+    // The next subscriber restarts the hardware.
+    watch.subscribe(() => {});
+    expect(calls).toHaveLength(2);
+
+    // The browser delivers stragglers for the first, cleared watch.
+    calls[0].fix(FIX);
+    calls[0].fail({ code: 'permission-denied', message: '' });
+    expect(fixes).toEqual([]);
+    expect(errors).toEqual(['unavailable']);
+    expect(calls[1].stop).not.toHaveBeenCalled();
+
+    calls[1].fix(FIX);
+    expect(fixes).toEqual([FIX]);
+  });
+
+  it('keeps a watch that a subscriber restarted from inside the error fan-out', () => {
+    const calls: Array<{
+      fail: (error: PositionError) => void;
+      stop: ReturnType<typeof vi.fn>;
+    }> = [];
+    const service: GeolocationService = {
+      isSupported: () => true,
+      watchPosition: vi.fn((_fix, fail) => {
+        const stop = vi.fn();
+        calls.push({ fail, stop });
+        return stop;
+      }),
+      getCurrentPosition: vi.fn(),
+    };
+    const watch = createPositionWatch(service);
+    let off: () => void = () => {};
+    off = watch.subscribe(
+      () => {},
+      () => {
+        // A subscriber that gives up and immediately tries again.
+        off();
+        off = watch.subscribe(() => {});
+      },
+    );
+    calls[0].fail({ code: 'unavailable', message: '' });
+    expect(calls).toHaveLength(2);
+    expect(calls[1].stop).not.toHaveBeenCalled();
+  });
+
   it('returns a requested fix without broadcasting it', async () => {
     const geo = fakeGeolocation();
     const watch = createPositionWatch(geo.service);
