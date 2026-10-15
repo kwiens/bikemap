@@ -84,7 +84,7 @@ and the host must honour it.
 | Host → page | Meaning |
 |---|---|
 | `{ type: "geolocation/fix", watchId, fix }` | A fix for an open watch. |
-| `{ type: "geolocation/error", watchId, error }` | The watch failed. `permission-denied` and `unavailable` end a ride recording; `timeout` is ignored and the watch is expected to continue. |
+| `{ type: "geolocation/error", watchId, error }` | An error on an open watch. `permission-denied` ends the watch and any ride recording. `unavailable` ends them only if the watch has not produced a fix yet (no provider); after a fix it means the signal was lost, the page keeps recording and expects the watch to carry on, so report a lost signal as `unavailable` and keep the watch running. `timeout` is ignored. |
 | `{ type: "geolocation/current", requestId, fix }` | Answer to `getCurrent`. |
 | `{ type: "geolocation/currentError", requestId, error }` | Failed answer to `getCurrent`. |
 

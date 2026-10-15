@@ -149,13 +149,21 @@ export function useLocationTracking({
             : null;
         paintFix(fix);
       },
-      (error) => {
+      (error, isFatal) => {
         // Timeouts are routine indoors and under tree cover; keep the dot and
-        // wait. Only a lost permission or no provider takes it down — and
-        // ends this subscription, so the next tap on the locate button (or
-        // the next recording) starts the hardware again rather than joining
-        // a stream the browser has already closed.
+        // wait.
         if (error.code === 'timeout') return;
+        if (!isFatal) {
+          // Signal lost after a fix (a tunnel, an iOS hiccup): the watch
+          // carries on, so keep following and let the next fix bring the dot
+          // back. A stale dot would claim a position we no longer know.
+          marker.current?.remove();
+          marker.current = null;
+          return;
+        }
+        // A lost permission or no provider ends tracking, and this
+        // subscription, so the next tap on the locate button (or the next
+        // recording) starts the hardware again.
         hasFailed = true;
         coldStartRequest.current += 1;
         flyToNextFix.current = false;

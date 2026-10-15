@@ -32,7 +32,8 @@ vi.mock('@/utils/ride-stats', async (importOriginal) => {
 });
 
 // Mock ride data
-vi.mock('@/data/ride', () => ({
+vi.mock('@/data/ride', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/data/ride')>()),
   generateRideName: vi.fn().mockReturnValue('Test Ride'),
 }));
 
@@ -360,9 +361,10 @@ describe('useRideRecording', () => {
         simulatePosition(-85.3, 35.0);
       });
       act(() => {
+        // Permission revoked mid-ride (a loss of signal is not fatal).
         errorCallback?.({
-          code: 2,
-          message: 'Position unavailable',
+          code: 1,
+          message: 'Permission revoked',
           PERMISSION_DENIED: 1,
           POSITION_UNAVAILABLE: 2,
           TIMEOUT: 3,
@@ -391,9 +393,10 @@ describe('useRideRecording', () => {
       simulatePosition(-85.31, 35.01);
     });
     act(() => {
+      // Permission revoked mid-ride (a loss of signal is not fatal).
       errorCallback?.({
-        code: 2,
-        message: 'Position unavailable',
+        code: 1,
+        message: 'Permission revoked',
         PERMISSION_DENIED: 1,
         POSITION_UNAVAILABLE: 2,
         TIMEOUT: 3,
@@ -406,6 +409,33 @@ describe('useRideRecording', () => {
     expect(clearInProgress).not.toHaveBeenCalled();
     expect(result.current.hasRecovery).toBe(true);
     expect(result.current.isRecording).toBe(false);
+  });
+
+  it('keeps recording through a loss of signal and warns once', () => {
+    const onNotify = vi.fn();
+    const { result } = renderHook(() => useRideRecording(onNotify));
+    act(() => {
+      result.current.startRecording();
+    });
+    act(() => {
+      simulatePosition(-85.3, 35.0);
+    });
+    const lost = { code: 2, message: 'location unknown' };
+    act(() => {
+      errorCallback?.(lost as GeolocationPositionError);
+      errorCallback?.(lost as GeolocationPositionError);
+    });
+    expect(result.current.isRecording).toBe(true);
+    expect(onNotify).toHaveBeenCalledTimes(1);
+    expect(onNotify).toHaveBeenCalledWith('GPS signal lost — still recording');
+
+    // Signal back, then lost again: a fresh warning.
+    act(() => {
+      simulatePosition(-85.31, 35.01);
+      errorCallback?.(lost as GeolocationPositionError);
+    });
+    expect(onNotify).toHaveBeenCalledTimes(2);
+    expect(result.current.isRecording).toBe(true);
   });
 
   it('dispatches RIDE_RECORDING_STOP exactly once per stop, with the ride id', async () => {
@@ -615,6 +645,59 @@ describe('useRideRecording', () => {
       window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
       window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
     }
+  });
+
+  it('clears the recovery record when a continued ride is saved before any fix', async () => {
+    const { loadInProgress, clearInProgress, saveRide } = await import(
+      '@/utils/ride-storage'
+    );
+    (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue({
+      startTime: Date.now() - 60000,
+      points: [
+        { lng: -85.3, lat: 35.0, altitude: 200, timestamp: Date.now() - 60000 },
+        { lng: -85.31, lat: 35.01, altitude: 210, timestamp: Date.now() },
+      ],
+    });
+    const { result } = renderHook(() => useRideRecording());
+    await act(async () => {
+      await result.current.continueRide();
+    });
+    (clearInProgress as ReturnType<typeof vi.fn>).mockClear();
+
+    // Finish before the GPS has produced a single fix.
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+
+    expect(saveRide).toHaveBeenCalled();
+    expect(clearInProgress).toHaveBeenCalled();
+    expect(result.current.hasRecovery).toBe(false);
+    (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+  });
+
+  it('saves a recovered ride once even when Save it is tapped twice', async () => {
+    const { loadInProgress, saveRide } = await import('@/utils/ride-storage');
+    (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue({
+      startTime: Date.now() - 60000,
+      points: [
+        { lng: -85.3, lat: 35.0, altitude: 200, timestamp: Date.now() - 60000 },
+        { lng: -85.31, lat: 35.01, altitude: 210, timestamp: Date.now() },
+      ],
+    });
+    (saveRide as ReturnType<typeof vi.fn>).mockClear();
+    const { result } = renderHook(() => useRideRecording());
+
+    let rides: unknown[] = [];
+    await act(async () => {
+      rides = await Promise.all([
+        result.current.recoverRide(),
+        result.current.recoverRide(),
+      ]);
+    });
+
+    expect(saveRide).toHaveBeenCalledTimes(1);
+    expect(rides.filter(Boolean)).toHaveLength(1);
+    (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue(null);
   });
 
   it('checks for crash recovery on mount', async () => {

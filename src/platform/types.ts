@@ -59,12 +59,17 @@ export interface GeolocationService {
  * location marker and the ride recorder never run two GPS watches at once.
  */
 export interface PositionWatch {
+  /**
+   * `onError` receives every error plus whether it ended the stream (see
+   * `isFatalPositionError`). The stream decides once, so subscribers that
+   * joined at different times can't disagree about whether GPS is gone.
+   * After a fatal error the stream has stopped the hardware; the next
+   * subscriber starts it again.
+   */
   subscribe(
     onFix: (fix: PositionFix) => void,
-    onError?: (error: PositionError) => void,
+    onError?: (error: PositionError, isFatal: boolean) => void,
   ): Unsubscribe;
-  /** The most recent fix from the watch, if it has produced one. */
-  latest(): PositionFix | null;
   /**
    * Ask for a single fix outside the stream — a cached coarse one to paint
    * the dot on a cold start, or a nudge to the hardware after the app comes
