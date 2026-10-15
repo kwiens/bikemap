@@ -57,33 +57,30 @@ describe('createPositionWatch', () => {
     expect(geo.stop).toHaveBeenCalledTimes(1);
   });
 
-  it('fans fixes and errors out to every subscriber and remembers the latest fix', () => {
+  it('fans fixes and errors out to every subscriber', () => {
     const geo = fakeGeolocation();
     const watch = createPositionWatch(geo.service);
     const fixesA: PositionFix[] = [];
     const fixesB: PositionFix[] = [];
-    const errors: PositionError[] = [];
+    const errors: Array<[PositionError, boolean]> = [];
     watch.subscribe((fix) => fixesA.push(fix));
     watch.subscribe(
       (fix) => fixesB.push(fix),
-      (error) => errors.push(error),
+      (error, isFatal) => errors.push([error, isFatal]),
     );
 
-    expect(watch.latest()).toBeNull();
     geo.emit(FIX);
     geo.fail({ code: 'timeout', message: 'slow' });
 
     expect(fixesA).toEqual([FIX]);
     expect(fixesB).toEqual([FIX]);
-    expect(errors).toEqual([{ code: 'timeout', message: 'slow' }]);
-    expect(watch.latest()).toEqual(FIX);
+    expect(errors).toEqual([[{ code: 'timeout', message: 'slow' }, false]]);
   });
 
   it('restarts cleanly after the last subscriber leaves', () => {
     const geo = fakeGeolocation();
     const watch = createPositionWatch(geo.service);
     watch.subscribe(() => {})();
-    expect(watch.latest()).toBeNull();
     watch.subscribe(() => {});
     expect(geo.service.watchPosition).toHaveBeenCalledTimes(2);
   });
@@ -103,12 +100,43 @@ describe('createPositionWatch', () => {
     geo.fail({ code: 'permission-denied', message: '' });
     expect(errors).toEqual(['timeout', 'permission-denied']);
     expect(geo.stop).toHaveBeenCalledTimes(1);
-    expect(watch.latest()).toBeNull();
 
     // The first subscriber is still attached; a second one brings the
     // hardware back for both.
     watch.subscribe(() => {});
     expect(geo.service.watchPosition).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the watch through a loss of signal after a fix', () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+    const errors: Array<[string, boolean]> = [];
+    const fixes: PositionFix[] = [];
+    watch.subscribe(
+      (fix) => fixes.push(fix),
+      (error, isFatal) => errors.push([error.code, isFatal]),
+    );
+    geo.emit(FIX);
+    // iOS reports a tunnel or a bridge as POSITION_UNAVAILABLE and keeps
+    // the watch running.
+    geo.fail({ code: 'unavailable', message: 'location unknown' });
+    expect(errors).toEqual([['unavailable', false]]);
+    expect(geo.stop).not.toHaveBeenCalled();
+    geo.emit(FIX);
+    expect(fixes).toHaveLength(2);
+  });
+
+  it('ends the watch when no provider ever produced a fix', () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+    const errors: Array<[string, boolean]> = [];
+    watch.subscribe(
+      () => {},
+      (error, isFatal) => errors.push([error.code, isFatal]),
+    );
+    geo.fail({ code: 'unavailable', message: 'no provider' });
+    expect(errors).toEqual([['unavailable', true]]);
+    expect(geo.stop).toHaveBeenCalledTimes(1);
   });
 
   it('survives a provider that fails synchronously inside watchPosition', () => {
