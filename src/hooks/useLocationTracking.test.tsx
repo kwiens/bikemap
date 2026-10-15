@@ -47,7 +47,7 @@ const FIX: PositionFix = {
 
 function fakePlatform() {
   let onFix: ((fix: PositionFix) => void) | null = null;
-  let onError: ((error: PositionError) => void) | null = null;
+  let onError: ((error: PositionError, isFatal: boolean) => void) | null = null;
   let onHeading: ((deg: number) => void) | null = null;
   const unsubscribe = vi.fn();
   const stopHeading = vi.fn();
@@ -61,7 +61,6 @@ function fakePlatform() {
         onError = error;
         return unsubscribe;
       }),
-      latest: () => null,
       requestFix,
     },
     heading: {
@@ -80,7 +79,12 @@ function fakePlatform() {
     requestFix,
     requestPermission,
     emit: (fix: PositionFix) => onFix?.(fix),
-    fail: (error: PositionError) => onError?.(error),
+    // The stream's verdict defaults to the one it gives with no fix yet.
+    fail: (
+      error: PositionError,
+      isFatal = error.code === 'permission-denied' ||
+        error.code === 'unavailable',
+    ) => onError?.(error, isFatal),
     turn: (deg: number) => onHeading?.(deg),
   };
 }
@@ -247,12 +251,28 @@ describe('useLocationTracking', () => {
     expect(platform.services.positions.subscribe).toHaveBeenCalledTimes(2);
   });
 
+  it('hides the dot but keeps tracking through a loss of signal', () => {
+    const platform = fakePlatform();
+    const { result } = renderTracking(platform);
+    act(() => result.current.setTracking(true));
+    act(() => platform.emit(FIX));
+
+    act(() => platform.fail({ code: 'unavailable', message: 'tunnel' }, false));
+    expect(markerInstances[0].remove).toHaveBeenCalled();
+    expect(result.current.isTracking).toBe(true);
+    expect(platform.unsubscribe).not.toHaveBeenCalled();
+
+    // The next fix brings the dot back.
+    act(() => platform.emit(FIX));
+    expect(markerInstances).toHaveLength(2);
+  });
+
   it('unsubscribes and permits a locate retry after a synchronous fatal error', async () => {
     vi.useFakeTimers();
     const platform = fakePlatform();
     vi.mocked(platform.services.positions.subscribe).mockImplementationOnce(
       (_fix, onError) => {
-        onError?.({ code: 'unavailable', message: 'no provider' });
+        onError?.({ code: 'unavailable', message: 'no provider' }, true);
         return platform.unsubscribe;
       },
     );

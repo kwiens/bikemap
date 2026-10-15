@@ -84,10 +84,10 @@ export function createWebKeepAwake(): KeepAwakeService {
         document.addEventListener('visibilitychange', handleVisibility);
         void acquireLock();
       }
-      let released = false;
+      let isReleased = false;
       return () => {
-        if (released) return;
-        released = true;
+        if (isReleased) return;
+        isReleased = true;
         holders -= 1;
         if (holders === 0) releaseAll();
       };

@@ -361,9 +361,10 @@ describe('useRideRecording', () => {
         simulatePosition(-85.3, 35.0);
       });
       act(() => {
+        // Permission revoked mid-ride (a loss of signal is not fatal).
         errorCallback?.({
-          code: 2,
-          message: 'Position unavailable',
+          code: 1,
+          message: 'Permission revoked',
           PERMISSION_DENIED: 1,
           POSITION_UNAVAILABLE: 2,
           TIMEOUT: 3,
@@ -392,9 +393,10 @@ describe('useRideRecording', () => {
       simulatePosition(-85.31, 35.01);
     });
     act(() => {
+      // Permission revoked mid-ride (a loss of signal is not fatal).
       errorCallback?.({
-        code: 2,
-        message: 'Position unavailable',
+        code: 1,
+        message: 'Permission revoked',
         PERMISSION_DENIED: 1,
         POSITION_UNAVAILABLE: 2,
         TIMEOUT: 3,
@@ -407,6 +409,33 @@ describe('useRideRecording', () => {
     expect(clearInProgress).not.toHaveBeenCalled();
     expect(result.current.hasRecovery).toBe(true);
     expect(result.current.isRecording).toBe(false);
+  });
+
+  it('keeps recording through a loss of signal and warns once', () => {
+    const onNotify = vi.fn();
+    const { result } = renderHook(() => useRideRecording(onNotify));
+    act(() => {
+      result.current.startRecording();
+    });
+    act(() => {
+      simulatePosition(-85.3, 35.0);
+    });
+    const lost = { code: 2, message: 'location unknown' };
+    act(() => {
+      errorCallback?.(lost as GeolocationPositionError);
+      errorCallback?.(lost as GeolocationPositionError);
+    });
+    expect(result.current.isRecording).toBe(true);
+    expect(onNotify).toHaveBeenCalledTimes(1);
+    expect(onNotify).toHaveBeenCalledWith('GPS signal lost — still recording');
+
+    // Signal back, then lost again: a fresh warning.
+    act(() => {
+      simulatePosition(-85.31, 35.01);
+      errorCallback?.(lost as GeolocationPositionError);
+    });
+    expect(onNotify).toHaveBeenCalledTimes(2);
+    expect(result.current.isRecording).toBe(true);
   });
 
   it('dispatches RIDE_RECORDING_STOP exactly once per stop, with the ride id', async () => {

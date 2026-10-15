@@ -180,10 +180,13 @@ export function useRideRecording(
     const session = ++gpsSessionRef.current;
     // Set if the provider fails inside subscribe(), before we hold its stop
     // function: cleanup() has already run, so the rest of startup must not.
-    let failedDuringSubscribe = false;
+    let hasFailedDuringSubscribe = false;
+    // Warn once per loss of signal, not on every error while it lasts.
+    let isSignalLost = false;
     const stopPositions = positions.subscribe(
       (fix) => {
         if (session !== gpsSessionRef.current) return;
+        isSignalLost = false;
         const speed = fix.speed ?? 0;
         const AUTO_PAUSE_SPEED = 0.5; // m/s (~1.1 mph)
         const AUTO_PAUSE_COUNT = 3; // consecutive low-speed readings
@@ -322,12 +325,19 @@ export function useRideRecording(
           }
         }
       },
-      (error: PositionError) => {
+      (error: PositionError, isFatal: boolean) => {
         if (session !== gpsSessionRef.current) return;
-        // A timeout is transient; the watch keeps going. Permission denied or
-        // no provider means the ride cannot continue.
+        // A timeout is transient; the watch keeps going.
         if (error.code === 'timeout') return;
-        failedDuringSubscribe = true;
+        if (!isFatal) {
+          // Signal lost mid-ride: the stream keeps the watch running and the
+          // next fix resumes the track, so the ride carries on.
+          if (!isSignalLost) onNotify?.('GPS signal lost — still recording');
+          isSignalLost = true;
+          return;
+        }
+        // Permission denied or no provider: the ride cannot continue.
+        hasFailedDuringSubscribe = true;
         // Keep what was recorded so far: the periodic save may be up to ten
         // seconds behind, and cleanup() would otherwise clear the in-progress
         // record and lose the ride. The recovery banner offers "Save it".
@@ -346,7 +356,7 @@ export function useRideRecording(
         );
       },
     );
-    if (failedDuringSubscribe) {
+    if (hasFailedDuringSubscribe) {
       stopPositions();
       return;
     }

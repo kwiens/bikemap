@@ -387,6 +387,13 @@ compass. Everything that touches a device capability goes through
   starts the hardware, the last stops it. `positions.requestFix()` returns a
   one-off fix without broadcasting it — a cached coarse fix paints the dot on a
   cold start but must never become a ride track point.
+- **The stream decides when GPS is gone** (`isFatalPositionError`) and passes
+  `isFatal` to every subscriber's `onError`. A denied permission is fatal;
+  `unavailable` is fatal only before the first fix (no provider). After a
+  fix it is a transient loss of signal — iOS reports a tunnel or bridge that
+  way and keeps the watch running — so tracking hides the dot and the
+  recorder keeps recording. Don't let a subscriber classify errors itself:
+  one that joined later would disagree with the stream.
 - **`useKeepAwake(active)`** holds the platform's screen lock; holders are
   counted, so tracking and recording can each hold it.
 - The GPS watch starts on the first explicit opt-in (locate button or Record),
