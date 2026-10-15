@@ -1,3 +1,4 @@
+import { downloadFile } from '@/utils/format';
 import type { ExportFile, ShareService } from '../types';
 
 /**
@@ -12,17 +13,8 @@ export function createWebShare(): ShareService {
 
     async exportFile({ filename, mimeType, content }: ExportFile) {
       if (typeof document === 'undefined') return 'failed';
-      const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      try {
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = filename;
-        anchor.click();
-        return 'downloaded';
-      } finally {
-        URL.revokeObjectURL(url);
-      }
+      downloadFile(content, filename, mimeType);
+      return 'downloaded';
     },
 
     async shareLink(url: string) {
