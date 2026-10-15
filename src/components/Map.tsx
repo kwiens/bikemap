@@ -198,8 +198,12 @@ const MapboxMap = memo(function MapboxMap() {
   const handleRideSelect = useCallback(
     async ({ rideId }: MapEventDetails['ride-select']) => {
       if (!map.current) return;
-      const ride = await loadRide(rideId);
-      if (!ride) return;
+      const ride = await loadRide(rideId).catch((error: unknown) => {
+        console.error('Failed to load ride:', error);
+        return null;
+      });
+      // The map may have been torn down while IndexedDB was reading.
+      if (!ride || !map.current) return;
 
       const segments = splitRideSegments(ride.points).map((segment) =>
         segment.map((p) => [p.lng, p.lat] as [number, number]),
