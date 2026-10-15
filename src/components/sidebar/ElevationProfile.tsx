@@ -401,6 +401,8 @@ export function ElevationProfile() {
   // whatever profile is currently displayed (trail or ride) — otherwise a map
   // route-click leaves the previous trail's chart visible.
   useMapEvent(MAP_EVENTS.ROUTE_SELECT, () => {
+    // Also supersedes a ride still loading when nothing is showing yet.
+    latestRideIdRef.current = null;
     if (sourceRef.current !== null) {
       clearProfile();
       clearUrlState();
@@ -418,7 +420,12 @@ export function ElevationProfile() {
 
   useMapEvent(MAP_EVENTS.RIDE_SELECT, async ({ rideId }) => {
     latestRideIdRef.current = rideId;
-    const ride = await loadRide(rideId);
+    // Ride storage is IndexedDB, which some private windows block; a failed
+    // read just leaves the pane as it was.
+    const ride = await loadRide(rideId).catch((error: unknown) => {
+      console.error('Failed to load ride:', error);
+      return null;
+    });
     if (!ride || latestRideIdRef.current !== rideId) return;
     const elevProfile = rideToElevationProfile(ride);
     sourceRef.current = 'ride';

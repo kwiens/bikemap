@@ -99,10 +99,10 @@ function createNativeKeepAwake(transport: BridgeTransport): KeepAwakeService {
     acquire() {
       holders += 1;
       if (holders === 1) transport.send({ type: 'keepAwake/acquire' });
-      let released = false;
+      let isReleased = false;
       return () => {
-        if (released) return;
-        released = true;
+        if (isReleased) return;
+        isReleased = true;
         holders -= 1;
         if (holders === 0) transport.send({ type: 'keepAwake/release' });
       };
@@ -144,10 +144,10 @@ function createNativeHeading(transport: BridgeTransport): HeadingService {
       });
       watchers += 1;
       if (watchers === 1) transport.send({ type: 'heading/watch' });
-      let stopped = false;
+      let isStopped = false;
       return () => {
-        if (stopped) return;
-        stopped = true;
+        if (isStopped) return;
+        isStopped = true;
         stop();
         watchers -= 1;
         if (watchers === 0) transport.send({ type: 'heading/clearWatch' });
