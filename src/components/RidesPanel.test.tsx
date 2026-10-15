@@ -185,6 +185,46 @@ describe('RidesPanel', () => {
     }
   });
 
+  it('saves a pending unfinished ride before starting a new recording', async () => {
+    mockHook.hasRecovery = true;
+    const order: string[] = [];
+    mockHook.recoverRide = vi.fn(async () => {
+      order.push('recover');
+      return { id: 'old-ride' };
+    });
+    mockHook.startRecording = vi.fn(() => {
+      order.push('start');
+    });
+    render(<RidesPanel />);
+    openPanel();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Record a Ride'));
+    });
+    expect(order).toEqual(['recover', 'start']);
+  });
+
+  it('does not start recording when the unfinished ride cannot be saved', async () => {
+    mockHook.hasRecovery = true;
+    mockHook.recoverRide = vi.fn().mockRejectedValue(new Error('quota'));
+    const toasts: string[] = [];
+    const onToast = (e: Event) =>
+      toasts.push((e as CustomEvent).detail.message);
+    window.addEventListener(MAP_EVENTS.TOAST, onToast);
+    try {
+      render(<RidesPanel />);
+      openPanel();
+      await act(async () => {
+        fireEvent.click(screen.getByText('Record a Ride'));
+      });
+      expect(mockHook.startRecording).not.toHaveBeenCalled();
+      expect(toasts).toEqual([
+        'Save or discard the unfinished ride before recording',
+      ]);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.TOAST, onToast);
+    }
+  });
+
   it('dispatches RIDES_PANEL_TOGGLE on toggle', () => {
     const events: CustomEvent[] = [];
     const handler = (e: Event) => events.push(e as CustomEvent);
