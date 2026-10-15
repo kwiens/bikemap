@@ -112,9 +112,29 @@ export function RidesPanel() {
         dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId: ride.id });
       }
     } else {
+      // A new recording checkpoints into the same slot the unfinished ride
+      // is waiting in, and finishing it clears that slot. Save the
+      // unfinished ride first so starting over can't silently discard it.
+      if (hasRecovery) {
+        try {
+          const recovered = await recoverRide();
+          if (recovered) notify('Unfinished ride saved');
+        } catch (error) {
+          console.error('Failed to save unfinished ride:', error);
+          notify('Save or discard the unfinished ride before recording');
+          return;
+        }
+      }
       startRecording();
     }
-  }, [isRecording, stopRecording, startRecording]);
+  }, [
+    isRecording,
+    hasRecovery,
+    stopRecording,
+    startRecording,
+    recoverRide,
+    notify,
+  ]);
 
   return (
     <>
