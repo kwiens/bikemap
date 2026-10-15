@@ -32,7 +32,8 @@ vi.mock('@/utils/ride-stats', async (importOriginal) => {
 });
 
 // Mock ride data
-vi.mock('@/data/ride', () => ({
+vi.mock('@/data/ride', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/data/ride')>()),
   generateRideName: vi.fn().mockReturnValue('Test Ride'),
 }));
 
@@ -615,6 +616,59 @@ describe('useRideRecording', () => {
       window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
       window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
     }
+  });
+
+  it('clears the recovery record when a continued ride is saved before any fix', async () => {
+    const { loadInProgress, clearInProgress, saveRide } = await import(
+      '@/utils/ride-storage'
+    );
+    (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue({
+      startTime: Date.now() - 60000,
+      points: [
+        { lng: -85.3, lat: 35.0, altitude: 200, timestamp: Date.now() - 60000 },
+        { lng: -85.31, lat: 35.01, altitude: 210, timestamp: Date.now() },
+      ],
+    });
+    const { result } = renderHook(() => useRideRecording());
+    await act(async () => {
+      await result.current.continueRide();
+    });
+    (clearInProgress as ReturnType<typeof vi.fn>).mockClear();
+
+    // Finish before the GPS has produced a single fix.
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+
+    expect(saveRide).toHaveBeenCalled();
+    expect(clearInProgress).toHaveBeenCalled();
+    expect(result.current.hasRecovery).toBe(false);
+    (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+  });
+
+  it('saves a recovered ride once even when Save it is tapped twice', async () => {
+    const { loadInProgress, saveRide } = await import('@/utils/ride-storage');
+    (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue({
+      startTime: Date.now() - 60000,
+      points: [
+        { lng: -85.3, lat: 35.0, altitude: 200, timestamp: Date.now() - 60000 },
+        { lng: -85.31, lat: 35.01, altitude: 210, timestamp: Date.now() },
+      ],
+    });
+    (saveRide as ReturnType<typeof vi.fn>).mockClear();
+    const { result } = renderHook(() => useRideRecording());
+
+    let rides: unknown[] = [];
+    await act(async () => {
+      rides = await Promise.all([
+        result.current.recoverRide(),
+        result.current.recoverRide(),
+      ]);
+    });
+
+    expect(saveRide).toHaveBeenCalledTimes(1);
+    expect(rides.filter(Boolean)).toHaveLength(1);
+    (loadInProgress as ReturnType<typeof vi.fn>).mockResolvedValue(null);
   });
 
   it('checks for crash recovery on mount', async () => {

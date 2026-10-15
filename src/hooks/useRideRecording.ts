@@ -87,6 +87,7 @@ export function useRideRecording(
   const preserveProgressRef = useRef(false); // keep in-progress data if GPS fails during continue
   const gpsSessionRef = useRef(0); // invalidate callbacks already queued by a cleared watch
   const stoppingRef = useRef(false); // synchronous re-entry guard for stopRecording
+  const isRecoveringRef = useRef(false); // synchronous re-entry guard for recoverRide
   const segmentBreakRef = useRef(false); // next GPS point follows a manual pause — don't bridge it
 
   const saveIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(
@@ -537,6 +538,11 @@ export function useRideRecording(
         onNotify?.('Could not save your ride — open Rides to recover it.');
         return null;
       }
+      // The ride is safely stored, so the in-progress record must go even if
+      // a continued ride never got its first fix (which is what normally
+      // clears this flag). Otherwise the banner would offer the saved ride
+      // for recovery again and "Save it" would store a duplicate.
+      preserveProgressRef.current = false;
       cleanup({ rideId: ride.id });
       onNotify?.('Ride saved!');
 
@@ -559,27 +565,35 @@ export function useRideRecording(
   }, []);
 
   const recoverRide = useCallback(async (): Promise<RecordedRide | null> => {
-    const data = await loadInProgress();
-    if (!data || data.points.length < 2) {
+    // Building the ride awaits IndexedDB and DEM tiles; a second tap on
+    // "Save it" in that window would store the same ride twice.
+    if (isRecoveringRef.current) return null;
+    isRecoveringRef.current = true;
+    try {
+      const data = await loadInProgress();
+      if (!data || data.points.length < 2) {
+        await clearInProgress();
+        setHasRecovery(false);
+        return null;
+      }
+
+      const points = data.points;
+      const { corrected, deduplicated } = await tryDemCorrection(points);
+      const ride = buildRide(
+        points,
+        data.startTime,
+        points[points.length - 1].timestamp,
+        corrected,
+        deduplicated,
+      );
+
+      await saveRide(ride);
       await clearInProgress();
       setHasRecovery(false);
-      return null;
+      return ride;
+    } finally {
+      isRecoveringRef.current = false;
     }
-
-    const points = data.points;
-    const { corrected, deduplicated } = await tryDemCorrection(points);
-    const ride = buildRide(
-      points,
-      data.startTime,
-      points[points.length - 1].timestamp,
-      corrected,
-      deduplicated,
-    );
-
-    await saveRide(ride);
-    await clearInProgress();
-    setHasRecovery(false);
-    return ride;
   }, []);
 
   const continueRide = useCallback(async () => {
