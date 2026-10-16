@@ -6,7 +6,9 @@ import React from 'react';
 import { activeCityId } from '@/config/map.config';
 import type { BikeRoute } from '@/data/bike-routes';
 import type { CityId } from '@/data/cities/types';
+import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 import { setBikeRoutes } from '@/data/route-source';
+import { setMountainBikeTrails } from '@/data/trail-source';
 
 const EmbedMap = dynamic(() => import('@/components/embed/EmbedMap'), {
   ssr: false,
@@ -20,12 +22,15 @@ const EmbedMap = dynamic(() => import('@/components/embed/EmbedMap'), {
 export default function EmbedClient({
   cityId,
   routes,
+  trails,
 }: {
   cityId: CityId;
   routes: BikeRoute[];
+  trails: MountainBikeTrail[];
 }): ReactElement {
   if (cityId === activeCityId) {
     setBikeRoutes(routes);
+    setMountainBikeTrails(trails);
   }
 
   return (
