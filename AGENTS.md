@@ -467,7 +467,8 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
 - `src/payload/components/TrailMapEditor.tsx` — the one admin map (pick/move/draw)
 - `src/payload/read/trails.ts` — reads trails back out for the public map
 - `src/payload/collections/Routes.ts` + `src/payload/read/routes.ts` — Casual
-  route records and the public map read path. A route either owns imported
+  route records and the public map read path. A route is either built on the
+  map (`composed`, the default — see "Route editor" below), owns imported
   geometry, selects a same-city Trail and reuses its current measurements, or
   explicitly names a legacy Mapbox Studio layer that has not been migrated.
   Casual reads Routes only; linking a Trail is how a curator exposes it there
@@ -475,6 +476,10 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   `pnpm db:import:chattanooga-routes` rather than committing generated route
   GeoJSON. Bend's seed derives its eight imported routes directly from the
   committed bike-network source.
+- `src/payload/routing/` + `components/RouteMapEditor.tsx` — the route editor.
+  A curator clicks waypoints; each leg is routed over a graph of the city's
+  published trails plus OSM roads and paths, so two waypoints on one trail take
+  just the stretch between them. See "Route editor" below.
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
 - `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind
@@ -550,6 +555,30 @@ Things to know before touching it:
   `slugify('Tiddlywinks (Upper)')` is `tiddlywinks-(upper)` against a stored
   `tiddlywinks-upper` whose static elevation file is named after it. Overwriting
   on open would break charts by looking at a page.
+- **Route editor (`geometrySource: 'composed'`).** The editor writes only the
+  route's `plan` (waypoints + routed legs, `routing/plan.ts`);
+  `resolveRouteSource` derives `geom`, `distance`, and `bounds` from it on
+  every save, so never accept those from the client for a composed route.
+  Things to know:
+  - **The graph** (`routing/graph.ts`) joins OSM ways by shared node ids and
+    our curated trails by *stitching*: any dead end within `STITCH_METERS` of
+    another line is connected to it. Chattanooga's GIS trails share no nodes
+    with OSM, so without stitching they are islands. Edge cost is length ×
+    `COST_FACTORS` (trails cheapest, primary roads dearest — discouraged,
+    never excluded; motorways and trunks are not fetched at all).
+  - **The network comes from Overpass in fixed 0.04° cells** through the
+    admin-only `GET /api/routes/network?cell=x,y`, cached per server instance
+    for six hours. Every cell is a query against the public instance, which
+    sheds load (504) after a burst, so keep cells large and requests few —
+    don't shrink `ROUTE_CELL_DEG` or widen `LEG_MARGIN_DEG` casually.
+  - **Snapping prefers a curated trail** within `TRAIL_SNAP_PREFERENCE_METERS`
+    of the nearest line, because OSM often maps the same trail a few meters
+    off ours and the route should ride on (and be named for) our trail.
+  - **A route is a snapshot.** Editing a trail does not move routes built
+    along it; reopen the route and move a waypoint to re-route.
+  - The enum default is a function (`() => 'composed'`) on purpose: Postgres
+    can't use an enum value as a column default in the transaction that adds
+    it.
 - **There is one user role: admin.** Everyone signed in can edit everything.
   Keep writing access rules as `req.user?.role === 'admin'` rather than
   `Boolean(req.user)` — that way a second role added later starts with no
