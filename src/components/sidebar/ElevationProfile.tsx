@@ -29,6 +29,8 @@ import { getSetting } from '@/utils/settings';
 import { activeCityId } from '@/config/map.config';
 import { useEmbed } from '@/components/EmbedContext';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
+import { useTrailConditions } from '@/components/TrailConditionsProvider';
+import { TrailConditionsStrip } from './TrailConditionsStrip';
 
 const CHART_HEIGHT = 100;
 const CHART_PADDING_TOP = 4;
@@ -94,6 +96,19 @@ function profileSlug(trailName: string): string {
   return trail ? slugForTrail(trail) : slugify(trailName);
 }
 
+/**
+ * The slug conditions are keyed by, or null.
+ *
+ * Stricter than `profileSlug`, which invents one for an unrecognised name.
+ * Conditions attach to a curated trail, so an OSM way, a route or a ride has
+ * none — guessing would key reports against a trail that doesn't exist.
+ */
+function curatedSlug(trailName: string): string | null {
+  const trail = getMountainBikeTrails().find(
+    (item) => item.trailName === trailName,
+  );
+  return trail ? slugForTrail(trail) : null;
+}
 /**
  * Maximum color stops per chart.
  *
@@ -322,6 +337,21 @@ export function findClosestProfileIndex(
   return bestIdx;
 }
 
+function trailSelectionUrl(isEmbed: boolean, name?: string): string {
+  if (!isEmbed) {
+    return name
+      ? `?trail=${encodeURIComponent(profileSlug(name))}`
+      : window.location.pathname;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  params.delete('route');
+  params.delete('trail');
+  if (name) params.set('trail', profileSlug(name));
+  const search = params.toString();
+  return `${window.location.pathname}${search ? `?${search}` : ''}`;
+}
+
 export function ElevationProfile() {
   // Embeds never carry the settings cookie (that's the whole premise of
   // embed mode), so `getSetting('sidebarOpen')` always misses there and the
@@ -335,6 +365,10 @@ export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
   const [profileSource, setProfileSource] = useState<ProfileSource>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
+  // The curated trail conditions are shown for, if this selection is one. State
+  // rather than derived from `trailName`, since a ride and an OSM way both put
+  // a name there and neither has conditions.
+  const [conditionSlug, setConditionSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [locationIndex, setLocationIndex] = useState<number | null>(null);
@@ -352,6 +386,9 @@ export function ElevationProfile() {
 
   const [collapsed, setCollapsed] = useState(false);
 
+  // Only to decide whether the pane has conditions worth opening for.
+  const { options: conditionOptions } = useTrailConditions();
+
   useEffect(() => {
     const handleTrailSelect = (e: Event) => {
       const { trailName: name } = (e as CustomEvent).detail;
@@ -359,11 +396,8 @@ export function ElevationProfile() {
       setProfileSource('trail');
       rideIdRef.current = null;
       setTrailName(name);
-      window.history.replaceState(
-        null,
-        '',
-        `?trail=${encodeURIComponent(profileSlug(name))}`,
-      );
+      setConditionSlug(curatedSlug(name));
+      window.history.replaceState(null, '', trailSelectionUrl(isEmbed, name));
     };
     // OSM trails ship a ready-built profile (no curated JSON to load by name),
     // and aren't restorable by slug on reload, so no URL state is written.
@@ -380,6 +414,8 @@ export function ElevationProfile() {
       // trail's name must not shadow the curated /data/elevation JSON.
       profileCache.set(`osm:${osmProfile.trail}`, osmProfile);
       setTrailName(osmProfile.trail);
+      // An OSM way has no row to hang reports on, even if its name matches one.
+      setConditionSlug(null);
       setProfile(osmProfile);
       profileRef.current = osmProfile;
       setHoverIndex(null);
@@ -397,7 +433,7 @@ export function ElevationProfile() {
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
-        window.history.replaceState(null, '', window.location.pathname);
+        window.history.replaceState(null, '', trailSelectionUrl(isEmbed));
       }
     };
     const handleTrailDeselect = () => {
@@ -405,7 +441,7 @@ export function ElevationProfile() {
         sourceRef.current = null;
         setProfileSource(null);
         setTrailName(null);
-        window.history.replaceState(null, '', window.location.pathname);
+        window.history.replaceState(null, '', trailSelectionUrl(isEmbed));
       }
     };
     const handleRouteDeselect = () => {
@@ -413,7 +449,7 @@ export function ElevationProfile() {
         sourceRef.current = null;
         setProfileSource(null);
         setTrailName(null);
-        window.history.replaceState(null, '', window.location.pathname);
+        window.history.replaceState(null, '', trailSelectionUrl(isEmbed));
       }
     };
     const handleSidebarToggle = (e: Event) => {
@@ -432,6 +468,8 @@ export function ElevationProfile() {
       sourceRef.current = 'ride';
       setProfileSource('ride');
       rideIdRef.current = rideId;
+      // A ride is not a trail anyone reports on.
+      setConditionSlug(null);
       if (elevProfile) {
         setTrailName(ride.name);
         profileCache.set(`ride:${ride.name}`, elevProfile);
@@ -453,7 +491,7 @@ export function ElevationProfile() {
         setTrailName(null);
         setProfile(null);
         profileRef.current = null;
-        window.history.replaceState(null, '', window.location.pathname);
+        window.history.replaceState(null, '', trailSelectionUrl(isEmbed));
       }
     };
     const handleRecordingStart = () => {
@@ -530,7 +568,7 @@ export function ElevationProfile() {
         handleRecordingStop,
       );
     };
-  }, []);
+  }, [isEmbed]);
 
   // Listen for GPS location updates and find closest point on trail
   useEffect(() => {
@@ -679,16 +717,24 @@ export function ElevationProfile() {
   const hasProfile =
     !!trailName && !loading && !!profile && profile.profile.length >= 2;
 
-  if (!hasProfile) {
+  /**
+   * The pane's second reason to open. It used to need a chart, which would have
+   * hidden conditions on trails without a stored or bundled chart, including
+   * those whose ways Overpass couldn't resolve.
+   *
+   * `conditionOptions` is in the test because with no database there is no
+   * vocabulary, and the pane must not open on an empty strip.
+   */
+  const hasConditions =
+    !!trailName && !!conditionSlug && conditionOptions.length > 0;
+
+  if (!hasProfile && !hasConditions) {
     return null;
   }
 
-  const points = profile.profile;
-  // Headline mileage: profile.distance, which carries the authoritative total
-  // (precomputed OSM stats, curated JSON, accuracy-filtered ride stats) and can
-  // differ from the tile-simplified chart geometry's sum (the chart subcomponents
-  // derive their own x-axis normalizer from the points).
-  const headlineDistFt = profile.distance;
+  // No longer narrowed off `hasProfile`, which is no longer the only way past
+  // the guard above.
+  const points = hasProfile && profile ? profile.profile : null;
 
   // Mountain icon toggle button (visible when collapsed)
   if (collapsed) {
@@ -703,7 +749,9 @@ export function ElevationProfile() {
           onClick={() => setCollapsed(false)}
           className={TOGGLE_BTN_CLASS}
           type="button"
-          title="Show elevation profile"
+          title={
+            hasProfile ? 'Show elevation profile' : 'Show trail conditions'
+          }
         >
           <FontAwesomeIcon icon={faChartArea} className={TOGGLE_ICON_CLASS} />
         </button>
@@ -740,11 +788,20 @@ export function ElevationProfile() {
             {trailName}
           </span>
         )}
-        <div className="flex gap-3 text-[11px] text-gray-500 ml-auto shrink-0">
-          <span>{(headlineDistFt / 5280).toFixed(1)} mi</span>
-          <span>+{Math.round(profile.gain).toLocaleString()} ft climbing</span>
-        </div>
-        <div className="flex gap-1 ml-2 shrink-0">
+        {points && profile && (
+          <div className="flex gap-3 text-[11px] text-gray-500 ml-auto shrink-0">
+            {/* Headline mileage: profile.distance, which carries the
+                authoritative total (precomputed OSM stats, curated JSON,
+                accuracy-filtered ride stats) and can differ from the
+                tile-simplified chart geometry's sum (the chart subcomponents
+                derive their own x-axis normalizer from the points). */}
+            <span>{(profile.distance / 5280).toFixed(1)} mi</span>
+            <span>
+              +{Math.round(profile.gain).toLocaleString()} ft climbing
+            </span>
+          </div>
+        )}
+        <div className={cn('flex gap-1 shrink-0', points ? 'ml-2' : 'ml-auto')}>
           <button
             type="button"
             className={ACTION_BTN_CLASS}
@@ -769,14 +826,17 @@ export function ElevationProfile() {
           >
             <FontAwesomeIcon icon={faShareAlt} />
           </button>
-          <button
-            type="button"
-            className={ACTION_BTN_CLASS}
-            onClick={() => downloadGpx(profile)}
-            title="Download GPX"
-          >
-            <FontAwesomeIcon icon={faDownload} />
-          </button>
+          {/* Nothing to export when the pane is open for conditions alone. */}
+          {profile && points && (
+            <button
+              type="button"
+              className={ACTION_BTN_CLASS}
+              onClick={() => downloadGpx(profile)}
+              title="Download GPX"
+            >
+              <FontAwesomeIcon icon={faDownload} />
+            </button>
+          )}
           <button
             type="button"
             className={ACTION_BTN_CLASS}
@@ -788,7 +848,12 @@ export function ElevationProfile() {
         </div>
       </div>
 
-      {profile.osm && (
+      {/* Where the OSM tag strip sits: describes the trail, doesn't measure it. */}
+      {hasConditions && conditionSlug && trailName && (
+        <TrailConditionsStrip slug={conditionSlug} trailName={trailName} />
+      )}
+
+      {profile?.osm && (
         <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-1 -mt-0.5">
           <span className="truncate capitalize">
             {[
@@ -813,66 +878,70 @@ export function ElevationProfile() {
         </div>
       )}
 
-      <div className="flex relative">
-        <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
-          <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
-            {Math.round(profile.max).toLocaleString()} ft
-          </span>
-          <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
-            {Math.round(profile.min).toLocaleString()} ft
-          </span>
-        </div>
+      {points && profile && (
+        <div className="flex relative">
+          <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
+            <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
+              {Math.round(profile.max).toLocaleString()} ft
+            </span>
+            <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
+              {Math.round(profile.min).toLocaleString()} ft
+            </span>
+          </div>
 
-        <div className="relative flex-1">
-          <ElevationSvg
-            points={points}
-            gradeColors={gradeColors}
-            profile={profile}
-            chartWidth={chartWidth}
-            svgRef={svgRef}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={clearHover}
-            onTouchStart={handleTouch}
-            onTouchMove={handleTouch}
-            onTouchEnd={clearHover}
-          />
-          {locationIndex !== null && (
-            <LocationIndicator
-              points={points}
-              profile={profile}
-              chartWidth={chartWidth}
-              locationIndex={locationIndex}
-            />
-          )}
-          {hoverIndex !== null && (
-            <HoverIndicator
+          <div className="relative flex-1">
+            <ElevationSvg
               points={points}
               gradeColors={gradeColors}
               profile={profile}
               chartWidth={chartWidth}
-              hoverIndex={hoverIndex}
+              svgRef={svgRef}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={clearHover}
+              onTouchStart={handleTouch}
+              onTouchMove={handleTouch}
+              onTouchEnd={clearHover}
             />
+            {locationIndex !== null && (
+              <LocationIndicator
+                points={points}
+                profile={profile}
+                chartWidth={chartWidth}
+                locationIndex={locationIndex}
+              />
+            )}
+            {hoverIndex !== null && (
+              <HoverIndicator
+                points={points}
+                gradeColors={gradeColors}
+                profile={profile}
+                chartWidth={chartWidth}
+                hoverIndex={hoverIndex}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {points && (
+        <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
+          {hoverIndex !== null ? (
+            <>
+              {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
+              <span className="inline-flex items-center gap-1 text-gray-700">
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-2 w-2 rounded-full border border-black/10"
+                  style={{ backgroundColor: gradeColors[hoverIndex] }}
+                />
+                {formatGrade(grades[hoverIndex])}
+              </span>
+            </>
+          ) : (
+            '\u00A0'
           )}
         </div>
-      </div>
-
-      <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
-        {hoverIndex !== null ? (
-          <>
-            {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
-            <span className="inline-flex items-center gap-1 text-gray-700">
-              <span
-                aria-hidden="true"
-                className="inline-block h-2 w-2 rounded-full border border-black/10"
-                style={{ backgroundColor: gradeColors[hoverIndex] }}
-              />
-              {formatGrade(grades[hoverIndex])}
-            </span>
-          </>
-        ) : (
-          '\u00A0'
-        )}
-      </div>
+      )}
     </div>
   );
 }

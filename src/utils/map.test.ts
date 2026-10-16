@@ -1564,11 +1564,16 @@ describe('loadCuratedGeojson', () => {
 
   it('falls back to the static file when the API fails', async () => {
     const { map, setData } = mockMap();
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
     mockFetch({ [API]: 503, [STATIC]: trails });
 
     await loadCuratedGeojson(map, 'bend-mtb-trails-source', API, STATIC);
 
     expect(setData).toHaveBeenCalledWith(trails);
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it('falls back when the API answers with no features', async () => {

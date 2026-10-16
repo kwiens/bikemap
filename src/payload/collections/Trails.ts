@@ -1,7 +1,17 @@
-import type { Access, CollectionConfig, Field, FilterOptions } from 'payload';
+import type {
+  CollectionBeforeDeleteHook,
+  CollectionConfig,
+  Field,
+  FilterOptions,
+} from 'payload';
 import { resolveTrailGeometry } from '@/payload/hooks/resolveTrailGeometry';
 import { cityOptions, isCityId } from '@/config/map.config';
 import { DEFAULT_KIND_VALUE, UNRATED_VALUE } from '@/data/trail-vocabulary';
+import {
+  accessAssignedCity,
+  canChangeCity,
+  createInAssignedCity,
+} from '@/payload/access/city-scoped';
 import {
   invalidatePublicTrailDataAfterChange,
   invalidatePublicTrailDataAfterDelete,
@@ -12,6 +22,7 @@ import { previewTrailGeometry } from '@/payload/endpoints/preview-trail-geometry
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { validateOsmIds } from '@/payload/osm/ids';
 import { slugify } from '@/utils/string';
+import { conditionLockFields } from './condition-lock-fields';
 import { defaultVocabularyId } from './vocabulary-fields';
 
 /**
@@ -34,25 +45,23 @@ import { defaultVocabularyId } from './vocabulary-fields';
  */
 
 /**
- * Admins edit every city; any other role only the city on its user record.
+ * Clears a trail's condition reports before the trail goes.
  *
- * Admin is the only role today, so in practice this is "signed in". The scoping
- * is here rather than deferred because it is the shape that has to hold when a
- * second role arrives — and a rule written then, against live data, is the kind
- * that gets one case wrong.
+ * `trail_conditions.trail_id` is NOT NULL with an ON DELETE SET NULL foreign key
+ * — Payload generates that pair for a required relationship, and together they
+ * make Postgres refuse the delete. Without this, deleting any trail someone had
+ * reported on would fail with a raw constraint violation.
  */
-const cityScoped: Access = ({ req }) => {
-  const user = req.user;
-  if (!user) {
-    return false;
-  }
-  if (user.role === 'admin') {
-    return true;
-  }
-  // No city on a scoped user means no rows, rather than all rows.
-  return user.city ? { city: { equals: user.city } } : false;
+const deleteConditionReports: CollectionBeforeDeleteHook = async ({
+  id,
+  req,
+}) => {
+  await req.payload.delete({
+    collection: 'trail-conditions',
+    req,
+    where: { trail: { equals: id } },
+  });
 };
-
 const areasForTrailCity: FilterOptions = ({ data }) =>
   isCityId(data.city) ? { city: { equals: data.city } } : true;
 
@@ -77,11 +86,13 @@ export const Trails: CollectionConfig = {
   },
   // Published trails are public; everything else needs a login.
   access: {
-    create: cityScoped,
-    delete: cityScoped,
+    create: createInAssignedCity,
+    delete: accessAssignedCity,
     read: ({ req }) =>
-      req.user ? cityScoped({ req }) : { _status: { equals: 'published' } },
-    update: cityScoped,
+      req.user
+        ? accessAssignedCity({ req })
+        : { _status: { equals: 'published' } },
+    update: accessAssignedCity,
   },
   versions: {
     drafts: true,
@@ -92,6 +103,7 @@ export const Trails: CollectionConfig = {
     afterChange: [invalidatePublicTrailDataAfterChange],
     afterDelete: [invalidatePublicTrailDataAfterDelete],
     beforeChange: [resolveTrailGeometry],
+    beforeDelete: [deleteConditionReports],
   },
   endpoints: [
     {
@@ -160,6 +172,9 @@ export const Trails: CollectionConfig = {
                   type: 'select',
                   required: true,
                   options: cityOptions,
+                  access: {
+                    update: canChangeCity,
+                  },
                   admin: {
                     description:
                       'Which public city map serves this trail. The admin and database are shared across every city.',
@@ -232,6 +247,34 @@ export const Trails: CollectionConfig = {
                       'Drives the line colour and sidebar icon, both of which come from the kind and rating rows rather than being stored per trail. Manage the list under Lists → Trail kinds.',
                   },
                 },
+              ],
+            },
+            {
+              type: 'collapsible',
+              label: 'Condition reports',
+              admin: {
+                description:
+                  'Log what this trail is like, and see what riders have said. Closing it below stops rider reports; the trail complex and Settings → Condition reporting can close it too, and any one is enough.',
+                initCollapsed: true,
+              },
+              fields: [
+                {
+                  name: 'conditionLog',
+                  type: 'ui',
+                  label: 'Log a condition',
+                  admin: {
+                    components: {
+                      Field:
+                        '@/payload/components/TrailConditionLog#TrailConditionLog',
+                    },
+                  },
+                },
+                // Closing comes after logging: logging is the daily action, and
+                // closing is the rare, deliberate one.
+                ...conditionLockFields({
+                  effect: 'for this trail',
+                  example: 'Closed for logging until 1 May.',
+                }),
               ],
             },
             {
