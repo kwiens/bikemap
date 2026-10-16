@@ -45,8 +45,10 @@ export function RideHistory({
     refreshSummaries();
   }, [refreshSummaries]);
 
-  // A finished recording adds a ride; select/deselect may follow a rename or
-  // delete in RideDetail.
+  // A finished recording adds a ride, and starting one may first save an
+  // unfinished ride from the recovery slot; select/deselect may follow a
+  // rename or delete in RideDetail.
+  useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, refreshSummaries);
   useMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, refreshSummaries);
   useMapEvent(MAP_EVENTS.RIDE_SELECT, refreshSummaries);
   useMapEvent(MAP_EVENTS.RIDE_DESELECT, refreshSummaries);
