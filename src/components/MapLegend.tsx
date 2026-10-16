@@ -25,7 +25,11 @@ import {
 } from './sidebar';
 import { getRideStyle } from './WelcomeModal';
 import { getSetting, setSetting } from '@/utils/settings';
-import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
+import {
+  SIDEBAR_THEME_CLASS,
+  TOGGLE_BTN_CLASS,
+  TOGGLE_ICON_CLASS,
+} from './styles';
 import { cn } from '@/lib/utils';
 import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
@@ -51,7 +55,9 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
     () => {
-      if (isEmbed) return 'routes';
+      if (isEmbed) {
+        return embedOptions.mode === 'mtb' ? 'trails' : 'routes';
+      }
       const saved = getSetting('activeTab');
       if (saved === 'routes' && hasRoutesSection) return saved;
       if (saved === 'trails') return saved;
@@ -59,16 +65,19 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       return hasRoutesSection ? 'routes' : 'trails';
     },
   );
-  // Embed mode is Casual-only — no MTB tab, so tab switching is a no-op.
+  // Embed mode is fixed to the route family chosen by the host page, so tab
+  // switching remains a no-op there.
   const switchTab = (tab: 'routes' | 'trails') => {
     if (isEmbed) return;
     if (tab === 'routes' && !hasRoutesSection) return;
     setActiveSection(tab);
     setSetting('activeTab', tab);
   };
-  // What section actually renders — embed mode always shows Casual/routes
-  // regardless of activeSection (kept only so non-embed logic is untouched).
-  const visibleSection = isEmbed ? 'routes' : activeSection;
+  const visibleSection = isEmbed
+    ? embedOptions.mode === 'mtb'
+      ? 'trails'
+      : 'routes'
+    : activeSection;
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
@@ -454,29 +463,30 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       <div
         ref={sidebarRef}
         className={cn(
-          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-[950] overflow-hidden transition-transform duration-300 ease-in-out flex flex-col max-md:w-full max-md:max-w-[320px]',
+          SIDEBAR_THEME_CLASS,
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         {isEmbed ? (
-          /* Embed mode is Casual-only — a compact label instead of the pill */
-          <div className="flex items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
-            <span className="text-sm font-medium text-gray-700">
-              {siteConfig.name}
+          /* The host fixes the embed mode, so a compact label replaces tabs. */
+          <div className="flex items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-app-primary/40 bg-app-secondary pt-[calc(17px+env(safe-area-inset-top))]">
+            <span className="text-sm font-medium text-app-surface">
+              {siteConfig.name} ·{' '}
+              {embedOptions.mode === 'mtb' ? 'MTB routes' : 'Casual routes'}
             </span>
           </div>
         ) : (
           /* Casual / MTB toggle in header */
-          <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
-            <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
+          <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-app-primary/40 bg-app-secondary pt-[calc(17px+env(safe-area-inset-top))]">
+            <div className="flex bg-app-surface/10 rounded-full p-1 w-full border border-app-surface/20">
               {hasRoutesSection && (
                 <button
                   type="button"
                   className={cn(
                     'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                     activeSection === 'routes'
-                      ? 'bg-white text-gray-800 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700',
+                      ? 'bg-app-primary text-app-secondary shadow-sm'
+                      : 'text-app-surface/70 hover:text-app-surface',
                   )}
                   onClick={() => switchTab('routes')}
                 >
@@ -488,8 +498,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                 className={cn(
                   'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                   activeSection === 'trails'
-                    ? 'bg-white text-gray-800 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700',
+                    ? 'bg-app-primary text-app-secondary shadow-sm'
+                    : 'text-app-surface/70 hover:text-app-surface',
                 )}
                 onClick={() => switchTab('trails')}
               >
@@ -499,7 +509,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <div className="overflow-y-auto flex-1 min-h-0">
+        <div className="overflow-y-auto flex-1 min-h-0 border-t border-app-surface/10">
           <div className="px-4 pb-4 pt-2">
             {visibleSection === 'routes' && (
               <>

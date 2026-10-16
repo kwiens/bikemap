@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -126,6 +125,11 @@ jobs:
           key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      # Build imports the production Payload config, which requires a strong
+      # signing key even though this job has no database or deployed sessions.
+      - name: Generate an ephemeral build signing key
+        run: echo "PAYLOAD_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Build project and check dependency deduplication
         env:

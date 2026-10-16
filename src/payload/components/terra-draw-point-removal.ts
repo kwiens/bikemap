@@ -8,7 +8,7 @@ export type PointRemovalResult = 'minimum-points' | 'miss' | 'removed';
  *
  * Terra Draw exposes right-click deletion, but that has no touch equivalent and
  * its Delete key removes the entire selected feature. This uses its public
- * geometry API so the edit still enters Terra Draw's undo history.
+ * geometry API; the editor records the result in its own undo history.
  */
 export function removeSelectedLinePointAt(
   draw: TerraDraw,
