@@ -104,7 +104,11 @@ jobs:
         id: generate
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Use the job token so workflow changes can still generate summaries.
+          # Claude only reads context; the trusted publisher writes the PR body.
+          github_token: ${{ github.token }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.ANTHROPIC_API_KEY == '' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           prompt: |
             Read /tmp/architecture-summary/prompt.md and follow it exactly.
             The pull request is #${{ steps.pr.outputs.number }} in ${{ github.repository }}
