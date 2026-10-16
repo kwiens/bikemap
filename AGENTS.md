@@ -128,7 +128,11 @@ The app uses custom DOM events on `window` for component communication. **All ev
 - `onMapEvent(MAP_EVENTS.X, (detail) => …)` — returns the unsubscribe function (return it from a `useEffect`, or collect several for a manual teardown).
 - `useMapEvent(MAP_EVENTS.X, handler)` (`src/hooks/useMapEvent.ts`) — subscribes for a component's lifetime and reads the latest handler through a ref, so callers pass a plain closure and never re-register.
 
-Adding an event means adding its name to `MAP_EVENTS` **and** its detail type to `MapEventDetails`. The full set:
+Adding an event means adding its name to `MAP_EVENTS` **and** its detail type to `MapEventDetails`.
+
+**Panel layout is not event-mirrored state.** Which side panel is open lives in one store, `src/hooks/useLayout.ts`: components read it with `useLayout()` and change it with `setSidebarOpen` / `setRidesPanelOpen` / the `toggle*` helpers. The store keeps the two panels mutually exclusive, persists the sidebar only for a deliberate toggle (`persist: true`), and dispatches `sidebar-toggle` / `rides-panel-toggle` itself. Never keep a local copy of this state fed by those events — that is the duplication the store replaced. `MapLegendProvider` seeds it per mount with `useSeedLayout` (cookie, or the embed option). Viewport checks go through `isMobileViewport()`, and panels dismiss on a phone via `useOutsideTap`.
+
+The full set:
 
 | Event | Purpose |
 |-------|---------|
@@ -138,13 +142,13 @@ Adding an event means adding its name to `MAP_EVENTS` **and** its detail type to
 | `area-select` | Rec-area heading clicked — zoom to area bounds |
 | `layer-toggle` | Show/hide a layer: `attractions`, `bikeResources`, `bikeRentals` (radio-style markers), `osmTrails`, `bikeNetwork` |
 | `center-location` | Pan map to a location (and open its popup) |
-| `sidebar-toggle` | Sidebar opened/closed — map resize + elevation pane layout |
+| `sidebar-toggle` | Sidebar opened/closed — dispatched by the layout store (`src/hooks/useLayout.ts`); the map resizes on it |
 | `elevation-hover` | Elevation chart hover — moves the map hover marker |
 | `location-update` | GPS fix — recenter / elevation-pane location dot |
 | `ride-style-chosen` | Welcome modal preference — selects default sidebar tab |
 | `ride-recording-start/stop/update` | Ride recorder lifecycle → live map track |
 | `ride-select` / `ride-deselect` | Saved ride selection (map track + elevation pane + panel) |
-| `rides-panel-toggle` | Rides panel opened/closed (closes the sidebar, with a `sidebar-toggle` dispatch) |
+| `rides-panel-toggle` | Rides panel opened/closed — dispatched by the layout store |
 | `toast` | Show a toast via the map's toast host |
 | `map-ready` | Map fully initialized (also sets `window.__mapReady` for late listeners) |
 

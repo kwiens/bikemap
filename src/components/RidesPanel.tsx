@@ -1,8 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useRef, useCallback, memo } from 'react';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
+import {
+  getLayout,
+  isMobileViewport,
+  setRidesPanelOpen,
+  toggleRidesPanel,
+  useLayout,
+} from '@/hooks/useLayout';
+import { useOutsideTap } from '@/hooks/useOutsideTap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTimes,
@@ -24,7 +32,7 @@ const PulseDot = memo(function PulseDot() {
 });
 
 export function RidesPanel() {
-  const [isOpen, setIsOpen] = useState(false);
+  const { ridesPanelOpen: isOpen } = useLayout();
   const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -53,17 +61,7 @@ export function RidesPanel() {
     dismissRecovery,
   } = useRideRecording(notify);
 
-  const isOpenRef = useRef(isOpen);
-  isOpenRef.current = isOpen;
-
-  const isRecordingRef = useRef(false);
-  isRecordingRef.current = isRecording;
-
-  const toggle = useCallback(() => {
-    const next = !isOpenRef.current;
-    setIsOpen(next);
-    dispatchMapEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, { isOpen: next });
-  }, []);
+  const toggle = toggleRidesPanel;
 
   const handleRecoverRide = useCallback(async () => {
     const ride = await recoverRide();
@@ -78,33 +76,19 @@ export function RidesPanel() {
     notify('Ride resumed — keep going!');
   }, [continueRide, notify]);
 
-  // The sidebar and this panel are mutually exclusive.
-  useMapEvent(MAP_EVENTS.SIDEBAR_TOGGLE, ({ isOpen: sidebarOpen }) => {
-    if (sidebarOpen && isOpenRef.current) {
-      setIsOpen(false);
-      dispatchMapEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, { isOpen: false });
-    }
-  });
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (window.innerWidth > 768) return;
-      if (!isOpen) return;
-      if (toggleRef.current?.contains(event.target as Node)) return;
-      if (panelRef.current?.contains(event.target as Node)) return;
-      toggle();
-    };
-    document.addEventListener('pointerdown', handleClickOutside);
-    return () =>
-      document.removeEventListener('pointerdown', handleClickOutside);
-  }, [isOpen, toggle]);
+  // On a phone the panel overlays the map; a tap on the map dismisses it.
+  const closeOnMobile = useCallback(() => {
+    if (isMobileViewport()) setRidesPanelOpen(false);
+  }, []);
+  useOutsideTap(
+    [panelRef, toggleRef],
+    () => getLayout().ridesPanelOpen,
+    closeOnMobile,
+  );
 
   useMapEvent(MAP_EVENTS.RIDE_SELECT, ({ rideId, openPanel }) => {
     setSelectedRideId(rideId);
-    if (openPanel && !isOpenRef.current) {
-      setIsOpen(true);
-      dispatchMapEvent(MAP_EVENTS.RIDES_PANEL_TOGGLE, { isOpen: true });
-    }
+    if (openPanel) setRidesPanelOpen(true);
   });
   useMapEvent(MAP_EVENTS.RIDE_DESELECT, () => setSelectedRideId(null));
 
@@ -114,11 +98,9 @@ export function RidesPanel() {
       dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId });
       dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
       dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
-      if (window.innerWidth <= 768 && isOpen) {
-        toggle();
-      }
+      closeOnMobile();
     },
-    [isOpen, toggle],
+    [closeOnMobile],
   );
 
   // The recorder reports the outcome (saved / too short / save failed) through
