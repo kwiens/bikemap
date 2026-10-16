@@ -8,7 +8,7 @@
  * button stays even with no reports — an unreported trail is the one worth
  * asking about.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronDown,
@@ -37,13 +37,15 @@ export function TrailConditionsStrip({
   slug: string;
   trailName: string;
 }) {
-  const { latest, lockedReason: reasonFor, options } = useTrailConditions();
+  const {
+    latest,
+    historyRevision = 0,
+    lockedReason: reasonFor,
+    options,
+  } = useTrailConditions();
   const [expanded, setExpanded] = useState(false);
   const [history, setHistory] = useState<ConditionReport[] | null>(null);
   const [loading, setLoading] = useState(false);
-  // Which trail the loaded history belongs to, so switching trails can't leave
-  // one trail's reports under another's name.
-  const loadedFor = useRef<string | null>(null);
 
   const current = latest[slug];
 
@@ -52,11 +54,12 @@ export function TrailConditionsStrip({
   useEffect(() => {
     setExpanded(false);
     setHistory(null);
-    loadedFor.current = null;
   }, [slug]);
 
+  // A local submission may be older than the badge and still belongs in
+  // history. Its revision also refreshes a history that was already open.
   useEffect(() => {
-    if (!expanded || loadedFor.current === slug) {
+    if (!expanded) {
       return;
     }
 
@@ -68,13 +71,13 @@ export function TrailConditionsStrip({
       try {
         const response = await fetch(
           `/api/map/conditions/${encodeURIComponent(slug)}?city=${activeCityId}`,
-          { signal: controller.signal },
+          { signal: controller.signal, cache: 'no-store' },
         );
         const data: { reports: ConditionReport[] } | null = response?.ok
           ? await response.json()
           : null;
+        if (controller.signal.aborted) return;
         setHistory(data?.reports ?? []);
-        loadedFor.current = slug;
         setLoading(false);
       } catch (error) {
         if ((error as Error)?.name !== 'AbortError') {
@@ -88,7 +91,7 @@ export function TrailConditionsStrip({
     void load();
 
     return () => controller.abort();
-  }, [expanded, slug]);
+  }, [expanded, slug, historyRevision]);
 
   const openReport = useCallback(() => {
     window.dispatchEvent(

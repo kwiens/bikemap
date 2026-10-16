@@ -26,10 +26,12 @@ function report(
 }
 
 function Reports({ local }: { local: ConditionReport }) {
-  const { latest, recordLocal, refresh } = useTrailConditions();
+  const { latest, historyRevision, recordLocal, refresh } =
+    useTrailConditions();
   return (
     <>
       <output>{latest.trail?.value ?? 'loading'}</output>
+      <span data-testid="history-revision">{historyRevision}</span>
       <button onClick={() => recordLocal('trail', local)}>Report</button>
       <button onClick={refresh}>Refresh</button>
     </>
@@ -62,9 +64,11 @@ describe('condition report ordering', () => {
 
     fireEvent.click(screen.getByText('Report'));
     expect(screen.getByRole('status')).toHaveTextContent('closed');
+    expect(screen.getByTestId('history-revision')).toHaveTextContent('1');
     fireEvent.click(screen.getByText('Refresh'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(screen.getByRole('status')).toHaveTextContent('closed');
+    expect(screen.getByTestId('history-revision')).toHaveTextContent('1');
 
     current = report(3, 'wet');
     fireEvent.click(screen.getByText('Refresh'));
@@ -96,5 +100,6 @@ describe('condition report ordering', () => {
     );
     fireEvent.click(screen.getByText('Report'));
     expect(screen.getByRole('status')).toHaveTextContent('closed');
+    expect(screen.getByTestId('history-revision')).toHaveTextContent('1');
   });
 });
