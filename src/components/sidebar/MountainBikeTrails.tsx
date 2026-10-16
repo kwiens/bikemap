@@ -7,9 +7,12 @@ import {
 import { cn } from '@/lib/utils';
 import { regionOf } from '@/data/trail-region';
 import { getMountainBikeTrails } from '@/data/trail-source';
+import { useTrailConditions } from '@/components/TrailConditionsProvider';
+import { ConditionBadge } from './ConditionBadge';
 import { pressableProps } from './a11y';
 import type { MountainBikeTrailsProps } from './types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
+import { slugForTrail } from '@/data/mountain-bike-trails';
 
 /**
  * Groups the current trail list region -> area -> trails, with a trail count
@@ -92,6 +95,9 @@ function TrailRow({
   selectedTrail: string | null;
   onTrailSelect: (name: string) => void;
 }) {
+  // Keyed by slug, not name: two complexes can both have a "Larry".
+  const { latest } = useTrailConditions();
+  const condition = latest[slugForTrail(trail)];
   const hasDistance = (trail.distance ?? 0) > 0;
   const hasElevationGain = (trail.elevationGain ?? 0) > 0;
   const hasElevationLoss = (trail.elevationLoss ?? 0) > 0;
@@ -115,8 +121,8 @@ function TrailRow({
       className={cn(
         'p-2 rounded cursor-pointer transition-all duration-200 border border-transparent',
         selectedTrail === trail.trailName
-          ? 'bg-blue-600/10 border-blue-600'
-          : 'hover:bg-blue-600/5 hover:border-blue-500',
+          ? 'bg-app-primary/15 border-app-primary'
+          : 'hover:bg-app-primary/10 hover:border-app-primary',
         selectedTrail && selectedTrail !== trail.trailName && 'opacity-70',
       )}
     >
@@ -128,6 +134,7 @@ function TrailRow({
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
           {trail.displayName}
         </span>
+        <ConditionBadge report={condition} />
         {hasDistance || hasElevationGain || hasElevationLoss ? (
           <span className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap text-[11px] text-gray-500">
             {hasDistance ? `${trail.distance} mi` : ''}
@@ -247,7 +254,7 @@ export function MountainBikeTrails({
           <input
             ref={searchRef}
             type="text"
-            className="w-full py-2 pr-8 pl-3 border border-gray-300 rounded-lg text-sm text-app-secondary bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30 placeholder:text-gray-400"
+            className="w-full py-2 pr-8 pl-3 border border-gray-300 rounded-lg text-sm text-app-surface bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30 placeholder:text-gray-400"
             placeholder="Search trails..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -289,7 +296,7 @@ export function MountainBikeTrails({
             return (
               <React.Fragment key={region}>
                 <div
-                  className="text-xs font-bold text-gray-700 cursor-pointer rounded pt-2.5 pb-1 px-1 flex items-center whitespace-nowrap hover:bg-blue-600/5 hover:text-blue-600"
+                  className="text-xs font-bold text-gray-700 cursor-pointer rounded pt-2.5 pb-1 px-1 flex items-center whitespace-nowrap hover:bg-app-primary/15 hover:text-app-primary"
                   {...pressableProps(() => {
                     toggleSet(setExpandedRegions, region);
                     onAreaSelect(region);
@@ -318,7 +325,7 @@ export function MountainBikeTrails({
                       <React.Fragment key={area}>
                         {!singleArea && (
                           <div
-                            className="text-[11px] font-semibold uppercase text-gray-500 tracking-wide cursor-pointer rounded py-2 pb-1 px-1 pl-4 flex items-baseline hover:bg-blue-600/5 hover:text-blue-600"
+                            className="text-[11px] font-semibold uppercase text-gray-500 tracking-wide cursor-pointer rounded py-2 pb-1 px-1 pl-4 flex items-baseline hover:bg-app-primary/15 hover:text-app-primary"
                             {...pressableProps(() => handleAreaClick(area))}
                             role="button"
                             tabIndex={0}
