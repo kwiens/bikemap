@@ -543,6 +543,28 @@ describe('ElevationProfile ride selection', () => {
     expect(screen.queryByText('Morning Ride')).toBeNull();
   });
 
+  it('drops a ride that finishes loading after it was deselected', async () => {
+    let resolveRide: (value: RecordedRide) => void = () => {};
+    loadRideMock.mockReturnValue(
+      new Promise<RecordedRide>((resolve) => {
+        resolveRide = resolve;
+      }),
+    );
+    render(<ElevationProfile />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
+          detail: { rideId: 'ride-1' },
+        }),
+      );
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
+    });
+    await act(async () => {
+      resolveRide(ride);
+    });
+    expect(screen.queryByText('Morning Ride')).toBeNull();
+  });
+
   it('ignores a ride that cannot be read', async () => {
     loadRideMock.mockRejectedValue(new Error('IndexedDB blocked'));
     render(<ElevationProfile />);

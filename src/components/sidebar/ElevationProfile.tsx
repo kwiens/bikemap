@@ -460,6 +460,7 @@ export function ElevationProfile() {
   });
 
   useMapEvent(MAP_EVENTS.RIDE_DESELECT, () => {
+    latestRideIdRef.current = null;
     if (sourceRef.current === 'ride') {
       clearProfile();
       clearUrlState();
