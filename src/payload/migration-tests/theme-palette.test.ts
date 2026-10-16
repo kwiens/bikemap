@@ -10,10 +10,14 @@ vi.mock('@payloadcms/db-postgres', () => ({
     ),
 }));
 
-const ensureTheme = await import('./20261002_041000_ensure_theme_global');
-const expandPalette = await import('./20261002_043000_expand_theme_palette');
+const ensureTheme = await import(
+  '../../migrations/20261002_041000_ensure_theme_global'
+);
+const expandPalette = await import(
+  '../../migrations/20261002_043000_expand_theme_palette'
+);
 const simplifyPalette = await import(
-  './20261002_050000_simplify_theme_palette'
+  '../../migrations/20261002_050000_simplify_theme_palette'
 );
 
 const migrationArgs = {
@@ -32,7 +36,9 @@ describe('theme palette migrations', () => {
   it('creates the legacy-compatible Theme table only when it is absent', async () => {
     await ensureTheme.up(migrationArgs);
 
-    expect(executedSql.join('\n')).toContain('CREATE TABLE IF NOT EXISTS "theme"');
+    expect(executedSql.join('\n')).toContain(
+      'CREATE TABLE IF NOT EXISTS "theme"',
+    );
     expect(executedSql.join('\n')).toContain('WHEN duplicate_object THEN null');
   });
 
@@ -40,9 +46,7 @@ describe('theme palette migrations', () => {
     await expandPalette.up(migrationArgs);
 
     const query = executedSql.join('\n');
-    expect(query).toContain(
-      'ADD COLUMN IF NOT EXISTS "surface_color" varchar',
-    );
+    expect(query).toContain('ADD COLUMN IF NOT EXISTS "surface_color" varchar');
     expect(query).toContain('ADD COLUMN IF NOT EXISTS "ink_color" varchar');
     expect(query).toContain(
       'ADD COLUMN IF NOT EXISTS "supporting_accent_color" varchar',
@@ -54,12 +58,8 @@ describe('theme palette migrations', () => {
     await simplifyPalette.up(migrationArgs);
 
     const query = executedSql.join('\n');
-    expect(query).toContain(
-      'RENAME COLUMN "accent_color" TO "primary_color"',
-    );
-    expect(query).toContain(
-      'RENAME COLUMN "deep_color" TO "sidebar_color"',
-    );
+    expect(query).toContain('RENAME COLUMN "accent_color" TO "primary_color"');
+    expect(query).toContain('RENAME COLUMN "deep_color" TO "sidebar_color"');
     expect(query).toContain('RENAME COLUMN "ink_color" TO "text_color"');
     expect(query).toContain(
       'RENAME COLUMN "supporting_accent_color" TO "accent_color"',
