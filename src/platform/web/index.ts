@@ -3,6 +3,7 @@ import type { PlatformServices } from '../types';
 import { createWebGeolocation } from './geolocation';
 import { createWebHeading } from './heading';
 import { createWebKeepAwake } from './keep-awake';
+import { createWebShare } from './share';
 
 /** The browser implementation: what the public site and the PWA run on. */
 export function createWebPlatform(): PlatformServices {
@@ -13,5 +14,6 @@ export function createWebPlatform(): PlatformServices {
     positions: createPositionWatch(geolocation),
     keepAwake: createWebKeepAwake(),
     heading: createWebHeading(),
+    share: createWebShare(),
   };
 }
