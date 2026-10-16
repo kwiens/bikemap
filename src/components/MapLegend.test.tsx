@@ -86,6 +86,7 @@ vi.mock('./sidebar', () => ({
 }));
 
 vi.mock('./styles', () => ({
+  SIDEBAR_THEME_CLASS: 'sidebar-theme',
   TOGGLE_BTN_CLASS: 'toggle-btn',
   TOGGLE_ICON_CLASS: 'toggle-icon',
 }));

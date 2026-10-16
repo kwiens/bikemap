@@ -26,7 +26,7 @@ export function ToggleRow({ icon, label, isActive, onToggle }: ToggleRowProps) {
   return (
     <div
       {...pressableProps(onToggle)}
-      className="p-2 rounded cursor-pointer transition-all duration-200 flex items-center justify-between hover:bg-blue-600/5"
+      className="p-2 rounded cursor-pointer transition-all duration-200 flex items-center justify-between hover:bg-app-primary/15"
     >
       <div className="flex items-center gap-3">
         <FontAwesomeIcon icon={icon} className="w-4 h-4 text-gray-500" />

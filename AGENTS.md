@@ -474,7 +474,8 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
 - `src/payload/components/TrailMapEditor.tsx` — the one admin map (pick/move/draw)
 - `src/payload/read/trails.ts` — reads trails back out for the public map
 - `src/payload/collections/Routes.ts` + `src/payload/read/routes.ts` — Casual
-  route records and the public map read path. A route either owns imported
+  route records and the public map read path. A route is either built on the
+  map (`composed`, the default — see "Route editor" below), owns imported
   geometry, selects a same-city Trail and reuses its current measurements, or
   explicitly names a legacy Mapbox Studio layer that has not been migrated.
   Casual reads Routes only; linking a Trail is how a curator exposes it there
@@ -482,6 +483,10 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   `pnpm db:import:chattanooga-routes` rather than committing generated route
   GeoJSON. Bend's seed derives its eight imported routes directly from the
   committed bike-network source.
+- `src/payload/routing/` + `components/RouteMapEditor.tsx` — the route editor.
+  A curator clicks waypoints; each leg is routed over a graph of the city's
+  published trails plus OSM roads and paths, so two waypoints on one trail take
+  just the stretch between them. See "Route editor" below.
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
 - `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind
@@ -557,6 +562,30 @@ Things to know before touching it:
   `slugify('Tiddlywinks (Upper)')` is `tiddlywinks-(upper)` against a stored
   `tiddlywinks-upper` whose static elevation file is named after it. Overwriting
   on open would break charts by looking at a page.
+- **Route editor (`geometrySource: 'composed'`).** The editor writes only the
+  route's `plan` (waypoints + routed legs, `routing/plan.ts`);
+  `resolveRouteSource` derives `geom`, `distance`, and `bounds` from it on
+  every save, so never accept those from the client for a composed route.
+  Things to know:
+  - **The graph** (`routing/graph.ts`) joins OSM ways by shared node ids and
+    our curated trails by *stitching*: any dead end within `STITCH_METERS` of
+    another line is connected to it. Chattanooga's GIS trails share no nodes
+    with OSM, so without stitching they are islands. Edge cost is length ×
+    `COST_FACTORS` (trails cheapest, primary roads dearest — discouraged,
+    never excluded; motorways and trunks are not fetched at all).
+  - **The network comes from Overpass in fixed 0.04° cells** through the
+    admin-only `GET /api/routes/network?cell=x,y`, cached per server instance
+    for six hours. Every cell is a query against the public instance, which
+    sheds load (504) after a burst, so keep cells large and requests few —
+    don't shrink `ROUTE_CELL_DEG` or widen `LEG_MARGIN_DEG` casually.
+  - **Snapping prefers a curated trail** within `TRAIL_SNAP_PREFERENCE_METERS`
+    of the nearest line, because OSM often maps the same trail a few meters
+    off ours and the route should ride on (and be named for) our trail.
+  - **A route is a snapshot.** Editing a trail does not move routes built
+    along it; reopen the route and move a waypoint to re-route.
+  - The enum default is a function (`() => 'composed'`) on purpose: Postgres
+    can't use an enum value as a column default in the transaction that adds
+    it.
 - **There is one user role: admin.** Everyone signed in can edit everything.
   Keep writing access rules as `req.user?.role === 'admin'` rather than
   `Boolean(req.user)` — that way a second role added later starts with no
@@ -687,8 +716,89 @@ Things to know before touching it:
 - **Generated, lint-excluded**: `src/payload-types.ts`, `src/migrations/`,
   `src/app/(payload)/admin/importMap.js`.
 
+### Crowdsourced Trail Conditions
+
+Anyone can report what a trail was like — no account — from the selected-trail
+pane. The options come from a curated vocabulary. Full guide:
+[`docs/guides/trail-conditions.md`](docs/guides/trail-conditions.md).
+
+Two collections: `trail-condition-types` (the dropdown, nav group **Lists**, the
+same shape as `trail-ratings`) and `trail-conditions` (the reports, its own nav
+group **Conditions**). A report is a condition and an observed date, nothing
+else.
+
+- **This is the only public write path in the app, and it has exactly one door.**
+  `TrailConditions`'s access rules are **admin-only on purpose** — that is what
+  keeps Payload's own `/api/trail-conditions` shut. The public write goes
+  through `POST /api/map/conditions`, which validates first and then uses the
+  Local API (which bypasses access control by design). **Relaxing `create` on
+  the collection opens a second, unguarded door.**
+- **Anti-abuse is a honeypot plus a per-IP-hash rate limit**, both in
+  `src/payload/conditions/guard.ts` — pure, no Payload import, so it is testable
+  without a database. A tripped honeypot gets a **fake `200`**, never an error:
+  an error tells the bot which field is the trap. No captcha and no new service,
+  per ADR-0001 C3. `guard.ts` is where a captcha would go if one is ever needed.
+- **The IP is never stored** — only a salted, truncated one-way hash, in
+  `reporterHash`, so a spree can be found and removed together.
+  `CONDITION_REPORT_SALT` is optional and falls back to `PAYLOAD_SECRET`.
+- **Reports are live immediately; `hidden` is the moderation lever.** No drafts
+  on this collection — it is append-only data, and a versions table would double
+  the writes to express one boolean.
+- **Three switches close reporting, and any one is enough**: the
+  `condition-reporting` global (site-wide, mainly so a fork can ship the trail
+  data without a public form), and a `conditionReportsClosed` checkbox + note on
+  a trail and on a trail complex. A site-wide closure takes precedence;
+  otherwise the active trail note wins over the complex note via
+  `resolveLockMessage`. **Closing stops new reports; it never hides old ones** —
+  on a shut trail, what it was like when someone last rode it is the point.
+  Ask `lockFor(summary, slug)` rather than reading `locked`/`reporting`
+  separately, or the precedence gets re-derived and drifts.
+- **The hidden button is a courtesy; `submitConditionReport` is the gate.** It
+  re-checks all three switches and returns **403** with the same message. The
+  flag is named for the exception (`conditionReportsClosed`, default false) so
+  `ADD COLUMN ... DEFAULT false` needed no backfill and the lookup isn't
+  `equals: true` against a column of nulls.
+- **Staleness is deliberate.** A report stops driving the badge after
+  `CONDITION_FRESH_DAYS` (14) and stays in history. A stale condition is worse
+  than none: a green "Dry" pill from October is wrong in March in a way that
+  looks authoritative. `ConditionBadge` owns that rule for both surfaces.
+- **A closure is the exception, and never expires.** A condition type flagged
+  `marksClosed` (seeded on "Closed") draws the trail as a **red dashed overlay**
+  above its normal line, and its badge holds until someone reports something
+  else — a trail does not reopen because nobody rode it for a fortnight. Ask
+  `isConditionCurrent`, not `isConditionFresh`, on anything user-facing. This is
+  also why `getConditionSummary` has **no date floor**: a window would quietly
+  reopen a trail shut last season. Which conditions close is **data** — nothing
+  matches on the value `'closed'`. The "closed to reports" switches are
+  moderation and deliberately do *not* mark the map.
+- **`ElevationProfile` no longer requires a chart to open.** Its guard is now
+  `hasProfile || hasConditions`, with the chart, y-axis, stats and GPX button
+  conditional — otherwise conditions would be invisible on exactly the trails
+  nobody has curated yet. The gate also tests that the vocabulary loaded, so the
+  pane never opens on an empty strip with no database.
+- **Conditions key on the trail's `slug`, never its name** — two complexes can
+  both have a "Larry". `curatedSlug()` in the pane returns `null` for an OSM way,
+  a route or a recorded ride; don't confuse it with `profileSlug()` beside it,
+  which deliberately invents a slug for an unrecognised name.
+- **Report city comes from the saved trail**, in the collection's
+  `beforeValidate` hook. Never use a deployment default: the shared admin can
+  report on either city's trails, and direct REST writes must behave the same.
+- **Condition reads populate only metadata**, not trail geometry or elevation
+  profiles. Preserve those `select`/`populate` limits as CMS data grows.
+- **Summaries select the newest visible report per published trail in SQL.**
+  Never cap the city's report history: that can hide another trail's old closure.
+- **Same-day reports sort by submission time and ID.** The provider uses the
+  same ordering as the server, so stale cached responses cannot undo a fresh
+  closure, and an older observation cannot reopen a newer closure.
+- **`Trails` has a `beforeDelete` hook that clears a trail's reports.**
+  `trail_conditions.trail_id` is NOT NULL with an ON DELETE SET NULL FK — Payload
+  generates that pair, and together they make Postgres *refuse* to delete a trail
+  anyone has reported on. Reads also skip a report whose trail is null.
+
 ## Configuration & Secrets
 
 - Mapbox credentials belong in `.env.local`; see `.env.example` for required keys.
 - Never commit secrets or `.env.local` to version control.
 - `DATABASE_URL` and `PAYLOAD_SECRET` are only needed for the content backend.
+- `CONDITION_REPORT_SALT` is optional; it salts the condition-reporter hash and
+  falls back to `PAYLOAD_SECRET`.
