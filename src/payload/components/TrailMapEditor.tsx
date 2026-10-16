@@ -1,15 +1,21 @@
 'use client';
 
 /**
- * The one map in the trail editor. Three modes over the same view:
+ * The one map in the trail editor. Five modes over the same view:
  *
- *   Pick ways    click OSM trails to add/remove them. The default, and the one
- *                to prefer — the geometry then stays maintained upstream, where
- *                community fixes flow in for free.
- *   Move points  drag the line's points around. The escape hatch for when OSM
- *                is wrong or coarse.
- *   Draw         click along the trail to extend it. How a trail that isn't in
- *                OSM at all gets geometry.
+ *   Pick ways      click OSM trails to add/remove them. The default, and the
+ *                  one to prefer — the geometry then stays maintained upstream,
+ *                  where community fixes flow in for free.
+ *   Follow trails  click along a trail and the line follows the OSM network
+ *                  between clicks (`route-tool.ts`). The fast way to trace a
+ *                  trail that is in OSM as part of longer ways.
+ *   Draw           click along the trail to extend it. How a trail that isn't in
+ *                  OSM at all gets geometry.
+ *   Move points    drag the line's points around one at a time. The escape
+ *                  hatch for when OSM is wrong or coarse.
+ *   Select points  select many points at once — box, click, Shift-click — and
+ *                  move, delete, split, join, reverse, or simplify them
+ *                  (`point-selection-tool.ts`, `line-edits.ts`).
  *
  * Import GPX replaces the line with a recorded or planned track, then drops into
  * Move points to tidy it up. It is the Draw path with the clicking done by a GPS.
@@ -19,13 +25,13 @@
  * your place on every switch.
  *
  * **Moving or drawing flips the trail to `geometrySource: 'edited'`**, which
- * stops the OSM rebuild for it — otherwise the next save would refetch the ways
- * and throw the edit away. "Discard edits" puts it back.
+ * makes the line curator-owned. Otherwise the save hook treats it as OSM-owned
+ * and restores the last reviewed OSM line, throwing the point edit away.
  *
  * ## Terra Draw owns the line; we own the ways
  *
- * Vertex dragging, midpoint insertion, deletion, snapping, and undo/redo come
- * from [Terra Draw](https://terradraw.io). Hand-rolling those is a lot of fiddly
+ * Single-point dragging, midpoint insertion, deletion, and snapping come from
+ * [Terra Draw](https://terradraw.io). Hand-rolling those is a lot of fiddly
  * hit-testing to own, and the version that did got the details wrong in ways
  * that only show up under a real pointer.
  *
@@ -33,9 +39,15 @@
  * one feature each (`partsToFeatures` / `featuresToParts`) and are joined back
  * up on the way out.
  *
- * **Pick mode stays custom.** OSM ways are vector-tile features from a remote
- * tileset, not features in Terra Draw's store — there is nothing for it to edit.
- * That mode is a plain Mapbox click handler on a transparent hit layer.
+ * **Pick, Follow trails, and Select points stay custom.** OSM ways are
+ * vector-tile features from a remote tileset, not features in Terra Draw's
+ * store, and Terra Draw has no notion of selecting points across features. In
+ * those modes Terra Draw is inert and only draws the line.
+ *
+ * **Undo is the editor's, not Terra Draw's** (`edit-history.ts`). Every settled
+ * edit — a finished drag, a finished piece, one bulk operation — pushes a
+ * snapshot of the line before it. Terra Draw keeps only its mode-level history,
+ * for taking back points of a piece still being drawn.
  *
  * ## Two rules this component lives by
  *
@@ -55,14 +67,20 @@ import mapboxgl from 'mapbox-gl';
 // The public app pulls this in from its own layout, but the (payload) route
 // group is a separate tree — without it the map renders with broken controls.
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useField } from '@payloadcms/ui';
+import {
+  toast,
+  useConfig,
+  useDocumentInfo,
+  useField,
+  useFormBackgroundProcessing,
+  useFormProcessing,
+} from '@payloadcms/ui';
+import { formatAdminURL } from 'payload/shared';
 import {
   TerraDraw,
   TerraDrawLineStringMode,
   TerraDrawModeUndoRedo,
   TerraDrawSelectMode,
-  TerraDrawSessionUndoRedo,
-  TerraDrawUndoRedoKeyboardShortcuts,
 } from 'terra-draw';
 import { TerraDrawMapboxGLAdapter } from 'terra-draw-mapbox-gl-adapter';
 import { mapConfig } from '@/config/map.config';
@@ -71,26 +89,49 @@ import {
   OSM_TRAILS_SOURCE_LAYER,
   OSM_TRAILS_TILEJSON_URL,
 } from '@/data/osm-trails';
+import type { TrailNetworkResponse } from '@/payload/endpoints/trail-network';
 import { boundsOf, lengthMeters } from '@/payload/osm/assemble';
-import { createDeletedPieces } from '@/payload/osm/deleted-pieces';
+import { createEditHistory } from '@/payload/osm/edit-history';
+import type { PreviewTrailGeometryResponse } from '@/payload/endpoints/preview-trail-geometry';
 import {
+  cloneParts,
   featuresToParts,
   parseTrailGeometry,
   partsToFeatures,
+  roundParts,
   samePartsAs,
   toTrailGeometry,
   type TrailGeometry,
 } from '@/payload/osm/geometry';
 import { MAX_GPX_BYTES, parseGpx } from '@/payload/osm/gpx';
 import { parseOsmIds } from '@/payload/osm/ids';
+import {
+  deletePoints,
+  type EditResult,
+  joinParts,
+  partsOf,
+  type PointRef,
+  reverseParts,
+  simplifyParts,
+  splitAtPoints,
+} from '@/payload/osm/line-edits';
 import { METERS_TO_MILES } from '@/payload/osm/units';
 import { OSM_BIKE_TRAIL_FILTER } from '@/utils/map';
 import { cn } from '@/lib/utils';
 import { Banner, type Tone } from './admin-ui';
+import {
+  createPointSelectionTool,
+  type PointSelectionTool,
+} from './point-selection-tool';
+import {
+  createRouteTool,
+  type RouteStatus,
+  type RouteTool,
+} from './route-tool';
 import { removeSelectedLinePointAt } from './terra-draw-point-removal';
 
 type Parts = [number, number][][];
-type Mode = 'draw' | 'move' | 'pick';
+type Mode = 'draw' | 'move' | 'pick' | 'route' | 'select';
 
 const WAYS_LAYER = 'osm-ways';
 const WAYS_HIT_LAYER = 'osm-ways-hit';
@@ -126,6 +167,16 @@ const STYLES = {
 
 type StyleKey = keyof typeof STYLES;
 
+/** Simplify tolerances offered, in meters. 3 m matches the GPX import's. */
+const SIMPLIFY_TOLERANCES_M = [1, 3, 5, 10, 20] as const;
+
+const IDLE_ROUTE: RouteStatus = {
+  network: 'idle',
+  networkMessage: null,
+  note: null,
+  waypoints: 0,
+};
+
 export function TrailMapEditor({
   path,
   readOnly,
@@ -144,27 +195,52 @@ export function TrailMapEditor({
   const { setValue: setRebuild } = useField<boolean>({
     path: 'rebuildGeometry',
   });
+  const { setValue: setBounds } = useField({ path: 'bounds' });
+  const { setValue: setDistance } = useField({ path: 'distance' });
+  const { setValue: setElevationGain } = useField({ path: 'elevationGain' });
+  const { setValue: setElevationLoss } = useField({ path: 'elevationLoss' });
+  const { setValue: setElevationMax } = useField({ path: 'elevationMax' });
+  const { setValue: setElevationMin } = useField({ path: 'elevationMin' });
+  const { setValue: setElevationProfile } = useField({
+    path: 'elevationProfile',
+  });
+  const { setValue: setOsmReport } = useField({ path: 'osmReport' });
+  const { value: displayName } = useField<string>({ path: 'displayName' });
   const { setValue: setTrailName, value: trailName } = useField<string>({
     path: 'trailName',
   });
+  const {
+    config: {
+      routes: { api: apiRoute },
+      serverURL,
+    },
+  } = useConfig();
+  const isProcessing = useFormProcessing();
+  const isBackgroundProcessing = useFormBackgroundProcessing();
+  const { data: documentData, id: documentId } = useDocumentInfo();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const statsRef = useRef<HTMLSpanElement | null>(null);
   const gpxInputRef = useRef<HTMLInputElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<TerraDraw | null>(null);
+  const routeToolRef = useRef<RouteTool | null>(null);
+  const selectionToolRef = useRef<PointSelectionTool | null>(null);
 
   /** The working copy. Written at drag rate, so it cannot live in state. */
   const partsRef = useRef<Parts>([]);
+  /**
+   * The line as of the last settled edit — what an undo snapshot is taken from.
+   * `partsRef` runs ahead of it during a drag or a piece being drawn.
+   */
+  const settledRef = useRef<Parts>([]);
   /** True while *we* are writing into Terra Draw's store. See the change handler. */
   const loadingRef = useRef(false);
   /** Terra Draw throws if started twice or stopped before starting. */
   const startedRef = useRef(false);
-  /**
-   * Undo for deleted pieces, which Terra Draw's own history does not cover.
-   * See `deleted-pieces.ts` for why it has to exist.
-   */
-  const deletedRef = useRef(createDeletedPieces());
+  /** Undo and redo for every edit. See `edit-history.ts`. */
+  const historyRef = useRef(createEditHistory());
+  const refreshRequestRef = useRef<AbortController | null>(null);
 
   const [ready, setReady] = useState(false);
   const [drawFailed, setDrawFailed] = useState(false);
@@ -174,15 +250,22 @@ export function TrailMapEditor({
   const [history, setHistory] = useState({ canRedo: false, canUndo: false });
   const [isRemovingPoint, setIsRemovingPoint] = useState(false);
   const [pointRemovalNote, setPointRemovalNote] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasUnsavedPreview, setHasUnsavedPreview] = useState(false);
   const [importNote, setImportNote] = useState<{
     text: string;
     tone: Tone;
   } | null>(null);
+  const [routeStatus, setRouteStatus] = useState<RouteStatus>(IDLE_ROUTE);
+  const [selection, setSelection] = useState<PointRef[]>([]);
+  const [editNote, setEditNote] = useState<string | null>(null);
+  const [toleranceMeters, setToleranceMeters] = useState<number>(3);
   /**
    * The ways the line currently on screen was built from.
    *
    * Picking a way does not add it to the line — the line is assembled from
-   * Overpass on the server when you save. So a way picked a moment ago has no
+   * Overpass when you refresh the preview. So a way picked a moment ago has no
    * points on it, and in Move points that reads as "this way is broken" rather
    * than "this way isn't in the line yet". Comparing against this is how the
    * editor can say which it is.
@@ -203,7 +286,11 @@ export function TrailMapEditor({
   const sourceRef = useRef(geometrySource);
   const setGeomRef = useRef(setGeom);
   const setOsmIdsRef = useRef(setOsmIds);
+  const setOsmReportRef = useRef(setOsmReport);
+  const setRebuildRef = useRef(setRebuild);
   const setSourceRef = useRef(setGeometrySource);
+  const apiRef = useRef({ apiRoute, serverURL });
+  apiRef.current = { apiRoute, serverURL };
   idsRef.current = ids;
   modeRef.current = mode;
   readOnlyRef.current = Boolean(readOnly);
@@ -211,9 +298,34 @@ export function TrailMapEditor({
   sourceRef.current = geometrySource;
   setGeomRef.current = setGeom;
   setOsmIdsRef.current = setOsmIds;
+  setOsmReportRef.current = setOsmReport;
+  setRebuildRef.current = setRebuild;
   setSourceRef.current = setGeometrySource;
 
   const editable = !readOnly;
+
+  const cancelRefresh = useCallback(() => {
+    const request = refreshRequestRef.current;
+    if (!request) {
+      return;
+    }
+    refreshRequestRef.current = null;
+    request.abort();
+    setIsRefreshing(false);
+  }, []);
+
+  useEffect(() => {
+    refreshRequestRef.current?.abort();
+    refreshRequestRef.current = null;
+    setRefreshError(null);
+    setIsRefreshing(false);
+    setHasUnsavedPreview(false);
+
+    return () => {
+      refreshRequestRef.current?.abort();
+      refreshRequestRef.current = null;
+    };
+  }, [documentData?.updatedAt, documentId]);
 
   // --- reading and writing the line --------------------------------------
 
@@ -234,15 +346,57 @@ export function TrailMapEditor({
   /**
    * Writes the working line into the form, and takes ownership of it.
    *
-   * Flipping the source is what makes the edit survive: an 'osm' trail refetches
-   * its ways on the next save and would overwrite whatever was dragged.
+   * Flipping the source is what makes the edit survive: an 'osm' trail restores
+   * its last reviewed geometry unless a new OSM preview accompanies the save.
    */
   const commit = useCallback(() => {
+    // A late OSM response must never overwrite a point edit made while the
+    // network request was running.
+    cancelRefresh();
+    setHasUnsavedPreview(false);
+    setOsmReportRef.current(null);
+    setRebuildRef.current(false);
     setGeomRef.current(toTrailGeometry(partsRef.current));
     if (sourceRef.current !== 'edited') {
       setSourceRef.current('edited');
     }
+  }, [cancelRefresh]);
+
+  /**
+   * Lights the toolbar buttons from what can actually be undone.
+   *
+   * Three sources count: the editor's history, Terra Draw's points of a piece
+   * still being drawn, and the clicks of a route still being built.
+   */
+  const syncHistory = useCallback(() => {
+    const draw = drawRef.current;
+    const isDrawing = modeRef.current === 'draw';
+    setHistory({
+      canRedo:
+        historyRef.current.canRedo() || (isDrawing && Boolean(draw?.canRedo())),
+      canUndo:
+        historyRef.current.canUndo() ||
+        (isDrawing && Boolean(draw?.canUndo())) ||
+        (modeRef.current === 'route' &&
+          Boolean(routeToolRef.current?.hasRoute())),
+    });
   }, []);
+
+  /**
+   * Closes the edit in progress into one undo step.
+   *
+   * Called when Terra Draw finishes an action — the end of a drag, a finished
+   * piece, a deleted point — so a drag that rewrote the line on every frame is
+   * still a single Undo. A no-op when nothing has changed since the last one.
+   */
+  const settle = useCallback(() => {
+    if (samePartsAs(settledRef.current, partsRef.current)) {
+      return;
+    }
+    historyRef.current.push(settledRef.current);
+    settledRef.current = cloneParts(partsRef.current);
+    syncHistory();
+  }, [syncHistory]);
 
   /**
    * Pulls Terra Draw's store back into `parts` and, optionally, the form.
@@ -253,37 +407,14 @@ export function TrailMapEditor({
    * — so committing on every event marked a trail "Edited by hand" and dirtied
    * the form the moment you clicked its line, before touching a single point.
    */
-  /**
-   * Lights the toolbar buttons from what can actually be undone.
-   *
-   * Terra Draw's own answer is not the whole story: a deleted piece is
-   * restorable by us and not by it, so a stack it knows nothing about has to
-   * count towards Undo.
-   */
-  const syncHistory = useCallback(() => {
-    const draw = drawRef.current;
-    setHistory({
-      canRedo: Boolean(draw?.canRedo()),
-      canUndo: Boolean(draw?.canUndo()) || deletedRef.current.depth() > 0,
-    });
-  }, []);
-
   const readBack = useCallback(
     (write: boolean) => {
       const draw = drawRef.current;
       if (!draw) {
         return;
       }
-      const previous = partsRef.current;
       const next = featuresToParts(draw.getSnapshot());
-      const changed = !samePartsAs(next, previous);
-
-      // A piece going missing is the one edit Terra Draw's own undo cannot put
-      // back, so it gets a snapshot. Rare enough to afford the `setState` that
-      // follows — a drag never reaches this branch.
-      if (changed && write && deletedRef.current.record(previous, next)) {
-        queueMicrotask(syncHistory);
-      }
+      const changed = !samePartsAs(next, partsRef.current);
 
       partsRef.current = next;
       paintStats();
@@ -291,34 +422,45 @@ export function TrailMapEditor({
         commit();
       }
     },
-    [commit, paintStats, syncHistory],
+    [commit, paintStats],
   );
 
-  const togglePick = useCallback((id: number, name: string) => {
-    const current = idsRef.current;
-    // Order is meaningful — it disambiguates trails that double back — so
-    // append rather than sort.
-    const next = current.includes(id)
-      ? current.filter((existing) => existing !== id)
-      : [...current, id];
-    setNames((previous) => ({ ...previous, [id]: name }));
-    setOsmIdsRef.current(next);
-    if (sourceRef.current === 'imported') {
-      // Selecting a maintainable source is the curator's explicit request to
-      // replace a style-only imported line. Without this, imported trails
-      // would accept the clicks and then ignore them on save.
-      sourceRef.current = 'osm';
-      setSourceRef.current('osm');
-    }
-  }, []);
+  const togglePick = useCallback(
+    (id: number, name: string) => {
+      // The response is tied to the exact ordered id list sent to Overpass. If
+      // that list changes, discard the request instead of pairing an old line
+      // with the new selection.
+      cancelRefresh();
+      const current = idsRef.current;
+      // Order is meaningful — it disambiguates trails that double back — so
+      // append rather than sort.
+      const next = current.includes(id)
+        ? current.filter((existing) => existing !== id)
+        : [...current, id];
+      setNames((previous) => ({ ...previous, [id]: name }));
+      setHasUnsavedPreview(false);
+      setRefreshError(null);
+      setOsmReportRef.current(null);
+      setRebuildRef.current(false);
+      setOsmIdsRef.current(next);
+      if (sourceRef.current === 'imported') {
+        // Selecting a maintainable source is the curator's explicit request to
+        // replace a style-only imported line. Without this, imported trails
+        // would accept the clicks and then ignore them on save.
+        sourceRef.current = 'osm';
+        setSourceRef.current('osm');
+      }
+    },
+    [cancelRefresh],
+  );
 
   /**
    * Replaces Terra Draw's store with the given line.
    *
    * `baseline` says whether this line is a new starting point — a document
    * loading, or a save coming back — in which case there is nothing before it
-   * left to undo. Restoring a deleted piece passes false, because the rest of
-   * the undo stack is still every bit as valid as it was a moment ago.
+   * left to undo. Undo, redo, the bulk edits, and a basemap switch pass false,
+   * because the history is still every bit as valid as it was a moment ago.
    */
   const loadDraw = useCallback((parts: Parts, baseline = true) => {
     const draw = drawRef.current;
@@ -362,7 +504,8 @@ export function TrailMapEditor({
     // undoing someone else's save.
     if (baseline) {
       draw.clearUndoRedoHistory();
-      deletedRef.current.clear();
+      historyRef.current.clear();
+      settledRef.current = cloneParts(parts);
       setHistory({ canRedo: false, canUndo: false });
     }
   }, []);
@@ -389,6 +532,81 @@ export function TrailMapEditor({
   }, []);
 
   /**
+   * Puts a whole new line on screen and into the form, without touching the
+   * history — the callers decide what that step means for undo.
+   *
+   * Rounded on the way in: the bulk edits and routes compute coordinates, and
+   * Terra Draw silently refuses any with more than 9 decimal places.
+   */
+  const setLine = useCallback(
+    (next: Parts) => {
+      partsRef.current = roundParts(next);
+      settledRef.current = cloneParts(partsRef.current);
+      loadDraw(partsRef.current, false);
+      paintStats();
+      commit();
+      selectionToolRef.current?.refresh();
+      // A route in progress was built against the old line — it may be set to
+      // extend a piece that no longer exists, or is now a different one.
+      if (routeToolRef.current?.hasRoute()) {
+        routeToolRef.current.cancel();
+      }
+      // Loading cleared Terra Draw's selection, which is what shows the handles.
+      if (modeRef.current === 'move') {
+        autoSelect();
+      }
+      syncHistory();
+    },
+    [autoSelect, commit, loadDraw, paintStats, syncHistory],
+  );
+
+  /**
+   * Applies one bulk edit as one undo step.
+   *
+   * `before` is for a gesture that has been previewing as it went (a group
+   * drag): by its end the working line already *is* the result, so the step
+   * has to be recorded from where the gesture started.
+   */
+  const applyEdit = useCallback(
+    (next: Parts, before?: Parts) => {
+      if (!before) {
+        // Any Terra Draw edit not yet closed off becomes its own step first.
+        settle();
+      }
+      const base = before ?? settledRef.current;
+      if (samePartsAs(next, base)) {
+        if (before) {
+          setLine(base);
+        }
+        return;
+      }
+      historyRef.current.push(base);
+      setLine(next);
+    },
+    [setLine, settle],
+  );
+
+  /** Shows a line mid-gesture. Neither committed nor recorded. */
+  const previewLine = useCallback(
+    (next: Parts) => {
+      partsRef.current = roundParts(next);
+      loadDraw(partsRef.current, false);
+      paintStats();
+    },
+    [loadDraw, paintStats],
+  );
+
+  /** One of the Select points operations: apply it, keep its selection, say what happened. */
+  const runEdit = useCallback(
+    (result: EditResult, note: string | null) => {
+      applyEdit(result.parts);
+      selectionToolRef.current?.setSelection(result.selection);
+      setEditNote(note);
+    },
+    [applyEdit],
+  );
+
+  /**
    * Registers Terra Draw against the current style, and restores the line.
    *
    * **Must not run before the style has loaded.** The Mapbox adapter's
@@ -400,8 +618,8 @@ export function TrailMapEditor({
    * It also has to run *again* after every basemap switch: `setStyle` discards
    * every source and layer, including the adapter's, and it does not put them
    * back. Re-registering is why the line survives a switch to satellite. The
-   * undo history does not — a fair trade for not maintaining a fork of the
-   * adapter.
+   * undo history survives too, because it is the editor's rather than Terra
+   * Draw's.
    */
   const mountDraw = useCallback(() => {
     const draw = drawRef.current;
@@ -432,8 +650,34 @@ export function TrailMapEditor({
 
     setDrawFailed(false);
     draw.setMode(terraModeFor(modeRef.current, !readOnlyRef.current));
-    loadDraw(partsRef.current);
+    loadDraw(partsRef.current, false);
   }, [loadDraw]);
+
+  /** Loads the OSM trail network in one grid cell, for Follow trails. */
+  const fetchNetwork = useCallback(
+    async (bbox: [number, number, number, number]) => {
+      const { apiRoute: api, serverURL: server } = apiRef.current;
+      const endpoint = formatAdminURL({
+        apiRoute: api,
+        path: '/trails/network',
+        serverURL: server,
+      });
+      const response = await fetch(`${endpoint}?bbox=${bbox.join(',')}`, {
+        credentials: 'same-origin',
+      });
+      const body = (await response.json().catch(() => ({}))) as Partial<
+        TrailNetworkResponse & { message: string }
+      >;
+      if (!response.ok || !Array.isArray(body.ways)) {
+        throw new Error(
+          body.message ??
+            `Trails could not be loaded (HTTP ${response.status}).`,
+        );
+      }
+      return body.ways;
+    },
+    [],
+  );
 
   // --- the map -----------------------------------------------------------
 
@@ -457,6 +701,8 @@ export function TrailMapEditor({
 
     mapboxgl.accessToken = mapConfig.mapbox.accessToken;
     const map = new mapboxgl.Map({
+      // Shift-drag is box select in Select points.
+      boxZoom: false,
       center: mapConfig.defaultView.center,
       container: containerRef.current,
       style: STYLES.streets,
@@ -510,6 +756,7 @@ export function TrailMapEditor({
         setPointRemovalNote('Click directly on a visible point to remove it.');
       } else {
         setPointRemovalNote(null);
+        settle();
       }
     });
 
@@ -543,20 +790,15 @@ export function TrailMapEditor({
       ],
       // Undo/redo is **opt-in**. Without this the `undo()` and `redo()` methods
       // exist and do nothing at all — the base mode's implementations are empty
-      // functions — so the toolbar buttons silently no-op.
+      // functions.
       //
-      // Both levels are needed, and they cover different things:
-      //   sessionLevel  completed actions — a point moved, inserted, or deleted.
-      //                 This is what "undo my drag" means.
-      //   modeLevel     steps inside an unfinished action — taking back the last
-      //                 point while still drawing a line.
-      // The coordinator prefers the mode stack while drawing and the session
-      // stack otherwise, so wiring both makes Undo mean the obvious thing in
-      // either mode.
+      // Only the mode level: taking back the last point while still drawing a
+      // piece. Completed edits undo through the editor's own history, which
+      // also covers what Terra Draw's session level never could — deleted
+      // pieces and the bulk edits. Its keyboard shortcuts are left off too;
+      // the map's own key handler routes Ctrl+Z to the right stack.
       undoRedo: {
-        keyboardShortcuts: new TerraDrawUndoRedoKeyboardShortcuts(),
         modeLevel: new TerraDrawModeUndoRedo(),
-        sessionLevel: new TerraDrawSessionUndoRedo(),
       },
     });
     drawRef.current = draw;
@@ -571,21 +813,56 @@ export function TrailMapEditor({
         return;
       }
       readBack(!loadingRef.current && !readOnlyRef.current);
+      // The Delete key removes a whole piece without a `finish` event, so it
+      // closes its own undo step.
+      if (
+        type === 'delete' &&
+        !loadingRef.current &&
+        modeRef.current === 'move'
+      ) {
+        queueMicrotask(settle);
+      }
     });
 
-    // Fires for every push, undo, and redo, from the buttons or the keyboard
-    // shortcuts — so the toolbar reflects what is actually on the stacks rather
-    // than offering an Undo that would do nothing.
+    // The end of a drag, an inserted or deleted point, a finished piece.
+    draw.on('finish', settle);
+
+    // Fires for every push, undo, and redo of a piece still being drawn, so the
+    // toolbar reflects what is actually on the stacks.
     draw.on('history', syncHistory);
 
+    const routeTool = createRouteTool(map, {
+      apply: (next) => applyEdit(next),
+      fetchNetwork,
+      getParts: () => partsRef.current,
+      isActive: () => !readOnlyRef.current && modeRef.current === 'route',
+      onStatus: (status) => {
+        setRouteStatus(status);
+        syncHistory();
+      },
+    });
+    routeToolRef.current = routeTool;
+
+    const selectionTool = createPointSelectionTool(map, {
+      apply: applyEdit,
+      getParts: () => partsRef.current,
+      isActive: () => !readOnlyRef.current && modeRef.current === 'select',
+      onSelection: setSelection,
+      preview: previewLine,
+    });
+    selectionToolRef.current = selectionTool;
+
     // Fires on the first load *and* on every basemap switch, which discards
-    // every source and layer — ours and Terra Draw's alike. So both the way
-    // layers and the Terra Draw registration are rebuilt here, and `mountDraw`
-    // is the only place `draw.start()` is ever called.
+    // every source and layer — ours and Terra Draw's alike. So the way layers,
+    // the Terra Draw registration, and the tools' layers are all rebuilt here,
+    // and `mountDraw` is the only place `draw.start()` is ever called. The
+    // tools go last so their points and previews draw above the line.
     map.on('style.load', () => {
       installWayLayers(map);
       applyWayStyle(map, idsRef.current, modeRef.current);
       mountDraw();
+      routeTool.install();
+      selectionTool.install();
       setReady(true);
     });
 
@@ -597,11 +874,22 @@ export function TrailMapEditor({
       }
       startedRef.current = false;
       drawRef.current = null;
+      routeToolRef.current = null;
+      selectionToolRef.current = null;
       map.remove();
       mapRef.current = null;
       setReady(false);
     };
-  }, [mountDraw, readBack, syncHistory, togglePick]);
+  }, [
+    applyEdit,
+    fetchNetwork,
+    mountDraw,
+    previewLine,
+    readBack,
+    settle,
+    syncHistory,
+    togglePick,
+  ]);
 
   // Mode governs what Terra Draw is doing and how the ways layer looks.
   useEffect(() => {
@@ -619,6 +907,42 @@ export function TrailMapEditor({
     }
     applyWayStyle(map, ids, mode);
   }, [autoSelect, editable, ids, mode, ready]);
+
+  // Entering and leaving the custom modes. Leaving Follow trails keeps any
+  // route in progress, and a double-click there finishes the route instead of
+  // zooming.
+  useEffect(() => {
+    const map = mapRef.current;
+    const routeTool = routeToolRef.current;
+    const selectionTool = selectionToolRef.current;
+    if (!map || !routeTool || !selectionTool || !ready) {
+      return;
+    }
+    map.getCanvas().style.cursor = '';
+    setEditNote(null);
+    if (mode === 'route' && editable) {
+      map.doubleClickZoom.disable();
+      routeTool.activate();
+    }
+    selectionTool.refresh();
+    syncHistory();
+
+    return () => {
+      // On unmount the init effect's cleanup has already removed the map, and
+      // there is nothing left to finish a route into.
+      if (mapRef.current !== map) {
+        return;
+      }
+      if (mode === 'route') {
+        map.doubleClickZoom.enable();
+        routeTool.deactivate();
+        setRouteStatus(IDLE_ROUTE);
+      }
+      if (mode === 'select') {
+        selectionTool.clear();
+      }
+    };
+  }, [editable, mode, ready, syncHistory]);
 
   useEffect(() => {
     if (mode !== 'move' || !editable) {
@@ -667,39 +991,261 @@ export function TrailMapEditor({
   }, [geomValue, loadDraw, paintStats, ready]);
 
   /**
-   * Undo, over both stacks.
-   *
-   * Terra Draw's is tried first and covers everything it can, which is every
-   * coordinate edit. Deleting a whole piece is the exception: it reports the
-   * undo as successful and leaves the piece deleted, so a *successful* undo
-   * that moved nothing is the signal to fall back to our own snapshot.
+   * Undo, taking back the smallest thing first: a click of the route being
+   * built, then a point of the piece being drawn, then the last settled edit.
    */
   const undo = useCallback(() => {
-    const before = partsRef.current;
-    if (drawRef.current?.undo()) {
-      readBack(true);
-    }
-    if (!samePartsAs(partsRef.current, before)) {
+    const draw = drawRef.current;
+    if (modeRef.current === 'route' && routeToolRef.current?.undoLeg()) {
       syncHistory();
       return;
     }
-
-    const restored = deletedRef.current.restore();
-    if (restored) {
-      partsRef.current = restored;
-      loadDraw(restored, false);
-      paintStats();
-      commit();
+    if (modeRef.current === 'draw' && draw?.canUndo()) {
+      draw.undo();
+      syncHistory();
+      return;
     }
-    syncHistory();
-  }, [commit, loadDraw, paintStats, readBack, syncHistory]);
+    settle();
+    const previous = historyRef.current.undo(partsRef.current);
+    if (previous) {
+      setLine(previous);
+      selectionToolRef.current?.clear();
+      setEditNote(null);
+    }
+  }, [setLine, settle, syncHistory]);
 
   const redo = useCallback(() => {
-    if (drawRef.current?.redo()) {
-      readBack(true);
+    const draw = drawRef.current;
+    if (modeRef.current === 'draw' && draw?.canRedo()) {
+      draw.redo();
+      syncHistory();
+      return;
     }
-  }, [readBack]);
+    const next = historyRef.current.redo(partsRef.current);
+    if (next) {
+      setLine(next);
+      selectionToolRef.current?.clear();
+      setEditNote(null);
+    }
+  }, [setLine, syncHistory]);
 
+  // --- Select points operations -------------------------------------------
+  //
+  // Each acts on the selection when there is one, and on the whole line when
+  // there isn't — except the two that only make sense on chosen points.
+
+  const deleteSelected = useCallback(() => {
+    const chosen = selectionToolRef.current?.selection() ?? [];
+    if (chosen.length === 0) {
+      return;
+    }
+    runEdit(
+      deletePoints(partsRef.current, chosen),
+      `Deleted ${plural(chosen.length, 'point')}.`,
+    );
+  }, [runEdit]);
+
+  const splitSelected = useCallback(() => {
+    const chosen = selectionToolRef.current?.selection() ?? [];
+    const before = partsRef.current.length;
+    const result = splitAtPoints(partsRef.current, chosen);
+    if (result.parts.length === before) {
+      setEditNote(
+        'Select a point in the middle of a piece to split there — a piece’s end points can’t split it.',
+      );
+      return;
+    }
+    runEdit(
+      result,
+      `Split into ${plural(result.parts.length - before + 1, 'piece')}.`,
+    );
+  }, [runEdit]);
+
+  const joinSelected = useCallback(() => {
+    const chosen = selectionToolRef.current?.selection() ?? [];
+    const targets =
+      chosen.length > 0
+        ? partsOf(chosen)
+        : partsRef.current.map((_, index) => index);
+    if (targets.length < 2) {
+      setEditNote(
+        'Select points on at least two pieces to join them, or clear the selection to join every piece.',
+      );
+      return;
+    }
+    runEdit(
+      joinParts(partsRef.current, targets),
+      `Joined ${plural(targets.length, 'piece')} into one. Any gap between them is bridged with a straight line.`,
+    );
+  }, [runEdit]);
+
+  const reverseSelected = useCallback(() => {
+    const chosen = selectionToolRef.current?.selection() ?? [];
+    const targets =
+      chosen.length > 0
+        ? partsOf(chosen)
+        : partsRef.current.map((_, index) => index);
+    runEdit(
+      reverseParts(partsRef.current, targets, chosen),
+      `Reversed ${plural(targets.length, 'piece')}.`,
+    );
+  }, [runEdit]);
+
+  const simplifySelected = useCallback(() => {
+    const chosen = selectionToolRef.current?.selection() ?? [];
+    const count = (parts: Parts) =>
+      parts.reduce((total, part) => total + part.length, 0);
+    const before = count(partsRef.current);
+    const result = simplifyParts(partsRef.current, toleranceMeters, chosen);
+    const after = count(result.parts);
+    if (after === before) {
+      setEditNote(
+        `Nothing to simplify at ${toleranceMeters} m — every point is needed to keep the shape. Try a larger tolerance.`,
+      );
+      return;
+    }
+    runEdit(
+      result,
+      `Simplified ${chosen.length > 0 ? 'the selection' : 'the line'} from ${before.toLocaleString()} to ${after.toLocaleString()} points.`,
+    );
+  }, [runEdit, toleranceMeters]);
+
+  /**
+   * Keys for the map, while it has focus. Undo/redo work in every editing mode;
+   * the rest belong to the custom modes, since Terra Draw handles its own.
+   */
+  const onMapKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (readOnlyRef.current) {
+        return;
+      }
+      const hasModifier = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+      const current = modeRef.current;
+      let handled = true;
+
+      // Pick ways has no undo — its Undo button is disabled — and a stray
+      // Ctrl+Z there must not revert a line edit and take the trail off OSM.
+      if (current === 'pick') {
+        handled = false;
+      } else if (hasModifier && key === 'z') {
+        if (event.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if (hasModifier && key === 'y') {
+        redo();
+      } else if (current === 'route' && event.key === 'Enter') {
+        routeToolRef.current?.finish();
+      } else if (current === 'route' && event.key === 'Escape') {
+        routeToolRef.current?.cancel();
+      } else if (current === 'route' && event.key === 'Backspace') {
+        routeToolRef.current?.undoLeg();
+        syncHistory();
+      } else if (
+        current === 'select' &&
+        (event.key === 'Delete' || event.key === 'Backspace')
+      ) {
+        deleteSelected();
+      } else if (current === 'select' && event.key === 'Escape') {
+        selectionToolRef.current?.clear();
+      } else if (current === 'select' && hasModifier && key === 'a') {
+        selectionToolRef.current?.selectAll();
+      } else {
+        handled = false;
+      }
+
+      if (handled) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    },
+    [deleteSelected, redo, syncHistory, undo],
+  );
+
+  async function refreshFromOsm(): Promise<void> {
+    if (
+      !editable ||
+      ids.length === 0 ||
+      isRefreshing ||
+      refreshRequestRef.current !== null ||
+      isProcessing ||
+      isBackgroundProcessing
+    ) {
+      return;
+    }
+
+    setRefreshError(null);
+    setIsRefreshing(true);
+    const controller = new AbortController();
+    const requestedIds = [...ids];
+    refreshRequestRef.current = controller;
+
+    try {
+      const endpoint = formatAdminURL({
+        apiRoute,
+        path: '/trails/preview-osm-geometry',
+        serverURL,
+      });
+      const response = await fetch(endpoint, {
+        body: JSON.stringify({ name: displayName || trailName, osmIds: ids }),
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: controller.signal,
+      });
+      const body: unknown = await response.json();
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (!sameOrderedIds(requestedIds, idsRef.current)) {
+        return;
+      }
+      if (!response.ok || !isGeometryPreview(body)) {
+        throw new Error(messageFrom(body));
+      }
+
+      setGeom(body.geometry);
+      setGeometrySource('osm');
+      setBounds(body.measurements.bounds);
+      setDistance(body.measurements.distance);
+      setElevationGain(body.measurements.elevationGain);
+      setElevationLoss(body.measurements.elevationLoss);
+      setElevationMax(body.measurements.elevationMax);
+      setElevationMin(body.measurements.elevationMin);
+      setElevationProfile(body.profile);
+      setOsmReport({
+        ...body.report,
+        builtAt: new Date().toISOString(),
+        isPreview: true,
+        requestedIds,
+        source: 'osm',
+      });
+      setRebuild(true);
+      // The builder may reorder connected ways while joining them. The preview
+      // still corresponds to the ordered selection we sent, so track that
+      // request rather than comparing the form against the assembled order.
+      setLineWays(requestedIds);
+      setHasUnsavedPreview(true);
+      toast.success(body.message);
+    } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'The trail line could not be refreshed.';
+      setRefreshError(message);
+      toast.error(message);
+    } finally {
+      if (refreshRequestRef.current === controller) {
+        refreshRequestRef.current = null;
+        setIsRefreshing(false);
+      }
+    }
+  }
   /**
    * Replaces the line with a GPX file's tracks.
    *
@@ -707,9 +1253,8 @@ export function TrailMapEditor({
    * maintained here" and skips measuring entirely, whereas a GPX line is ours to
    * adjust and its distance and elevation must follow the line on save.
    *
-   * Loaded as a new baseline, so Undo cannot step back across it — Terra Draw's
-   * history has no record of a wholesale replacement. That is why replacing an
-   * existing line asks first.
+   * One undo step like any other edit, so replacing an existing line needs no
+   * confirmation — Undo puts the old line back.
    */
   const importGpx = useCallback(
     async (file: File) => {
@@ -736,19 +1281,8 @@ export function TrailMapEditor({
         setImportNote({ text: `${file.name}: ${parsed.error}`, tone: 'error' });
         return;
       }
-      if (
-        partsRef.current.length > 0 &&
-        !window.confirm(
-          `Replace the current trail line with the track from ${file.name}? This cannot be undone, but leaving without saving keeps the current line.`,
-        )
-      ) {
-        return;
-      }
-
-      partsRef.current = parsed.parts;
-      loadDraw(parsed.parts);
-      paintStats();
-      commit();
+      const hadLine = partsRef.current.length > 0;
+      applyEdit(parsed.parts);
       // The line no longer comes from the picked ways, and saying they have
       // "changed since this line was built" would send the curator off to
       // rebuild from OSM — the opposite of what they just did.
@@ -761,11 +1295,8 @@ export function TrailMapEditor({
       if (!trailName?.trim() && parsed.name) {
         setTrailName(parsed.name);
       }
-      // Already in Move points, the mode effect won't re-run, and `loadDraw`
-      // just cleared the selection that shows the handles.
-      if (modeRef.current === 'move') {
-        autoSelect();
-      } else {
+      // Already in Move points, `applyEdit` re-selected the line itself.
+      if (modeRef.current !== 'move') {
         setMode('move');
       }
 
@@ -773,17 +1304,12 @@ export function TrailMapEditor({
       const pieces =
         parsed.parts.length > 1 ? ` in ${parsed.parts.length} pieces` : '';
       setImportNote({
-        text: `Imported ${file.name}: ${parsed.pointsRead.toLocaleString()} GPS points simplified to ${kept.toLocaleString()}${pieces}. Adjust the line if needed, then save to measure its distance and elevation.`,
+        text: `Imported ${file.name}: ${parsed.pointsRead.toLocaleString()} GPS points simplified to ${kept.toLocaleString()}${pieces}. ${hadLine ? 'Undo brings back the previous line. ' : ''}Adjust the line if needed, then save to measure its distance and elevation.`,
         tone: 'info',
       });
     },
-    [autoSelect, commit, loadDraw, paintStats, setTrailName, trailName],
+    [applyEdit, setTrailName, trailName],
   );
-
-  const revertToOsm = useCallback(() => {
-    setGeometrySource('osm');
-    setRebuild(true);
-  }, [setGeometrySource, setRebuild]);
 
   // --- render ------------------------------------------------------------
 
@@ -804,6 +1330,12 @@ export function TrailMapEditor({
   const hasLine = parts.length > 0;
   const staleNote = staleLineNote(mode, ids, lineWays, geometrySource, hasLine);
   const editing = mode !== 'pick' && !drawFailed;
+  const canRefresh =
+    editable &&
+    picked.length > 0 &&
+    !isRefreshing &&
+    !isProcessing &&
+    !isBackgroundProcessing;
 
   return (
     <div className="field-type">
@@ -822,16 +1354,28 @@ export function TrailMapEditor({
             onClick={() => setMode('pick')}
           />
           <ModeButton
-            active={mode === 'move'}
+            active={mode === 'route'}
             disabled={!editable || drawFailed}
-            label="Adjust line"
-            onClick={() => setMode('move')}
+            label="Follow trails"
+            onClick={() => setMode('route')}
           />
           <ModeButton
             active={mode === 'draw'}
             disabled={!editable || drawFailed}
             label="Draw line"
             onClick={() => setMode('draw')}
+          />
+          <ModeButton
+            active={mode === 'move'}
+            disabled={!editable || drawFailed}
+            label="Adjust line"
+            onClick={() => setMode('move')}
+          />
+          <ModeButton
+            active={mode === 'select'}
+            disabled={!editable || drawFailed || !hasLine}
+            label="Select points"
+            onClick={() => setMode('select')}
           />
         </div>
         <div
@@ -901,6 +1445,15 @@ export function TrailMapEditor({
 
       {staleNote && <Banner tone="warning">{staleNote}</Banner>}
 
+      {hasUnsavedPreview && (
+        <Banner>
+          This refreshed line is only a preview. Review it here, then use Save
+          draft or Publish to keep it.
+        </Banner>
+      )}
+
+      {refreshError && <Banner tone="error">{refreshError}</Banner>}
+
       {drawFailed && (
         <Banner tone="error">
           The line editor could not attach to the map, so the trail line is
@@ -908,9 +1461,45 @@ export function TrailMapEditor({
         </Banner>
       )}
 
+      {mode === 'route' && editable && (
+        <RouteBar
+          onCancel={() => routeToolRef.current?.cancel()}
+          onFinish={() => routeToolRef.current?.finish()}
+          status={routeStatus}
+        />
+      )}
+
+      {mode === 'select' && editable && (
+        <SelectBar
+          onClear={() => selectionToolRef.current?.clear()}
+          onDelete={deleteSelected}
+          onJoin={joinSelected}
+          onReverse={reverseSelected}
+          onSelectAll={() => selectionToolRef.current?.selectAll()}
+          onSimplify={simplifySelected}
+          onSplit={splitSelected}
+          onTolerance={setToleranceMeters}
+          pieces={parts.length}
+          selection={selection}
+          toleranceMeters={toleranceMeters}
+        />
+      )}
+
+      {editNote && (mode === 'select' || mode === 'route') && (
+        <p
+          aria-live="polite"
+          className="mb-2 mt-0 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-elevation-800)]"
+        >
+          {editNote}
+        </p>
+      )}
+
       <div
+        aria-label="Trail line map"
         className="h-[480px] w-full rounded-[var(--style-radius-s,4px)] border border-solid border-[color:var(--theme-elevation-150)]"
+        onKeyDown={onMapKeyDown}
         ref={containerRef}
+        role="application"
       />
 
       <div className="flex items-center gap-3 py-2 text-[0.85rem]">
@@ -920,15 +1509,6 @@ export function TrailMapEditor({
           <span className="text-[color:var(--theme-elevation-600)]">
             Drawn here
           </span>
-        )}
-        {picked.length > 0 && geometrySource === 'edited' && (
-          <button
-            className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--theme-elevation-800)]"
-            onClick={revertToOsm}
-            type="button"
-          >
-            Use selected OpenStreetMap trails on next save
-          </button>
         )}
       </div>
 
@@ -959,29 +1539,48 @@ export function TrailMapEditor({
               No OpenStreetMap trail segments selected yet.
             </p>
           ) : (
-            <ol className="m-0 pl-5">
-              {picked.map((way) => (
-                <li className="mb-1" key={way.id}>
-                  {way.name}{' '}
-                  <a
-                    className="text-[0.8rem] underline-offset-2 hover:underline"
-                    href={`https://www.openstreetmap.org/way/${way.id}`}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    #{way.id}
-                  </a>{' '}
-                  <button
-                    className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!editable}
-                    onClick={() => togglePick(way.id, way.name)}
-                    type="button"
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ol>
+            <>
+              <ol className="m-0 pl-5">
+                {picked.map((way) => (
+                  <li className="mb-1" key={way.id}>
+                    {way.name}{' '}
+                    <a
+                      className="text-[0.8rem] underline-offset-2 hover:underline"
+                      href={`https://www.openstreetmap.org/way/${way.id}`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      #{way.id}
+                    </a>{' '}
+                    <button
+                      className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!editable}
+                      onClick={() => togglePick(way.id, way.name)}
+                      type="button"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <ModeButton
+                  active={false}
+                  disabled={!canRefresh}
+                  isToggle={false}
+                  label={
+                    isRefreshing
+                      ? 'Refreshing line…'
+                      : 'Refresh line from OpenStreetMap'
+                  }
+                  onClick={() => void refreshFromOsm()}
+                />
+                <span className="max-w-[60ch] text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.4]">
+                  Loads the latest selected segments into this form without
+                  saving them.
+                </span>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -997,7 +1596,7 @@ export function TrailMapEditor({
  * a read-only form both want.
  */
 function terraModeFor(mode: Mode, editable: boolean): string {
-  if (!editable || mode === 'pick') {
+  if (!editable || mode === 'pick' || mode === 'route' || mode === 'select') {
     return STATIC;
   }
   return mode === 'draw' ? LINESTRING : SELECT;
@@ -1030,7 +1629,7 @@ function staleLineNote(
   // An edited line has stopped tracking the ways altogether, so saying "save to
   // rebuild" would be a lie — saving deliberately will not touch it.
   if (source === 'edited') {
-    return 'The selected OpenStreetMap trails have changed, but this custom line will not be replaced when you save. Use “Use selected OpenStreetMap trails on next save” if you want those changes applied.';
+    return 'The selected OpenStreetMap trails have changed, but this custom line is still on the map. Refresh the line below to preview the selected segments before saving them.';
   }
 
   if (mode === 'pick') {
@@ -1038,8 +1637,12 @@ function staleLineNote(
   }
 
   return hasLine
-    ? 'The selected OpenStreetMap trails have changed since this line was built, so the new sections are not part of the editable line yet. Save to rebuild the line, then adjust it.'
+    ? 'The selected OpenStreetMap trails have changed since this line was built. Refresh the line below to preview the new sections before saving or adjusting them.'
     : null;
+}
+
+function sameOrderedIds(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
 function hintFor(
@@ -1052,21 +1655,12 @@ function hintFor(
 ): string {
   if (mode === 'pick') {
     if (source === 'edited') {
-      return 'Click trail segments to select them. Your custom line stays unchanged until you use “Use selected OpenStreetMap trails on next save.”';
+      return 'Click trail segments to select them. Your custom line stays unchanged until you refresh the line, so you can review the replacement before saving.';
     }
     if (source === 'imported') {
-      return 'Click a trail segment to start replacing the imported map line with OpenStreetMap. Select segments in riding order, then save to join and store them.';
+      return 'Click a trail segment to start replacing the imported map line with OpenStreetMap. Select segments in riding order, then refresh the line to review it.';
     }
-    return 'Click a trail segment to select it; click it again to remove it. For trails that double back, select segments in riding order. Saving joins those segments into one line and stores it with this trail.';
-  }
-
-  // The most confusing state in the editor: ways are picked but the line does
-  // not exist yet, because it is assembled from Overpass on the server when you
-  // save. Without saying so, Move points just looks broken.
-  if (!hasLine) {
-    return hasWays
-      ? 'Nothing to adjust yet. Save this trail to build the line from the selected OpenStreetMap trails, then return here to adjust it.'
-      : 'Nothing to adjust yet. Choose OpenStreetMap trails and save, import a GPX file, or switch to Draw line and click along the route.';
+    return 'Click a trail segment to select it; click it again to remove it. For trails that double back, select segments in riding order. Refresh joins those segments into a line you can review before saving.';
   }
 
   const takesOwnership =
@@ -1074,8 +1668,24 @@ function hintFor(
       ? ''
       : ' Your first change makes this a custom line, so future saves keep your version instead of replacing it from OpenStreetMap.';
 
+  if (mode === 'route') {
+    return `Click where the trail starts, then click further along it — the line follows the trails between clicks. Start on the end of an existing piece to extend it. Hold Alt (Option) while clicking to go straight across a gap. Double-click or press Enter to finish, Backspace to take back a click, Escape to cancel.${takesOwnership}`;
+  }
+
+  // The most confusing state in the editor: ways are picked but the line does
+  // not exist yet, because it is assembled from Overpass when you refresh the
+  // preview. Without saying so, Move points just looks broken.
+  if (!hasLine) {
+    return hasWays
+      ? 'Nothing to adjust yet. Return to Choose from OpenStreetMap and refresh the line first.'
+      : 'Nothing to adjust yet. Choose OpenStreetMap trails and refresh the line, import a GPX file, or switch to Follow trails or Draw line and click along the route.';
+  }
+
   if (mode === 'draw') {
-    return `Click to add points to the line; it snaps to nearby trails and points. Press Enter to finish a piece, Escape to cancel it.${takesOwnership}`;
+    return `Click to add points to the line; it snaps to the line’s own points. To trace a trail that is on the map, Follow trails is faster. Press Enter to finish a piece, Escape to cancel it.${takesOwnership}`;
+  }
+  if (mode === 'select') {
+    return `Click a point to select it; Shift- or Ctrl-click to add or remove points; Shift-drag a box to select every point in it. Drag a selected point to move the whole selection. Press Delete to remove the selected points, Escape to clear. With nothing selected, Join, Reverse, and Simplify act on the whole line.${takesOwnership}`;
   }
   // With one piece the editor selects it for you; with several it can't know
   // which one you mean, so say that rather than leaving you to guess why the
@@ -1094,7 +1704,239 @@ function hintFor(
   // this sentence said "click a point and press Delete to remove it", which is
   // the gesture that removes the *whole piece* — following it lost a section of
   // trail, and Terra Draw cannot undo that on its own.
-  return `${selecting}drag a point to move it, drag a midpoint to add one, or choose Remove point and click a point. You can also right-click a point to remove it. Press Delete to remove the whole selected piece; Undo brings it back. Distance updates as you drag. Use Calculate and save elevation below after the line is saved.${takesOwnership}`;
+  return `${selecting}drag a point to move it, drag a midpoint to add one, or choose Remove point and click a point. You can also right-click a point to remove it. Press Delete to remove the whole selected piece; Undo brings it back. Distance updates as you drag. Calculate elevation below when the line is ready.${takesOwnership}`;
+}
+
+function isGeometryPreview(
+  value: unknown,
+): value is PreviewTrailGeometryResponse {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as Partial<PreviewTrailGeometryResponse>;
+  const measurements = candidate.measurements;
+  const report = candidate.report;
+  const parsed = parseTrailGeometry(candidate.geometry);
+  return Boolean(
+    typeof candidate.message === 'string' &&
+      parsed.ok &&
+      parsed.parts.length > 0 &&
+      measurements &&
+      isBounds(measurements.bounds) &&
+      isFiniteNumber(measurements.distance) &&
+      isOptionalNumber(measurements.elevationGain) &&
+      isOptionalNumber(measurements.elevationLoss) &&
+      isOptionalNumber(measurements.elevationMax) &&
+      isOptionalNumber(measurements.elevationMin) &&
+      report &&
+      Array.isArray(report.gaps) &&
+      Array.isArray(report.missingIds) &&
+      Array.isArray(report.resolvedIds) &&
+      Array.isArray(report.warnings),
+  );
+}
+
+function isBounds(
+  value: unknown,
+): value is [number, number, number, number] | null {
+  return (
+    value === null ||
+    (Array.isArray(value) && value.length === 4 && value.every(isFiniteNumber))
+  );
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isOptionalNumber(value: unknown): value is number | null {
+  return value === null || isFiniteNumber(value);
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'name' in error &&
+    error.name === 'AbortError'
+  );
+}
+
+function messageFrom(value: unknown): string {
+  if (value && typeof value === 'object' && 'message' in value) {
+    const message = value.message;
+    if (typeof message === 'string') {
+      return message;
+    }
+  }
+  return 'The trail line could not be refreshed.';
+}
+
+/** Follow trails' controls, and what the network is doing. */
+function RouteBar({
+  onCancel,
+  onFinish,
+  status,
+}: {
+  onCancel: () => void;
+  onFinish: () => void;
+  status: RouteStatus;
+}) {
+  const networkText =
+    status.networkMessage ??
+    (status.network === 'ready' ? 'Trails loaded for this area.' : null);
+  return (
+    <div
+      aria-label="Follow trails"
+      className="mb-2 flex flex-wrap items-center gap-1.5"
+      role="group"
+    >
+      <ModeButton
+        active={false}
+        disabled={status.waypoints < 2}
+        isToggle={false}
+        label="Finish route"
+        onClick={onFinish}
+      />
+      <ModeButton
+        active={false}
+        disabled={status.waypoints === 0}
+        isToggle={false}
+        label="Cancel route"
+        onClick={onCancel}
+      />
+      {networkText && (
+        <span
+          aria-live="polite"
+          className={cn(
+            'text-[0.8rem]',
+            status.network === 'error'
+              ? 'text-[color:var(--theme-error-500,#c00)]'
+              : 'text-[color:var(--theme-elevation-600)]',
+          )}
+        >
+          {networkText}
+        </span>
+      )}
+      {status.note && (
+        <span
+          aria-live="polite"
+          className="basis-full text-[0.8rem] text-[color:var(--theme-warning-600,#b45309)]"
+        >
+          {status.note}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Select points' operations, with the selection they will act on. */
+function SelectBar({
+  onClear,
+  onDelete,
+  onJoin,
+  onReverse,
+  onSelectAll,
+  onSimplify,
+  onSplit,
+  onTolerance,
+  pieces,
+  selection,
+  toleranceMeters,
+}: {
+  onClear: () => void;
+  onDelete: () => void;
+  onJoin: () => void;
+  onReverse: () => void;
+  onSelectAll: () => void;
+  onSimplify: () => void;
+  onSplit: () => void;
+  onTolerance: (meters: number) => void;
+  pieces: number;
+  selection: PointRef[];
+  toleranceMeters: number;
+}) {
+  const selectedPieces = partsOf(selection).length;
+  const hasSelection = selection.length > 0;
+  const summary = hasSelection
+    ? `${plural(selection.length, 'point')} selected${pieces > 1 ? ` on ${plural(selectedPieces, 'piece')}` : ''}`
+    : 'Nothing selected — tools act on the whole line';
+
+  return (
+    <div
+      aria-label="Point tools"
+      className="mb-2 flex flex-wrap items-center gap-1.5"
+      role="group"
+    >
+      <span className="mr-1 text-[0.8rem] text-[color:var(--theme-elevation-600)]">
+        {summary}
+      </span>
+      <ModeButton
+        active={false}
+        isToggle={false}
+        label="Select all"
+        onClick={onSelectAll}
+      />
+      <ModeButton
+        active={false}
+        disabled={!hasSelection}
+        isToggle={false}
+        label="Clear"
+        onClick={onClear}
+      />
+      <span
+        aria-hidden
+        className="mx-1 h-4 w-px bg-[var(--theme-elevation-150)]"
+      />
+      <ModeButton
+        active={false}
+        disabled={!hasSelection}
+        isToggle={false}
+        label="Delete points"
+        onClick={onDelete}
+      />
+      <ModeButton
+        active={false}
+        disabled={!hasSelection}
+        isToggle={false}
+        label="Split at points"
+        onClick={onSplit}
+      />
+      <ModeButton
+        active={false}
+        disabled={hasSelection ? selectedPieces < 2 : pieces < 2}
+        isToggle={false}
+        label="Join pieces"
+        onClick={onJoin}
+      />
+      <ModeButton
+        active={false}
+        isToggle={false}
+        label="Reverse"
+        onClick={onReverse}
+      />
+      <span className="inline-flex items-center gap-1">
+        <ModeButton
+          active={false}
+          isToggle={false}
+          label="Simplify"
+          onClick={onSimplify}
+        />
+        <select
+          aria-label="Simplify tolerance"
+          className="rounded-[var(--style-radius-s,4px)] border border-solid border-[color:var(--theme-elevation-150)] bg-[var(--theme-elevation-50)] px-1 py-1 text-[0.8rem] text-[color:var(--theme-elevation-800)]"
+          onChange={(event) => onTolerance(Number(event.target.value))}
+          value={toleranceMeters}
+        >
+          {SIMPLIFY_TOLERANCES_M.map((meters) => (
+            <option key={meters} value={meters}>
+              {meters} m
+            </option>
+          ))}
+        </select>
+      </span>
+    </div>
+  );
 }
 
 function ModeButton({
@@ -1199,8 +2041,13 @@ function applyWayStyle(map: mapboxgl.Map, ids: number[], mode: Mode) {
     ['case', isPicked, 7, 4],
   ]);
   // Dimmed while editing so they stay as context without competing with the
-  // line being worked on.
-  map.setPaintProperty(WAYS_LAYER, 'line-opacity', picking ? 1 : 0.35);
+  // line being worked on — except in Follow trails, where they are what the
+  // line follows.
+  map.setPaintProperty(
+    WAYS_LAYER,
+    'line-opacity',
+    picking || mode === 'route' ? 1 : 0.35,
+  );
 
   if (map.getLayer(WAYS_HIT_LAYER)) {
     // Off while editing, or a click meant for a point gets eaten by a way.
@@ -1210,4 +2057,8 @@ function applyWayStyle(map: mapboxgl.Map, ids: number[], mode: Mode) {
       picking ? 'visible' : 'none',
     );
   }
+}
+
+function plural(count: number, noun: string): string {
+  return `${count.toLocaleString()} ${noun}${count === 1 ? '' : 's'}`;
 }

@@ -32,7 +32,7 @@ const colorConfig = {
   gray: {
     iconContainer: 'bg-gray-100 border-2 border-gray-500',
     icon: 'text-gray-500',
-    cardHover: 'hover:bg-gray-500/5 hover:border-gray-500/30 hover:shadow-md',
+    cardHover: 'hover:bg-app-ink/5 hover:border-app-ink/30 hover:shadow-md',
     arrow: 'bg-gray-100 text-gray-500',
   },
 } as const;

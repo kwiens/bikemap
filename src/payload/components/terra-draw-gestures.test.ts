@@ -263,9 +263,9 @@ describe('the Delete key', () => {
   });
 
   it('cannot be undone by Terra Draw, while claiming otherwise', () => {
-    // The reason `deleted-pieces.ts` exists. `canUndo()` says yes and `undo()`
-    // reports success, and the piece stays gone — so the editor keeps its own
-    // snapshot and falls back to it when an undo moves nothing.
+    // One reason the editor keeps its own snapshot history (`edit-history.ts`)
+    // rather than Terra Draw's session history: `canUndo()` says yes and
+    // `undo()` reports success, and the piece stays gone.
     h.press('Delete');
 
     expect(h.draw.canUndo()).toBe(true);
