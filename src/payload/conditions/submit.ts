@@ -10,7 +10,8 @@ import 'server-only';
  * Returns a result rather than throwing: a rate-limited rider is an ordinary
  * outcome needing a sentence, not an exception.
  */
-import { getPayload } from 'payload';
+import { createLocalReq, getPayload } from 'payload';
+import { sql, type PostgresAdapter } from '@payloadcms/db-postgres';
 import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
 import {
@@ -154,78 +155,104 @@ export async function submitConditionReport(
       };
     }
 
-    // Two limits: the hourly cap stops one person rewriting the whole map, the
-    // per-trail cooldown stops one opinion being repeated until it looks agreed.
-    const [recent, sameTrail] = await Promise.all([
-      payload.count({
-        collection: 'trail-conditions',
-        where: {
-          and: [
-            { reporterHash: { equals: input.reporterHash } },
-            { createdAt: { greater_than: hoursAgo(1) } },
-          ],
-        },
-      }),
-      payload.count({
-        collection: 'trail-conditions',
-        where: {
-          and: [
-            { reporterHash: { equals: input.reporterHash } },
-            { trail: { equals: trail.id } },
-            {
-              createdAt: {
-                greater_than: minutesAgo(RATE_LIMIT.perTrailMinutes),
-              },
-            },
-          ],
-        },
-      }),
-    ]);
-
-    if (sameTrail.totalDocs > 0) {
-      return {
-        message: `You have already reported this trail in the last ${RATE_LIMIT.perTrailMinutes} minutes. Thanks — that is enough for now.`,
-        ok: false,
-        reason: 'rate-limited',
-      };
-    }
-
-    if (recent.totalDocs >= RATE_LIMIT.perHour) {
-      return {
-        message: `That is ${RATE_LIMIT.perHour} reports in an hour, which is our limit. Please try again later.`,
-        ok: false,
-        reason: 'rate-limited',
-      };
-    }
-
-    const saved = await payload.create({
-      collection: 'trail-conditions',
-      depth: 0,
-      data: {
-        city: input.city,
-        condition: type.id,
-        hidden: false,
-        observedAt: input.observedAt.toISOString(),
-        reporterHash: input.reporterHash,
-        // Anything through this door is a rider; 'admin' is set by hand in the CMS.
-        source: 'public',
-        trail: trail.id,
-      },
+    // The lock spans both count statements and the insert. READ COMMITTED
+    // gives a waiting request a fresh snapshot after its predecessor commits.
+    const transactionID = await payload.db.beginTransaction({
+      isolationLevel: 'read committed',
     });
+    if (!transactionID)
+      throw new Error('Condition reporting requires transactions.');
+    try {
+      const req = await createLocalReq({ req: { transactionID } }, payload);
+      const transaction = payload.db.sessions?.[transactionID]?.db as
+        | PostgresAdapter['sessions'][string]['db']
+        | undefined;
+      if (!transaction)
+        throw new Error('Condition report transaction was lost.');
+      await transaction.execute(sql`
+        SELECT pg_advisory_xact_lock(hashtextextended(${'bikemap-condition-report:' + input.reporterHash}, 0))
+      `);
+      // Two limits: the hourly cap stops one person rewriting the whole map, the
+      // per-trail cooldown stops one opinion being repeated until it looks agreed.
+      const [recent, sameTrail] = await Promise.all([
+        payload.count({
+          collection: 'trail-conditions',
+          req,
+          where: {
+            and: [
+              { reporterHash: { equals: input.reporterHash } },
+              { createdAt: { greater_than: hoursAgo(1) } },
+            ],
+          },
+        }),
+        payload.count({
+          collection: 'trail-conditions',
+          req,
+          where: {
+            and: [
+              { reporterHash: { equals: input.reporterHash } },
+              { trail: { equals: trail.id } },
+              {
+                createdAt: {
+                  greater_than: minutesAgo(RATE_LIMIT.perTrailMinutes),
+                },
+              },
+            ],
+          },
+        }),
+      ]);
 
-    return {
-      ok: true,
-      report: {
-        id: saved.id,
-        createdAt: saved.createdAt,
-        color: type.color || DEFAULT_CONDITION_COLOR,
-        marksClosed: type.marksClosed === true,
-        name: type.name,
-        observedAt: input.observedAt.toISOString(),
-        source: 'public',
-        value: type.value,
-      },
-    };
+      if (sameTrail.totalDocs > 0) {
+        return {
+          message: `You have already reported this trail in the last ${RATE_LIMIT.perTrailMinutes} minutes. Thanks — that is enough for now.`,
+          ok: false,
+          reason: 'rate-limited',
+        };
+      }
+
+      if (recent.totalDocs >= RATE_LIMIT.perHour) {
+        return {
+          message: `That is ${RATE_LIMIT.perHour} reports in an hour, which is our limit. Please try again later.`,
+          ok: false,
+          reason: 'rate-limited',
+        };
+      }
+
+      const saved = await payload.create({
+        collection: 'trail-conditions',
+        req,
+        depth: 0,
+        data: {
+          city: input.city,
+          condition: type.id,
+          hidden: false,
+          observedAt: input.observedAt.toISOString(),
+          reporterHash: input.reporterHash,
+          // Anything through this door is a rider; 'admin' is set by hand in the CMS.
+          source: 'public',
+          trail: trail.id,
+        },
+      });
+
+      await payload.db.commitTransaction(transactionID);
+      return {
+        ok: true,
+        report: {
+          id: saved.id,
+          createdAt: saved.createdAt,
+          color: type.color || DEFAULT_CONDITION_COLOR,
+          marksClosed: type.marksClosed === true,
+          name: type.name,
+          observedAt: input.observedAt.toISOString(),
+          source: 'public',
+          value: type.value,
+        },
+      };
+    } finally {
+      // A committed session is already removed; rejected/failed submissions
+      // roll back here so their locks never survive the request.
+      await payload.db.rollbackTransaction(transactionID);
+    }
   } catch (error) {
     console.error('Could not file a condition report.', error);
     return {
