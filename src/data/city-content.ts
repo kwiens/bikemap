@@ -6,7 +6,7 @@
  * type to the public map:
  *
  *   1. add its array to `CityContentData` and a store to `contentStores`
- *      (create the store next to the type's existing `*-source.ts`),
+ *      (create the store next to the type's data module),
  *   2. read it in `getCityContent` on the server,
  *   3. have consumers call the store's `get()` at render time.
  *
@@ -35,8 +35,8 @@ const contentStores: ContentStores = {
 };
 
 /**
- * What a page publishes. Each page loads only what it renders (the embed has
- * no trails), so every list is optional; `cityId` is the city the server
+ * What a page publishes. Each page loads only what it renders (an embed loads
+ * its selected route family), so every list is optional; `cityId` is the city the server
  * resolved from the request host.
  */
 export interface CityContent extends Partial<CityContentData> {

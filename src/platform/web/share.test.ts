@@ -31,6 +31,22 @@ describe('createWebShare', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:gpx');
   });
 
+  it('reports a failed file download without rejecting', async () => {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: () => {
+        throw new Error('blob unavailable');
+      },
+    });
+    await expect(
+      createWebShare().exportFile({
+        filename: 'ride.gpx',
+        mimeType: 'application/gpx+xml',
+        content: '<gpx/>',
+      }),
+    ).resolves.toBe('failed');
+  });
+
   it('shares a link by copying it, and reports a clipboard failure', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {

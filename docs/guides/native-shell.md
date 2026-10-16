@@ -187,9 +187,9 @@ async function handle(ref, subs, msg) {
 }
 ```
 
-The real host lives in this repository at `native/` (an Expo app with its own
-pnpm root; see its README). Its bridge host (`native/src/bridge/host.ts`)
-is the reference for every message above, including the share sheet.
+The native Expo host is separate work and is not included in this PR. The
+contract above and the page-side tests define the messages it must implement,
+including the share sheet. Add the host location here when it lands.
 
 ## 5. Testing the page side without a device
 

@@ -13,8 +13,12 @@ export function createWebShare(): ShareService {
 
     async exportFile({ filename, mimeType, content }: ExportFile) {
       if (typeof document === 'undefined') return 'failed';
-      downloadFile(content, filename, mimeType);
-      return 'downloaded';
+      try {
+        downloadFile(content, filename, mimeType);
+        return 'downloaded';
+      } catch {
+        return 'failed';
+      }
     },
 
     async shareLink(url: string) {

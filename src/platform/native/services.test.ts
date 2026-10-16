@@ -182,6 +182,27 @@ describe('createNativePlatform', () => {
     await expect(link).resolves.toBe('failed');
   });
 
+  it('reports bridge send failures and removes the result listener', async () => {
+    const bridge = fakeTransport();
+    const stop = vi.fn();
+    vi.spyOn(bridge.transport, 'onEvent').mockReturnValue(stop);
+    vi.spyOn(bridge.transport, 'send').mockImplementation(() => {
+      throw new Error('host channel closed');
+    });
+    const platform = createNativePlatform(ALL, bridge.transport);
+    await expect(
+      platform.share.exportFile({
+        filename: 'ride.gpx',
+        mimeType: 'application/gpx+xml',
+        content: '<gpx/>',
+      }),
+    ).resolves.toBe('failed');
+    await expect(
+      platform.share.shareLink('https://bikechatt.com'),
+    ).resolves.toBe('failed');
+    expect(stop).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the browser implementation for capabilities the host does not claim', () => {
     const bridge = fakeTransport();
     const platform = createNativePlatform(

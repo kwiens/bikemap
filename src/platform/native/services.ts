@@ -161,7 +161,10 @@ function createNativeShare(transport: BridgeTransport): ShareService {
 
   // A share sheet stays open as long as the rider likes, so there is no
   // timeout: the promise settles when the host reports back.
-  function awaitResult(requestId: number): Promise<ShareOutcome> {
+  function awaitResult(
+    requestId: number,
+    send: () => void,
+  ): Promise<ShareOutcome> {
     return new Promise((resolve) => {
       const stop = transport.onEvent((event) => {
         if (event.type === 'share/result' && event.requestId === requestId) {
@@ -169,6 +172,12 @@ function createNativeShare(transport: BridgeTransport): ShareService {
           resolve(event.ok ? 'shared' : 'failed');
         }
       });
+      try {
+        send();
+      } catch {
+        stop();
+        resolve('failed');
+      }
     });
   }
 
@@ -176,21 +185,21 @@ function createNativeShare(transport: BridgeTransport): ShareService {
     isSupported: () => true,
     exportFile({ filename, mimeType, content }) {
       const requestId = nextRequestId++;
-      const result = awaitResult(requestId);
-      transport.send({
-        type: 'share/file',
-        requestId,
-        filename,
-        mimeType,
-        content,
-      });
-      return result;
+      return awaitResult(requestId, () =>
+        transport.send({
+          type: 'share/file',
+          requestId,
+          filename,
+          mimeType,
+          content,
+        }),
+      );
     },
     shareLink(url) {
       const requestId = nextRequestId++;
-      const result = awaitResult(requestId);
-      transport.send({ type: 'share/link', requestId, url });
-      return result;
+      return awaitResult(requestId, () =>
+        transport.send({ type: 'share/link', requestId, url }),
+      );
     },
   };
 }
