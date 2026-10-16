@@ -83,7 +83,7 @@ export function parseEmbedOptions(
 
   const options: EmbedOptions = { ...DEFAULT_EMBED_OPTIONS, layers: [] };
 
-  if (params.get('mode') === 'mtb') options.mode = 'mtb';
+  options.mode = parseEmbedMode(params.get('mode') ?? undefined);
 
   const sidebar = params.get('sidebar');
   if (sidebar === 'open') options.sidebarOpen = true;
@@ -108,6 +108,11 @@ export function parseEmbedOptions(
   }
 
   return options;
+}
+
+/** Shared by the server data loader and the iframe option decoder. */
+export function parseEmbedMode(mode: string | string[] | undefined): EmbedMode {
+  return (Array.isArray(mode) ? mode[0] : mode) === 'mtb' ? 'mtb' : 'casual';
 }
 
 /**
