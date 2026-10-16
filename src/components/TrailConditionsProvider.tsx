@@ -30,6 +30,8 @@ import {
 interface TrailConditionsValue {
   /** The newest visible report per trail slug. Absent means nobody has said. */
   latest: Record<string, ConditionReport>;
+  /** Changes after a local submission, including an older observation. */
+  historyRevision: number;
   /** True until the first fetch settles, either way. */
   loading: boolean;
   /**
@@ -79,6 +81,7 @@ const NO_SUMMARY: ConditionSummary = {
 
 const EMPTY: TrailConditionsValue = {
   latest: {},
+  historyRevision: 0,
   loading: false,
   lockedReason: () => null,
   options: [],
@@ -105,6 +108,7 @@ export function TrailConditionsProvider({
   const [summary, setSummary] = useState<ConditionSummary>(NO_SUMMARY);
   const [loading, setLoading] = useState(true);
   const [reloads, setReloads] = useState(0);
+  const [historyRevision, setHistoryRevision] = useState(0);
 
   const refresh = useCallback(() => setReloads((n) => n + 1), []);
 
@@ -119,6 +123,7 @@ export function TrailConditionsProvider({
   const localRef = useRef<Record<string, ConditionReport>>({});
 
   const recordLocal = useCallback((slug: string, report: ConditionReport) => {
+    setHistoryRevision((revision) => revision + 1);
     localRef.current = mergeLocal(localRef.current, { [slug]: report });
     setSummary((prev) => ({
       ...prev,
@@ -169,13 +174,14 @@ export function TrailConditionsProvider({
   const value = useMemo(
     () => ({
       latest: summary.latest,
+      historyRevision,
       loading,
       lockedReason: (slug: string) => lockFor(summary, slug),
       options: summary.options,
       recordLocal,
       refresh,
     }),
-    [summary, loading, recordLocal, refresh],
+    [summary, historyRevision, loading, recordLocal, refresh],
   );
 
   return (
