@@ -912,7 +912,7 @@ export interface ConditionReporting {
   createdAt?: string | null;
 }
 /**
- * How the admin looks. Changes apply on the next page load. Clear a field to fall back to the default.
+ * Customize the public map and admin palette. Each field explains which parts of the interface it changes. Changes apply on the next page load.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "theme".
@@ -920,23 +920,25 @@ export interface ConditionReporting {
 export interface Theme {
   id: number;
   /**
-   * Focus rings and highlights. Default #c3f44d.
+   * Changes selected tabs, highlighted cards, icons, borders, and keyboard focus rings.
+   */
+  primaryColor?: string | null;
+  /**
+   * Changes the sidebar background, floating map buttons, and other dark brand areas.
+   */
+  sidebarColor?: string | null;
+  /**
+   * Changes cards, panels, form controls, and the light end of the neutral color scale.
+   */
+  surfaceColor?: string | null;
+  /**
+   * Changes primary text and tints the gray shades used for secondary text, borders, and dividers.
+   */
+  textColor?: string | null;
+  /**
+   * Changes enabled toggle switches, hover states, and supporting emphasis.
    */
   accentColor?: string | null;
-  /**
-   * Deep brand colour. Default #1a434e.
-   */
-  deepColor?: string | null;
-  /**
-   * The cast of the greys everything is built from. Applies to both light and dark mode, because Payload derives dark mode by inverting the same scale.
-   */
-  neutralTint?: ('cool' | 'neutral' | 'warm') | null;
-  cornerStyle?: ('sharp' | 'soft' | 'round') | null;
-  fontFamily?: ('geist' | 'system' | 'serif') | null;
-  /**
-   * Escape hatch for anything the fields above do not cover. Injected verbatim into the admin. Admins only — treat it as code.
-   */
-  customCss?: string | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -956,12 +958,11 @@ export interface ConditionReportingSelect<T extends boolean = true> {
  * via the `definition` "theme_select".
  */
 export interface ThemeSelect<T extends boolean = true> {
+  primaryColor?: T;
+  sidebarColor?: T;
+  surfaceColor?: T;
+  textColor?: T;
   accentColor?: T;
-  deepColor?: T;
-  neutralTint?: T;
-  cornerStyle?: T;
-  fontFamily?: T;
-  customCss?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
