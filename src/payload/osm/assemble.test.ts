@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import * as rideStats from '@/utils/ride-stats';
 import { assembleWays, boundsOf, lengthMeters, walkingOrder } from './assemble';
 import type { OsmWay } from './overpass';
 
@@ -106,6 +107,47 @@ describe('assembleWays', () => {
 });
 
 describe('walkingOrder', () => {
+  it('bounds distance work for fragmented imports while retaining every part', () => {
+    const parts: [number, number][][] = Array.from(
+      { length: 101 },
+      (_, index) => {
+        const start: [number, number] = [-121 + index * 0.001, 44];
+        const end: [number, number] = [start[0] + 0.0005, 44];
+        return index % 2 === 0 ? [start, end] : [end, start];
+      },
+    );
+    // Blank slots must not change the returned indices. Throw early if the
+    // old cubic search runs, so the regression cannot hang the test process.
+    parts.splice(20, 0, []);
+    const distance = rideStats.haversineDistance;
+    let calls = 0;
+    const spy = vi
+      .spyOn(rideStats, 'haversineDistance')
+      .mockImplementation((...args) => {
+        calls += 1;
+        if (calls > 3 * parts.length) {
+          throw new Error('Multipart ordering exceeded its linear work budget');
+        }
+        return distance(...args);
+      });
+
+    try {
+      const original = structuredClone(parts);
+      const result = walkingOrder(parts);
+      expect(result).toEqual(
+        parts.flatMap((part, index) => {
+          if (part.length === 0) return [];
+          const originalIndex = index > 20 ? index - 1 : index;
+          return [{ index, reversed: originalIndex % 2 === 1 }];
+        }),
+      );
+      expect(parts).toEqual(original);
+      expect(calls).toBeLessThanOrEqual(3 * parts.length);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   // East Rim's shape: two pieces ~180 m apart, stored far end first.
   const north: [number, number][] = [
     [-121.4, 44.0],
