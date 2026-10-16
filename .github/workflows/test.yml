@@ -132,10 +132,6 @@ jobs:
         run: echo "PAYLOAD_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Build project and check dependency deduplication
-        env:
-          # Production-mode config validation still runs in CI; this value is
-          # deliberately local to the disposable build and is never deployed.
-          PAYLOAD_SECRET: ci-build-only-not-a-deployed-payload-secret
         run: |
           set +e
           pnpm build &
