@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearTileCache, sampleTerrain, sampleTerrainParts } from './terrain';
+import {
+  clearTileCache,
+  densify,
+  sampleTerrain,
+  sampleTerrainParts,
+} from './terrain';
 
 // sharp is a native decoder for PNG bytes; the fixtures below are already raw
 // RGB, so the decode is a pass-through here.
@@ -159,4 +164,112 @@ describe('sampleTerrainParts', () => {
     expect(await sampleTerrainParts([[[-121.4, 44.0]]], TOKEN)).toBeNull();
     expect(await sampleTerrainParts([], TOKEN)).toBeNull();
   });
+});
+
+describe('terrain sampling budgets', () => {
+  it('bounds a long segment before expanding intermediate samples', () => {
+    const line: [number, number][] = [
+      [0, 0],
+      [0.02, 0],
+    ];
+    const points = densify(line, 20, 4);
+    expect(points.length).toBeLessThanOrEqual(4);
+    expect(points[0]).toEqual(line[0]);
+    expect(points.at(-1)).toEqual(line[1]);
+  });
+
+  it('keeps ordinary samples and every original bend', () => {
+    const line: [number, number][] = [
+      [0, 0],
+      [0.001, 0],
+      [0.001, 0.001],
+    ];
+    const points = densify(line, 20, 20);
+    expect(points).toHaveLength(11);
+    for (const point of line) expect(points).toContainEqual(point);
+  });
+
+  it('uses spare samples across many similar segments', () => {
+    const line: [number, number][] = Array.from({ length: 5 }, (_, index) => [
+      index * 0.0004,
+      0,
+    ]);
+    const points = densify(line, 20, 8);
+    expect(points).toHaveLength(8);
+    for (const point of line) expect(points).toContainEqual(point);
+  });
+
+  it('declines dense geometry rather than dropping vertices and reporting false elevations', async () => {
+    const fetch = setFetchStub(vi.fn(async () => okTile(100)));
+    expect(
+      await sampleTerrain(
+        [
+          [0, 0],
+          [0.001, 0],
+          [0, 0],
+        ],
+        TOKEN,
+        2,
+      ),
+    ).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('reserves vertices across parts before distributing the remaining samples', async () => {
+    setFetchStub(vi.fn(async () => okTile(100)));
+    const parts: [number, number][][] = [
+      [
+        [0, 0],
+        [0.02, 0],
+      ],
+      [
+        [1, 1],
+        [1.000001, 1],
+      ],
+      [
+        [2, 2],
+        [2.000001, 2],
+      ],
+    ];
+    const result = await sampleTerrainParts(parts, TOKEN, 8);
+    expect(result).toHaveLength(3);
+    expect(result?.flat().length).toBeLessThanOrEqual(8);
+    result?.forEach((part, index) => {
+      expect([part[0].lng, part[0].lat]).toEqual(parts[index][0]);
+      expect([part.at(-1)?.lng, part.at(-1)?.lat]).toEqual(parts[index][1]);
+    });
+  });
+
+  it('uses a spare sample when equal parts each receive a fractional share', async () => {
+    setFetchStub(vi.fn(async () => okTile(100)));
+    const parts: [number, number][][] = [
+      [
+        [0, 0],
+        [0.02, 0],
+      ],
+      [
+        [1, 1],
+        [1.02, 1],
+      ],
+    ];
+    const result = await sampleTerrainParts(parts, TOKEN, 5);
+    expect(result?.flat()).toHaveLength(5);
+    expect(result).toHaveLength(2);
+  });
+
+  it('declines the entire profile when part vertices exceed the whole-trail budget', async () => {
+    const fetch = setFetchStub(vi.fn(async () => okTile(100)));
+    expect(await sampleTerrainParts([LINE, LINE, LINE], TOKEN, 4)).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 1, -1, 2.5, Number.NaN, Number.POSITIVE_INFINITY, 8001])(
+    'declines invalid sample budget %s without tile requests',
+    async (budget) => {
+      const fetch = setFetchStub(vi.fn(async () => okTile(100)));
+      expect(await sampleTerrain(LINE, TOKEN, budget)).toBeNull();
+      expect(await sampleTerrainParts([LINE], TOKEN, budget)).toBeNull();
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
 });

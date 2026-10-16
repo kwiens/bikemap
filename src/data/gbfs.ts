@@ -140,10 +140,17 @@ export function gbfsToBikeRentalLocation(
     price: 'Pay per ride',
     hours: '24/7',
     capacity: station.capacity,
-    availableBikes: status?.num_bikes_available,
-    availableDocks: status?.num_docks_available,
+    availableBikes: availabilityCount(status?.num_bikes_available),
+    availableDocks: availabilityCount(status?.num_docks_available),
     isChargingStation: station.is_charging_station || false,
   };
+}
+
+// JSON type annotations do not validate the third-party feed at runtime.
+function availabilityCount(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined;
 }
 
 // Only allow web links we can safely place in an href. The deep link comes from

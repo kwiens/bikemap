@@ -26,8 +26,8 @@
   "ADA Accessible Trail": {
     "defaultBounds": [-85.1097581, 35.0825544, -85.1052411, 35.0892083],
     "distance": 1.08,
-    "elevationGain": 63,
-    "elevationLoss": 53,
+    "elevationGain": 52,
+    "elevationLoss": 65,
     "elevationMax": 1039,
     "elevationMin": 967
   },
@@ -66,8 +66,8 @@
   "Barkeater": {
     "defaultBounds": [-85.4552915, 34.8249863, -85.4407035, 34.8354084],
     "distance": 2.74,
-    "elevationGain": 134,
-    "elevationLoss": 237,
+    "elevationGain": 239,
+    "elevationLoss": 142,
     "elevationMax": 1880,
     "elevationMin": 1636
   },
@@ -114,8 +114,8 @@
   "Bicycles/Pedestrians": {
     "defaultBounds": [-85.1163509, 35.0843688, -85.0964359, 35.0970648],
     "distance": 5.31,
-    "elevationGain": 414,
-    "elevationLoss": 310,
+    "elevationGain": 377,
+    "elevationLoss": 337,
     "elevationMax": 1002,
     "elevationMin": 827
   },
@@ -162,8 +162,8 @@
   "BLUE Trail": {
     "defaultBounds": [-85.2738342, 34.8954675, -85.2278657, 34.9418983],
     "distance": 3.28,
-    "elevationGain": 72,
-    "elevationLoss": 102,
+    "elevationGain": 83,
+    "elevationLoss": 91,
     "elevationMax": 795,
     "elevationMin": 690
   },
@@ -290,8 +290,8 @@
   "Chief Richard Taylor Nature Trail": {
     "defaultBounds": [-85.1181071, 34.9110805, -85.1108555, 34.9144985],
     "distance": 1,
-    "elevationGain": 20,
-    "elevationLoss": 11,
+    "elevationGain": 10,
+    "elevationLoss": 21,
     "elevationMax": 758,
     "elevationMin": 737
   },
@@ -314,16 +314,16 @@
   "Christmas Top": {
     "defaultBounds": [-85.066582, 35.0420401, -85.0564656, 35.0430582],
     "distance": 0.71,
-    "elevationGain": 160,
-    "elevationLoss": 171,
+    "elevationGain": 289,
+    "elevationLoss": 52,
     "elevationMax": 1215,
     "elevationMin": 885
   },
   "Chunky": {
     "defaultBounds": [-85.3842909, 35.0481304, -85.3809126, 35.0519062],
     "distance": 1.23,
-    "elevationGain": 305,
-    "elevationLoss": 97,
+    "elevationGain": 204,
+    "elevationLoss": 199,
     "elevationMax": 1841,
     "elevationMin": 1719
   },
@@ -346,8 +346,8 @@
   "Cloudland Canyon Connector": {
     "defaultBounds": [-85.4801969, 34.8171127, -85.4131963, 34.8625931],
     "distance": 8.22,
-    "elevationGain": 323,
-    "elevationLoss": 865,
+    "elevationGain": 606,
+    "elevationLoss": 628,
     "elevationMax": 2002,
     "elevationMin": 1623
   },
@@ -378,8 +378,8 @@
   "Crabtree Farm Trail Connection": {
     "defaultBounds": [-85.3096882, 35.0084388, -85.2991541, 35.0122235],
     "distance": 1.12,
-    "elevationGain": 21,
-    "elevationLoss": 52,
+    "elevationGain": 51,
+    "elevationLoss": 31,
     "elevationMax": 667,
     "elevationMin": 638
   },
@@ -482,8 +482,8 @@
   "Dogwood Ridge Trail": {
     "defaultBounds": [-85.1151302, 35.0898056, -85.1061185, 35.096678],
     "distance": 1.27,
-    "elevationGain": 63,
-    "elevationLoss": 133,
+    "elevationGain": 73,
+    "elevationLoss": 123,
     "elevationMax": 991,
     "elevationMin": 879
   },
@@ -515,7 +515,7 @@
     "defaultBounds": [-85.4193649, 35.0387982, -85.3854006, 35.0479882],
     "distance": 3.22,
     "elevationGain": 341,
-    "elevationLoss": 170,
+    "elevationLoss": 160,
     "elevationMax": 1784,
     "elevationMin": 1540
   },
@@ -714,8 +714,8 @@
   "Hawks Ridge": {
     "defaultBounds": [-85.1209313, 35.0880143, -85.1060972, 35.0991794],
     "distance": 3.02,
-    "elevationGain": 462,
-    "elevationLoss": 304,
+    "elevationGain": 449,
+    "elevationLoss": 321,
     "elevationMax": 988,
     "elevationMin": 858
   },
@@ -954,8 +954,8 @@
   "Jackson Gap Trail": {
     "defaultBounds": [-85.385076, 34.957547, -85.3768304, 34.9701612],
     "distance": 2.56,
-    "elevationGain": 477,
-    "elevationLoss": 520,
+    "elevationGain": 792,
+    "elevationLoss": 192,
     "elevationMax": 1956,
     "elevationMin": 1298
   },
@@ -1106,16 +1106,16 @@
   "Mid Ridge": {
     "defaultBounds": [-85.0669937, 35.0385723, -85.0595957, 35.0516271],
     "distance": 1.23,
-    "elevationGain": 99,
-    "elevationLoss": 10,
+    "elevationGain": 120,
+    "elevationLoss": 0,
     "elevationMax": 1096,
     "elevationMin": 978
   },
   "Middle Trail": {
     "defaultBounds": [-85.3835492, 34.9129728, -85.3694418, 34.9314294],
     "distance": 2.17,
-    "elevationGain": 234,
-    "elevationLoss": 299,
+    "elevationGain": 342,
+    "elevationLoss": 224,
     "elevationMax": 1499,
     "elevationMin": 1330
   },
@@ -1162,8 +1162,8 @@
   "Mouse Creek Greenway Phase 3": {
     "defaultBounds": [-84.8798434, 35.1665636, -84.8769816, 35.1751432],
     "distance": 0.77,
-    "elevationGain": 22,
-    "elevationLoss": 42,
+    "elevationGain": 53,
+    "elevationLoss": 0,
     "elevationMax": 872,
     "elevationMin": 803
   },
@@ -1178,8 +1178,8 @@
   "Mouse Creek Greenway Phase 5": {
     "defaultBounds": [-84.8651641, 35.1917697, -84.8525906, 35.2017243],
     "distance": 1.32,
-    "elevationGain": 20,
-    "elevationLoss": 10,
+    "elevationGain": 0,
+    "elevationLoss": 31,
     "elevationMax": 824,
     "elevationMin": 762
   },
@@ -1202,8 +1202,8 @@
   "North Chickamauga Creek Greenway": {
     "defaultBounds": [-85.2288542, 35.1108324, -85.214613, 35.1532866],
     "distance": 3.76,
-    "elevationGain": 202,
-    "elevationLoss": 278,
+    "elevationGain": 256,
+    "elevationLoss": 305,
     "elevationMax": 742,
     "elevationMin": 639
   },
@@ -1274,8 +1274,8 @@
   "Outer Bike Trail": {
     "defaultBounds": [-85.1785691, 35.1122189, -85.1670204, 35.1243424],
     "distance": 3.59,
-    "elevationGain": 304,
-    "elevationLoss": 388,
+    "elevationGain": 343,
+    "elevationLoss": 338,
     "elevationMax": 811,
     "elevationMin": 683
   },
@@ -1362,8 +1362,8 @@
   "Points Unknown": {
     "defaultBounds": [-85.067951, 35.0388772, -85.0591656, 35.0553596],
     "distance": 1.59,
-    "elevationGain": 90,
-    "elevationLoss": 231,
+    "elevationGain": 171,
+    "elevationLoss": 148,
     "elevationMax": 1193,
     "elevationMin": 1036
   },
@@ -1378,24 +1378,24 @@
   "Prince Albert": {
     "defaultBounds": [-85.4801703, 34.8187396, -85.466792, 34.8214657],
     "distance": 0.75,
-    "elevationGain": 31,
-    "elevationLoss": 40,
+    "elevationGain": 10,
+    "elevationLoss": 60,
     "elevationMax": 1897,
     "elevationMin": 1800
   },
   "RED Trail": {
     "defaultBounds": [-85.2783349, 34.9088474, -85.2345111, 34.9390879],
     "distance": 8.34,
-    "elevationGain": 442,
-    "elevationLoss": 395,
+    "elevationGain": 422,
+    "elevationLoss": 416,
     "elevationMax": 914,
     "elevationMin": 706
   },
   "Rolling Green": {
     "defaultBounds": [-85.0629636, 35.0430392, -85.056161, 35.0483465],
     "distance": 1.78,
-    "elevationGain": 123,
-    "elevationLoss": 290,
+    "elevationGain": 247,
+    "elevationLoss": 168,
     "elevationMax": 1031,
     "elevationMin": 874
   },
@@ -1490,8 +1490,8 @@
   "Spur and Connector Trails": {
     "defaultBounds": [-85.3810591, 34.9200648, -85.3711632, 34.9331299],
     "distance": 0.49,
-    "elevationGain": 154,
-    "elevationLoss": 119,
+    "elevationGain": 122,
+    "elevationLoss": 163,
     "elevationMax": 1594,
     "elevationMin": 1140
   },
@@ -1538,8 +1538,8 @@
   "Switchyard Connector": {
     "defaultBounds": [-85.3896138, 35.0516632, -85.3798656, 35.0585824],
     "distance": 1.43,
-    "elevationGain": 51,
-    "elevationLoss": 188,
+    "elevationGain": 20,
+    "elevationLoss": 218,
     "elevationMax": 1840,
     "elevationMin": 1661
   },
@@ -1578,8 +1578,8 @@
   "TNT Bike Trail": {
     "defaultBounds": [-85.1091556, 35.0830565, -85.0991377, 35.092709],
     "distance": 4.29,
-    "elevationGain": 455,
-    "elevationLoss": 199,
+    "elevationGain": 360,
+    "elevationLoss": 325,
     "elevationMax": 1049,
     "elevationMin": 837
   },
@@ -1722,8 +1722,8 @@
   "White Oak Ridge": {
     "defaultBounds": [-85.067956, 35.0388895, -85.0608872, 35.054183],
     "distance": 1.28,
-    "elevationGain": 187,
-    "elevationLoss": 125,
+    "elevationGain": 171,
+    "elevationLoss": 133,
     "elevationMax": 1248,
     "elevationMin": 1134
   },

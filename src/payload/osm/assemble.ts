@@ -132,10 +132,23 @@ export function assembleWays(ways: OsmWay[]): AssembledGeometry {
     return { gaps: [], orderedIds: [], parts: [] };
   }
 
-  const runs: Segment[] = [];
+  const grown: Segment[] = [];
   while (segments.length > 0) {
-    runs.push(growRun(segments));
+    grown.push(growRun(segments));
   }
+
+  // Runs come out in the order they were seeded, which is pick order, not
+  // walking order. Leaving them that way makes the elevation chart jump from
+  // the far end of one run to the far end of the next.
+  const runs = walkingOrder(grown.map((run) => run.coordinates)).map(
+    ({ index, reversed }) =>
+      reversed
+        ? {
+            coordinates: [...grown[index].coordinates].reverse(),
+            ids: [...grown[index].ids].reverse(),
+          }
+        : grown[index],
+  );
 
   const parts = runs.map((run) => run.coordinates);
 
@@ -144,6 +157,143 @@ export function assembleWays(ways: OsmWay[]): AssembledGeometry {
     orderedIds: runs.flatMap((run) => run.ids),
     parts,
   };
+}
+
+/** One step of a walk through a trail's parts. */
+export interface PartStep {
+  /** Index into the parts that were ordered. */
+  index: number;
+  /** Walk this part from its last coordinate to its first. */
+  reversed: boolean;
+}
+
+/**
+ * Two walks whose gaps differ by less than this are equally good, and the one
+ * that keeps more of the source direction wins.
+ */
+const GAP_TIE_M = 1;
+
+/** Keep the all-start search bounded, including for imported GPX segments. */
+const MAX_OPTIMIZED_PARTS = 100;
+
+/**
+ * Orders and orients a trail's parts so each one starts where the last ended.
+ *
+ * Multi-part geometry arrives in whatever order its source kept it: GIS
+ * exports group pieces by feature id, and hand edits append new pieces at the
+ * end. The parts are walked in sequence to build the elevation profile, so out
+ * of order they make the chart leap between distant ends of the trail. East
+ * Rim's two GIS pieces were stored far end first, putting a 1.1 km break
+ * mid-chart where the pieces really sit 180 m apart.
+ *
+ * Every part and orientation is tried as the start, then the nearest free end
+ * is followed greedily; the walk with the least total gap wins. A walk and its
+ * exact reverse always tie, so ties go to whichever keeps more length in its
+ * source direction. Cost is O(n³) in the number of parts, so this search is
+ * limited to 100 parts (the most fragmented current trail has 22). Larger
+ * imports keep their supplied sequence, choosing each direction from the
+ * previous endpoint in one linear pass. Every part is retained.
+ */
+export function walkingOrder(parts: [number, number][][]): PartStep[] {
+  const usable = parts
+    .map((part, index) => ({ index, lengthMeters: lengthMeters([part]), part }))
+    .filter(({ part }) => part.length > 0);
+
+  if (usable.length > MAX_OPTIMIZED_PARTS) {
+    const steps: PartStep[] = [];
+    let tail: [number, number] | undefined;
+    for (const { index, part } of usable) {
+      const reversed =
+        tail !== undefined &&
+        distanceBetween(tail, part[part.length - 1]) <
+          distanceBetween(tail, part[0]);
+      steps.push({ index, reversed });
+      tail = endOf(part, reversed);
+    }
+    return steps;
+  }
+
+  const walks: Walk[] = [];
+  for (const first of usable) {
+    for (const firstReversed of [false, true]) {
+      walks.push(walkFrom(first, firstReversed, usable));
+    }
+  }
+  if (walks.length === 0) {
+    return [];
+  }
+
+  // Ties are judged against the shortest walk, not pairwise against whichever
+  // walk currently leads; pairwise, each step could give up another metre.
+  const shortestGapMeters = Math.min(...walks.map((walk) => walk.gapMeters));
+  let best: Walk | null = null;
+  for (const walk of walks) {
+    if (
+      walk.gapMeters <= shortestGapMeters + GAP_TIE_M &&
+      (!best || walk.forwardMeters > best.forwardMeters)
+    ) {
+      best = walk;
+    }
+  }
+  return best?.steps ?? [];
+}
+
+interface Walk {
+  /** Length walked in each part's source direction, for breaking ties. */
+  forwardMeters: number;
+  gapMeters: number;
+  steps: PartStep[];
+}
+
+interface WalkablePart {
+  index: number;
+  lengthMeters: number;
+  part: [number, number][];
+}
+
+/** Follows the nearest free end greedily from one starting part. */
+function walkFrom(
+  first: WalkablePart,
+  firstReversed: boolean,
+  usable: WalkablePart[],
+): Walk {
+  const steps: PartStep[] = [{ index: first.index, reversed: firstReversed }];
+  const remaining = usable.filter(({ index }) => index !== first.index);
+  let tail = endOf(first.part, firstReversed);
+  let gapMeters = 0;
+  let forwardMeters = firstReversed ? 0 : first.lengthMeters;
+
+  while (remaining.length > 0) {
+    let nearest = {
+      at: 0,
+      distanceMeters: Number.POSITIVE_INFINITY,
+      reversed: false,
+    };
+    remaining.forEach(({ part }, at) => {
+      const toStartMeters = distanceBetween(tail, part[0]);
+      const toEndMeters = distanceBetween(tail, part[part.length - 1]);
+      if (toStartMeters < nearest.distanceMeters) {
+        nearest = { at, distanceMeters: toStartMeters, reversed: false };
+      }
+      if (toEndMeters < nearest.distanceMeters) {
+        nearest = { at, distanceMeters: toEndMeters, reversed: true };
+      }
+    });
+
+    const [next] = remaining.splice(nearest.at, 1);
+    steps.push({ index: next.index, reversed: nearest.reversed });
+    gapMeters += nearest.distanceMeters;
+    if (!nearest.reversed) {
+      forwardMeters += next.lengthMeters;
+    }
+    tail = endOf(next.part, nearest.reversed);
+  }
+
+  return { forwardMeters, gapMeters, steps };
+}
+
+function endOf(part: [number, number][], reversed: boolean): [number, number] {
+  return reversed ? part[0] : part[part.length - 1];
 }
 
 /**

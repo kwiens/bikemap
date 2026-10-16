@@ -151,6 +151,29 @@ describe('measureParts', () => {
     expect(coordinates.has(`${SHORT[1][0]},${SHORT[1][1]}`)).toBe(true);
   });
 
+  it('walks parts in order even when they are stored out of order', async () => {
+    // westTail continues WEST; stored first, it would put a ~800 m backward
+    // jump at the start of the chart.
+    const westTail: [number, number][] = [
+      [-121.39, 44.0],
+      [-121.38, 44.0],
+    ];
+    const measured = await measureParts([westTail, WEST], 'Split Trail', {
+      mapboxToken: TOKEN,
+    });
+    const profile = measured.profile?.profile ?? [];
+
+    expect(profile[0].slice(2)).toEqual(WEST[0]);
+    expect(profile[profile.length - 1].slice(2)).toEqual(westTail[1]);
+    expect(measured.profile?.geometryGapDetails).toEqual([
+      { feet: 0, from: WEST[1], to: westTail[0] },
+    ]);
+    // Reported against the stored line, which lists westTail first.
+    expect(measured.gaps).toEqual([
+      { distanceMeters: 0, fromPart: 1, toPart: 0 },
+    ]);
+  });
+
   it('warns rather than storing a flat line when no terrain can be read', async () => {
     globalThis.fetch = vi.fn(
       async () => ({ ok: false, status: 404 }) as unknown as Response,
