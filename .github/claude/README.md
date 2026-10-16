@@ -20,12 +20,17 @@ repository secret.
 
 1. Install the [Claude GitHub App](https://github.com/apps/claude) on this
    repository.
-2. Create a token with `claude setup-token` and store it as the
-   `CLAUDE_CODE_OAUTH_TOKEN` repository secret:
+2. Add an Anthropic Console API key as the `ANTHROPIC_API_KEY` repository
+   secret. These workflows use the API key when it is present:
 
    ```bash
-   gh secret set CLAUDE_CODE_OAUTH_TOKEN
+   gh secret set ANTHROPIC_API_KEY
    ```
+
+   Alternatively, create a token with `claude setup-token` and store it as the
+   `CLAUDE_CODE_OAUTH_TOKEN` repository secret. OAuth is used only when no API
+   key is configured. A Max subscription's OAuth token may fail in the action
+   even when local Claude Code works; in that case use an API key.
 
 ## Running them by hand
 

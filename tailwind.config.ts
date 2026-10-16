@@ -82,9 +82,30 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        // Admin components share this Tailwind build but not the frontend
+        // stylesheet, so every palette variable needs a default.
         // App brand colors
-        'app-primary': '#c3f44d',
-        'app-secondary': '#1a434e',
+        'app-primary': 'rgb(var(--app-primary, 195 244 77) / <alpha-value>)',
+        'app-secondary': 'rgb(var(--app-secondary, 26 67 78) / <alpha-value>)',
+        'app-surface': 'rgb(var(--app-surface, 255 255 255) / <alpha-value>)',
+        'app-ink': 'rgb(var(--app-ink, 26 67 78) / <alpha-value>)',
+        'app-accent': 'rgb(var(--app-accent, 165 215 48) / <alpha-value>)',
+        // Existing components use Tailwind's neutral utilities extensively.
+        // Tint that scale between the editable surface and ink tokens so the
+        // whole UI participates in the theme without losing its hierarchy.
+        white: 'rgb(var(--app-surface, 255 255 255) / <alpha-value>)',
+        gray: {
+          50: 'color-mix(in srgb, rgb(var(--app-surface, 255 255 255)) 97%, rgb(var(--app-ink, 26 67 78)))',
+          100: 'color-mix(in srgb, rgb(var(--app-surface, 255 255 255)) 93%, rgb(var(--app-ink, 26 67 78)))',
+          200: 'color-mix(in srgb, rgb(var(--app-surface, 255 255 255)) 85%, rgb(var(--app-ink, 26 67 78)))',
+          300: 'color-mix(in srgb, rgb(var(--app-surface, 255 255 255)) 72%, rgb(var(--app-ink, 26 67 78)))',
+          400: 'color-mix(in srgb, rgb(var(--app-surface, 255 255 255)) 52%, rgb(var(--app-ink, 26 67 78)))',
+          500: 'color-mix(in srgb, rgb(var(--app-surface, 255 255 255)) 35%, rgb(var(--app-ink, 26 67 78)))',
+          600: 'color-mix(in srgb, rgb(var(--app-surface, 255 255 255)) 24%, rgb(var(--app-ink, 26 67 78)))',
+          700: 'color-mix(in srgb, rgb(var(--app-surface, 255 255 255)) 14%, rgb(var(--app-ink, 26 67 78)))',
+          800: 'color-mix(in srgb, rgb(var(--app-surface, 255 255 255)) 7%, rgb(var(--app-ink, 26 67 78)))',
+          900: 'rgb(var(--app-ink, 26 67 78) / <alpha-value>)',
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
