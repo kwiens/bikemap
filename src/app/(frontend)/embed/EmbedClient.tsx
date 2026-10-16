@@ -17,7 +17,7 @@ const EmbedMap = dynamic(() => import('@/components/embed/EmbedMap'), {
 export default function EmbedClient({
   content,
 }: {
-  /** Routes only: embeds are Casual-only and never attach the trail layers. */
+  /** Only the content family selected by the embed mode is loaded. */
   content: CityContent;
 }): ReactElement {
   publishCityContent(content);

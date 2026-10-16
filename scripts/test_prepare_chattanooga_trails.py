@@ -98,12 +98,47 @@ class BuildFeatureCollectionTest(unittest.TestCase):
             [{"properties": {"Trail": "Trail A"}, "parts": [[(5, 6), (7, 8)]]}],
             lambda x, y: (x, y),
         )
-        parts = merge_supplemental_features(collection, features)
+        merge_supplemental_features(collection, features)
 
-        self.assertEqual(parts, 1)
         self.assertEqual(
             [feature["properties"]["Trail"] for feature in collection["features"]],
             ["Trail A", "Trail B"],
+        )
+
+    def test_connects_an_existing_trail_at_exact_part_endpoints(self):
+        collection, _ = build_feature_collection(
+            [{
+                "properties": {"Trail": "Trail A"},
+                "parts": [
+                    [(4, 4), (5, 5)],
+                    [(1, 1), (2, 2)],
+                ],
+            }],
+            lambda x, y: (x, y),
+        )
+        connector = {
+            "type": "Feature",
+            "properties": {
+                "Trail": "Trail A",
+                "supplementalMode": "connect",
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [[[2.0, 2.0], [3.0, 3.0], [4.0, 4.0]]],
+            },
+        }
+
+        merge_supplemental_features(collection, [connector])
+
+        self.assertEqual(
+            collection["features"][0]["geometry"]["coordinates"],
+            [[
+                [1.0, 1.0],
+                [2.0, 2.0],
+                [3.0, 3.0],
+                [4.0, 4.0],
+                [5.0, 5.0],
+            ]],
         )
 
 

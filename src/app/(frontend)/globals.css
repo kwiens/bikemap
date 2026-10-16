@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --app-primary: 195 244 77;
+  --app-secondary: 26 67 78;
+  --app-surface: 255 255 255;
+  --app-ink: 26 67 78;
+  --app-accent: 165 215 48;
+}
+
 /* Reset and base styles */
 * {
   box-sizing: border-box;
@@ -30,6 +38,8 @@ html {
 }
 
 body {
+  background: rgb(var(--app-surface));
+  color: rgb(var(--app-ink));
   margin: 0;
   padding: 0;
   overflow: hidden;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, memo, useCallback } from 'react';
+import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import mapboxgl from 'mapbox-gl';
 import { MapLegendProvider } from '@/components/MapLegend';
@@ -49,6 +49,7 @@ import {
   highlightMtnBikeArea,
   initMtnBikeColors,
   initMtnBikeLayers,
+  setClosedTrails,
   ensureMtnBikeSource,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
@@ -81,7 +82,9 @@ import {
   onMapEvent,
 } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
-import { clearMapReady, setMapReady } from '@/utils/map-ready';
+import { clearMapReady, onMapReady, setMapReady } from '@/utils/map-ready';
+import { useTrailConditions } from '@/components/TrailConditionsProvider';
+import { closedTrails } from '@/data/trail-conditions';
 import { fetchRouteCollection, runtimeRouteIds } from '@/utils/route-source';
 
 // Ride recording is unreachable in embed mode, and its subtree (history, GPX,
@@ -116,14 +119,19 @@ if (!hasMapboxToken) {
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
-  const bikeRoutes = getBikeRoutes();
   const { isEmbed, options: embedOptions } = useEmbed();
+  const isMtbEmbed = isEmbed && embedOptions.mode === 'mtb';
+  const bikeRoutes = useMemo(
+    () => (isMtbEmbed ? [] : getBikeRoutes()),
+    [isMtbEmbed],
+  );
   // Embed mode is fixed for the lifetime of the tree, but the init effect runs
   // once on mount and must not list it as a dependency.
   const isEmbedRef = useRef(isEmbed);
   isEmbedRef.current = isEmbed;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const { latest: latestConditions } = useTrailConditions();
   // Removes the OSM trail selection's window listeners on teardown/restyle.
   const osmSelectionCleanup = useRef<(() => void) | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
@@ -827,7 +835,7 @@ const MapboxMap = memo(function MapboxMap() {
               canPruneStudioRoutes,
               styleRequestController.signal,
             ),
-            bikeRoutesUrl
+            bikeRoutesUrl && !isMtbEmbed
               ? fetchRouteCollection(
                   bikeRoutesUrl,
                   styleRequestController.signal,
@@ -1002,12 +1010,9 @@ const MapboxMap = memo(function MapboxMap() {
           // scans during initialization and keeping the interaction path fast.
           initRouteBoundsFromDefaults(bikeRoutes);
 
-          // Embed mode is Casual-only: the MTB tab is hidden, so attaching the
-          // trail tilesets would cost the partner's page two extra vector
-          // sources and their tile traffic on the critical path to MAP_READY,
-          // and would leave trail lines clickable with no UI to show the
-          // result. Skip the whole stack there.
-          const showTrails = !isEmbedRef.current;
+          // Casual embeds skip the trail stack and its tile traffic. MTB embeds
+          // attach it because their sidebar and deep links expose trails.
+          const showTrails = !isEmbedRef.current || isMtbEmbed;
 
           if (showTrails) {
             // Initialize all mountain bike trail layers. The MTB tileset
@@ -1281,6 +1286,20 @@ const MapboxMap = memo(function MapboxMap() {
 
   useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, handleRecordingStart);
   useMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, handleRecordingStop);
+
+  // Draw a red dashed line over any trail whose newest report says it is shut.
+  // Keyed on the conditions, not just the map, so a closure filed while the
+  // page is open appears without a reload.
+  useEffect(() => {
+    if (isEmbed) return;
+    return onMapReady(() => {
+      if (!map.current) return;
+      setClosedTrails(
+        map.current,
+        closedTrails({ latest: latestConditions }, getMountainBikeTrails()),
+      );
+    });
+  }, [isEmbed, latestConditions]);
 
   return (
     <>
