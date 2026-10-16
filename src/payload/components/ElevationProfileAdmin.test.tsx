@@ -86,6 +86,7 @@ const ORIGINAL_FETCH = globalThis.fetch;
 beforeEach(() => {
   ui.fields = {
     bounds: { value: [-85.3, 35.1, -85.29, 35.11] },
+    city: { value: 'chattanooga' },
     distance: { value: 1 },
     elevationGain: { value: 240 },
     elevationLoss: { value: 180 },
@@ -94,6 +95,7 @@ beforeEach(() => {
     elevationProfile: { value: PROFILE },
     geom: { value: GEOMETRY },
     geometrySource: { value: 'osm' },
+    slug: { value: 'test-trail' },
   };
   ui.documentInfo.data = {};
   ui.documentInfo.hasSavePermission = true;
@@ -125,9 +127,7 @@ describe('ElevationProfileAdmin', () => {
         'Terrain samples riders see on the map. Recalculate from topo elevations along the track.',
       ),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/no separate save draft is needed/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/without saving/i)).toBeInTheDocument();
     expect(
       screen.getByText(/stored with trail · 3 samples/i),
     ).toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('ElevationProfileAdmin', () => {
     ).toBeInTheDocument();
   });
 
-  it('recalculates and puts the returned values into the open form', async () => {
+  it('recalculates into the form without saving the trail', async () => {
     globalThis.fetch = vi.fn(async () =>
       Response.json({
         measurements: {
@@ -155,15 +155,14 @@ describe('ElevationProfileAdmin', () => {
           elevationMax: 1300,
           elevationMin: 990,
         },
-        message: 'Elevation profile recalculated and saved.',
+        message: 'Elevation preview recalculated. Save this trail to keep it.',
         profile: { ...PROFILE, gain: 300, loss: 220, max: 1300, min: 990 },
-        updatedAt: '2026-09-19T12:00:00.000Z',
       }),
     ) as typeof fetch;
 
     fireEvent.click(
       render(<ElevationProfileAdmin />).getByRole('button', {
-        name: /calculate and save elevation/i,
+        name: /calculate elevation/i,
       }),
     );
 
@@ -172,34 +171,40 @@ describe('ElevationProfileAdmin', () => {
         '/api/trails/42/recalculate-elevation',
         expect.objectContaining({
           credentials: 'same-origin',
+          body: expect.any(String),
+          headers: { 'Content-Type': 'application/json' },
           method: 'POST',
           signal: expect.anything(),
         }),
       ),
     );
-    expect(ui.dispatch).toHaveBeenCalledTimes(7);
+    expect(ui.dispatch).toHaveBeenCalledTimes(8);
     expect(ui.dispatch).toHaveBeenCalledWith({
-      initialValue: 220,
-      modified: false,
+      initialValue: 180,
+      modified: true,
       path: 'elevationLoss',
       type: 'UPDATE',
       value: 220,
     });
-    expect(ui.documentInfo.setData).toHaveBeenCalledWith(
+    expect(ui.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
-        elevationGain: 300,
-        elevationLoss: 220,
-        elevationProfile: expect.objectContaining({ gain: 300 }),
+        modified: true,
+        path: 'rebuildElevation',
+        value: true,
       }),
     );
+    expect(ui.documentInfo.setData).not.toHaveBeenCalled();
     expect(ui.toast.success).toHaveBeenCalledWith(
-      'Elevation profile recalculated and saved.',
+      'Elevation preview recalculated. Save this trail to keep it.',
     );
+    expect(screen.getByText(/unsaved preview/i)).toBeInTheDocument();
   });
 
   it('repopulates a bundled profile when the trail has no CMS geometry', async () => {
+    ui.fields.city = { value: 'bend' };
     ui.fields.geom = { value: null };
     ui.fields.geometrySource = { value: 'imported' };
+    ui.fields.slug = { value: 'renamed-trail' };
     delete ui.fields.elevationProfile;
     globalThis.fetch = vi.fn(async () =>
       Response.json({
@@ -211,43 +216,48 @@ describe('ElevationProfileAdmin', () => {
           elevationMax: 1240,
           elevationMin: 1000,
         },
-        message: 'Bundled elevation profile repopulated and saved.',
+        message:
+          'Bundled elevation profile preview is ready. Save this trail to keep it.',
         profile: PROFILE,
-        updatedAt: '2026-09-19T12:00:00.000Z',
       }),
     ) as typeof fetch;
 
     const view = render(<ElevationProfileAdmin />);
     const action = view.getByRole('button', {
-      name: /import and save bundled profile/i,
+      name: /preview bundled profile/i,
     });
 
     expect(action).toBeEnabled();
     expect(
-      screen.getByText(/copy in the existing rider profile/i),
+      screen.getByText(/preview the bundled rider profile/i),
     ).toBeInTheDocument();
     fireEvent.click(action);
 
     await waitFor(() =>
       expect(ui.toast.success).toHaveBeenCalledWith(
-        'Bundled elevation profile repopulated and saved.',
+        'Bundled elevation profile preview is ready. Save this trail to keep it.',
       ),
     );
     expect(globalThis.fetch).toHaveBeenCalledWith(
       '/api/trails/42/recalculate-elevation',
       expect.objectContaining({ method: 'POST' }),
     );
+    const requestInit = vi.mocked(globalThis.fetch).mock.calls[0]?.[1];
+    expect(JSON.parse(String(requestInit?.body))).toEqual({
+      city: 'bend',
+      geometry: null,
+      slug: 'renamed-trail',
+    });
   });
 
-  it('requires unsaved geometry changes to be saved first', () => {
+  it('can calculate from unsaved geometry changes', () => {
     ui.isModified = true;
 
     render(<ElevationProfileAdmin />);
 
     expect(
-      screen.getByRole('button', { name: /calculate and save elevation/i }),
-    ).toBeDisabled();
-    expect(screen.getByText(/save the trail first/i)).toBeInTheDocument();
+      screen.getByRole('button', { name: /calculate elevation/i }),
+    ).toBeEnabled();
   });
 
   it('requires a saved trail line when there is no imported profile source', () => {
@@ -256,9 +266,9 @@ describe('ElevationProfileAdmin', () => {
     render(<ElevationProfileAdmin />);
 
     expect(
-      screen.getByRole('button', { name: /calculate and save elevation/i }),
+      screen.getByRole('button', { name: /calculate elevation/i }),
     ).toBeDisabled();
-    expect(screen.getByText(/save a trail line first/i)).toBeInTheDocument();
+    expect(screen.getByText(/add a trail line first/i)).toBeInTheDocument();
   });
 
   it('does not run alongside a form save', () => {
@@ -267,7 +277,7 @@ describe('ElevationProfileAdmin', () => {
     render(<ElevationProfileAdmin />);
 
     expect(
-      screen.getByRole('button', { name: /calculate and save elevation/i }),
+      screen.getByRole('button', { name: /calculate elevation/i }),
     ).toBeDisabled();
     expect(screen.getByText(/wait for the current save/i)).toBeInTheDocument();
   });
@@ -276,15 +286,14 @@ describe('ElevationProfileAdmin', () => {
     globalThis.fetch = vi.fn(async () =>
       Response.json({
         measurements: { distance: 1 },
-        message: 'Elevation profile recalculated and saved.',
+        message: 'Elevation preview recalculated. Save this trail to keep it.',
         profile: { profile: [] },
-        updatedAt: '2026-09-19T12:00:00.000Z',
       }),
     ) as typeof fetch;
 
     fireEvent.click(
       render(<ElevationProfileAdmin />).getByRole('button', {
-        name: /calculate and save elevation/i,
+        name: /calculate elevation/i,
       }),
     );
 
@@ -306,14 +315,39 @@ describe('ElevationProfileAdmin', () => {
     ) as typeof fetch;
     const view = render(<ElevationProfileAdmin />);
 
-    fireEvent.click(
-      view.getByRole('button', { name: /calculate and save elevation/i }),
-    );
+    fireEvent.click(view.getByRole('button', { name: /calculate elevation/i }));
     ui.documentInfo.id = 43;
     view.rerender(<ElevationProfileAdmin />);
 
     await waitFor(() => expect(signal?.aborted).toBe(true));
     expect(ui.documentInfo.setData).not.toHaveBeenCalled();
+    expect(ui.toast.error).not.toHaveBeenCalled();
+  });
+
+  it('aborts a recalculation when the trail line changes', async () => {
+    let signal: AbortSignal | undefined;
+    globalThis.fetch = vi.fn(
+      async (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          signal = init?.signal ?? undefined;
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        }),
+    ) as typeof fetch;
+    const view = render(<ElevationProfileAdmin />);
+
+    fireEvent.click(view.getByRole('button', { name: /calculate elevation/i }));
+    ui.fields.geom = {
+      value: {
+        ...GEOMETRY,
+        coordinates: [[...GEOMETRY.coordinates[0], [-85.28, 35.12]]],
+      },
+    };
+    view.rerender(<ElevationProfileAdmin />);
+
+    await waitFor(() => expect(signal?.aborted).toBe(true));
+    expect(ui.dispatch).not.toHaveBeenCalled();
     expect(ui.toast.error).not.toHaveBeenCalled();
   });
 });
