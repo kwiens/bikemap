@@ -216,6 +216,31 @@ export function featuresToParts(features: unknown[]): [number, number][][] {
 }
 
 /**
+ * Decimal places kept on coordinates the editor computes — about 1 cm, the
+ * precision OSM itself stores.
+ *
+ * Terra Draw rejects any coordinate with more than 9 decimal places
+ * ("Feature has coordinates with excessive precision"), and like every
+ * `addFeatures` rejection it does so silently: the line just isn't there. A
+ * snapped route point or a point moved by a computed offset easily carries 14.
+ */
+export const COORDINATE_DECIMALS = 7;
+
+/** Copies coordinate runs, rounded to {@link COORDINATE_DECIMALS}. */
+export function roundParts(parts: [number, number][][]): [number, number][][] {
+  const scale = 10 ** COORDINATE_DECIMALS;
+  return parts.map((part) =>
+    part.map(
+      ([lng, lat]) =>
+        [Math.round(lng * scale) / scale, Math.round(lat * scale) / scale] as [
+          number,
+          number,
+        ],
+    ),
+  );
+}
+
+/**
  * Deep-copies coordinate runs.
  *
  * Terra Draw mutates the features it is handed, so anything crossing into it
