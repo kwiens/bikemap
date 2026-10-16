@@ -361,9 +361,10 @@ describe('useRideRecording', () => {
         simulatePosition(-85.3, 35.0);
       });
       act(() => {
+        // Permission revoked mid-ride (a loss of signal is not fatal).
         errorCallback?.({
-          code: 2,
-          message: 'Position unavailable',
+          code: 1,
+          message: 'Permission revoked',
           PERMISSION_DENIED: 1,
           POSITION_UNAVAILABLE: 2,
           TIMEOUT: 3,
@@ -392,9 +393,10 @@ describe('useRideRecording', () => {
       simulatePosition(-85.31, 35.01);
     });
     act(() => {
+      // Permission revoked mid-ride (a loss of signal is not fatal).
       errorCallback?.({
-        code: 2,
-        message: 'Position unavailable',
+        code: 1,
+        message: 'Permission revoked',
         PERMISSION_DENIED: 1,
         POSITION_UNAVAILABLE: 2,
         TIMEOUT: 3,
@@ -407,6 +409,33 @@ describe('useRideRecording', () => {
     expect(clearInProgress).not.toHaveBeenCalled();
     expect(result.current.hasRecovery).toBe(true);
     expect(result.current.isRecording).toBe(false);
+  });
+
+  it('keeps recording through a loss of signal and warns once', () => {
+    const onNotify = vi.fn();
+    const { result } = renderHook(() => useRideRecording(onNotify));
+    act(() => {
+      result.current.startRecording();
+    });
+    act(() => {
+      simulatePosition(-85.3, 35.0);
+    });
+    const lost = { code: 2, message: 'location unknown' };
+    act(() => {
+      errorCallback?.(lost as GeolocationPositionError);
+      errorCallback?.(lost as GeolocationPositionError);
+    });
+    expect(result.current.isRecording).toBe(true);
+    expect(onNotify).toHaveBeenCalledTimes(1);
+    expect(onNotify).toHaveBeenCalledWith('GPS signal lost — still recording');
+
+    // Signal back, then lost again: a fresh warning.
+    act(() => {
+      simulatePosition(-85.31, 35.01);
+      errorCallback?.(lost as GeolocationPositionError);
+    });
+    expect(onNotify).toHaveBeenCalledTimes(2);
+    expect(result.current.isRecording).toBe(true);
   });
 
   it('dispatches RIDE_RECORDING_STOP exactly once per stop, with the ride id', async () => {
@@ -578,6 +607,44 @@ describe('useRideRecording', () => {
     );
     expect(result.current.hasRecovery).toBe(true);
     consoleError.mockRestore();
+  });
+
+  it('aborts startup cleanly when the device has no geolocation', async () => {
+    Object.defineProperty(navigator, 'geolocation', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+    const lifecycle: string[] = [];
+    const handler = (e: Event) => lifecycle.push(e.type);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    const onNotify = vi.fn();
+
+    try {
+      const { result } = renderHook(() => useRideRecording(onNotify));
+      await act(async () => {
+        result.current.startRecording();
+      });
+      expect(result.current.isRecording).toBe(false);
+      expect(onNotify).toHaveBeenCalledWith(
+        'GPS unavailable — check your device settings',
+      );
+      // The map saw a start and then a stop, in that order — never a stop
+      // followed by a start, which would leave it in recording mode.
+      expect(lifecycle).toEqual([
+        MAP_EVENTS.RIDE_RECORDING_START,
+        MAP_EVENTS.RIDE_RECORDING_STOP,
+      ]);
+      // And a second attempt is not blocked by a leaked subscription.
+      await act(async () => {
+        result.current.startRecording();
+      });
+      expect(onNotify).toHaveBeenCalledTimes(2);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_START, handler);
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
+    }
   });
 
   it('clears the recovery record when a continued ride is saved before any fix', async () => {
