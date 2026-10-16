@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { TrailConditionsStrip } from './TrailConditionsStrip';
 import type { ConditionReport } from '@/data/trail-conditions';
 import { MAP_EVENTS } from '@/events';
@@ -14,6 +14,8 @@ import { MAP_EVENTS } from '@/events';
  * so what these check is the promise made alongside it: that closing reports
  * does not also hide what has already been reported.
  */
+
+let historyRevision = 0;
 
 const lockedReason = vi.fn<(slug: string) => null | string>(() => null);
 
@@ -31,6 +33,7 @@ const fresh: ConditionReport = {
 vi.mock('@/components/TrailConditionsProvider', () => ({
   useTrailConditions: () => ({
     latest: { pondo: fresh },
+    historyRevision,
     loading: false,
     lockedReason,
     options: [{ color: '#16a34a', name: 'Dry', value: 'dry' }],
@@ -45,12 +48,36 @@ function renderStrip() {
 
 describe('TrailConditionsStrip', () => {
   beforeEach(() => {
+    historyRevision = 0;
     lockedReason.mockReset();
     lockedReason.mockReturnValue(null);
     global.fetch = vi.fn().mockResolvedValue({
       json: async () => ({ reports: [] }),
       ok: true,
     }) as unknown as typeof fetch;
+  });
+
+  it('refreshes already-open history after a submission, even if the badge is unchanged', async () => {
+    const view = renderStrip();
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    await screen.findByText('Nothing reported yet. Ridden it lately?');
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        reports: [{ ...fresh, id: 2, name: 'Older observation just filed' }],
+      }),
+    } as Response);
+    historyRevision += 1;
+    view.rerender(<TrailConditionsStrip slug="pondo" trailName="Pondo" />);
+    await screen.findByText('Older observation just filed');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
   });
 
   it('offers the report button when the trail is open', () => {
