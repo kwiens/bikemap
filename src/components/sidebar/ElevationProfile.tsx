@@ -17,6 +17,7 @@ import { buildProfileGpx } from '@/utils/gpx';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
 import { useLayout } from '@/hooks/useLayout';
+import { useEmbed } from '@/components/EmbedContext';
 import { loadRide } from '@/utils/ride-storage';
 import { rideToElevationProfile } from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -353,6 +354,7 @@ function trailSelectionUrl(isEmbed: boolean, name?: string): string {
 }
 
 export function ElevationProfile() {
+  const { isEmbed } = useEmbed();
   // Which side panels are open decides where the pane sits (and, on a
   // phone, whether it shows at all).
   const { sidebarOpen, ridesPanelOpen } = useLayout();
