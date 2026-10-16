@@ -35,14 +35,12 @@ beforeEach(() => {
 });
 
 describe('GeometrySourceField', () => {
-  it('explains that an OpenStreetMap line is built and stored on save', () => {
+  it('explains that an OpenStreetMap line must be refreshed before saving', () => {
     render(<GeometrySourceField path="geometrySource" />);
 
     expect(screen.getByText('OpenStreetMap')).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /saving refreshes the line and stores it with this trail/i,
-      ),
+      screen.getByText(/refresh and review the line, then save it/i),
     ).toBeInTheDocument();
   });
 
@@ -64,11 +62,9 @@ describe('OsmBuildReport', () => {
 
     render(<OsmBuildReport path="osmReport" />);
 
-    expect(screen.getByText('Ready to build')).toBeInTheDocument();
+    expect(screen.getByText('Ready to refresh')).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /save this trail to join them into one line and store it/i,
-      ),
+      screen.getByText(/refresh the line.*review the preview.*then save/i),
     ).toBeInTheDocument();
   });
 
