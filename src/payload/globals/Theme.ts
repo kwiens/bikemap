@@ -49,7 +49,22 @@ export const Theme: GlobalConfig = {
   fields: [
     {
       type: 'collapsible',
-      label: 'Frontend color palette',
+      label: 'Logo',
+      fields: [
+        {
+          name: 'logo',
+          type: 'upload',
+          relationTo: 'media',
+          admin: {
+            description:
+              'Upload a PNG, JPEG, or WebP logo. It replaces the bicycle mark on the welcome screen.',
+          },
+        },
+      ],
+    },
+    {
+      type: 'collapsible',
+      label: 'Color palette',
       fields: [
         {
           type: 'row',

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { getPayload } from 'payload';
 import config from '@payload-config';
+import type { SiteBranding } from '@/components/SiteBrandingContext';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -11,9 +12,18 @@ export interface ThemeDoc {
   sidebarColor?: null | string;
   surfaceColor?: null | string;
   textColor?: null | string;
+  logo?:
+    | null
+    | number
+    | {
+        alt?: null | string;
+        url?: null | string;
+      };
 }
 
-const FRONTEND_VARIABLES: Array<[keyof ThemeDoc, string]> = [
+type ThemeColorField = Exclude<keyof ThemeDoc, 'logo'>;
+
+const FRONTEND_VARIABLES: Array<[ThemeColorField, string]> = [
   ['primaryColor', '--app-primary'],
   ['sidebarColor', '--app-secondary'],
   ['surfaceColor', '--app-surface'],
@@ -71,20 +81,32 @@ export async function getThemeCss(): Promise<string> {
   return theme ? buildThemeCss(theme) : '';
 }
 
-export async function getFrontendThemeCss(): Promise<string> {
-  const theme = await readTheme();
-  return theme ? buildFrontendThemeCss(theme) : '';
+export async function getFrontendTheme(): Promise<{
+  branding: SiteBranding;
+  css: string;
+}> {
+  const theme = await readTheme(1);
+  const logo =
+    theme?.logo && typeof theme.logo === 'object' ? theme.logo : undefined;
+
+  return {
+    branding: {
+      logoAlt: logo?.alt ?? null,
+      logoUrl: logo?.url ?? null,
+    },
+    css: theme ? buildFrontendThemeCss(theme) : '',
+  };
 }
 
 /** Database failures must never take either the map or admin login down. */
-async function readTheme(): Promise<ThemeDoc | null> {
+async function readTheme(depth = 0): Promise<ThemeDoc | null> {
   if (!process.env.DATABASE_URL) return null;
 
   try {
     const payload = await getPayload({ config });
     return (await payload.findGlobal({
       slug: 'theme',
-      depth: 0,
+      depth,
     })) as ThemeDoc;
   } catch (error) {
     console.error('Could not read the site theme; using defaults.', error);

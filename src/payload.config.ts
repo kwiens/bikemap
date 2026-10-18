@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { postgresAdapter } from '@payloadcms/db-postgres';
 import { buildConfig } from 'payload';
 import { Organizations } from './payload/collections/Organizations';
+import { Media } from './payload/collections/Media';
 import { Routes } from './payload/collections/Routes';
 import { TrailAreas } from './payload/collections/TrailAreas';
 import { TrailConditions } from './payload/collections/TrailConditions';
@@ -46,6 +47,7 @@ export default buildConfig({
     },
   },
   collections: [
+    Media,
     Routes,
     Trails,
     TrailConditions,

@@ -5,9 +5,10 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import './globals.css';
 import './map.css';
 import Script from 'next/script';
+import { SiteBrandingProvider } from '@/components/SiteBrandingContext';
 import { siteConfigForHostname } from '@/config/site.config';
+import { getFrontendTheme } from '@/payload/read/theme';
 import { getRequestHostname } from '@/utils/request-hostname';
-import { getFrontendThemeCss } from '@/payload/read/theme';
 
 // Self-hosted to keep production builds reproducible and offline-capable
 // (next/font/google would fetch from Google Fonts at build time).
@@ -64,7 +65,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const config = siteConfigForHostname(await getRequestHostname());
-  const themeCss = await getFrontendThemeCss();
+  const { branding, css: themeCss } = await getFrontendTheme();
 
   return (
     <html lang="en">
@@ -163,7 +164,9 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <SiteBrandingProvider branding={branding}>
+          {children}
+        </SiteBrandingProvider>
         <Analytics />
         <Script src="/register-sw.js" strategy="lazyOnload" />
       </body>

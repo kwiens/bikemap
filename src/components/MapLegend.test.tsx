@@ -10,6 +10,7 @@ import { siteConfig } from '@/config/site.config';
 import { MAP_EVENTS } from '@/events';
 import { dispatch } from '@/test/fixtures';
 import { FeatureSettingsProvider } from './FeatureSettingsContext';
+import { SiteBrandingProvider } from './SiteBrandingContext';
 import { DEFAULT_FEATURE_SETTINGS } from '@/config/features.config';
 
 // Mock all sidebar children to keep tests focused on MapLegendProvider state
@@ -135,6 +136,24 @@ describe('MapLegendProvider', () => {
     expect(
       screen.queryByTestId('mountain-bike-trails'),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows the configured logo at the top of the sidebar', () => {
+    render(
+      <SiteBrandingProvider
+        branding={{ logoAlt: 'City cycling logo', logoUrl: '/media/logo.png' }}
+      >
+        <MapLegendProvider>
+          <div />
+        </MapLegendProvider>
+      </SiteBrandingProvider>,
+    );
+
+    const logo = screen.getByRole('img', { name: 'City cycling logo' });
+    expect(logo).toHaveAttribute('src', '/media/logo.png');
+    expect(
+      screen.getByRole('button', { name: 'Close sidebar' }),
+    ).toBeInTheDocument();
   });
 
   it('hides the category selector when Casual routes are disabled', () => {
@@ -432,14 +451,10 @@ describe('embed mode', () => {
   });
 
   it('does not write the settings cookie when the sidebar is toggled', () => {
-    const { container } = renderEmbed({ sidebarOpen: false });
-    const toggleBtn = container.querySelector(
-      '.toggle-btn',
-    ) as HTMLButtonElement;
-    expect(toggleBtn).toBeTruthy();
+    renderEmbed({ sidebarOpen: false });
 
-    fireEvent.click(toggleBtn);
-    fireEvent.click(toggleBtn);
+    fireEvent.click(screen.getByRole('button', { name: 'Open sidebar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close sidebar' }));
 
     expect(document.cookie).not.toContain('-settings=');
   });

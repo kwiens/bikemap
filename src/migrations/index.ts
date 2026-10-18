@@ -15,6 +15,7 @@ import * as migration_20261002_050000_simplify_theme_palette from './20261002_05
 import * as migration_20261017_203000_general_settings from './20261017_203000_general_settings';
 import * as migration_20261017_204000_split_general_settings from './20261017_204000_split_general_settings';
 import * as migration_20261017_205000_add_casual_routes_setting from './20261017_205000_add_casual_routes_setting';
+import * as migration_20261018_035455_add_theme_logo from './20261018_035455_add_theme_logo';
 
 export const migrations = [
   {
@@ -101,5 +102,10 @@ export const migrations = [
     up: migration_20261017_205000_add_casual_routes_setting.up,
     down: migration_20261017_205000_add_casual_routes_setting.down,
     name: '20261017_205000_add_casual_routes_setting',
+  },
+  {
+    up: migration_20261018_035455_add_theme_logo.up,
+    down: migration_20261018_035455_add_theme_logo.down,
+    name: '20261018_035455_add_theme_logo',
   },
 ];
