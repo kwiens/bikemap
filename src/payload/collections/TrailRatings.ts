@@ -8,11 +8,9 @@ import { slugValidator, valueField } from './vocabulary-fields';
 /**
  * Difficulty ratings — the green/blue/black vocabulary trails are graded with.
  *
- * This was a hardcoded `select` on Trails, so adding a band (a "double black",
- * or a local grading scheme) meant editing TypeScript, writing a migration for
- * the Postgres enum, and deploying. As a collection it is curated in the admin,
- * and the **colour comes with it** — the palette used to live in code for the
- * same reason, and recolouring "advanced" is now an edit rather than a release.
+ * The backing rows mirror `trail-options.config.ts`. They remain a collection
+ * because trails use relationships for referential integrity, but the list is
+ * hidden and immutable in the admin so configuration cannot drift by city.
  *
  * Trails reference this through a `relationship`, so renaming a rating updates
  * every trail at once and Payload blocks deleting one still in use.
@@ -31,19 +29,20 @@ export const TrailRatings: CollectionConfig = {
   // than alphabetically, which puts Advanced before Easy.
   defaultSort: 'sortOrder',
   admin: {
+    hidden: true,
     useAsTitle: 'name',
     defaultColumns: ['name', 'value', 'color', 'sortOrder'],
-    description:
-      'How trails are graded, and the colour each grade draws in. Anything added here becomes selectable on a trail.',
+    description: 'Code-owned trail difficulty options.',
     group: 'Lists',
     listSearchableFields: ['name', 'value'],
   },
   access: {
-    // Shared reference data: any signed-in editor may read, admins curate.
-    create: ({ req }) => req.user?.role === 'admin',
-    delete: ({ req }) => req.user?.role === 'admin',
+    // Shared reference data: signed-in editors may resolve relationships, but
+    // changes ship through configuration plus a seed or migration.
+    create: () => false,
+    delete: () => false,
     read: ({ req }) => Boolean(req.user),
-    update: ({ req }) => req.user?.role === 'admin',
+    update: () => false,
   },
   fields: [
     {

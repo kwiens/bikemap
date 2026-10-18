@@ -16,6 +16,7 @@ import { getRequestHostname } from '@/utils/request-hostname';
 import { resolveActiveCityId } from '@/config/map.config';
 import { siteConfigForHostname } from '@/config/site.config';
 import { getCityContent } from '@/payload/read/city-content';
+import { getGeneralSettings } from '@/payload/read/general-settings';
 import HomeClient from './HomeClient';
 
 export async function generateMetadata({
@@ -52,7 +53,10 @@ export default async function Home({
     searchParams,
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
-  const content = await getCityContent(cityId);
+  const [content, settings] = await Promise.all([
+    getCityContent(cityId),
+    getGeneralSettings(),
+  ]);
 
-  return <HomeClient content={content} />;
+  return <HomeClient content={content} settings={settings} />;
 }

@@ -102,11 +102,11 @@ export interface Config {
   };
   fallbackLocale: null;
   globals: {
-    'condition-reporting': ConditionReporting;
+    'general-settings': GeneralSetting;
     theme: Theme;
   };
   globalsSelect: {
-    'condition-reporting': ConditionReportingSelect<false> | ConditionReportingSelect<true>;
+    'general-settings': GeneralSettingsSelect<false> | GeneralSettingsSelect<true>;
     theme: ThemeSelect<false> | ThemeSelect<true>;
   };
   locale: null;
@@ -251,7 +251,7 @@ export interface Trail {
    */
   organization?: (number | null) | Organization;
   /**
-   * Manage the list under Lists → Trail ratings.
+   * Difficulty options are configured in src/config/trail-options.config.ts.
    */
   rating: number | TrailRating;
   /**
@@ -419,7 +419,7 @@ export interface Organization {
   createdAt: string;
 }
 /**
- * How trails are graded, and the colour each grade draws in. Anything added here becomes selectable on a trail.
+ * Code-owned trail difficulty options.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "trail-ratings".
@@ -514,7 +514,7 @@ export interface TrailCondition {
   createdAt: string;
 }
 /**
- * What riders can report a trail as being. Anything added here becomes selectable on the report form.
+ * Code-owned trail condition options.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "trail-condition-types".
@@ -902,26 +902,58 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   createdAt?: T;
 }
 /**
- * Whether riders can report trail conditions. Turning this off leaves existing reports visible.
+ * Turn optional public-site features on or off.
  *
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "condition-reporting".
+ * via the `definition` "general-settings".
  */
-export interface ConditionReporting {
+export interface GeneralSetting {
   id: number;
   /**
-   * Untick to close the report form across the whole map.
+   * Show the Casual tab and its curated route options.
    */
-  enabled?: boolean | null;
+  casualRoutes?: boolean | null;
+  /**
+   * Show trail-condition reports and let riders submit new reports.
+   */
+  conditionReporting?: boolean | null;
   /**
    * Optional, e.g. “Conditions are reported on our forum instead.”
    */
-  disabledMessage?: string | null;
+  conditionReportingDisabledMessage?: string | null;
+  /**
+   * Show ride recording controls and saved ride history.
+   */
+  rideRecording?: boolean | null;
+  /**
+   * Offer the nationwide OpenStreetMap trail overlay.
+   */
+  nationwideTrails?: boolean | null;
+  /**
+   * Offer the classified bike-network overlay.
+   */
+  bikeNetwork?: boolean | null;
+  /**
+   * Show the attractions layer and location list.
+   */
+  attractions?: boolean | null;
+  /**
+   * Show bike shops, repair locations, and other cycling resources.
+   */
+  bikeResources?: boolean | null;
+  /**
+   * Offer live bike-share stations or free-floating bikes where configured.
+   */
+  bikeRentals?: boolean | null;
+  /**
+   * Serve the embeddable map and show the embed builder.
+   */
+  embeds?: boolean | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
 /**
- * Customize the public map and admin palette. Each field explains which parts of the interface it changes. Changes apply on the next page load.
+ * Customize the public map and admin palette. Changes apply on the next page load.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "theme".
@@ -953,11 +985,19 @@ export interface Theme {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "condition-reporting_select".
+ * via the `definition` "general-settings_select".
  */
-export interface ConditionReportingSelect<T extends boolean = true> {
-  enabled?: T;
-  disabledMessage?: T;
+export interface GeneralSettingsSelect<T extends boolean = true> {
+  casualRoutes?: T;
+  conditionReporting?: T;
+  conditionReportingDisabledMessage?: T;
+  rideRecording?: T;
+  nationwideTrails?: T;
+  bikeNetwork?: T;
+  attractions?: T;
+  bikeResources?: T;
+  bikeRentals?: T;
+  embeds?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

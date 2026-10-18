@@ -7,6 +7,8 @@ import { embedBuilderConfig } from '@/utils/embed-options';
 import { getCityRoutes } from '@/payload/read/routes';
 import { getCityTrailSummaries } from '@/payload/read/trails';
 import { resolveActiveCityId } from '@/config/map.config';
+import { getGeneralSettings } from '@/payload/read/general-settings';
+import { notFound } from 'next/navigation';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -24,6 +26,8 @@ export default async function EmbedDemoPage({
     searchParams,
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
+  const settings = await getGeneralSettings();
+  if (!settings.embeds) notFound();
   const config = siteConfigForHostname(hostname, query.city);
   const [{ routes }, { trails }] = await Promise.all([
     getCityRoutes(cityId),
@@ -31,7 +35,7 @@ export default async function EmbedDemoPage({
   ]);
   const builderConfig = embedBuilderConfig(
     hostname,
-    routes,
+    settings.casualRoutes ? routes : [],
     trails,
     query.city,
   );

@@ -12,6 +12,10 @@ function textFields(fields: Field[]): TextField[] {
 }
 
 describe('Theme global', () => {
+  it('has its own appearance-only settings page', () => {
+    expect(Theme.label).toBe('Theme');
+  });
+
   it('keeps the Ride Bend fallback palette and editor-facing labels together', () => {
     const fields = textFields(Theme.fields);
 

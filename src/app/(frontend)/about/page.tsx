@@ -8,6 +8,7 @@ import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
 import { getCityRoutes } from '@/payload/read/routes';
 import { getCityTrailSummaries } from '@/payload/read/trails';
+import { getGeneralSettings } from '@/payload/read/general-settings';
 import {
   ArrowLeft,
   MessageCircle,
@@ -98,13 +99,14 @@ export default async function AboutPage({
   const region = mapConfig.region.displayName;
   const showBikeChattAssets = siteConfig.cityId === 'chattanooga';
   const isBend = siteConfig.cityId === 'bend';
-  const [{ routes }, { trails }] = await Promise.all([
+  const [{ routes }, { trails }, settings] = await Promise.all([
     getCityRoutes(siteConfig.cityId),
     getCityTrailSummaries(siteConfig.cityId),
+    getGeneralSettings(),
   ]);
   const builderConfig = embedBuilderConfig(
     hostname,
-    routes,
+    settings.casualRoutes ? routes : [],
     trails,
     query.city,
   );
@@ -170,29 +172,31 @@ export default async function AboutPage({
         </section>
 
         {/* Downloads */}
-        <section className="mb-14">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
-            Downloads
-          </h2>
+        {settings.embeds && (
+          <section className="mb-14">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
+              Downloads
+            </h2>
 
-          <Link
-            href={`/export${citySearch}`}
-            className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-sm transition-all group mb-3"
-          >
-            <div className="w-10 h-10 rounded-lg bg-app-secondary flex items-center justify-center shrink-0">
-              <Printer className="w-5 h-5 text-app-primary" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900 group-hover:text-app-secondary">
-                Print map & route files
-              </p>
-              <p className="text-sm text-gray-500">
-                Download routes as GPX or SVG
-              </p>
-            </div>
-            <MapIcon className="w-4 h-4 text-gray-300 ml-auto" />
-          </Link>
-        </section>
+            <Link
+              href={`/export${citySearch}`}
+              className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-sm transition-all group mb-3"
+            >
+              <div className="w-10 h-10 rounded-lg bg-app-secondary flex items-center justify-center shrink-0">
+                <Printer className="w-5 h-5 text-app-primary" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900 group-hover:text-app-secondary">
+                  Print map & route files
+                </p>
+                <p className="text-sm text-gray-500">
+                  Download routes as GPX or SVG
+                </p>
+              </div>
+              <MapIcon className="w-4 h-4 text-gray-300 ml-auto" />
+            </Link>
+          </section>
+        )}
 
         {showBikeChattAssets && (
           <section className="mb-14">

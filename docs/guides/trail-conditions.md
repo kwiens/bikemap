@@ -79,24 +79,21 @@ months ago — dry" instead, which is information rather than a claim.
 
 | | slug | group | what it is |
 |---|---|---|---|
-| Trail conditions | `trail-condition-types` | Lists | the dropdown's options |
+| Trail conditions | `trail-condition-types` | hidden backing data | the dropdown's options |
 | Condition reports | `trail-conditions` | Conditions | the reports themselves |
 
-`trail-condition-types` is the same curated-vocabulary pattern as trail ratings
-and kinds — name, stable `value`, colour, sort order — because conditions are
-*local*. "Dusty / loose" is the interesting distinction in Bend in August and
-meaningless in a Tennessee spring; "Snow / ice" is the reverse.
+Trail conditions and ratings are configured in
+`src/config/trail-options.config.ts`. Payload retains hidden backing rows so
+trails and historical reports keep referential integrity. After changing the
+configuration, update the corresponding seed or migration before deploying.
 
 Two things follow from it being data:
 
-- **Colour comes off the row**, never off the report. Recolouring a condition in
-  the admin repaints every badge that ever used it.
-- **`value` is the stable key.** `name` is a label a curator may reword at any
-  time. Never match on it.
+- **Colour comes off the backing row**, never off the report.
+- **`value` is the stable key.** Never match on a display name.
 
-Retire an option by unticking **Offer this on the report form** rather than
-deleting it — Payload blocks deleting a row a past report still points at, and
-that block is correct.
+Retire an option through configuration and a migration rather than deleting its
+backing row; past reports still point at it.
 
 ## Closing a trail to new reports
 

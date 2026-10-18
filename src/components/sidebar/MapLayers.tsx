@@ -7,6 +7,7 @@ import { mapConfig } from '@/config/map.config';
 import { bikeResources, mapFeatures } from '@/data/geo_data';
 import { MapLayersSection, ToggleRow } from './MapLayersSection';
 import type { MapLayersProps } from './types';
+import { useFeatureSettings } from '@/components/FeatureSettingsContext';
 
 const layers: {
   key: 'attractions' | 'bikeResources' | 'bikeRentals';
@@ -42,6 +43,7 @@ export function MapLayers({
   onToggleBikeResources,
   onToggleBikeRentals,
 }: MapLayersProps) {
+  const features = useFeatureSettings();
   const stateMap: Record<string, boolean> = {
     attractions: showAttractions,
     bikeResources: showBikeResources,
@@ -52,7 +54,13 @@ export function MapLayers({
     bikeResources: onToggleBikeResources,
     bikeRentals: onToggleBikeRentals,
   };
-  const visibleLayers = layers.filter((layer) => layer.enabled);
+  const visibleLayers = layers.filter(
+    (layer) =>
+      layer.enabled &&
+      (layer.key !== 'attractions' || features.attractions) &&
+      (layer.key !== 'bikeResources' || features.bikeResources) &&
+      (layer.key !== 'bikeRentals' || features.bikeRentals),
+  );
 
   if (visibleLayers.length === 0) {
     return null;

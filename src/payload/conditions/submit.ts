@@ -110,7 +110,7 @@ export async function submitConditionReport(
           ],
         },
       }),
-      payload.findGlobal({ slug: 'condition-reporting', depth: 0 }),
+      payload.findGlobal({ slug: 'general-settings', depth: 0 }),
     ]);
 
     const trail = trails.docs[0];
@@ -129,7 +129,7 @@ export async function submitConditionReport(
     const area =
       trail.area && typeof trail.area === 'object' ? trail.area : null;
     const closed =
-      settings?.enabled === false ||
+      settings?.conditionReporting === false ||
       trail.conditionReportsClosed === true ||
       area?.conditionReportsClosed === true;
 
@@ -140,8 +140,8 @@ export async function submitConditionReport(
         // note field when the box is unticked but keeps the stored text, so a
         // leftover note from a past closure must not speak for an active one.
         message:
-          settings?.enabled === false
-            ? resolveLockMessage(settings?.disabledMessage)
+          settings?.conditionReporting === false
+            ? resolveLockMessage(settings?.conditionReportingDisabledMessage)
             : resolveLockMessage(
                 trail.conditionReportsClosed === true
                   ? trail.conditionReportsNote

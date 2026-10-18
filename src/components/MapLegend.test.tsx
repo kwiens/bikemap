@@ -9,6 +9,8 @@ import { DEFAULT_EMBED_OPTIONS, type EmbedOptions } from '@/utils/embed';
 import { siteConfig } from '@/config/site.config';
 import { MAP_EVENTS } from '@/events';
 import { dispatch } from '@/test/fixtures';
+import { FeatureSettingsProvider } from './FeatureSettingsContext';
+import { DEFAULT_FEATURE_SETTINGS } from '@/config/features.config';
 
 // Mock all sidebar children to keep tests focused on MapLegendProvider state
 vi.mock('./sidebar', () => ({
@@ -133,6 +135,26 @@ describe('MapLegendProvider', () => {
     expect(
       screen.queryByTestId('mountain-bike-trails'),
     ).not.toBeInTheDocument();
+  });
+
+  it('hides the category selector when Casual routes are disabled', () => {
+    render(
+      <FeatureSettingsProvider
+        settings={{ ...DEFAULT_FEATURE_SETTINGS, casualRoutes: false }}
+      >
+        <MapLegendProvider>
+          <div />
+        </MapLegendProvider>
+      </FeatureSettingsProvider>,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Casual' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'MTB' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('mountain-bike-trails')).toBeInTheDocument();
   });
 
   it('defaults to trails section when cookie is mountain', () => {

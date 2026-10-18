@@ -36,9 +36,10 @@ function colorField(
 
 export const Theme: GlobalConfig = {
   slug: 'theme',
+  label: 'Theme',
   admin: {
     description:
-      'Customize the public map and admin palette. Each field explains which parts of the interface it changes. Changes apply on the next page load.',
+      'Customize the public map and admin palette. Changes apply on the next page load.',
     group: 'Settings',
   },
   access: {

@@ -1,10 +1,9 @@
 /**
  * The rating and kind vocabularies a trail is described with.
  *
- * Both used to be hardcoded `select` options on the Trails collection, which
- * meant adding a difficulty band or a new sort of trail was a code change, a
- * migration, and a deploy. They are collections now — `trail-ratings` and
- * `trail-kinds` — so a curator can add, rename, recolour, and reorder them.
+ * Trails keep relationships to `trail-ratings` and `trail-kinds` for
+ * referential integrity. Difficulty options are code-owned configuration;
+ * kinds remain an editable list in the admin.
  *
  * What stays in code is the *default* vocabulary and the small set of things a
  * database row genuinely can't carry:
@@ -26,14 +25,18 @@ import {
   faRoute,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
-import { RATING_COLORS, UNRATED_COLOR } from './trail-metadata';
+import {
+  TRAIL_DIFFICULTY_OPTIONS,
+  type TrailDifficultyOption,
+  UNRATED_DIFFICULTY_VALUE,
+} from '@/config/trail-options.config';
 
 /**
  * The rating meaning "nobody has graded this", which the app has always
  * represented as an empty string. Kept as a real row rather than a blank
  * relationship so it can carry a colour like any other.
  */
-export const UNRATED_VALUE = 'unrated';
+export const UNRATED_VALUE = UNRATED_DIFFICULTY_VALUE;
 
 /** The kind a trail is unless someone says otherwise. */
 export const DEFAULT_KIND_VALUE = 'trail';
@@ -41,13 +44,7 @@ export const DEFAULT_KIND_VALUE = 'trail';
 /** Greenways are drawn in their own green regardless of difficulty. */
 export const GREENWAY_COLOR = '#059669';
 
-export interface RatingSeed {
-  color: string;
-  name: string;
-  /** Difficulty order, low to high. Drives the admin list and the dropdown. */
-  sortOrder: number;
-  value: string;
-}
+export type RatingSeed = TrailDifficultyOption;
 
 /**
  * The icon keys a kind may hold. Narrow rather than `string` so it lines up
@@ -70,35 +67,7 @@ export interface KindSeed {
  * Colours come from `RATING_COLORS` rather than being repeated, so the checked-
  * in palette and the seeded one cannot drift apart.
  */
-export const DEFAULT_RATINGS: RatingSeed[] = [
-  { color: RATING_COLORS.easy, name: 'Easy', sortOrder: 1, value: 'easy' },
-  {
-    color: RATING_COLORS.intermediate,
-    name: 'Intermediate',
-    sortOrder: 2,
-    value: 'intermediate',
-  },
-  {
-    color: RATING_COLORS.advanced,
-    name: 'Advanced',
-    sortOrder: 3,
-    value: 'advanced',
-  },
-  {
-    color: RATING_COLORS.expert,
-    name: 'Expert',
-    sortOrder: 4,
-    value: 'expert',
-  },
-  {
-    color: UNRATED_COLOR,
-    name: 'Unrated',
-    // Last on purpose: it is not harder than Expert, it is the absence of a
-    // grade, and it should sit at the bottom of the list rather than mid-scale.
-    sortOrder: 99,
-    value: UNRATED_VALUE,
-  },
-];
+export const DEFAULT_RATINGS: RatingSeed[] = TRAIL_DIFFICULTY_OPTIONS;
 
 export const DEFAULT_KINDS: KindSeed[] = [
   { icon: 'mountain', name: 'Singletrack trail', value: DEFAULT_KIND_VALUE },

@@ -11,8 +11,8 @@ import { TrailKinds } from './payload/collections/TrailKinds';
 import { TrailRatings } from './payload/collections/TrailRatings';
 import { Trails } from './payload/collections/Trails';
 import { Users } from './payload/collections/Users';
-import { ConditionReporting } from './payload/globals/ConditionReporting';
 import { resolveDatabaseUrl } from './payload/database';
+import { GeneralSettings } from './payload/globals/GeneralSettings';
 import { Theme } from './payload/globals/Theme';
 import { payloadCsrfOrigins, payloadSecret } from './payload/security';
 
@@ -56,7 +56,7 @@ export default buildConfig({
     Organizations,
     Users,
   ],
-  globals: [ConditionReporting, Theme],
+  globals: [GeneralSettings, Theme],
   csrf: payloadCsrfOrigins(),
   secret: payloadSecret(),
   typescript: {

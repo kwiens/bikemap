@@ -48,14 +48,17 @@ import type { EmbedLayer } from '@/utils/embed';
 import { bikeNetworkUrl, bikeResources, mapFeatures } from '@/data/geo_data';
 import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
+import { useFeatureSettings } from '@/components/FeatureSettingsContext';
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
+  const features = useFeatureSettings();
   const hasRoutesSection =
-    getBikeRoutes().length > 0 ||
-    mapFeatures.length > 0 ||
-    bikeResources.length > 0 ||
-    Boolean(mapConfig.gbfs);
+    features.casualRoutes &&
+    (getBikeRoutes().length > 0 ||
+      mapFeatures.length > 0 ||
+      bikeResources.length > 0 ||
+      (features.bikeRentals && Boolean(mapConfig.gbfs)));
   const { isEmbed, options: embedOptions } = useEmbed();
   // Embeds never carry the settings cookie, so they take the host page's
   // option instead.
@@ -354,24 +357,22 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
               {embedOptions.mode === 'mtb' ? 'MTB routes' : 'Casual routes'}
             </span>
           </div>
-        ) : (
+        ) : hasRoutesSection ? (
           /* Casual / MTB toggle in header */
           <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-app-primary/40 bg-app-secondary pt-[calc(17px+env(safe-area-inset-top))]">
             <div className="flex bg-app-surface/10 rounded-full p-1 w-full border border-app-surface/20">
-              {hasRoutesSection && (
-                <button
-                  type="button"
-                  className={cn(
-                    'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
-                    activeSection === 'routes'
-                      ? 'bg-app-primary text-app-secondary shadow-sm'
-                      : 'text-app-surface/70 hover:text-app-surface',
-                  )}
-                  onClick={() => switchTab('routes')}
-                >
-                  Casual
-                </button>
-              )}
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
+                  activeSection === 'routes'
+                    ? 'bg-app-primary text-app-secondary shadow-sm'
+                    : 'text-app-surface/70 hover:text-app-surface',
+                )}
+                onClick={() => switchTab('routes')}
+              >
+                Casual
+              </button>
               <button
                 type="button"
                 className={cn(
@@ -386,7 +387,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           </div>
-        )}
+        ) : null}
 
         <div className="overflow-y-auto flex-1 min-h-0 border-t border-app-surface/10">
           <div className="px-4 pb-4 pt-2">
@@ -397,7 +398,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   onRouteSelect={handleRouteSelect}
                 />
 
-                {bikeNetworkUrl && (
+                {bikeNetworkUrl && features.bikeNetwork && (
                   <BikeNetworkLayer
                     isActive={showBikeNetwork}
                     onToggle={toggleBikeNetworkLayer}
@@ -423,23 +424,27 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   onCenterLocation={centerOnLocation}
                 />
 
-                <BikeRentalList
-                  show={showBikeRentals}
-                  onCenterLocation={centerOnLocation}
-                />
+                {features.bikeRentals && (
+                  <BikeRentalList
+                    show={showBikeRentals}
+                    onCenterLocation={centerOnLocation}
+                  />
+                )}
               </>
             )}
 
             {visibleSection === 'trails' && (
               <>
-                <MapLayersSection>
-                  <ToggleRow
-                    icon={faMountain}
-                    label="Nationwide trails"
-                    isActive={showOsmTrails}
-                    onToggle={toggleOsmTrailsLayer}
-                  />
-                </MapLayersSection>
+                {features.nationwideTrails && (
+                  <MapLayersSection>
+                    <ToggleRow
+                      icon={faMountain}
+                      label="Nationwide trails"
+                      isActive={showOsmTrails}
+                      onToggle={toggleOsmTrailsLayer}
+                    />
+                  </MapLayersSection>
+                )}
 
                 {getMountainBikeTrails().length > 0 && (
                   <MountainBikeTrails
