@@ -2,19 +2,25 @@ import type { ReactElement } from 'react';
 import React from 'react';
 import { resolveActiveCityId } from '@/config/map.config';
 import { getCityRoutes } from '@/payload/read/routes';
+import { getCityTrailSummaries } from '@/payload/read/trails';
+import { parseEmbedMode } from '@/utils/embed';
 import { getRequestHostname } from '@/utils/request-hostname';
 import EmbedClient from './EmbedClient';
 
 export default async function EmbedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ city?: string | string[] }>;
+  searchParams: Promise<{ city?: string | string[]; mode?: string | string[] }>;
 }): Promise<ReactElement> {
   const [hostname, query] = await Promise.all([
     getRequestHostname(),
     searchParams,
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
-  const { routes } = await getCityRoutes(cityId);
-  return <EmbedClient cityId={cityId} routes={routes} />;
+  const mode = parseEmbedMode(query.mode);
+  const { routes } =
+    mode === 'casual' ? await getCityRoutes(cityId) : { routes: [] };
+  const { trails } =
+    mode === 'mtb' ? await getCityTrailSummaries(cityId) : { trails: [] };
+  return <EmbedClient cityId={cityId} routes={routes} trails={trails} />;
 }
