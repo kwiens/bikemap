@@ -122,8 +122,8 @@ export function RideHistory({
           className={cn(
             'p-2 rounded cursor-pointer transition-all duration-200 border border-transparent',
             selectedRideId === s.id
-              ? 'bg-blue-600/10 border-blue-600'
-              : 'hover:bg-blue-600/5 hover:border-blue-500',
+              ? 'bg-app-primary/15 border-app-primary'
+              : 'hover:bg-app-primary/10 hover:border-app-primary',
           )}
         >
           <div className="flex items-center gap-3">
