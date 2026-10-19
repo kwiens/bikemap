@@ -9,7 +9,7 @@ if (shouldRunMigrations(process.env)) {
   runPnpm('db:seed:bend-routes');
   // Keep the five Chattanooga routes that have not yet been migrated in the
   // database-backed Casual list. Their geometry source remains explicitly
-  // Studio; imported or trail-linked replacements are always preserved.
+  // Studio; imported, trail-linked, or composed replacements are preserved.
   runPnpm('db:seed:chattanooga-routes');
 } else if (process.env.DATABASE_URL && process.env.VERCEL_ENV) {
   console.log(

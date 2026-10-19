@@ -68,6 +68,7 @@ import {
   reversePlan,
   setLegMode,
   straightLeg,
+  unroutedLegs,
 } from '@/payload/routing/plan';
 import { routeLeg } from '@/payload/routing/router';
 import type { RouteNetworkResponse } from '@/payload/endpoints/route-network';
@@ -116,9 +117,12 @@ export function RouteMapEditor({
   path: string;
   readOnly?: boolean;
 }) {
-  const { setValue: setPlanValue, value: planValue } = useField<
-    RoutePlan | string | null
-  >({ path });
+  const {
+    errorMessage,
+    setValue: setPlanValue,
+    showError,
+    value: planValue,
+  } = useField<RoutePlan | string | null>({ path });
   const { value: cityValue } = useField<string>({ path: 'city' });
   const { value: colorValue } = useField<string>({ path: 'color' });
 
@@ -428,8 +432,11 @@ export function RouteMapEditor({
         undo: undoRef.current.length,
       });
       showPlan(target);
+      // A history entry can hold a placeholder whose routing result landed
+      // on a later copy of the plan, not on this one.
+      void routeLegs(target, unroutedLegs(target));
     },
-    [showPlan],
+    [routeLegs, showPlan],
   );
 
   const handleMapClick = useCallback(
@@ -682,6 +689,9 @@ export function RouteMapEditor({
         />
       </div>
 
+      {showError && errorMessage && (
+        <Banner tone="error">{errorMessage}</Banner>
+      )}
       {note && <Banner tone="warning">{note}</Banner>}
       {unroutedCount > 0 && (
         <Banner tone="warning">

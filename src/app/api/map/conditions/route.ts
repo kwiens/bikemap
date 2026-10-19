@@ -17,7 +17,9 @@ import type { CityId } from '@/data/cities/types';
 import {
   clientAddress,
   hashReporter,
+  isCrossSiteRequest,
   isHoneypotTripped,
+  isJsonContentType,
   parseIdentifier,
   parseObservedAt,
   reporterSalt,
@@ -64,6 +66,19 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: `city must be one of: ${cityIds.join(', ')}` },
       { status: 400 },
+    );
+  }
+
+  if (isCrossSiteRequest(request.headers, request.url)) {
+    return NextResponse.json(
+      { error: 'Reports can only be filed from this site.' },
+      { status: 403 },
+    );
+  }
+  if (!isJsonContentType(request.headers)) {
+    return NextResponse.json(
+      { error: 'Expected Content-Type: application/json.' },
+      { status: 415 },
     );
   }
 

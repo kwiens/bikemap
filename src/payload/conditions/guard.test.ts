@@ -3,7 +3,9 @@ import {
   clientAddress,
   hashReporter,
   HONEYPOT_FIELD,
+  isCrossSiteRequest,
   isHoneypotTripped,
+  isJsonContentType,
   OBSERVED_WINDOW,
   parseIdentifier,
   parseObservedAt,
@@ -61,6 +63,89 @@ describe('clientAddress', () => {
   });
 });
 
+describe('isCrossSiteRequest', () => {
+  const URL_HERE = 'https://bikechatt.com/api/map/conditions?city=chattanooga';
+
+  it('allows same-origin and user-initiated requests', () => {
+    expect(
+      isCrossSiteRequest(
+        new Headers({ 'sec-fetch-site': 'same-origin' }),
+        URL_HERE,
+      ),
+    ).toBe(false);
+    expect(
+      isCrossSiteRequest(new Headers({ 'sec-fetch-site': 'none' }), URL_HERE),
+    ).toBe(false);
+  });
+
+  it('allows a request with neither header, which no browser makes', () => {
+    expect(isCrossSiteRequest(new Headers(), URL_HERE)).toBe(false);
+  });
+
+  it('rejects any other Sec-Fetch-Site', () => {
+    for (const site of ['cross-site', 'same-site']) {
+      expect(
+        isCrossSiteRequest(new Headers({ 'sec-fetch-site': site }), URL_HERE),
+      ).toBe(true);
+    }
+  });
+
+  it('compares Origin with the host the proxy forwarded', () => {
+    const fromSite = new Headers({
+      'x-forwarded-host': 'bikechatt.com',
+      host: 'internal:3000',
+      origin: 'https://bikechatt.com',
+    });
+    expect(isCrossSiteRequest(fromSite, 'http://internal:3000/api')).toBe(
+      false,
+    );
+    expect(
+      isCrossSiteRequest(
+        new Headers({ host: 'bikechatt.com', origin: 'https://evil.example' }),
+        URL_HERE,
+      ),
+    ).toBe(true);
+  });
+
+  it('falls back to the request URL and rejects an opaque origin', () => {
+    expect(
+      isCrossSiteRequest(
+        new Headers({ origin: 'https://bikechatt.com' }),
+        URL_HERE,
+      ),
+    ).toBe(false);
+    expect(isCrossSiteRequest(new Headers({ origin: 'null' }), URL_HERE)).toBe(
+      true,
+    );
+  });
+});
+
+describe('isJsonContentType', () => {
+  it('accepts JSON with or without parameters', () => {
+    expect(
+      isJsonContentType(new Headers({ 'content-type': 'application/json' })),
+    ).toBe(true);
+    expect(
+      isJsonContentType(
+        new Headers({ 'content-type': 'Application/JSON; charset=utf-8' }),
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects the types a form or no-cors fetch can send without a preflight', () => {
+    for (const type of [
+      'text/plain',
+      'application/x-www-form-urlencoded',
+      'multipart/form-data; boundary=x',
+    ]) {
+      expect(isJsonContentType(new Headers({ 'content-type': type }))).toBe(
+        false,
+      );
+    }
+    expect(isJsonContentType(new Headers())).toBe(false);
+  });
+});
+
 describe('hashReporter', () => {
   it('is stable for the same address and salt', () => {
     expect(hashReporter('203.0.113.5', 'pepper')).toBe(
@@ -115,6 +200,22 @@ describe('parseObservedAt', () => {
     ).toBe(true);
   });
 
+  it('accepts a bare date exactly the window back, at any time of day', () => {
+    // 30 days before 2026-08-07. As 00:00Z it used to lose to "now minus 30
+    // days" at the current time of day.
+    const lateEvening = new Date('2026-08-07T23:59:00.000Z');
+    expect(parseObservedAt('2026-07-08', NOW).ok).toBe(true);
+    expect(parseObservedAt('2026-07-08', lateEvening).ok).toBe(true);
+  });
+
+  it('gives riders west of UTC their 30th day back too', () => {
+    // 21:00 on Aug 6 in Oregon is already Aug 7 UTC; their 30 days back is
+    // July 7.
+    const oregonEvening = new Date('2026-08-07T04:00:00.000Z');
+    expect(parseObservedAt('2026-07-07', oregonEvening).ok).toBe(true);
+    expect(parseObservedAt('2026-07-05', oregonEvening).ok).toBe(false);
+  });
+
   it('rejects a date beyond the past window', () => {
     const result = parseObservedAt(daysBefore(60), NOW);
     expect(result.ok).toBe(false);
@@ -133,6 +234,21 @@ describe('parseObservedAt', () => {
     const soon = new Date(NOW);
     soon.setHours(soon.getHours() + 12);
     expect(parseObservedAt(soon.toISOString(), NOW).ok).toBe(true);
+  });
+
+  it('never stores a moment later than now', () => {
+    // Reads order by this value, so a report pinned to tomorrow's noon would
+    // outrank every report filed after it until then.
+    const tomorrow = parseObservedAt('2026-08-08', NOW);
+    expect(tomorrow.ok === true && tomorrow.value.toISOString()).toBe(
+      NOW.toISOString(),
+    );
+
+    const morning = new Date('2026-08-07T08:30:00.000Z');
+    const today = parseObservedAt('2026-08-07', morning);
+    expect(today.ok === true && today.value.toISOString()).toBe(
+      morning.toISOString(),
+    );
   });
 
   it('rejects unparseable and non-date input', () => {

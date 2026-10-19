@@ -184,9 +184,12 @@ export function TrailMapEditor({
   path: string;
   readOnly?: boolean;
 }) {
-  const { setValue: setGeom, value: geomValue } = useField<
-    TrailGeometry | string | null
-  >({ path });
+  const {
+    errorMessage: geomError,
+    setValue: setGeom,
+    showError: showGeomError,
+    value: geomValue,
+  } = useField<TrailGeometry | string | null>({ path });
   const { setValue: setOsmIds, value: osmIdsValue } = useField<
     number[] | string
   >({ path: 'osmIds' });
@@ -366,14 +369,18 @@ export function TrailMapEditor({
    * Lights the toolbar buttons from what can actually be undone.
    *
    * Three sources count: the editor's history, Terra Draw's points of a piece
-   * still being drawn, and the clicks of a route still being built.
+   * still being drawn, and the clicks of a route still being built. Redo is off
+   * while a route is being built — see `redo`.
    */
   const syncHistory = useCallback(() => {
     const draw = drawRef.current;
     const isDrawing = modeRef.current === 'draw';
+    const isRouting = Boolean(routeToolRef.current?.hasRoute());
     setHistory({
       canRedo:
-        historyRef.current.canRedo() || (isDrawing && Boolean(draw?.canRedo())),
+        !isRouting &&
+        (historyRef.current.canRedo() ||
+          (isDrawing && Boolean(draw?.canRedo()))),
       canUndo:
         historyRef.current.canUndo() ||
         (isDrawing && Boolean(draw?.canUndo())) ||
@@ -867,6 +874,10 @@ export function TrailMapEditor({
     });
 
     return () => {
+      // Before the map goes: a tool left running would keep its timers and
+      // window listeners pointed at a removed map.
+      routeTool.dispose();
+      selectionTool.dispose();
       try {
         draw.stop();
       } catch {
@@ -979,6 +990,16 @@ export function TrailMapEditor({
     partsRef.current = incoming;
     loadDraw(incoming);
     paintStats();
+    // Same as `setLine`: a selection or a route in progress names points and
+    // pieces of the line just replaced — a refresh from OSM can land mid-edit.
+    selectionToolRef.current?.setSelection([]);
+    setEditNote(null);
+    if (routeToolRef.current?.hasRoute()) {
+      routeToolRef.current.cancel();
+    }
+    if (modeRef.current === 'move') {
+      autoSelect();
+    }
     // Whatever ways are on the record right now are the ones this line came
     // from — the server rebuilt it from them on the save that produced it.
     setLineWays(idsRef.current);
@@ -988,7 +1009,7 @@ export function TrailMapEditor({
     if (map && bounds) {
       map.fitBounds(bounds, { animate: false, padding: 60 });
     }
-  }, [geomValue, loadDraw, paintStats, ready]);
+  }, [autoSelect, geomValue, loadDraw, paintStats, ready]);
 
   /**
    * Undo, taking back the smallest thing first: a click of the route being
@@ -1015,6 +1036,11 @@ export function TrailMapEditor({
   }, [setLine, settle, syncHistory]);
 
   const redo = useCallback(() => {
+    // Applying a redo replaces the line, which cancels the route being built
+    // against it and throws its clicks away. Finish or cancel the route first.
+    if (routeToolRef.current?.hasRoute()) {
+      return;
+    }
     const draw = drawRef.current;
     if (modeRef.current === 'draw' && draw?.canRedo()) {
       draw.redo();
@@ -1440,6 +1466,8 @@ export function TrailMapEditor({
           />
         </div>
       </div>
+
+      {showGeomError && geomError && <Banner tone="error">{geomError}</Banner>}
 
       {importNote && <Banner tone={importNote.tone}>{importNote.text}</Banner>}
 

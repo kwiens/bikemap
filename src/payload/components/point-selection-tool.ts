@@ -39,6 +39,8 @@ export interface PointSelectionHost {
 
 export interface PointSelectionTool {
   clear(): void;
+  /** Ends any gesture and detaches from the map and window. Call before `map.remove()`. */
+  dispose(): void;
   /** (Re)adds the tool's layers. Call after every `style.load`. */
   install(): void;
   /** Redraws the points from the host's line. Call whenever the line changes. */
@@ -66,6 +68,8 @@ type Gesture =
   | { kind: 'box'; start: mapboxgl.Point }
   | {
       base: Parts;
+      /** The point pressed, which an unmoved release selects on its own. */
+      hit: PointRef;
       kind: 'drag';
       hasMoved: boolean;
       start: mapboxgl.LngLat;
@@ -198,6 +202,7 @@ export function createPointSelectionTool(
           base: host
             .getParts()
             .map((part) => part.map((p) => [...p] as Position)),
+          hit,
           kind: 'drag',
           hasMoved: false,
           start: event.lngLat,
@@ -274,6 +279,14 @@ export function createPointSelectionTool(
       pending?.();
       pending = null;
       host.apply(host.getParts(), ended.base);
+      return;
+    }
+
+    // Pressing a point already in a larger selection keeps that selection, in
+    // case it is the start of a group drag; released unmoved, it was a click.
+    if (ended?.kind === 'drag' && selected.size > 1) {
+      selected = new Set([pointKey(ended.hit)]);
+      changed();
     }
   }
 
@@ -319,14 +332,16 @@ export function createPointSelectionTool(
     box.style.height = `${Math.abs(a.y - b.y)}px`;
   }
 
-  map.on('mousedown', onMouseDown);
-  map.on('click', onClick);
-  map.on('mousemove', (event) => {
+  function onHover(event: mapboxgl.MapMouseEvent) {
     if (!host.isActive() || (gesture && gesture.kind !== 'press')) {
       return;
     }
     map.getCanvas().style.cursor = hitAt(event.point) ? 'pointer' : '';
-  });
+  }
+
+  map.on('mousedown', onMouseDown);
+  map.on('click', onClick);
+  map.on('mousemove', onHover);
 
   return {
     clear() {
@@ -334,6 +349,21 @@ export function createPointSelectionTool(
         selected = new Set();
         changed();
       }
+    },
+    dispose() {
+      window.removeEventListener('mousemove', onWindowMove);
+      window.removeEventListener('mouseup', onWindowUp);
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+      pending = null;
+      gesture = null;
+      box?.remove();
+      box = null;
+      map.off('mousedown', onMouseDown);
+      map.off('click', onClick);
+      map.off('mousemove', onHover);
     },
     install() {
       if (!map.getSource(VERTEX_SOURCE)) {

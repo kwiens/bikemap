@@ -44,6 +44,10 @@ the legend and the sidebar swatches mean, and turning a closed trail red would
 leave the two disagreeing. The dash is what carries the meaning, so it still
 reads without relying on colour at all.
 
+**MTB embeds (`/embed?mode=mtb`) show conditions and closures read-only**: the
+badges and the red dash appear, but no report form is mounted and the pane
+offers no Report button. A routes embed loads no conditions at all.
+
 **Which conditions close a trail is data, not code.** `marksClosed` is a
 checkbox on the condition type — seeded on "Closed", and a curator can tick it on
 "Snow / ice" too. Nothing in the app matches on the value `'closed'`.

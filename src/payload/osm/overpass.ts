@@ -142,6 +142,31 @@ export async function requestWithRetry(
 }
 
 /**
+ * The elements of an Overpass response, or an OverpassError when the query
+ * failed while running.
+ *
+ * Overpass reports a timed-out or out-of-memory query as HTTP 200 with a
+ * `remark` and empty or partial `elements`. Read as success, that becomes an
+ * empty network cached for hours — so any `runtime error` remark is a failure,
+ * which the endpoints answer with a 502 and do not cache.
+ */
+export async function readOverpassElements<
+  Element extends OverpassElement = OverpassElement,
+>(response: Response): Promise<Element[]> {
+  const payload = (await response.json()) as {
+    elements?: Element[];
+    remark?: string;
+  };
+  if (payload.remark && /runtime error/i.test(payload.remark)) {
+    throw new OverpassError(
+      `Overpass could not finish the query (${payload.remark.trim()}). Try again shortly.`,
+      response.status,
+    );
+  }
+  return payload.elements ?? [];
+}
+
+/**
  * Fetches the given ways with their geometry.
  *
  * Returns only the ways Overpass knew about — a way that has been deleted or
@@ -177,9 +202,7 @@ export async function fetchWaysByIds(
     options,
   );
 
-  const payload = (await response.json()) as { elements?: OverpassElement[] };
-
-  return (payload.elements ?? [])
+  return (await readOverpassElements(response))
     .filter((element) => element.type === 'way' && element.geometry)
     .map((element) => ({
       coordinates: (element.geometry ?? []).map(
@@ -220,11 +243,11 @@ export async function fetchTrailNetwork(
     query,
     options,
   );
-  const payload = (await response.json()) as {
-    elements?: (OverpassElement & { nodes?: number[] })[];
-  };
+  const elements = await readOverpassElements<
+    OverpassElement & { nodes?: number[] }
+  >(response);
 
-  return (payload.elements ?? [])
+  return elements
     .filter(
       (element) =>
         element.type === 'way' &&

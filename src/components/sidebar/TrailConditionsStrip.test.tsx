@@ -3,6 +3,8 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { EmbedProvider } from '@/components/EmbedContext';
+import { DEFAULT_EMBED_OPTIONS } from '@/utils/embed';
 import { TrailConditionsStrip } from './TrailConditionsStrip';
 import type { ConditionReport } from '@/data/trail-conditions';
 import { MAP_EVENTS } from '@/events';
@@ -143,5 +145,20 @@ describe('TrailConditionsStrip', () => {
     fireEvent.click(screen.getByRole('button', { name: /history/i }));
 
     expect(await screen.findByText(/Ridden it lately/)).toBeInTheDocument();
+  });
+
+  it('is read-only in an embed, which has no report form', async () => {
+    render(
+      <EmbedProvider options={{ ...DEFAULT_EMBED_OPTIONS, mode: 'mtb' }}>
+        <TrailConditionsStrip slug="pondo" trailName="Pondo" />
+      </EmbedProvider>,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: /report/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Muddy — stay off')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /history/i }));
+    expect(await screen.findByText('Nothing reported.')).toBeInTheDocument();
   });
 });

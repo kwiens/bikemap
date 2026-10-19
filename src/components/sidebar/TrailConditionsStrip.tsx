@@ -17,6 +17,7 @@ import {
   faPenToSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { activeCityId } from '@/config/map.config';
+import { useEmbed } from '@/components/EmbedContext';
 import { useTrailConditions } from '@/components/TrailConditionsProvider';
 import {
   type ConditionReport,
@@ -43,6 +44,8 @@ export function TrailConditionsStrip({
     lockedReason: reasonFor,
     options,
   } = useTrailConditions();
+  // Embeds are read-only: no report form is mounted to answer the button.
+  const { isEmbed } = useEmbed();
   const [expanded, setExpanded] = useState(false);
   const [history, setHistory] = useState<ConditionReport[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -109,6 +112,7 @@ export function TrailConditionsStrip({
   // A closure never goes stale, so this is never true for one.
   const stale = current && !isConditionCurrent(current);
   const lockedReason = reasonFor(slug);
+  const canReport = lockedReason === null && !isEmbed;
 
   return (
     <div className="text-[10px] text-gray-500 mb-1 -mt-0.5">
@@ -140,14 +144,15 @@ export function TrailConditionsStrip({
           />
           History
         </button>
-        {lockedReason === null ? (
+        {canReport && (
           <button type="button" className={LINK_CLASS} onClick={openReport}>
             <FontAwesomeIcon icon={faPenToSquare} className="mr-1" />
             Report
           </button>
-        ) : (
-          /* The steward's sentence, where the button was. The badge and history
-             stay: closing the form does not unsay what was already reported. */
+        )}
+        {/* The steward's sentence, where the button was. The badge and history
+            stay: closing the form does not unsay what was already reported. */}
+        {lockedReason !== null && (
           <span
             className="flex items-center gap-1 shrink-0 max-w-[55%] text-gray-400"
             title={lockedReason}
@@ -164,7 +169,7 @@ export function TrailConditionsStrip({
           {!loading && history?.length === 0 && (
             <div className="py-0.5">
               {/* Don't invite a report the trail won't take. */}
-              {lockedReason === null
+              {canReport
                 ? 'Nothing reported yet. Ridden it lately?'
                 : 'Nothing reported.'}
             </div>

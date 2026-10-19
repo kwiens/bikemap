@@ -363,20 +363,35 @@ export function setLegMode(
   };
 }
 
-/** The same route ridden the other way. Nothing needs routing again. */
+/**
+ * The same route ridden the other way. Routed legs are reused as they are;
+ * a straight placeholder is routed again, since the copy no longer matches
+ * whatever request was in flight for the original.
+ */
 export function reversePlan(plan: RoutePlan): PlanEdit {
-  return {
-    plan: {
-      ...plan,
-      legs: [...plan.legs].reverse().map((leg) => ({
-        ...leg,
-        coordinates: [...leg.coordinates].reverse(),
-        steps: [...leg.steps].reverse(),
-      })),
-      waypoints: [...plan.waypoints].reverse(),
-    },
-    reroute: [],
+  const reversed: RoutePlan = {
+    ...plan,
+    legs: [...plan.legs].reverse().map((leg) => ({
+      ...leg,
+      coordinates: [...leg.coordinates].reverse(),
+      steps: [...leg.steps].reverse(),
+    })),
+    waypoints: [...plan.waypoints].reverse(),
   };
+  return { plan: reversed, reroute: unroutedLegs(reversed) };
+}
+
+/**
+ * Network legs still drawn as a straight placeholder.
+ *
+ * A routing result only lands on the exact leg it was requested for, so a
+ * placeholder that reaches the screen any other way — undo, redo, a reversed
+ * copy — is never filled in unless it is routed again.
+ */
+export function unroutedLegs(plan: RoutePlan): number[] {
+  return plan.legs.flatMap((leg, index) =>
+    leg.mode === 'network' && leg.isUnrouted ? [index] : [],
+  );
 }
 
 /** Routes back to the start, making a loop. */

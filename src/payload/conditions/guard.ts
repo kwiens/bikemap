@@ -61,6 +61,57 @@ export function clientAddress(headers: Headers): string {
 }
 
 /**
+ * True when a browser says the request came from another site.
+ *
+ * The report form is anonymous, so without this any page could file reports
+ * from its visitors' browsers. `Sec-Fetch-Site` is the direct answer where the
+ * browser sends it; `Origin` covers the rest. Neither is present on a non-browser
+ * client, which this is not meant to stop — the rate limit is. The native shell
+ * loads the site's own origin, so its requests are same-origin like the web's.
+ */
+export function isCrossSiteRequest(
+  headers: Headers,
+  requestUrl: string,
+): boolean {
+  const fetchSite = headers.get('sec-fetch-site');
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') {
+    return true;
+  }
+
+  const origin = headers.get('origin');
+  if (!origin) {
+    return false;
+  }
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    // Includes the literal `null` an opaque origin sends.
+    return true;
+  }
+  return originHost.toLowerCase() !== requestHost(headers, requestUrl);
+}
+
+/** The host the client addressed, as the proxy in front of the app saw it. */
+function requestHost(headers: Headers, requestUrl: string): string {
+  const forwarded = headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  return (
+    forwarded ||
+    headers.get('host')?.trim() ||
+    new URL(requestUrl).host
+  ).toLowerCase();
+}
+
+/**
+ * Only `application/json` forces a CORS preflight, which a cross-site page then
+ * fails. Accepting anything else would let a no-cors `text/plain` POST through.
+ */
+export function isJsonContentType(headers: Headers): boolean {
+  const type = headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
+  return type === 'application/json';
+}
+
+/**
  * A salted one-way hash of an address. The address itself is never stored — this
  * is enough to count one person's reports and find the rest of them, and not
  * enough to work back to who they are. Truncated; a rate-limit bucket needs no
@@ -112,9 +163,13 @@ export function parseObservedAt(
     return { error: 'That date is in the future.', ok: false };
   }
 
-  const past = new Date(now);
-  past.setDate(past.getDate() - OBSERVED_WINDOW.maxPastDays);
-  if (parsed < past) {
+  // Whole calendar days, not instants: a bare `YYYY-MM-DD` is 00:00Z, so
+  // comparing it to "now minus 30 days" at the current time of day rejected the
+  // 30th day back every time. The extra day is the forward slack mirrored —
+  // riders west of UTC are a calendar day behind the server every evening.
+  const earliestDayMs =
+    utcDayMs(now) - (OBSERVED_WINDOW.maxPastDays + 1) * DAY_MS;
+  if (utcDayMs(parsed) < earliestDayMs) {
     return {
       error: `Reports older than ${OBSERVED_WINDOW.maxPastDays} days are not much use to anyone — please leave this one out.`,
       ok: false,
@@ -123,16 +178,17 @@ export function parseObservedAt(
 
   // Store the day at noon UTC, not the 00:00Z a bare `YYYY-MM-DD` parses to:
   // midnight UTC reads as the day before west of UTC, aging every fresh report a
-  // day early. The window checks above ran against the raw value.
-  const atNoonUtc = new Date(
-    Date.UTC(
-      parsed.getUTCFullYear(),
-      parsed.getUTCMonth(),
-      parsed.getUTCDate(),
-      12,
-    ),
-  );
-  return { ok: true, value: atNoonUtc };
+  // day early. Never later than now, though — reads order by this value, so a
+  // report dated tomorrow would outrank everything filed after it until then.
+  const atNoonMs = utcDayMs(parsed) + DAY_MS / 2;
+  return { ok: true, value: new Date(Math.min(atNoonMs, now.getTime())) };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Midnight UTC of the instant's UTC calendar day, in epoch milliseconds. */
+function utcDayMs(date: Date): number {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 /** Rejects anything that isn't a plausible slug before it becomes a query. */

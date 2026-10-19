@@ -1289,9 +1289,10 @@ const MapboxMap = memo(function MapboxMap() {
 
   // Draw a red dashed line over any trail whose newest report says it is shut.
   // Keyed on the conditions, not just the map, so a closure filed while the
-  // page is open appears without a reload.
+  // page is open appears without a reload. An MTB embed draws trails, so it
+  // shows closures too; a routes embed has none to mark.
   useEffect(() => {
-    if (isEmbed) return;
+    if (isEmbed && !isMtbEmbed) return;
     return onMapReady(() => {
       if (!map.current) return;
       setClosedTrails(
@@ -1299,7 +1300,7 @@ const MapboxMap = memo(function MapboxMap() {
         closedTrails({ latest: latestConditions }, getMountainBikeTrails()),
       );
     });
-  }, [isEmbed, latestConditions]);
+  }, [isEmbed, isMtbEmbed, latestConditions]);
 
   return (
     <>

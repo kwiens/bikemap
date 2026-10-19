@@ -18,9 +18,12 @@ export default async function EmbedPage({
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
   const mode = parseEmbedMode(query.mode);
+  // Only the list the client publishes: the readers also return status and,
+  // for routes, every route's GeoJSON, which would otherwise ride along in every
+  // embed's RSC payload.
   const content =
     mode === 'mtb'
-      ? { cityId, ...(await getCityTrailSummaries(cityId)) }
-      : { cityId, ...(await getCityRoutes(cityId)) };
-  return <EmbedClient content={content} />;
+      ? { cityId, trails: (await getCityTrailSummaries(cityId)).trails }
+      : { cityId, routes: (await getCityRoutes(cityId)).routes };
+  return <EmbedClient content={content} mode={mode} />;
 }

@@ -38,7 +38,9 @@ interface ApiError {
 }
 
 interface AdminFormField {
+  errorMessage?: string;
   initialValue?: unknown;
+  valid?: boolean;
   value?: unknown;
 }
 
@@ -93,6 +95,9 @@ export function ElevationProfileAdmin() {
   const slugField = useAdminFormField('slug');
   const displayNameField = useAdminFormField('displayName');
   const trailNameField = useAdminFormField('trailName');
+  // The save hook reports elevation failures against this UI field's path.
+  // Payload records them in form state but has no input here to show them on.
+  const saveError = useAdminFormField('elevationProfileAdmin');
   const dispatchFields = useFormFields(([, dispatch]) => dispatch);
   const [result, setResult] = useState<MeasurementSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -302,6 +307,9 @@ export function ElevationProfileAdmin() {
 
       <MeasurementSummary snapshot={snapshot} />
 
+      {saveError?.valid === false && saveError.errorMessage && (
+        <Banner tone="error">{saveError.errorMessage}</Banner>
+      )}
       {error && <Banner tone="error">{error}</Banner>}
       {unavailableReason && <Banner>{unavailableReason}</Banner>}
 

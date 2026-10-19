@@ -22,7 +22,10 @@ const ui = vi.hoisted(() => ({
     setData: vi.fn(),
     setLastUpdateTime: vi.fn(),
   },
-  fields: {} as Record<string, { value?: unknown }>,
+  fields: {} as Record<
+    string,
+    { errorMessage?: string; valid?: boolean; value?: unknown }
+  >,
   isBackgroundProcessing: false,
   isModified: false,
   isProcessing: false,
@@ -141,6 +144,19 @@ describe('ElevationProfileAdmin', () => {
 
     expect(
       screen.getByRole('img', { name: /elevation profile for test trail/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows an elevation error the save hook reported against this field', () => {
+    ui.fields.elevationProfileAdmin = {
+      errorMessage: 'Terrain tiles could not be loaded.',
+      valid: false,
+    };
+
+    render(<ElevationProfileAdmin />);
+
+    expect(
+      screen.getByText('Terrain tiles could not be loaded.'),
     ).toBeInTheDocument();
   });
 

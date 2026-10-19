@@ -20,6 +20,7 @@
 import { ValidationError, type CollectionBeforeChangeHook } from 'payload';
 import { isCityId } from '@/config/map.config';
 import { NOTABLE_GAP_M } from '@/payload/osm/assemble';
+import { osmWayWarnings } from '@/payload/osm/build';
 import {
   parseTrailGeometry,
   samePartsAs,
@@ -119,7 +120,12 @@ export const resolveTrailGeometry: CollectionBeforeChangeHook = async (
   // Bulk imports bring their own geometry and measurements. Without this, a
   // seed of a few hundred trails would fire one Overpass request each and get
   // the machine rate-limited long before it finished.
-  if (context?.skipOsmRebuild) {
+  //
+  // Restoring a version replays that version's stored document through this
+  // hook as an ordinary update. Its line and measurements were computed here
+  // when it was saved, but it carries no reviewed preview, so the OSM path
+  // would either refuse it or keep the current line in its place.
+  if (context?.skipOsmRebuild || context?.isRestoringVersion) {
     return data;
   }
 
@@ -290,11 +296,23 @@ async function rebuildFromOsmWays({
   const previousIds = readOsmIds(originalDoc?.osmIds);
 
   if (osmIds.length === 0) {
+    // The editor flips an imported trail to 'osm' on its first pick and never
+    // back, so unpicking every way again arrives here rather than on the
+    // imported path. No OSM line was ever saved over the imported one, so
+    // there is nothing to clear: the GIS line and its numbers stay.
+    if (originalDoc?.geometrySource === 'imported') {
+      return {
+        ...data,
+        ...storedGeometry(originalDoc),
+        geometrySource: 'imported',
+        rebuildElevation: false,
+        rebuildGeometry: false,
+      };
+    }
     // Clearing the ways clears what was derived from them, rather than leaving
     // a stale line attached to a trail that no longer claims it. A trail that
     // never had ways has nothing to clear, but it has no line either, so it
-    // cannot carry measurements — an 'imported' trail, whose geometry is
-    // maintained elsewhere, has already returned before this point.
+    // cannot carry measurements.
     return { ...data, ...CLEARED_GEOMETRY };
   }
 
@@ -309,19 +327,36 @@ async function rebuildFromOsmWays({
   if (
     operation === 'update' &&
     sameIds(osmIds, previousIds) &&
-    Boolean(originalDoc?.geom) &&
     data.rebuildElevation === true &&
     data.rebuildGeometry !== true
   ) {
-    return refreshElevationFromCurrentLine({ data, originalDoc, req });
+    // Only a reviewed preview may change an OSM trail's line, so re-sampling
+    // measures the stored one; a submitted line or report has not been checked
+    // against the ways and must not ride along.
+    if (!parseTrailGeometry(originalDoc?.geom).parts?.length) {
+      throw elevationValidationError(
+        'This trail has no saved line to measure. Refresh the OpenStreetMap ways and save the preview first.',
+        req,
+      );
+    }
+    return refreshElevationFromCurrentLine({
+      data: {
+        ...data,
+        geom: originalDoc?.geom,
+        osmReport: originalDoc?.osmReport ?? null,
+      },
+      originalDoc,
+      req,
+    });
   }
 
   // A routine save never contacts Overpass. Curators first build a preview,
-  // inspect it on the map, and then save that exact reviewed line.
+  // inspect it on the map, and then save that exact reviewed line. That holds
+  // for a trail whose ways never produced a line, too: renaming or publishing
+  // it must not be blocked on rebuilding geometry nobody asked about.
   const unchanged =
     operation === 'update' &&
     sameIds(osmIds, previousIds) &&
-    Boolean(originalDoc?.geom) &&
     data.rebuildGeometry !== true;
 
   if (unchanged) {
@@ -396,7 +431,15 @@ async function saveOsmPreview(
     );
   }
   const gaps = measured.gaps;
-  const warnings = [...new Set([...report.warnings, ...measured.warnings])];
+  const warnings = [
+    ...osmWayWarnings(
+      new Set(osmIds).size,
+      report.missingIds,
+      parsed.parts.length,
+      gaps,
+    ),
+    ...measured.warnings,
+  ];
 
   return {
     ...data,
@@ -435,26 +478,19 @@ function previewReport(value: unknown): {
   missingIds: number[];
   requestedIds: number[];
   resolvedIds: number[];
-  warnings: string[];
 } {
   if (!value || typeof value !== 'object') {
-    return { missingIds: [], requestedIds: [], resolvedIds: [], warnings: [] };
+    return { missingIds: [], requestedIds: [], resolvedIds: [] };
   }
   const report = value as {
     missingIds?: unknown;
     requestedIds?: unknown;
     resolvedIds?: unknown;
-    warnings?: unknown;
   };
   return {
     missingIds: validOsmIds(report.missingIds),
     requestedIds: validOsmIds(report.requestedIds),
     resolvedIds: validOsmIds(report.resolvedIds),
-    warnings: Array.isArray(report.warnings)
-      ? report.warnings.filter(
-          (warning): warning is string => typeof warning === 'string',
-        )
-      : [],
   };
 }
 

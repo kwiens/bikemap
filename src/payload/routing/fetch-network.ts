@@ -8,6 +8,7 @@ import {
   DEFAULT_ENDPOINT,
   type OverpassElement,
   type OverpassOptions,
+  readOverpassElements,
   requestWithRetry,
 } from '@/payload/osm/overpass';
 import type { NetworkWay } from './graph';
@@ -46,10 +47,11 @@ export async function fetchRouteNetwork(
     routeNetworkQuery(bbox, options.timeoutSeconds),
     options,
   );
-  const payload = (await response.json()) as {
-    elements?: (OverpassElement & { nodes?: number[] })[];
-  };
-  return networkWaysFrom(payload.elements ?? []);
+  return networkWaysFrom(
+    await readOverpassElements<OverpassElement & { nodes?: number[] }>(
+      response,
+    ),
+  );
 }
 
 export function networkWaysFrom(

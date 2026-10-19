@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { ValidationError } from 'payload';
+import { measureParts } from '@/payload/osm/measure';
 import { resolveTrailGeometry } from './resolveTrailGeometry';
+
+// Real measurements everywhere, but a test can stand in for a terrain sample
+// that would otherwise need the network.
+vi.mock('@/payload/osm/measure', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/payload/osm/measure')>();
+  return { ...actual, measureParts: vi.fn(actual.measureParts) };
+});
 
 /**
  * The hook's job is deciding *which* geometry wins on save, and the expensive
@@ -437,5 +445,174 @@ describe('other sources', () => {
         path: 'geom',
       },
     ]);
+  });
+
+  it('keeps an imported line when the last picked way is removed again', async () => {
+    // Picking a way flips the form to 'osm' and unpicking never flips it back,
+    // so this save looks like "clear the ways" — but no OSM line ever replaced
+    // the imported one, and wiping it would lose the GIS geometry for good.
+    const geom = multiLine([A, B]);
+    const elevationProfile = { name: 'Imported', points: [] };
+    const result = await run({
+      data: {
+        distance: null,
+        geom: null,
+        geometrySource: 'osm',
+        osmIds: [],
+      },
+      originalDoc: {
+        distance: 4.2,
+        elevationProfile,
+        geom,
+        geometrySource: 'imported',
+        osmIds: null,
+      },
+    });
+
+    expect(fetched).toBe(0);
+    expect(result.geometrySource).toBe('imported');
+    expect(result.geom).toEqual(geom);
+    expect(result.distance).toBe(4.2);
+    expect(result.elevationProfile).toEqual(elevationProfile);
+  });
+
+  it('saves an OSM trail whose ways never produced a line', async () => {
+    // Renaming or publishing such a trail must not demand a geometry rebuild.
+    const result = await run({
+      data: { displayName: 'Renamed', geometrySource: 'osm', osmIds: [1, 2] },
+      originalDoc: { geom: null, geometrySource: 'osm', osmIds: [1, 2] },
+    });
+
+    expect(fetched).toBe(0);
+    expect(result.displayName).toBe('Renamed');
+    expect(result.geom).toBeNull();
+    expect(result.distance).toBeNull();
+  });
+
+  it('refuses to recalculate elevation when there is no saved line', async () => {
+    const failed = await run({
+      data: { geometrySource: 'osm', osmIds: [1, 2], rebuildElevation: true },
+      originalDoc: { geom: null, geometrySource: 'osm', osmIds: [1, 2] },
+    }).catch((error: unknown) => error as ValidationError);
+
+    expect(failed).toBeInstanceOf(ValidationError);
+    expect((failed as ValidationError).data.errors).toEqual([
+      {
+        message: expect.stringMatching(/no saved line/i),
+        path: 'elevationProfileAdmin',
+      },
+    ]);
+  });
+
+  it('recalculates elevation from the stored line, not the submitted one', async () => {
+    // Only a reviewed preview may change an OSM line; an elevation refresh
+    // must not become a way to store an unchecked one.
+    const stored = multiLine([A, B]);
+    const storedReport = { resolvedIds: [1, 2], source: 'osm', warnings: [] };
+    vi.mocked(measureParts).mockImplementationOnce(async (parts) => ({
+      bounds: [-121.4, 44.0, -121.39, 44.01],
+      distance: 1,
+      elevationGain: 10,
+      elevationLoss: 5,
+      elevationMax: 120,
+      elevationMin: 100,
+      gaps: [],
+      profile: { name: 'Phil’s', points: parts[0] } as never,
+      warnings: [],
+    }));
+
+    const result = await run({
+      data: {
+        geom: multiLine([A, C]),
+        geometrySource: 'osm',
+        osmIds: [1, 2],
+        osmReport: { resolvedIds: [9], source: 'osm', warnings: ['forged'] },
+        rebuildElevation: true,
+      },
+      originalDoc: {
+        geom: stored,
+        geometrySource: 'osm',
+        osmIds: [1, 2],
+        osmReport: storedReport,
+      },
+    });
+
+    expect(vi.mocked(measureParts).mock.calls.at(-1)?.[0]).toEqual([[A, B]]);
+    expect(result.geom).toEqual(stored);
+    expect(result.osmReport).toEqual(storedReport);
+    expect(result.elevationGain).toBe(10);
+    expect(result.rebuildElevation).toBe(false);
+  });
+
+  it('does not keep terrain warnings from the preview', async () => {
+    // The preview's terrain sampling can fail transiently; the saved report
+    // describes this save's measurement and the ways themselves.
+    const result = await run({
+      data: {
+        geom: multiLine([A, B, C]),
+        geometrySource: 'osm',
+        osmIds: [1, 2, 3],
+        osmReport: {
+          isPreview: true,
+          missingIds: [3],
+          requestedIds: [1, 2, 3],
+          resolvedIds: [1, 2],
+          warnings: [
+            'No elevation data could be read for this trail; distance is still accurate.',
+          ],
+        },
+        rebuildGeometry: true,
+      },
+      originalDoc: { geom: multiLine([A, B]), osmIds: [1, 2] },
+    });
+
+    expect((result.osmReport as { warnings: string[] }).warnings).toEqual([
+      '1 of 3 ways no longer exist in OSM (3). The trail was built from the rest.',
+    ]);
+  });
+});
+
+describe('restoring a version', () => {
+  // Payload's restoreVersion replays the stored version through beforeChange
+  // as an update, flagging it on the request context.
+  const context = { isRestoringVersion: true };
+  const current = {
+    distance: 4.2,
+    geom: multiLine([A, B]),
+    geometrySource: 'osm',
+    osmIds: [1, 2],
+  };
+
+  it('restores a version built from different ways', async () => {
+    const version = {
+      distance: 7.7,
+      geom: multiLine([A, B, C]),
+      geometrySource: 'osm',
+      osmIds: [1, 3],
+      osmReport: { resolvedIds: [1, 3], source: 'osm', warnings: [] },
+      rebuildGeometry: false,
+    };
+
+    expect(
+      await run({ context, data: { ...version }, originalDoc: current }),
+    ).toEqual(version);
+    expect(fetched).toBe(0);
+  });
+
+  it('restores the version line when the ways are the same', async () => {
+    const version = {
+      distance: 3.1,
+      geom: multiLine([A, C]),
+      geometrySource: 'osm',
+      osmIds: [1, 2],
+    };
+
+    const result = await run({
+      context,
+      data: { ...version },
+      originalDoc: current,
+    });
+    expect(result.geom).toEqual(version.geom);
+    expect(result.distance).toBe(3.1);
   });
 });

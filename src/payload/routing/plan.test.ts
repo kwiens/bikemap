@@ -17,6 +17,7 @@ import {
   reversePlan,
   setLegMode,
   straightLeg,
+  unroutedLegs,
 } from './plan';
 import { routeLeg } from './router';
 
@@ -217,6 +218,32 @@ describe('edits', () => {
     expect(planGeometry(reversed)?.coordinates).toEqual([
       [at(1, 1), at(1, 0), at(0, 0)],
     ]);
+  });
+
+  it('reroutes only the placeholder legs of a reversed plan', () => {
+    const plan = planThrough(at(0, 0), at(1, 0), at(1, 1), at(2, 1));
+    const routed = replacePendingLeg(plan, plan, 0, {
+      ...plan.legs[0],
+      isUnrouted: false,
+    });
+    const mixed = setLegMode(routed, 1, 'straight').plan;
+    const edit = reversePlan(mixed);
+
+    // Original legs 0 (routed), 1 (chosen straight), 2 (placeholder) come
+    // back as 2, 1, 0 — so only the new first leg still needs the router.
+    expect(edit.reroute).toEqual([0]);
+    expect(edit.plan.legs[0]).toMatchObject({
+      isUnrouted: true,
+      mode: 'network',
+    });
+  });
+
+  it('lists the network placeholders a plan still holds', () => {
+    const plan = planThrough(at(0, 0), at(1, 0), at(2, 0));
+
+    expect(unroutedLegs(plan)).toEqual([0, 1]);
+    expect(unroutedLegs(setLegMode(plan, 0, 'straight').plan)).toEqual([1]);
+    expect(unroutedLegs(EMPTY_PLAN)).toEqual([]);
   });
 
   it('closes a loop back to the start, once', () => {

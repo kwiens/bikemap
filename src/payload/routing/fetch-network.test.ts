@@ -1,6 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { OverpassError } from '@/payload/osm/overpass';
 import { cellBounds, cellsCovering } from './cells';
-import { networkWaysFrom, routeNetworkQuery } from './fetch-network';
+import {
+  fetchRouteNetwork,
+  networkWaysFrom,
+  routeNetworkQuery,
+} from './fetch-network';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('networkWaysFrom', () => {
   it('keeps rideable ways with matching nodes and geometry', () => {
@@ -47,6 +56,51 @@ describe('networkWaysFrom', () => {
         nodes: [1, 2],
       },
     ]);
+  });
+});
+
+describe('fetchRouteNetwork', () => {
+  it('rejects a query Overpass reports as timed out, so it is not cached as empty', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          elements: [],
+          remark:
+            'runtime error: Query timed out in "query" at line 1 after 60 seconds.',
+        }),
+      ),
+    );
+
+    await expect(
+      fetchRouteNetwork([-121.32, 44.04, -121.3, 44.06]),
+    ).rejects.toBeInstanceOf(OverpassError);
+  });
+
+  it('returns the classified ways of a clean response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          elements: [
+            {
+              geometry: [
+                { lat: 44, lon: -121.3 },
+                { lat: 44.001, lon: -121.3 },
+              ],
+              id: 7,
+              nodes: [1, 2],
+              tags: { highway: 'residential' },
+              type: 'way',
+            },
+          ],
+        }),
+      ),
+    );
+
+    const ways = await fetchRouteNetwork([-121.32, 44.04, -121.3, 44.06]);
+
+    expect(ways.map((way) => way.id)).toEqual([7]);
   });
 });
 

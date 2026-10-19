@@ -55,6 +55,11 @@ export interface RouteTool {
   cancel(): void;
   /** Keeps whatever route is in progress and clears the preview. Call on leaving the mode. */
   deactivate(): void;
+  /**
+   * Stops for good: no more listeners, timers, frames, or fetches. Call before
+   * `map.remove()`, or a failed cell keeps retrying for a map that is gone.
+   */
+  dispose(): void;
   /** Commits the route being built, if it has a leg. */
   finish(): void;
   hasRoute(): boolean;
@@ -65,9 +70,14 @@ export interface RouteTool {
 }
 
 interface Waypoint {
-  /** Where the route starts or ends at this click — usually `snap.point`. */
+  /**
+   * An Alt click: the leg arriving here goes straight to the raw click. The leg
+   * leaving it still follows the trails, from `snap`.
+   */
+  isFree: boolean;
+  /** Where the route starts or ends at this click — `snap.point` unless free. */
   position: Position;
-  /** The network point the click snapped to; null for a free (Alt) click. */
+  /** The network point nearest the click; null when there is none in range. */
   snap: NetworkSnap | null;
 }
 
@@ -124,6 +134,8 @@ export function createRouteTool(
   let lastClick: mapboxgl.Point | null = null;
   /** What the preview last drew, so an unmoved target skips the route search. */
   let previewKey = '';
+  let retryTimers: ReturnType<typeof setTimeout>[] = [];
+  let isDisposed = false;
 
   function report(patch: Partial<RouteStatus>) {
     status = { ...status, ...patch, waypoints: waypoints.length };
@@ -133,7 +145,7 @@ export function createRouteTool(
   // --- the network ------------------------------------------------------
 
   function loadView() {
-    if (!host.isActive()) {
+    if (isDisposed || !host.isActive()) {
       return;
     }
     if (map.getZoom() < MIN_NETWORK_ZOOM) {
@@ -192,12 +204,23 @@ export function createRouteTool(
         }
         report({ network: 'loading', networkMessage: 'Loading trails…' });
         try {
-          addWays(network, await host.fetchNetwork(cellBounds(key)));
+          const ways = await host.fetchNetwork(cellBounds(key));
+          if (isDisposed) {
+            return;
+          }
+          addWays(network, ways);
           loaded.add(key);
           failed.delete(key);
         } catch (error) {
+          if (isDisposed) {
+            return;
+          }
           failed.set(key, Date.now());
-          setTimeout(loadView, RETRY_AFTER_MS);
+          const timer = setTimeout(() => {
+            retryTimers = retryTimers.filter((pending) => pending !== timer);
+            loadView();
+          }, RETRY_AFTER_MS);
+          retryTimers.push(timer);
           report({
             network: 'error',
             networkMessage:
@@ -242,25 +265,29 @@ export function createRouteTool(
 
   function waypointAt(at: mapboxgl.LngLat, isFree: boolean): Waypoint {
     const click: Position = [at.lng, at.lat];
-    if (isFree) {
-      return { position: click, snap: null };
-    }
     const snap = snapToNetwork(network, click, snapMeters(at));
-    return { position: snap?.point ?? click, snap };
+    return {
+      isFree,
+      position: isFree ? click : (snap?.point ?? click),
+      snap,
+    };
   }
 
-  /** The leg from one waypoint to the next, and whether it had to go straight. */
+  /**
+   * The leg from one waypoint to the next, and whether it fell back to a
+   * straight line the curator did not ask for — the cue for the bar's note.
+   */
   function legBetween(from: Waypoint, to: Waypoint) {
+    if (to.isFree) {
+      return { coordinates: [from.position, to.position], isStraight: false };
+    }
     const routed =
       from.snap && to.snap ? routeBetween(network, from.snap, to.snap) : null;
     if (!routed) {
-      return {
-        coordinates: [from.position, to.position],
-        isStraight: Boolean(from.snap && to.snap),
-      };
+      return { coordinates: [from.position, to.position], isStraight: true };
     }
-    // A route starting on a line end that is off the network begins at that
-    // end, then joins the trail.
+    // A route starting off the network — a line end, or a free click — begins
+    // there, then joins the trail.
     const start = same(routed[0], from.position) ? [] : [from.position];
     return { coordinates: [...start, ...routed], isStraight: false };
   }
@@ -284,7 +311,7 @@ export function createRouteTool(
         const position = end.atStart ? part[0] : part[part.length - 1];
         extend = { atStart: end.atStart, part: end.part };
         const snap = snapToNetwork(network, position, snapMeters(event.lngLat));
-        waypoints = [{ position, snap }];
+        waypoints = [{ isFree: false, position, snap }];
       } else {
         extend = null;
         waypoints = [waypointAt(event.lngLat, isFree)];
@@ -308,7 +335,7 @@ export function createRouteTool(
     render();
     report({
       note: leg.isStraight
-        ? 'No trail connects those two points, so they are joined with a straight line. Undo takes it back.'
+        ? 'No loaded trail connects those two points, so they are joined with a straight line. Undo takes it back.'
         : null,
     });
   }
@@ -409,6 +436,23 @@ export function createRouteTool(
   map.on('mousemove', onMove);
   map.on('moveend', loadView);
 
+  function dispose() {
+    isDisposed = true;
+    queue = [];
+    for (const timer of retryTimers) {
+      clearTimeout(timer);
+    }
+    retryTimers = [];
+    if (frame) {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    }
+    map.off('click', onClick);
+    map.off('dblclick', onDoubleClick);
+    map.off('mousemove', onMove);
+    map.off('moveend', loadView);
+  }
+
   return {
     activate() {
       failed.clear();
@@ -427,6 +471,7 @@ export function createRouteTool(
       previewKey = '';
       setData(PREVIEW_SOURCE, EMPTY);
     },
+    dispose,
     finish,
     hasRoute: () => waypoints.length > 0,
     install() {
