@@ -60,10 +60,10 @@ export async function upsertImportedRoute(
   });
 
   if (existing.docs[0]) {
-    // A curator deliberately switched this public route to a Trail. Keep that
-    // live relationship instead of silently restoring imported geometry on a
-    // deploy or seed rerun.
-    if (existing.docs[0].geometrySource === 'trail') {
+    // A curator deliberately switched this public route to a Trail or rebuilt
+    // it on the map. Keep that choice instead of silently restoring imported
+    // geometry on a deploy or seed rerun.
+    if (isCuratorOwned(existing.docs[0])) {
       return 'preserved';
     }
     if (isCurrent(existing.docs[0], data)) {
@@ -111,12 +111,13 @@ export async function upsertStudioRoute(
   const existing = await findRoute(payload, city, route.id);
 
   if (existing) {
-    // Imported and trail-linked geometry are deliberate migrations away from
-    // Studio. A deploy must never switch either one back. An imported row with
-    // no geometry is not a usable migration, so repair that partial state.
+    // Imported, trail-linked, and composed geometry are deliberate migrations
+    // away from Studio. A deploy must never switch any of them back. An
+    // imported row with no geometry is not a usable migration, so repair that
+    // partial state.
     const hasImportedGeometry =
       existing.geometrySource === 'imported' && existing.geom != null;
-    if (existing.geometrySource === 'trail' || hasImportedGeometry) {
+    if (isCuratorOwned(existing) || hasImportedGeometry) {
       return 'preserved';
     }
     if (isCurrent(existing, data)) {
@@ -128,6 +129,14 @@ export async function upsertStudioRoute(
 
   await payload.create({ collection: 'routes', data });
   return 'created';
+}
+
+/** Geometry sources only a curator picks, which no seed may overwrite. */
+function isCuratorOwned(existing: Route): boolean {
+  return (
+    existing.geometrySource === 'trail' ||
+    existing.geometrySource === 'composed'
+  );
 }
 
 async function findRoute(

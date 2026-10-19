@@ -12,10 +12,15 @@ import { useUrlDeepLink } from '@/hooks/useUrlDeepLink';
 export default function EmbedMap() {
   const [options] = useState(() => parseEmbedOptions(window.location.search));
 
-  // Embed mode is Casual-only — there's no trails layer to deep-link into.
-  // The route slug comes from the options we already decoded, so `?route=` has
-  // a single decoder rather than two that can disagree about trimming.
-  useUrlDeepLink({ trails: false, route: options.route });
+  // Use the already-decoded selection for the chosen route family so query
+  // parsing has one source of truth and an irrelevant route/trail parameter
+  // cannot select hidden content.
+  useUrlDeepLink({
+    routes: options.mode === 'casual',
+    trails: options.mode === 'mtb',
+    route: options.route,
+    trail: options.trail,
+  });
 
   return (
     <EmbedProvider options={options}>
