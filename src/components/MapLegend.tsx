@@ -387,7 +387,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="border-b border-app-primary/40 bg-app-secondary pb-5 pl-[68px] pr-4 pt-[calc(24px+env(safe-area-inset-top))] text-sm font-medium text-app-surface">
+            MTB routes
+          </div>
+        )}
 
         <div className="overflow-y-auto flex-1 min-h-0 border-t border-app-surface/10">
           <div className="px-4 pb-4 pt-2">
