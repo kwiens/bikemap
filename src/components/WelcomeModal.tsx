@@ -154,7 +154,7 @@ export function WelcomeModal() {
             <button
               key={c.style}
               type="button"
-              className="flex-1 flex flex-col items-center gap-2 py-4 px-3 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-[#a5d730]"
+              className="flex-1 flex flex-col items-center gap-2 py-4 px-3 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-app-primary"
               onClick={() => choose(c.style)}
             >
               <span
