@@ -62,6 +62,11 @@
  *    form while you drag. The live distance readout is written straight to a
  *    DOM node.
  */
+import {
+  createEditorMap,
+  useEditorBasemap,
+  type EditorBasemap,
+} from './editor-map';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 // The public app pulls this in from its own layout, but the (payload) route
@@ -160,13 +165,6 @@ const POINTER_DISTANCE = 20;
  */
 const SNAPPING = { toCoordinate: true, toLine: true } as const;
 
-const STYLES = {
-  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
-  streets: 'mapbox://styles/mapbox/outdoors-v12',
-} as const;
-
-type StyleKey = keyof typeof STYLES;
-
 /** Simplify tolerances offered, in meters. 3 m matches the GPX import's. */
 const SIMPLIFY_TOLERANCES_M = [1, 3, 5, 10, 20] as const;
 
@@ -248,7 +246,7 @@ export function TrailMapEditor({
   const [ready, setReady] = useState(false);
   const [drawFailed, setDrawFailed] = useState(false);
   const [mode, setMode] = useState<Mode>('pick');
-  const [basemap, setBasemap] = useState<StyleKey>('streets');
+  const [basemap, setBasemap] = useState<EditorBasemap>('streets');
   const [names, setNames] = useState<Record<number, string>>({});
   const [history, setHistory] = useState({ canRedo: false, canUndo: false });
   const [isRemovingPoint, setIsRemovingPoint] = useState(false);
@@ -283,7 +281,6 @@ export function TrailMapEditor({
   // Everything the map's handlers read goes through a ref — see the note above.
   const idsRef = useRef(ids);
   const modeRef = useRef(mode);
-  const basemapRef = useRef<StyleKey>('streets');
   const readOnlyRef = useRef(Boolean(readOnly));
   const isRemovingPointRef = useRef(false);
   const sourceRef = useRef(geometrySource);
@@ -706,17 +703,13 @@ export function TrailMapEditor({
       return;
     }
 
-    mapboxgl.accessToken = mapConfig.mapbox.accessToken;
-    const map = new mapboxgl.Map({
-      // Shift-drag is box select in Select points.
-      boxZoom: false,
-      center: mapConfig.defaultView.center,
-      container: containerRef.current,
-      style: STYLES.streets,
-      zoom: mapConfig.defaultView.zoom,
-    });
+    // Shift-drag is box selection here, rather than Mapbox's box zoom.
+    const map = createEditorMap(
+      containerRef.current,
+      mapConfig.defaultView,
+      false,
+    );
     mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
     map.on('click', WAYS_HIT_LAYER, (event) => {
       if (readOnlyRef.current || modeRef.current !== 'pick') {
@@ -966,14 +959,7 @@ export function TrailMapEditor({
   // the singletrack visible on the ground. `style.load` fires again afterwards,
   // which is what re-registers Terra Draw and restores the line — the adapter
   // does not survive a `setStyle` on its own.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || basemapRef.current === basemap) {
-      return;
-    }
-    basemapRef.current = basemap;
-    map.setStyle(STYLES[basemap]);
-  }, [basemap]);
+  useEditorBasemap(mapRef, basemap);
 
   // Pull the stored line in — on first load, and after a save replaces it with
   // the server's rebuilt version.

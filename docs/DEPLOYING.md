@@ -333,3 +333,43 @@ Any Node host also works: set the same variables, run `pnpm run ci`, then
 - [ ] *(if using the admin)* `DATABASE_URL` and `PAYLOAD_SECRET` set on the host
 - [ ] *(if using the admin)* `pnpm db:migrate` run against the deployed database
 - [ ] *(if using the admin)* first user created at `/admin`
+
+## Isolate previews that change the database schema
+
+The default Vercel preview shares production's database and skips migrations.
+A branch that introduces collections or renames theme fields can therefore build
+successfully while `/admin` fails at runtime with a missing-column error.
+`getThemeCss` falling back to defaults does not repair Payload's own queries.
+
+For a preview that needs a newer schema, use the Neon CLI to create a database
+branch from the project's default branch. Keep its parent ID explicit. Set an
+expiration only for temporary previews that will not outlive that expiration.
+Use `neon connection-string` for the new branch: pooled for `DATABASE_URL`,
+direct for `DATABASE_URL_UNPOOLED`.
+
+If control-plane access is unavailable but the existing Postgres role can
+create databases, a separate database on the same compute also isolates the
+preview schema and records. Create an empty database, copy the source's public
+schema and data with `pg_dump`/`pg_restore` using a client at least as new as the
+server, and change the database name in both connection strings. Never restore
+into the source database. This shares compute capacity, unlike a Neon branch.
+
+Set those two values as **branch-specific preview** variables in Vercel, then
+set `PREVIEW_DATABASE_ISOLATED=true` for that same Git branch. The CI build now
+applies committed migrations and route syncs to the isolated database before
+building. Production and other previews keep their existing configuration.
+
+```bash
+neon branches create --project-id PROJECT --parent PARENT --name pr-143
+# Retrieve connection strings directly into local secret files; do not paste
+# them into an issue or PR. Scope each Vercel variable to this Git branch.
+vercel env add DATABASE_URL preview --git-branch trail-editor-tools < pooled-url.txt
+vercel env add DATABASE_URL_UNPOOLED preview --git-branch trail-editor-tools < direct-url.txt
+printf true | vercel env add PREVIEW_DATABASE_ISOLATED preview --git-branch trail-editor-tools
+```
+
+If a branch-specific variable already exists, use `vercel env update` instead of
+`add`. Redeploy after changing the variables. Check `/admin`, the collection
+list, and a saved draft; a green build alone does not validate the admin.
+Never apply a preview's migrations to the shared production database to make
+its preview work.

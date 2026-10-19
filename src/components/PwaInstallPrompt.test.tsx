@@ -26,6 +26,11 @@ afterEach(() => {
 });
 
 describe('PwaInstallPrompt', () => {
+  it('hides installation instructions before shell metadata arrives', () => {
+    hostWindow.ReactNativeWebView = { postMessage: vi.fn() };
+    render(<PwaInstallPrompt />);
+    expect(screen.queryByText(/Add .* to your home screen/)).toBeNull();
+  });
   it('shows installation instructions in an iOS browser', () => {
     render(<PwaInstallPrompt />);
     expect(screen.getByText(/Add .* to your home screen/)).toBeVisible();

@@ -14,6 +14,8 @@
  *
  * Client-safe, like `geometry.ts` — this runs in the admin bundle.
  */
+import { boundsOfCell, cellCoordinatesCovering } from '@/payload/routing/grid';
+import { MinHeap } from '@/payload/routing/min-heap';
 import { haversineDistance } from '@/utils/ride-stats';
 
 type Position = [number, number];
@@ -324,17 +326,10 @@ export function cellsCovering([west, south, east, north]: [
   number,
   number,
 ]): string[] {
-  const keys: string[] = [];
-  const x0 = Math.floor(west / NETWORK_CELL_DEG);
-  const x1 = Math.floor(east / NETWORK_CELL_DEG);
-  const y0 = Math.floor(south / NETWORK_CELL_DEG);
-  const y1 = Math.floor(north / NETWORK_CELL_DEG);
-  for (let x = x0; x <= x1; x++) {
-    for (let y = y0; y <= y1; y++) {
-      keys.push(`${x}:${y}`);
-    }
-  }
-  return keys;
+  return cellCoordinatesCovering(
+    [west, south, east, north],
+    NETWORK_CELL_DEG,
+  ).map(([x, y]) => `${x}:${y}`);
 }
 
 /**
@@ -345,13 +340,7 @@ export function cellsCovering([west, south, east, north]: [
  */
 export function cellBounds(key: string): [number, number, number, number] {
   const [x, y] = key.split(':').map(Number);
-  const round = (value: number) => Number(value.toFixed(4));
-  return [
-    round(x * NETWORK_CELL_DEG),
-    round(y * NETWORK_CELL_DEG),
-    round((x + 1) * NETWORK_CELL_DEG),
-    round((y + 1) * NETWORK_CELL_DEG),
-  ];
+  return boundsOfCell(x, y, NETWORK_CELL_DEG);
 }
 
 /** Indexes local segments; retains long ones without geographic amplification. */
@@ -446,67 +435,3 @@ function dropRepeats(points: Position[]): Position[] {
 }
 
 /** A binary min-heap of node ids by priority. Duplicates are allowed; stale ones are skipped by the caller. */
-class MinHeap {
-  private ids: number[] = [];
-  private priorities: number[] = [];
-
-  get size(): number {
-    return this.ids.length;
-  }
-
-  push(id: number, priority: number): void {
-    this.ids.push(id);
-    this.priorities.push(priority);
-    let index = this.ids.length - 1;
-    while (index > 0) {
-      const parent = (index - 1) >> 1;
-      if (this.priorities[parent] <= this.priorities[index]) {
-        break;
-      }
-      this.swap(index, parent);
-      index = parent;
-    }
-  }
-
-  pop(): number {
-    const top = this.ids[0];
-    const lastId = this.ids.pop() as number;
-    const lastPriority = this.priorities.pop() as number;
-    if (this.ids.length > 0) {
-      this.ids[0] = lastId;
-      this.priorities[0] = lastPriority;
-      let index = 0;
-      for (;;) {
-        const left = index * 2 + 1;
-        const right = left + 1;
-        let smallest = index;
-        if (
-          left < this.ids.length &&
-          this.priorities[left] < this.priorities[smallest]
-        ) {
-          smallest = left;
-        }
-        if (
-          right < this.ids.length &&
-          this.priorities[right] < this.priorities[smallest]
-        ) {
-          smallest = right;
-        }
-        if (smallest === index) {
-          break;
-        }
-        this.swap(index, smallest);
-        index = smallest;
-      }
-    }
-    return top;
-  }
-
-  private swap(a: number, b: number) {
-    [this.ids[a], this.ids[b]] = [this.ids[b], this.ids[a]];
-    [this.priorities[a], this.priorities[b]] = [
-      this.priorities[b],
-      this.priorities[a],
-    ];
-  }
-}

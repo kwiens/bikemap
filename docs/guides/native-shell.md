@@ -16,32 +16,44 @@ host implementation is not yet linked from this repository; add its location
 here when it exists. Once native builds ship, incompatible protocol changes
 must increment `PROTOCOL_VERSION`.
 
-## 1. Announce the host before the page loads
+## 1. Supply host metadata before the first device action
 
-Inject a global with `injectedJavaScriptBeforeContentLoaded`. The page checks
-for it synchronously during its first render, so it must exist before any
-script runs:
+Use `injectedJavaScriptObject` on the WebView:
 
-```js
-window.__bikemapNative = {
-  protocolVersion: 1,
-  capabilities: { geolocation: true, keepAwake: true, heading: true, share: true },
-};
+```tsx
+<WebView
+  source={{ uri: 'https://bikechatt.com/' }}
+  injectedJavaScriptObject={{
+    bikemap: {
+      protocolVersion: 1,
+      capabilities: { geolocation: true, keepAwake: true, heading: true, share: true },
+    },
+  }}
+  onMessage={handleMessage}
+/>
 ```
 
-`share` is optional (defaults to off). Without it the page keeps the browser
-behaviour — a blob download for GPX and the clipboard for links — neither of
-which works well inside a WebView, so claim it.
+The page reads `window.ReactNativeWebView.injectedObjectJson()` and validates
+its `bikemap` member. [React Native WebView recommends this over early script
+injection on Android](https://github.com/react-native-webview/react-native-webview/blob/master/docs/Reference.md#injectedjavascriptbeforecontentloaded),
+where `injectedJavaScriptBeforeContentLoaded` is not fully reliable.
+Older hosts may still inject `window.__bikemapNative = { protocolVersion: 1,
+capabilities: ... }`.
 
-The page uses native services when **both** `window.ReactNativeWebView`
-(provided by `react-native-webview`) and a compatible `__bikemapNative` are
-present, reporting `kind: 'native'` from `usePlatform()`. A different
-`protocolVersion` falls back to browser APIs, so an old app build against a
-new site keeps working.
+`usePlatform()` returns a stable facade. Rendering and capability checks do not
+commit to browser services: metadata arriving after the first render is read
+again when the rider first uses a device service. That first action selects the
+backend for the session, keeping the marker, recorder and their cleanup on one
+shared stream. Supply metadata before enabling device actions. If a host loads
+after an actual browser watch or recording has begun, reload the page after
+preserving the ride; the facade deliberately does not switch a live session to
+a different backend.
 
-The presence of both globals suppresses the "Add to home screen" prompt and
-service-worker registration regardless of protocol compatibility: an older
-shell is still an installed app.
+`share` is optional (defaults to off). Without it the page keeps blob downloads
+and clipboard sharing, so provide it for a complete WebView integration.
+An incompatible protocol uses browser services. Presence of the WebView channel
+suppresses installation prompts and service-worker registration even before
+metadata arrives or when the host uses an incompatible protocol.
 
 ## 2. Channel
 
@@ -81,7 +93,7 @@ and the host must honour it.
 
 | Page → host | Meaning |
 |---|---|
-| `{ type: "geolocation/watch", watchId, options }` | Start streaming fixes. `options`: `{ highAccuracy?, maximumAgeMs?, timeoutMs? }`. Use the app's background-location permission if it has one; the ride recorder relies on fixes continuing while the screen is off. |
+| `{ type: "geolocation/watch", watchId, options }` | Start streaming fixes. `options`: `{ highAccuracy?, maximumAgeMs?, timeoutMs? }`. This is a foreground position subscription. It is shared with the map marker and does not indicate that a ride is being recorded; see the background-recording requirements below. |
 | `{ type: "geolocation/clearWatch", watchId }` | Stop that watch. |
 | `{ type: "geolocation/getCurrent", requestId, options }` | One fix, not part of any watch. Used for a cached coarse fix on a cold start (`highAccuracy: false, maximumAgeMs: 60000`) and as a nudge after returning from the background. Treat `options.timeoutMs` as the GPS budget; the page waits that long plus 2 s for the bridge (10 s when no timeout is given) before giving up. |
 
@@ -148,17 +160,21 @@ Pairs with `Location.watchHeadingAsync` (`magHeading`) from `expo-location`.
 |---|---|
 | `{ type: "share/result", requestId, ok }` | The sheet closed. `ok: false` when it was dismissed or sharing failed; the page then shows "Could not export GPX" / "Could not share link". There is no page-side timeout: a sheet stays open as long as the rider likes, so always answer. |
 
-## 4. Minimal host sketch
+## 4. Foreground-only host sketch
 
 ```tsx
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
-const hostInfo = `window.__bikemapNative = ${JSON.stringify({
-  protocolVersion: 1,
-  capabilities: { geolocation: true, keepAwake: true, heading: true },
-})}; true;`;
+const hostInfo = {
+  bikemap: {
+    protocolVersion: 1,
+    capabilities: { geolocation: true, keepAwake: true, heading: true },
+  },
+};
+
+// <WebView injectedJavaScriptObject={hostInfo} onMessage={...} />
 
 function send(ref, event) {
   const json = JSON.stringify({ source: 'bikemap', v: 1, ...event });
@@ -167,18 +183,43 @@ function send(ref, event) {
   );
 }
 
-// onMessage={(e) => handle(JSON.parse(e.nativeEvent.data))}
+// onMessage={(e) => handle(webViewRef, subscriptions, JSON.parse(e.nativeEvent.data))}
 async function handle(ref, subs, msg) {
   if (msg.source !== 'bikemap' || msg.v !== 1) return;
   switch (msg.type) {
-    case 'geolocation/watch':
-      subs.set(msg.watchId, await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.BestForNavigation },
-        (p) => send(ref, { type: 'geolocation/fix', watchId: msg.watchId, fix: toFix(p) }),
-      ));
+    case 'geolocation/watch': {
+      const pending: { subscription: Location.LocationSubscription | null } = { subscription: null };
+      subs.set(msg.watchId, pending);
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (subs.get(msg.watchId) !== pending) break;
+      if (permission.status !== 'granted') {
+        subs.delete(msg.watchId);
+        send(ref, { type: 'geolocation/error', watchId: msg.watchId,
+          error: { code: 'permission-denied', message: 'Location permission denied' } });
+        break;
+      }
+      try {
+        const subscription = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.BestForNavigation },
+          (p) => {
+            if (subs.get(msg.watchId) === pending) {
+              send(ref, { type: 'geolocation/fix', watchId: msg.watchId, fix: toFix(p) });
+            }
+          },
+        );
+        // A clearWatch may arrive while permission/GPS startup is pending.
+        if (subs.get(msg.watchId) !== pending) subscription.remove();
+        else pending.subscription = subscription;
+      } catch {
+        if (subs.get(msg.watchId) !== pending) break;
+        subs.delete(msg.watchId);
+        send(ref, { type: 'geolocation/error', watchId: msg.watchId,
+          error: { code: 'unavailable', message: 'Could not start location' } });
+      }
       break;
+    }
     case 'geolocation/clearWatch':
-      subs.get(msg.watchId)?.remove(); subs.delete(msg.watchId);
+      subs.get(msg.watchId)?.subscription?.remove(); subs.delete(msg.watchId);
       break;
     case 'keepAwake/acquire': await activateKeepAwakeAsync('bikemap'); break;
     case 'keepAwake/release': deactivateKeepAwake('bikemap'); break;
@@ -187,14 +228,43 @@ async function handle(ref, subs, msg) {
 }
 ```
 
-The native Expo host is separate work and is not included in this PR. The
+This sketch only demonstrates the foreground protocol. `watchPositionAsync`
+does not provide background updates. The native Expo host is separate work; the
 contract above and the page-side tests define the messages it must implement,
 including the share sheet. Add the host location here when it lands.
 
+### Background recording requires a separate host contract
+
+[Expo documents `watchPositionAsync` as foreground-only](https://docs.expo.dev/versions/latest/sdk/location/#locationwatchpositionasyncoptions-callback-errorhandler).
+Screen-off recording needs `TaskManager` and `startLocationUpdatesAsync`, the
+platform background permissions, and a development build rather than Expo Go.
+A live WebView callback alone is not durable recording storage.
+
+Before advertising background recording, implement and test these together in
+the host and a versioned protocol extension:
+
+- Explicit recording start, pause, resume and stop with a stable recording ID.
+  `geolocation/watch` cannot stand in for recording intent: the marker retains
+  that subscription after following is turned off and after a ride ends.
+- Native durable storage of ordered fixes while the WebView is suspended or
+  terminated; acknowledge persisted batches, replay on reconnect, and deduplicate
+  by recording ID and sequence. Retain the original fix timestamps.
+- Recovery into the web ride history after reload, with one authority for the
+  recording state and its pause boundaries. IndexedDB alone cannot checkpoint
+  fixes that never reached the suspended page.
+- Native cleanup on stop and WebView/process disposal, including cancellation of
+  location subscriptions still being created asynchronously.
+- Physical iOS and Android checks: screen lock, app switch, revoked permission,
+  delayed/batched fixes, reload/process loss, recovery, and stop releasing the
+  background task while foreground location remains available.
+
+Version 1 currently covers foreground device services. It does not claim to
+solve those background lifecycle requirements.
+
 ## 5. Testing the page side without a device
 
-In Chrome DevTools on the public site, before the map mounts (or after a
-reload with a breakpoint at the top of the page), define both globals:
+In Chrome DevTools on the public site, before using any device service, define
+both globals. A first render without them no longer locks in browser services:
 
 ```js
 window.ReactNativeWebView = { postMessage: (m) => console.log('→ host', m) };
@@ -221,7 +291,7 @@ transport and each service against a fake transport.
 
 - It never requests location, keep-awake or the compass on load; only on the
   locate button, Record, or the compass mode tap.
-- It does not send a hello/handshake. Presence of the injected global is the
-  handshake, which keeps the first render synchronous.
-- It does not expect the host to persist anything. Rides are stored in the
-  WebView's IndexedDB; the settings cookie works as in a browser.
+- It does not send a hello/handshake. Validated injected metadata is the
+  announcement; service selection happens on the first device action.
+- Foreground rides are stored in the WebView's IndexedDB; settings use cookies.
+  Durable background recording requires the host extension described above.

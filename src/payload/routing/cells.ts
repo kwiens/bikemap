@@ -15,6 +15,8 @@
  * Client-safe.
  */
 
+import { boundsOfCell, cellCoordinatesCovering } from './grid';
+
 /** Cell size in degrees: about 3.2 × 4.4 km at Bend's latitude. */
 export const ROUTE_CELL_DEG = 0.04;
 
@@ -50,24 +52,11 @@ export function cellsCovering(
   [west, south, east, north]: [number, number, number, number],
   maxKeys = Number.POSITIVE_INFINITY,
 ): CellKey[] {
-  const keys: CellKey[] = [];
-  for (
-    let x = Math.floor(west / ROUTE_CELL_DEG);
-    x <= Math.floor(east / ROUTE_CELL_DEG);
-    x++
-  ) {
-    for (
-      let y = Math.floor(south / ROUTE_CELL_DEG);
-      y <= Math.floor(north / ROUTE_CELL_DEG);
-      y++
-    ) {
-      keys.push(cellKey(x, y));
-      if (keys.length >= maxKeys) {
-        return keys;
-      }
-    }
-  }
-  return keys;
+  return cellCoordinatesCovering(
+    [west, south, east, north],
+    ROUTE_CELL_DEG,
+    maxKeys,
+  ).map(([x, y]) => cellKey(x, y));
 }
 
 /** A cell's [west, south, east, north], or null for a malformed key. */
@@ -80,14 +69,8 @@ export function cellBounds(
   }
   const x = Number(match[1]);
   const y = Number(match[2]);
-  const west = x * ROUTE_CELL_DEG;
-  const south = y * ROUTE_CELL_DEG;
-  const bounds: [number, number, number, number] = [
-    west,
-    south,
-    west + ROUTE_CELL_DEG,
-    south + ROUTE_CELL_DEG,
-  ];
+  const bounds = boundsOfCell(x, y, ROUTE_CELL_DEG);
+  const [west, south] = bounds;
   return west >= -180 && bounds[2] <= 180 && south >= -90 && bounds[3] <= 90
     ? bounds
     : null;

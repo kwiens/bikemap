@@ -2,6 +2,29 @@ import { describe, expect, it } from 'vitest';
 import { shouldRunMigrations } from './ci-build-policy';
 
 describe('shouldRunMigrations', () => {
+  it('migrates an explicitly isolated preview', () => {
+    expect(
+      shouldRunMigrations({
+        DATABASE_URL: 'postgres://preview-branch',
+        VERCEL_ENV: 'preview',
+        PREVIEW_DATABASE_ISOLATED: 'true',
+      }),
+    ).toBe(true);
+  });
+
+  it.each(['false', '1', ''])(
+    'does not treat %j as preview isolation',
+    (value) => {
+      expect(
+        shouldRunMigrations({
+          DATABASE_URL: 'postgres://shared',
+          VERCEL_ENV: 'preview',
+          PREVIEW_DATABASE_ISOLATED: value,
+        }),
+      ).toBe(false);
+    },
+  );
+
   it('runs committed migrations for production Vercel builds', () => {
     expect(
       shouldRunMigrations({
