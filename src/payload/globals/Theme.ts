@@ -57,7 +57,7 @@ export const Theme: GlobalConfig = {
           relationTo: 'media',
           admin: {
             description:
-              'Upload a PNG, JPEG, or WebP logo. Used on the welcome screen, sidebar, and About page. App icons and downloadable artwork are separate.',
+              'Upload a PNG, JPEG, or WebP logo up to 3 MB. Used on the welcome screen, sidebar, and About page. App icons and downloadable artwork are separate.',
           },
         },
       ],

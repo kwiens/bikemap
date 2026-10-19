@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { postgresAdapter } from '@payloadcms/db-postgres';
+import { vercelBlobStorage } from '@payloadcms/storage-vercel-blob';
 import { buildConfig } from 'payload';
 import { Organizations } from './payload/collections/Organizations';
 import { Media } from './payload/collections/Media';
@@ -59,6 +60,15 @@ export default buildConfig({
     Users,
   ],
   globals: [GeneralSettings, Theme],
+  plugins: [
+    vercelBlobStorage({
+      collections: { media: true },
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      alwaysInsertFields: true,
+    }),
+  ],
+  // Leave room for multipart metadata below Vercel's 4.5 MB request limit.
+  upload: { limits: { fileSize: 3 * 1024 * 1024 }, abortOnLimit: true },
   csrf: payloadCsrfOrigins(),
   secret: payloadSecret(),
   typescript: {

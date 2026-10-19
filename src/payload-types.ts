@@ -149,6 +149,8 @@ export interface Media {
    * A short description of the logo for screen readers.
    */
   alt: string;
+  prefix?: string | null;
+  _objectKey?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -725,6 +727,8 @@ export interface PayloadMigration {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  prefix?: T;
+  _objectKey?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -1007,7 +1011,7 @@ export interface GeneralSetting {
 export interface Theme {
   id: number;
   /**
-   * Upload a PNG, JPEG, or WebP logo. Used on the welcome screen, sidebar, and About page. App icons and downloadable artwork are separate.
+   * Upload a PNG, JPEG, or WebP logo up to 3 MB. Used on the welcome screen, sidebar, and About page. App icons and downloadable artwork are separate.
    */
   logo?: (number | null) | Media;
   /**
