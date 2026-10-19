@@ -227,6 +227,50 @@ describe('RidesPanel', () => {
     }
   });
 
+  it('starts only once after repeated record taps during recovery', async () => {
+    mockHook.hasRecovery = true;
+    let finishRecovery!: (ride: { id: string }) => void;
+    mockHook.recoverRide = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finishRecovery = resolve;
+        }),
+    );
+    render(<RidesPanel />);
+    openPanel();
+    const record = screen.getByText('Record a Ride').closest('button')!;
+    fireEvent.click(record);
+    fireEvent.click(record);
+    expect(record).toBeDisabled();
+    expect(screen.getByText('Save it')).toBeDisabled();
+    expect(screen.getByText('Continue')).toBeDisabled();
+    expect(screen.getByText('Discard')).toBeDisabled();
+    expect(mockHook.recoverRide).toHaveBeenCalledTimes(1);
+    expect(mockHook.startRecording).not.toHaveBeenCalled();
+    await act(async () => finishRecovery({ id: 'old-ride' }));
+    expect(mockHook.startRecording).toHaveBeenCalledTimes(1);
+    expect(record).toBeEnabled();
+  });
+
+  it('does not start a recording while Save it is recovering the old ride', async () => {
+    mockHook.hasRecovery = true;
+    let finishRecovery!: (ride: { id: string }) => void;
+    mockHook.recoverRide = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finishRecovery = resolve;
+        }),
+    );
+    render(<RidesPanel />);
+    openPanel();
+    fireEvent.click(screen.getByText('Save it'));
+    fireEvent.click(screen.getByText('Record a Ride'));
+    expect(mockHook.recoverRide).toHaveBeenCalledTimes(1);
+    expect(mockHook.startRecording).not.toHaveBeenCalled();
+    await act(async () => finishRecovery({ id: 'old-ride' }));
+    expect(mockHook.startRecording).not.toHaveBeenCalled();
+  });
+
   it('dispatches RIDES_PANEL_TOGGLE on toggle', () => {
     const events: CustomEvent[] = [];
     const handler = (e: Event) => events.push(e as CustomEvent);

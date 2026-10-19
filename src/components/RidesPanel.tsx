@@ -36,6 +36,22 @@ export function RidesPanel() {
   const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const rideActionPendingRef = useRef(false);
+  const [isRideActionPending, setIsRideActionPending] = useState(false);
+
+  // Recovery can await storage and terrain requests. Serialize all recovery
+  // and recording actions so another tap cannot start over while it settles.
+  const runRideAction = useCallback(async (action: () => Promise<void>) => {
+    if (rideActionPendingRef.current) return;
+    rideActionPendingRef.current = true;
+    setIsRideActionPending(true);
+    try {
+      await action();
+    } finally {
+      rideActionPendingRef.current = false;
+      setIsRideActionPending(false);
+    }
+  }, []);
 
   // Recording feedback goes through the map's toast host rather than a toast
   // of our own: while recording from the HUD this panel is closed (translated
@@ -63,18 +79,26 @@ export function RidesPanel() {
 
   const toggle = toggleRidesPanel;
 
-  const handleRecoverRide = useCallback(async () => {
-    const ride = await recoverRide();
-    if (ride) {
-      notify('Ride recovered!');
-      dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId: ride.id });
-    }
-  }, [recoverRide, notify]);
+  const handleRecoverRide = useCallback(
+    () =>
+      runRideAction(async () => {
+        const ride = await recoverRide();
+        if (ride) {
+          notify('Ride recovered!');
+          dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId: ride.id });
+        }
+      }),
+    [recoverRide, notify, runRideAction],
+  );
 
-  const handleContinueRide = useCallback(async () => {
-    await continueRide();
-    notify('Ride resumed — keep going!');
-  }, [continueRide, notify]);
+  const handleContinueRide = useCallback(
+    () =>
+      runRideAction(async () => {
+        await continueRide();
+        notify('Ride resumed — keep going!');
+      }),
+    [continueRide, notify, runRideAction],
+  );
 
   // On a phone the panel overlays the map; a tap on the map dismisses it.
   const closeOnMobile = useCallback(() => {
@@ -105,36 +129,41 @@ export function RidesPanel() {
 
   // The recorder reports the outcome (saved / too short / save failed) through
   // `notify` itself, so only the follow-up selection lives here.
-  const handleRecordClick = useCallback(async () => {
-    if (isRecording) {
-      const ride = await stopRecording();
-      if (ride) {
-        dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId: ride.id });
-      }
-    } else {
-      // A new recording checkpoints into the same slot the unfinished ride
-      // is waiting in, and finishing it clears that slot. Save the
-      // unfinished ride first so starting over can't silently discard it.
-      if (hasRecovery) {
-        try {
-          const recovered = await recoverRide();
-          if (recovered) notify('Unfinished ride saved');
-        } catch (error) {
-          console.error('Failed to save unfinished ride:', error);
-          notify('Save or discard the unfinished ride before recording');
-          return;
+  const handleRecordClick = useCallback(
+    () =>
+      runRideAction(async () => {
+        if (isRecording) {
+          const ride = await stopRecording();
+          if (ride) {
+            dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId: ride.id });
+          }
+        } else {
+          // A new recording checkpoints into the same slot the unfinished ride
+          // is waiting in, and finishing it clears that slot. Save the
+          // unfinished ride first so starting over can't silently discard it.
+          if (hasRecovery) {
+            try {
+              const recovered = await recoverRide();
+              if (recovered) notify('Unfinished ride saved');
+            } catch (error) {
+              console.error('Failed to save unfinished ride:', error);
+              notify('Save or discard the unfinished ride before recording');
+              return;
+            }
+          }
+          startRecording();
         }
-      }
-      startRecording();
-    }
-  }, [
-    isRecording,
-    hasRecovery,
-    stopRecording,
-    startRecording,
-    recoverRide,
-    notify,
-  ]);
+      }),
+    [
+      isRecording,
+      hasRecovery,
+      stopRecording,
+      startRecording,
+      recoverRide,
+      notify,
+      runRideAction,
+    ],
+  );
 
   return (
     <>
@@ -189,6 +218,7 @@ export function RidesPanel() {
               type="button"
               className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center cursor-pointer border-none hover:bg-red-600 text-xs"
               onClick={handleRecordClick}
+              disabled={isRideActionPending}
               aria-label="Finish ride"
             >
               <FontAwesomeIcon icon={faFlagCheckered} />
@@ -223,6 +253,7 @@ export function RidesPanel() {
                   type="button"
                   className="flex-1 px-3 py-1.5 bg-green-500 text-white rounded text-xs font-medium hover:bg-green-600"
                   onClick={handleContinueRide}
+                  disabled={isRideActionPending}
                 >
                   Continue
                 </button>
@@ -230,6 +261,7 @@ export function RidesPanel() {
                   type="button"
                   className="flex-1 px-3 py-1.5 bg-amber-500 text-white rounded text-xs font-medium hover:bg-amber-600"
                   onClick={handleRecoverRide}
+                  disabled={isRideActionPending}
                 >
                   Save it
                 </button>
@@ -237,6 +269,7 @@ export function RidesPanel() {
                   type="button"
                   className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-50"
                   onClick={dismissRecovery}
+                  disabled={isRideActionPending}
                 >
                   Discard
                 </button>
@@ -280,6 +313,7 @@ export function RidesPanel() {
                   type="button"
                   className="flex-1 p-2.5 rounded-lg text-sm font-semibold cursor-pointer border-none transition-colors bg-red-500 text-white hover:bg-red-600"
                   onClick={handleRecordClick}
+                  disabled={isRideActionPending}
                 >
                   Finish
                 </button>
@@ -293,6 +327,7 @@ export function RidesPanel() {
               type="button"
               className="w-full flex items-center gap-2 py-5 px-3.5 border border-gray-200 rounded-lg bg-white cursor-pointer text-[15px] font-medium text-gray-700 transition-colors hover:bg-gray-50"
               onClick={handleRecordClick}
+              disabled={isRideActionPending}
             >
               <div className="w-3 h-3 rounded-full bg-red-500 shrink-0" />
               <span>Record a Ride</span>
