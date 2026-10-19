@@ -35,9 +35,10 @@ export default async function EmbedDemoPage({
   ]);
   const builderConfig = embedBuilderConfig(
     hostname,
-    settings.casualRoutes ? routes : [],
+    routes,
     trails,
     query.city,
+    settings,
   );
 
   return (

@@ -38,7 +38,9 @@ export function EmbedSnippetBuilder({
   const fieldId = useId();
   const markerLayers = availableLayers.filter((l) => l !== 'bikeNetwork');
   const hasBikeNetwork = availableLayers.includes('bikeNetwork');
-  const [mode, setMode] = useState<EmbedMode>('casual');
+  const [mode, setMode] = useState<EmbedMode>(
+    config.casualRoutes === false ? 'mtb' : 'casual',
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [route, setRoute] = useState('');
   const [trail, setTrail] = useState('');
@@ -141,7 +143,10 @@ export function EmbedSnippetBuilder({
             Routes to show
           </legend>
           <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
-            {ROUTE_MODES.map((option) => (
+            {ROUTE_MODES.filter(
+              (option) =>
+                config.casualRoutes !== false || option.value !== 'casual',
+            ).map((option) => (
               <label
                 key={option.value}
                 className={cn(

@@ -55,11 +55,7 @@ export function MapLayers({
     bikeRentals: onToggleBikeRentals,
   };
   const visibleLayers = layers.filter(
-    (layer) =>
-      layer.enabled &&
-      (layer.key !== 'attractions' || features.attractions) &&
-      (layer.key !== 'bikeResources' || features.bikeResources) &&
-      (layer.key !== 'bikeRentals' || features.bikeRentals),
+    (layer) => layer.enabled && features[layer.key],
   );
 
   if (visibleLayers.length === 0) {

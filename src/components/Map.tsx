@@ -1021,7 +1021,7 @@ const MapboxMap = memo(function MapboxMap() {
           // attach it because their sidebar and deep links expose trails.
           const showTrails = !isEmbedRef.current || isMtbEmbed;
 
-          if (showTrails && features.nationwideTrails) {
+          if (showTrails) {
             // Initialize all mountain bike trail layers. The MTB tileset
             // isn't included in the Mapbox Studio style, so attach it first.
             ensureMtnBikeSource(newMap);
@@ -1033,7 +1033,7 @@ const MapboxMap = memo(function MapboxMap() {
           // leftover TPL trails layer) so they don't render over our routes.
           hideStrayStyleLayers(newMap);
 
-          if (showTrails) {
+          if (showTrails && features.nationwideTrails) {
             // Attach the nationwide OSM bike-trails layer (hidden until toggled).
             // Its click handler is registered later, after the curated
             // route/MTB query, so curated trails win overlapping clicks.
@@ -1131,7 +1131,7 @@ const MapboxMap = memo(function MapboxMap() {
           // then bails on the already-handled click. Clear any prior registration
           // first in case the style reloads and re-runs this block.
           osmSelectionCleanup.current?.();
-          if (showTrails) {
+          if (showTrails && features.nationwideTrails) {
             osmSelectionCleanup.current = registerOsmTrailSelection(newMap);
           }
 
