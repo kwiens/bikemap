@@ -1675,6 +1675,26 @@ describe('hideStrayStyleLayers', () => {
 });
 
 describe('optimized Studio trail cleanup', () => {
+  it.each([false, true])(
+    'falls back to the configured style after a failed fetch (prune routes: %s)',
+    async (pruneStudioRoutes) => {
+      const previousFetch = global.fetch;
+      global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503 });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const styleUrl = 'mapbox://styles/example/style?optimize=true';
+
+      try {
+        await expect(
+          loadOptimizedMapStyle(styleUrl, 'test-token', pruneStudioRoutes),
+        ).resolves.toBe(styleUrl);
+        expect(warn).toHaveBeenCalledOnce();
+      } finally {
+        global.fetch = previousFetch;
+        warn.mockRestore();
+      }
+    },
+  );
+
   it('removes only orphan trail data from the composite style', () => {
     const style = {
       version: 8,
