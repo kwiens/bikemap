@@ -37,7 +37,7 @@ import {
   BIKE_NETWORK_INFRA_LAYER_ID,
   BIKE_NETWORK_SOURCE_ID,
 } from '@/data/bike-network';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent, onMapEvent } from '@/events';
 
 // --- Shared layer plumbing ----------------------------------------------------
 
@@ -1507,27 +1507,26 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): () => void {
   const onForeignSelect = () => {
     if (!selecting) clearSelection();
   };
-  const foreignEvents = [
-    MAP_EVENTS.ROUTE_SELECT,
-    MAP_EVENTS.TRAIL_SELECT,
-    MAP_EVENTS.ROUTE_DESELECT,
-    MAP_EVENTS.TRAIL_DESELECT,
+  const unsubscribes = [
+    onMapEvent(MAP_EVENTS.ROUTE_SELECT, onForeignSelect),
+    onMapEvent(MAP_EVENTS.TRAIL_SELECT, onForeignSelect),
+    onMapEvent(MAP_EVENTS.ROUTE_DESELECT, onForeignSelect),
+    onMapEvent(MAP_EVENTS.TRAIL_DESELECT, onForeignSelect),
   ];
-  for (const ev of foreignEvents) window.addEventListener(ev, onForeignSelect);
 
   // Hiding the Nationwide trails layer must also drop any active OSM selection,
   // or the highlight + elevation pane linger while the layer reads "off". Guard
   // on hasSelection so a curated selection (which also registers in the pane as
   // a 'trail') is left untouched.
-  const onLayerToggle = (e: Event) => {
-    const detail = (e as CustomEvent).detail ?? {};
-    if (detail.layer !== 'osmTrails' || detail.visible || !hasSelection) return;
-    clearSelection();
-    selecting = true;
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
-    selecting = false;
-  };
-  window.addEventListener(MAP_EVENTS.LAYER_TOGGLE, onLayerToggle);
+  unsubscribes.push(
+    onMapEvent(MAP_EVENTS.LAYER_TOGGLE, ({ layer, visible }) => {
+      if (layer !== 'osmTrails' || visible || !hasSelection) return;
+      clearSelection();
+      selecting = true;
+      dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
+      selecting = false;
+    }),
+  );
 
   map.on('click', OSM_TRAILS_HIT_LAYER_ID, (e) => {
     // A curated trail/route sitting on top already handled this click.
@@ -1552,8 +1551,8 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): () => void {
     clearSelection();
     const mySelection = selectionId;
     selecting = true;
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+    dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
+    dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
     selecting = false;
 
     // Highlight the whole way like a selected route.
@@ -1572,9 +1571,7 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): () => void {
         if (selectionId !== mySelection || !profile) return; // superseded
         // Carry a tiny OSM tag summary for the pane header.
         profile.osm = osmTrailDetails(props);
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, { detail: { profile } }),
-        );
+        dispatchMapEvent(MAP_EVENTS.OSM_TRAIL_SELECT, { profile });
       })
       .catch(() => {});
   });
@@ -1585,10 +1582,7 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): () => void {
   // listeners outlive it. Return a cleanup so a remount doesn't leak or
   // duplicate them (and fire clearOsmTrailHighlight on an already-removed map).
   return () => {
-    for (const ev of foreignEvents) {
-      window.removeEventListener(ev, onForeignSelect);
-    }
-    window.removeEventListener(MAP_EVENTS.LAYER_TOGGLE, onLayerToggle);
+    for (const unsubscribe of unsubscribes) unsubscribe();
   };
 }
 
@@ -1847,7 +1841,21 @@ export function highlightMtnBikeArea(
 // Recorded ride layer management
 const RIDE_SOURCE_ID = 'recorded-ride';
 const RIDE_LINE_ID = 'recorded-ride-line';
+const RIDE_CASING_ID = 'recorded-ride-casing';
 const RIDE_LINE_COLOR = '#ff6b35';
+
+function rideGeometry(
+  segments: [number, number][][],
+): GeoJSON.Feature<GeoJSON.MultiLineString> {
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'MultiLineString',
+      coordinates: segments.filter((segment) => segment.length >= 2),
+    },
+  };
+}
 
 export function addRideLayer(
   map: mapboxgl.Map,
@@ -1857,16 +1865,23 @@ export function addRideLayer(
 
   map.addSource(RIDE_SOURCE_ID, {
     type: 'geojson',
-    data: {
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'MultiLineString',
-        coordinates: segments.filter((segment) => segment.length >= 2),
-      },
-    },
+    data: rideGeometry(segments),
   });
 
+  // A white casing keeps the track legible where it runs along a route of a
+  // similar colour (the orange ride line over the red Zoo Loop, for one): the
+  // two lines otherwise merge into a single wider stroke.
+  map.addLayer({
+    id: RIDE_CASING_ID,
+    type: 'line',
+    source: RIDE_SOURCE_ID,
+    layout: ROUND_LINE,
+    paint: {
+      'line-color': '#ffffff',
+      'line-width': 8,
+      'line-opacity': 0.9,
+    },
+  });
   map.addLayer({
     id: RIDE_LINE_ID,
     type: 'line',
@@ -1875,7 +1890,7 @@ export function addRideLayer(
     paint: {
       'line-color': RIDE_LINE_COLOR,
       'line-width': 4,
-      'line-opacity': 0.85,
+      'line-opacity': 0.95,
     },
   });
 }
@@ -1888,14 +1903,7 @@ export function updateRideLayer(
     | mapboxgl.GeoJSONSource
     | undefined;
   if (source) {
-    source.setData({
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'MultiLineString',
-        coordinates: segments.filter((segment) => segment.length >= 2),
-      },
-    });
+    source.setData(rideGeometry(segments));
   } else {
     addRideLayer(map, segments);
   }
@@ -1903,6 +1911,7 @@ export function updateRideLayer(
 
 export function removeRideLayer(map: mapboxgl.Map): void {
   if (map.getLayer(RIDE_LINE_ID)) map.removeLayer(RIDE_LINE_ID);
+  if (map.getLayer(RIDE_CASING_ID)) map.removeLayer(RIDE_CASING_ID);
   if (map.getSource(RIDE_SOURCE_ID)) map.removeSource(RIDE_SOURCE_ID);
 }
 

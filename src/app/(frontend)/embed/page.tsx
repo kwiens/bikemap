@@ -18,9 +18,9 @@ export default async function EmbedPage({
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
   const mode = parseEmbedMode(query.mode);
-  const { routes } =
-    mode === 'casual' ? await getCityRoutes(cityId) : { routes: [] };
-  const { trails } =
-    mode === 'mtb' ? await getCityTrailSummaries(cityId) : { trails: [] };
-  return <EmbedClient cityId={cityId} routes={routes} trails={trails} />;
+  const content =
+    mode === 'mtb'
+      ? { cityId, ...(await getCityTrailSummaries(cityId)) }
+      : { cityId, ...(await getCityRoutes(cityId)) };
+  return <EmbedClient content={content} />;
 }

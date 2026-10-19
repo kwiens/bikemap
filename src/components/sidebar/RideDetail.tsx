@@ -11,10 +11,11 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import type { RecordedRide } from '@/data/ride';
 import { cn } from '@/lib/utils';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
+import { usePlatform } from '@/platform/context';
 import { buildRideGpx } from '@/utils/gpx';
 import { deleteRide, renameRide } from '@/utils/ride-storage';
 import {
-  downloadFile,
   formatDuration,
   formatDistance,
   formatSpeed,
@@ -33,6 +34,7 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
   const [nameInput, setNameInput] = useState(ride.name);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [currentName, setCurrentName] = useState(ride.name);
+  const { share } = usePlatform();
 
   const handleRename = () => {
     const trimmed = nameInput.trim();
@@ -43,9 +45,15 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
     setEditing(false);
   };
 
-  const handleExportGpx = () => {
-    const gpx = buildRideGpx({ name: currentName, points: ride.points });
-    downloadFile(gpx, `${slugify(currentName)}.gpx`, 'application/gpx+xml');
+  const handleExportGpx = async () => {
+    const outcome = await share.exportFile({
+      filename: `${slugify(currentName)}.gpx`,
+      mimeType: 'application/gpx+xml',
+      content: buildRideGpx({ name: currentName, points: ride.points }),
+    });
+    if (outcome === 'failed') {
+      dispatchMapEvent(MAP_EVENTS.TOAST, { message: 'Could not export GPX' });
+    }
   };
 
   const handleDelete = async () => {

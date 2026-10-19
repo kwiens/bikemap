@@ -90,7 +90,14 @@ src/
 │   ├── bike-network.ts    # Classified bike-network overlay constants
 │   ├── ride.ts            # Ride recording types
 │   └── gbfs.ts            # Live bike share API integration (station + free-bike)
-├── hooks/                 # useRideRecording, useWakeLock, useMapResize, useToast
+├── hooks/                 # useRideRecording, useLocationTracking, useKeepAwake,
+│                          # useLayout, useMapEvent, useMapResize, useToast
+├── platform/              # Device services behind interfaces (GPS, keep-awake,
+│   ├── types.ts           # compass) — see "Platform services" below
+│   ├── context.tsx        # PlatformProvider / usePlatform (default: web)
+│   ├── position-watch.ts  # One shared, ref-counted GPS stream
+│   ├── web/               # Browser implementations
+│   └── native/            # React Native WebView bridge (Expo shell)
 ├── utils/
 │   ├── map.ts             # Map layer plumbing, selection, bounds, geocoding
 │   ├── terrain-rgb.ts     # Shared Terrain-RGB decode + tile math
@@ -122,7 +129,17 @@ src/
 
 ### Event-Driven Communication
 
-The app uses custom DOM events (`window.dispatchEvent`) for component communication. **All event names live in `src/events.ts` (`MAP_EVENTS`)** — never use string literals. The full set:
+The app uses custom DOM events on `window` for component communication. **All event names live in `src/events.ts` (`MAP_EVENTS`) and every payload shape in `MapEventDetails`** — never use string literals, and never call `new CustomEvent` / `addEventListener` for these directly. Use the typed helpers:
+
+- `dispatchMapEvent(MAP_EVENTS.X, detail)` — the detail is checked against `MapEventDetails`; detail-less events take one argument.
+- `onMapEvent(MAP_EVENTS.X, (detail) => …)` — returns the unsubscribe function (return it from a `useEffect`, or collect several for a manual teardown).
+- `useMapEvent(MAP_EVENTS.X, handler)` (`src/hooks/useMapEvent.ts`) — subscribes for a component's lifetime and reads the latest handler through a ref, so callers pass a plain closure and never re-register.
+
+Adding an event means adding its name to `MAP_EVENTS` **and** its detail type to `MapEventDetails`.
+
+**Panel layout is not event-mirrored state.** Which side panel is open lives in one store, `src/hooks/useLayout.ts`: components read it with `useLayout()` and change it with `setSidebarOpen` / `setRidesPanelOpen` / the `toggle*` helpers. The store keeps the two panels mutually exclusive, persists the sidebar only for a deliberate toggle (`persist: true`), and dispatches `sidebar-toggle` / `rides-panel-toggle` itself. Never keep a local copy of this state fed by those events — that is the duplication the store replaced. `MapLegendProvider` seeds it per mount with `useSeedLayout` (cookie, or the embed option). Viewport checks go through `isMobileViewport()`, and panels dismiss on a phone via `useOutsideTap`.
+
+The full set:
 
 | Event | Purpose |
 |-------|---------|
@@ -132,17 +149,17 @@ The app uses custom DOM events (`window.dispatchEvent`) for component communicat
 | `area-select` | Rec-area heading clicked — zoom to area bounds |
 | `layer-toggle` | Show/hide a layer: `attractions`, `bikeResources`, `bikeRentals` (radio-style markers), `osmTrails`, `bikeNetwork` |
 | `center-location` | Pan map to a location (and open its popup) |
-| `sidebar-toggle` | Sidebar opened/closed — map resize + elevation pane layout |
+| `sidebar-toggle` | Sidebar opened/closed — dispatched by the layout store (`src/hooks/useLayout.ts`); the map resizes on it |
 | `elevation-hover` | Elevation chart hover — moves the map hover marker |
 | `location-update` | GPS fix — recenter / elevation-pane location dot |
 | `ride-style-chosen` | Welcome modal preference — selects default sidebar tab |
 | `ride-recording-start/stop/update` | Ride recorder lifecycle → live map track |
 | `ride-select` / `ride-deselect` | Saved ride selection (map track + elevation pane + panel) |
-| `rides-panel-toggle` | Rides panel opened/closed (closes the sidebar, with a `sidebar-toggle` dispatch) |
+| `rides-panel-toggle` | Rides panel opened/closed — dispatched by the layout store |
 | `toast` | Show a toast via the map's toast host |
 | `map-ready` | Map fully initialized (also sets `window.__mapReady` for late listeners) |
 
-**Important**: `route-select` and `trail-select` are bidirectional — both Map and MapLegend listen. When clicking on the map, the map dispatches and MapLegend updates its selection state; when clicking in the sidebar, MapLegend dispatches and Map handles the visual update. Event payloads are untyped (`CustomEvent.detail`) — check the dispatching site for the shape.
+**Important**: `route-select` and `trail-select` are bidirectional — both Map and MapLegend listen. When clicking on the map, the map dispatches and MapLegend updates its selection state; when clicking in the sidebar, MapLegend dispatches and Map handles the visual update. Payload shapes are in `MapEventDetails` (`src/events.ts`).
 
 ### Marker System
 
@@ -354,6 +371,47 @@ clicked way, those stats drive the pane's **headline numbers** (via
   totals become the pane's headline stats; on a miss the totals are computed from
   the real-time samples instead.
 
+### Platform services (GPS, keep-awake, compass)
+
+The map runs in a browser today and inside an Expo (React Native WebView) shell
+later, where the native side provides background location, keep-awake and the
+compass. Everything that touches a device capability goes through
+`src/platform/`:
+
+- **`types.ts`** defines the contracts: `GeolocationService`, `PositionWatch`,
+  `KeepAwakeService`, `HeadingService`, bundled as `PlatformServices` with a
+  `kind: 'web' | 'native'`. Fixes are the app's own `PositionFix`, never a DOM
+  `GeolocationPosition`; errors are `'permission-denied' | 'unavailable' |
+  'timeout'`.
+- **`web/`** wraps the Web APIs. Nothing outside `src/platform` may call
+  `navigator.geolocation`, `navigator.wakeLock` or listen to
+  `deviceorientation` directly.
+- **`usePlatform()`** (`context.tsx`) returns the services. Without a provider
+  the platform is detected: the Expo shell injects `window.__bikemapNative`
+  before load and the page talks to it over the React Native WebView message
+  channel (`src/platform/native/`, protocol in `protocol.ts`, host-side
+  contract in [`docs/guides/native-shell.md`](docs/guides/native-shell.md));
+  anything else is the browser. Change `protocol.ts` and that guide together.
+  A capability the host doesn't claim keeps its web implementation.
+- **`positions` is one shared, ref-counted GPS stream.** `useLocationTracking`
+  (the dot, follow-me and compass mode) and `useRideRecording` both subscribe
+  to it, so recording never starts a second watch. The first subscriber
+  starts the hardware, the last stops it. `positions.requestFix()` returns a
+  one-off fix without broadcasting it — a cached coarse fix paints the dot on a
+  cold start but must never become a ride track point.
+- **The stream decides when GPS is gone** (`isFatalPositionError`) and passes
+  `isFatal` to every subscriber's `onError`. A denied permission is fatal;
+  `unavailable` is fatal only before the first fix (no provider). After a
+  fix it is a transient loss of signal — iOS reports a tunnel or bridge that
+  way and keeps the watch running — so tracking hides the dot and the
+  recorder keeps recording. Don't let a subscriber classify errors itself:
+  one that joined later would disagree with the stream.
+- **`useKeepAwake(active)`** holds the platform's screen lock; holders are
+  counted, so tracking and recording can each hold it.
+- The GPS watch starts on the first explicit opt-in (locate button or Record),
+  never on map load, and stays on for the life of the map once started so a
+  rider can turn following off and still see where they are.
+
 ### Mapbox UI Overlays
 
 - The Mapbox canvas (`.map-container`) uses `position: absolute` with `z-index: 500` and covers the full viewport. It will obscure any sibling or child elements with a lower z-index.
@@ -421,13 +479,13 @@ All component styling uses Tailwind utility classes. The only remaining custom C
 
 Tests are in `*.test.ts` or `*.test.tsx` files adjacent to their source files. Run with `pnpm test:run`.
 
-Coverage spans ~30 test files: map utilities (`src/utils/map.test.ts`), config/city selection (`src/config/map.config.test.ts`), GBFS (`src/data/gbfs.test.ts`), ride recording/stats/storage (`src/hooks/useRideRecording.test.ts`, `src/utils/ride-*.test.ts`, `src/utils/elevation-accuracy.test.ts`), elevation (`dem`, `osm-elevation`, `gpx`), and components (`MapLegend`, `RidesPanel`, sidebar components). `src/components/Map.tsx` has no tests (known gap — see the deferred GPS/compass hook extraction).
+Coverage spans ~90 test files: map utilities (`src/utils/map.test.ts`), config/city selection (`src/config/map.config.test.ts`), GBFS (`src/data/gbfs.test.ts`), ride recording/stats/storage (`src/hooks/useRideRecording.test.ts`, `src/utils/ride-*.test.ts`, `src/utils/elevation-accuracy.test.ts`), elevation (`dem`, `osm-elevation`, `gpx`), location tracking and the platform services (`src/hooks/useLocationTracking.test.tsx`, `src/platform/**`), and components (`MapLegend`, `RidesPanel`, sidebar components). `src/components/Map.tsx` itself has no tests; its GPS, compass and recording glue lives in tested hooks.
 
 ### Mapbox Testing Limitations
 
 **Synthetic events don't trigger Mapbox layer clicks.** Mapbox's internal event system requires real user interactions to detect clicks on map layers. When testing:
 - You cannot programmatically click on route lines using `MouseEvent`
-- Use `window.dispatchEvent(new CustomEvent('route-select', { detail: { routeId } }))` to simulate what the map would do
+- Use `dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId })` to simulate what the map would do (from DevTools or a test, the raw `window.dispatchEvent(new CustomEvent('route-select', { detail: { routeId } }))` is equivalent — that is the only place raw dispatch belongs)
 - The Chrome DevTools MCP server can take screenshots but cannot trigger Mapbox layer events
 
 ### Browser Testing
@@ -503,15 +561,37 @@ only the following ordinary save keeps it.
   snapshot without osmIds), and **only Bend is seeded by default**
 
 **How the public map gets its trails and routes.** `src/app/(frontend)/page.tsx` is a
-server component: it calls `getCityTrailSummaries()` (Payload's Local API — a
-typed function call, no HTTP hop) plus `getCityRoutes()`, and passes both into
-`HomeClient` as props. The client publishes them to `src/data/trail-source.ts`
-and `src/data/route-source.ts` during render. The page resolves
-its city from the request hostname, so it reads `headers()` and renders per
-request. The trail summaries and GeoJSON use separate 24-hour Data Cache entries
-that collection hooks expire after content edits. `/api/map/trails` also sends
-`Cache-Control: max-age=60, stale-while-revalidate=3600`, so existing clients may
-serve one stale response while they refresh after an edit.
+server component: it calls `getCityContent()` (`src/payload/read/city-content.ts`),
+which reads every published object type through Payload's Local API in parallel
+(a typed function call, no HTTP hop) and returns one `CityContent` bundle.
+`HomeClient` hands it to `publishCityContent()` (`src/data/city-content.ts`)
+during render, which writes each list into its content store
+(`src/data/trail-source.ts`, `src/data/route-source.ts`, both built on
+`createContentStore` in `src/data/content-store.ts`). The page resolves its
+city from the request hostname, so it reads `headers()` and renders per
+request. The trail summaries and GeoJSON use separate 24-hour Data Cache
+entries that collection hooks expire after content edits. `/api/map/trails`
+also sends `Cache-Control: max-age=60, stale-while-revalidate=3600`, so
+existing clients may serve one stale response while they refresh after an
+edit.
+
+**Adding a Payload object type to the public map** (trailheads, events, …):
+
+1. Add a collection and a `src/payload/read/<type>.ts` reader that never
+   throws. If the reader goes through `unstable_cache` (as the trail readers
+   do), also add `afterChange` / `afterDelete` hooks that revalidate its tag —
+   see `src/payload/cache/` — or the admin's edits won't show for 24 hours.
+   `getCityRoutes` is uncached; pick deliberately.
+2. Create a store with `createContentStore(fallback?)` next to the type's data
+   module (a fallback keeps the checked-in data when the database hands back
+   nothing; no fallback means the database is the only truth).
+3. Add the list to `CityContentData` and the store to `contentStores` in
+   `city-content.ts`, and read it in `getCityContent`. The return type
+   requires every list, so forgetting the read is a type error.
+4. Consumers call the store's `get()` at render time and rebuild anything
+   derived through `subscribe`.
+
+`HomeClient` and `page.tsx` need no change. If an embed mode renders the new type, also add its reader to `embed/page.tsx`; each embed loads only the content it uses.
 
 Things to know before touching it:
 
