@@ -17,6 +17,10 @@ import {
 } from '@/data/mountain-bike-trails';
 import { resolveActiveCityId, cityConfigs } from '@/config/map.config';
 import { slugify } from '@/utils/string';
+import {
+  DEFAULT_FEATURE_SETTINGS,
+  type FeatureSettings,
+} from '@/config/features.config';
 import { MARKER_LAYERS, type EmbedLayer } from '@/utils/embed';
 
 export interface EmbedRouteOption {
@@ -37,6 +41,7 @@ export interface EmbedBuilderConfig {
   trails: EmbedTrailOption[];
   /** Layers this city can actually render, in `MARKER_LAYERS` order. */
   availableLayers: EmbedLayer[];
+  casualRoutes?: boolean;
 }
 
 /**
@@ -51,6 +56,7 @@ export function embedBuilderConfig(
   routes: BikeRoute[],
   trails: MountainBikeTrail[],
   cityQuery?: unknown,
+  settings: FeatureSettings = DEFAULT_FEATURE_SETTINGS,
 ): EmbedBuilderConfig {
   const cityId = resolveActiveCityId(hostname, cityQuery);
   const city = cityDataById[cityId];
@@ -65,14 +71,15 @@ export function embedBuilderConfig(
 
   return {
     cityId,
-    routes: routes.map((route) => ({
+    casualRoutes: settings.casualRoutes,
+    routes: (settings.casualRoutes ? routes : []).map((route) => ({
       id: route.id,
       name: route.name,
       slug: slugify(route.name),
     })),
     trails: trailOptions(availableTrails),
     availableLayers: [...MARKER_LAYERS, 'bikeNetwork' as const].filter(
-      (layer) => canShow[layer],
+      (layer) => canShow[layer] && settings[layer],
     ),
   };
 }

@@ -8,6 +8,12 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
       ADD COLUMN IF NOT EXISTS "condition_reporting_enabled" boolean DEFAULT true,
       ADD COLUMN IF NOT EXISTS "condition_reporting_disabled_message" varchar;
 
+    -- Globals have no row until their first save. Preserve the reporting
+    -- switch even when nobody has customized Theme yet.
+    INSERT INTO "theme" ("created_at", "updated_at")
+    SELECT NOW(), NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM "theme");
+
     DO $migration$
     BEGIN
       IF to_regclass('public.condition_reporting') IS NOT NULL THEN

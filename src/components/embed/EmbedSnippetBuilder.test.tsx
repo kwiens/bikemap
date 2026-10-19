@@ -253,3 +253,20 @@ describe('EmbedSnippetBuilder', () => {
     }
   });
 });
+
+it('starts with MTB embeds when Casual routes are disabled', () => {
+  render(
+    <EmbedSnippetBuilder
+      baseUrl="https://bikechatt.com"
+      config={{ ...CONFIG, casualRoutes: false }}
+    />,
+  );
+  expect(
+    screen.queryByRole('radio', { name: 'Casual routes' }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'MTB routes' })).toBeChecked();
+  expect(screen.getByTitle('Bike map preview')).toHaveAttribute(
+    'src',
+    expect.stringContaining('mode=mtb'),
+  );
+});

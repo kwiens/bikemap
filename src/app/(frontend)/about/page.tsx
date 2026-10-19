@@ -106,9 +106,10 @@ export default async function AboutPage({
   ]);
   const builderConfig = embedBuilderConfig(
     hostname,
-    settings.casualRoutes ? routes : [],
+    routes,
     trails,
     query.city,
+    settings,
   );
 
   return (
@@ -172,31 +173,29 @@ export default async function AboutPage({
         </section>
 
         {/* Downloads */}
-        {settings.embeds && (
-          <section className="mb-14">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
-              Downloads
-            </h2>
+        <section className="mb-14">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
+            Downloads
+          </h2>
 
-            <Link
-              href={`/export${citySearch}`}
-              className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-sm transition-all group mb-3"
-            >
-              <div className="w-10 h-10 rounded-lg bg-app-secondary flex items-center justify-center shrink-0">
-                <Printer className="w-5 h-5 text-app-primary" />
-              </div>
-              <div>
-                <p className="font-medium text-gray-900 group-hover:text-app-secondary">
-                  Print map & route files
-                </p>
-                <p className="text-sm text-gray-500">
-                  Download routes as GPX or SVG
-                </p>
-              </div>
-              <MapIcon className="w-4 h-4 text-gray-300 ml-auto" />
-            </Link>
-          </section>
-        )}
+          <Link
+            href={`/export${citySearch}`}
+            className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-sm transition-all group mb-3"
+          >
+            <div className="w-10 h-10 rounded-lg bg-app-secondary flex items-center justify-center shrink-0">
+              <Printer className="w-5 h-5 text-app-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900 group-hover:text-app-secondary">
+                Print map & route files
+              </p>
+              <p className="text-sm text-gray-500">
+                Download routes as GPX or SVG
+              </p>
+            </div>
+            <MapIcon className="w-4 h-4 text-gray-300 ml-auto" />
+          </Link>
+        </section>
 
         {showBikeChattAssets && (
           <section className="mb-14">
@@ -256,20 +255,22 @@ export default async function AboutPage({
         )}
 
         {/* Embed */}
-        <section className="mb-14">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
-            Put this map on your site
-          </h2>
-          <p className="text-sm text-gray-500 leading-relaxed mb-5">
-            Set it up below, then paste the snippet into your page — no account
-            or API key needed. The preview is the real thing, so what you see is
-            what your visitors get.
-          </p>
-          <EmbedSnippetBuilder
-            baseUrl={siteConfig.url}
-            config={builderConfig}
-          />
-        </section>
+        {settings.embeds && (
+          <section className="mb-14">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
+              Put this map on your site
+            </h2>
+            <p className="text-sm text-gray-500 leading-relaxed mb-5">
+              Set it up below, then paste the snippet into your page — no
+              account or API key needed. The preview is the real thing, so what
+              you see is what your visitors get.
+            </p>
+            <EmbedSnippetBuilder
+              baseUrl={siteConfig.url}
+              config={builderConfig}
+            />
+          </section>
+        )}
 
         {/* Data & credits */}
         <section className="mb-14">
