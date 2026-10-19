@@ -1007,7 +1007,7 @@ export interface GeneralSetting {
 export interface Theme {
   id: number;
   /**
-   * Upload a PNG, JPEG, or WebP logo. It replaces the bicycle mark on the welcome screen.
+   * Upload a PNG, JPEG, or WebP logo. Used on the welcome screen, sidebar, and About page. App icons and downloadable artwork are separate.
    */
   logo?: (number | null) | Media;
   /**

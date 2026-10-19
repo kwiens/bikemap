@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { siteConfig } from '@/config/site.config';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { getSetting, setSetting, type RideStyle } from '@/utils/settings';
-import { SiteLogo, useSiteBranding } from './SiteBrandingContext';
+import { SiteLogo } from './SiteBrandingContext';
 
 const features: {
   icon: IconDefinition;
@@ -71,7 +71,6 @@ export function getRideStyle(): RideStyle | null {
 }
 
 export function WelcomeModal() {
-  const { logoUrl } = useSiteBranding();
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
 
@@ -109,16 +108,14 @@ export function WelcomeModal() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5">
-          {logoUrl ? (
-            <SiteLogo
-              fallbackAlt={`${siteConfig.name} logo`}
-              className="mx-auto mb-3 h-[60px] max-w-[220px] object-contain"
-            />
-          ) : (
+          <SiteLogo
+            alt={`${siteConfig.name} logo`}
+            className="mx-auto mb-3 h-[60px] max-w-[220px] object-contain"
+          >
             <span className="inline-flex items-center justify-center w-[60px] h-[60px] rounded-full bg-app-primary text-app-secondary text-[28px] mb-3">
               <FontAwesomeIcon icon={faBicycle} />
             </span>
-          )}
+          </SiteLogo>
           <h1 className="text-[28px] font-bold text-app-secondary mb-1 tracking-tight">
             {siteConfig.name}
           </h1>

@@ -49,12 +49,11 @@ import { bikeNetworkUrl, bikeResources, mapFeatures } from '@/data/geo_data';
 import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { useFeatureSettings } from '@/components/FeatureSettingsContext';
-import { SiteLogo, useSiteBranding } from '@/components/SiteBrandingContext';
+import { SiteLogo } from '@/components/SiteBrandingContext';
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const features = useFeatureSettings();
-  const { logoUrl } = useSiteBranding();
   const hasRoutesSection =
     features.casualRoutes &&
     (getBikeRoutes().length > 0 ||
@@ -362,16 +361,14 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
         <div className="flex min-h-[72px] items-center justify-center border-b border-app-primary/40 bg-app-secondary px-5 pb-3 pt-[calc(12px+env(safe-area-inset-top))]">
           <div className="flex min-w-0 justify-center">
-            {logoUrl ? (
-              <SiteLogo
-                fallbackAlt={`${siteConfig.name} logo`}
-                className="max-h-12 max-w-full object-contain"
-              />
-            ) : (
+            <SiteLogo
+              alt={`${siteConfig.name} logo`}
+              className="max-h-12 max-w-full object-contain"
+            >
               <span className="truncate text-sm font-semibold text-app-surface">
                 {siteConfig.name}
               </span>
-            )}
+            </SiteLogo>
           </div>
         </div>
 

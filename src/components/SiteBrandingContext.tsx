@@ -28,25 +28,23 @@ export function SiteBrandingProvider({
   );
 }
 
-export function useSiteBranding(): SiteBranding {
-  return useContext(SiteBrandingContext);
-}
-
 export function SiteLogo({
   className,
-  fallbackAlt,
+  alt,
+  children,
 }: {
   className: string;
-  fallbackAlt: string;
+  alt: string;
+  children?: ReactNode;
 }) {
-  const { logoAlt, logoUrl } = useSiteBranding();
+  const { logoAlt, logoUrl } = useContext(SiteBrandingContext);
 
-  if (!logoUrl) return null;
+  if (!logoUrl) return children ?? null;
 
   // Payload accepts only raster images. Uploaded dimensions vary, so the
   // caller controls the bounding box while the natural aspect ratio is kept.
   return (
     // eslint-disable-next-line @next/next/no-img-element -- uploaded logos do not have fixed dimensions.
-    <img src={logoUrl} alt={logoAlt ?? fallbackAlt} className={className} />
+    <img src={logoUrl} alt={logoAlt ?? alt} className={className} />
   );
 }
