@@ -11,7 +11,10 @@ import {
 /** The two globals a React Native WebView host provides. */
 interface HostWindow {
   /** react-native-webview's channel from page to host. */
-  ReactNativeWebView?: { postMessage: (data: string) => void };
+  ReactNativeWebView?: {
+    postMessage: (data: string) => void;
+    injectedObjectJson?: () => string;
+  };
   /**
    * Installed by the host before load with the protocol version and
    * capabilities. The page adds `receive`, which the host calls (via
@@ -35,14 +38,27 @@ function hostWindow(): HostWindow | undefined {
  */
 export function isInsideNativeShell(): boolean {
   const w = hostWindow();
-  return Boolean(w?.ReactNativeWebView && w.__bikemapNative);
+  return Boolean(w?.ReactNativeWebView);
 }
 
-/** The host info injected before load, or null outside the shell or when the
+/** The injected host info, or null outside the shell or when the
  *  host speaks a protocol version this page does not. */
 export function detectNativeHost(): NativeHostInfo | null {
   if (!isInsideNativeShell()) return null;
-  const info = hostWindow()?.__bikemapNative;
+  const w = hostWindow();
+  // WebView recommends injectedJavaScriptObject on Android: unlike early
+  // script injection it does not depend on winning the page-load race.
+  try {
+    const json = w?.ReactNativeWebView?.injectedObjectJson?.();
+    const injected: unknown = json ? JSON.parse(json) : null;
+    if (typeof injected === 'object' && injected !== null) {
+      const info = (injected as { bikemap?: unknown }).bikemap;
+      if (isCompatibleHost(info)) return info;
+    }
+  } catch {
+    // Older shells can still use the legacy global below.
+  }
+  const info = w?.__bikemapNative;
   return isCompatibleHost(info) ? info : null;
 }
 

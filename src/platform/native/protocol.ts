@@ -30,9 +30,9 @@ export interface NativeCapabilities {
 }
 
 /**
- * Installed by the host before the page loads
- * (`injectedJavaScriptBeforeContentLoaded`). Its presence is how the page
- * knows it is inside the shell, synchronously, before the first render.
+ * Supplied through injectedJavaScriptObject.bikemap (preferred on Android),
+ * or the legacy __bikemapNative global. It must be available before the first
+ * device action; merely rendering the page does not select a backend.
  */
 export interface NativeHostInfo {
   protocolVersion: number;

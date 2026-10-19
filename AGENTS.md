@@ -387,8 +387,10 @@ compass. Everything that touches a device capability goes through
   `navigator.geolocation`, `navigator.wakeLock` or listen to
   `deviceorientation` directly.
 - **`usePlatform()`** (`context.tsx`) returns the services. Without a provider
-  the platform is detected: the Expo shell injects `window.__bikemapNative`
-  before load and the page talks to it over the React Native WebView message
+  the stable facade selects its backend on the first device action, so a late
+  host announcement after render does not lock in browser services. The Expo
+  shell supplies `injectedJavaScriptObject.bikemap` (or legacy
+  `window.__bikemapNative`) before that action. The page talks over the WebView message
   channel (`src/platform/native/`, protocol in `protocol.ts`, host-side
   contract in [`docs/guides/native-shell.md`](docs/guides/native-shell.md));
   anything else is the browser. Change `protocol.ts` and that guide together.

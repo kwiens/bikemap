@@ -24,6 +24,7 @@
  *
  * Client-safe: this runs in the admin bundle.
  */
+import { MinHeap } from './min-heap';
 import { dropRepeatedPoints } from '@/payload/osm/geometry';
 import { haversineDistance } from '@/utils/ride-stats';
 
@@ -828,57 +829,3 @@ function flatProjection(origin: Position): (p: Position) => [number, number] {
 }
 
 /** A binary min-heap of node ids keyed by priority. */
-class MinHeap {
-  private items: { node: number; priority: number }[] = [];
-
-  get size(): number {
-    return this.items.length;
-  }
-
-  push(node: number, priority: number): void {
-    const items = this.items;
-    items.push({ node, priority });
-    let index = items.length - 1;
-    while (index > 0) {
-      const parent = (index - 1) >> 1;
-      if (items[parent].priority <= items[index].priority) {
-        break;
-      }
-      [items[parent], items[index]] = [items[index], items[parent]];
-      index = parent;
-    }
-  }
-
-  pop(): number {
-    const items = this.items;
-    const top = items[0];
-    const last = items.pop();
-    if (items.length > 0 && last) {
-      items[0] = last;
-      let index = 0;
-      for (;;) {
-        const left = index * 2 + 1;
-        const right = left + 1;
-        let smallest = index;
-        if (
-          left < items.length &&
-          items[left].priority < items[smallest].priority
-        ) {
-          smallest = left;
-        }
-        if (
-          right < items.length &&
-          items[right].priority < items[smallest].priority
-        ) {
-          smallest = right;
-        }
-        if (smallest === index) {
-          break;
-        }
-        [items[smallest], items[index]] = [items[index], items[smallest]];
-        index = smallest;
-      }
-    }
-    return top.node;
-  }
-}

@@ -9,7 +9,10 @@ import {
 } from './transport';
 
 type HostGlobals = {
-  ReactNativeWebView?: { postMessage: (data: string) => void };
+  ReactNativeWebView?: {
+    postMessage: (data: string) => void;
+    injectedObjectJson?: () => string;
+  };
   __bikemapNative?: Record<string, unknown>;
 };
 
@@ -32,7 +35,7 @@ describe('detectNativeHost', () => {
 
   it('needs both the WebView channel and compatible host info', () => {
     w.ReactNativeWebView = { postMessage: vi.fn() };
-    expect(isInsideNativeShell()).toBe(false);
+    expect(isInsideNativeShell()).toBe(true);
     expect(detectNativeHost()).toBeNull();
     w.__bikemapNative = { ...HOST, protocolVersion: PROTOCOL_VERSION + 1 };
     // An incompatible shell is still the shell (no install prompt there),
@@ -42,6 +45,32 @@ describe('detectNativeHost', () => {
     w.__bikemapNative = { ...HOST };
     expect(detectNativeHost()).toEqual(HOST);
   });
+
+  it('reads host metadata from injectedJavaScriptObject without an early script', () => {
+    w.ReactNativeWebView = {
+      postMessage: vi.fn(),
+      injectedObjectJson: () => JSON.stringify({ bikemap: HOST }),
+    };
+    expect(isInsideNativeShell()).toBe(true);
+    expect(detectNativeHost()).toEqual(HOST);
+  });
+
+  it.each([
+    () => 'invalid JSON',
+    () => {
+      throw new Error('Host not ready');
+    },
+    () =>
+      JSON.stringify({ bikemap: { protocolVersion: PROTOCOL_VERSION + 1 } }),
+  ])(
+    'ignores unavailable or incompatible injected metadata',
+    (injectedObjectJson) => {
+      w.ReactNativeWebView = { postMessage: vi.fn(), injectedObjectJson };
+      expect(detectNativeHost()).toBeNull();
+      w.__bikemapNative = HOST;
+      expect(detectNativeHost()).toEqual(HOST);
+    },
+  );
 });
 
 describe('createReactNativeWebViewTransport', () => {

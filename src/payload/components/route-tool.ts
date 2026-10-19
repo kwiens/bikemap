@@ -65,6 +65,8 @@ export interface RouteTool {
 }
 
 interface Waypoint {
+  /** An explicit Alt-click permits a straight leg without a warning. */
+  isFree: boolean;
   /** Where the route starts or ends at this click — usually `snap.point`. */
   position: Position;
   /** The network point the click snapped to; null for a free (Alt) click. */
@@ -243,10 +245,10 @@ export function createRouteTool(
   function waypointAt(at: mapboxgl.LngLat, isFree: boolean): Waypoint {
     const click: Position = [at.lng, at.lat];
     if (isFree) {
-      return { position: click, snap: null };
+      return { isFree: true, position: click, snap: null };
     }
     const snap = snapToNetwork(network, click, snapMeters(at));
-    return { position: snap?.point ?? click, snap };
+    return { isFree: false, position: snap?.point ?? click, snap };
   }
 
   /** The leg from one waypoint to the next, and whether it had to go straight. */
@@ -256,7 +258,7 @@ export function createRouteTool(
     if (!routed) {
       return {
         coordinates: [from.position, to.position],
-        isStraight: Boolean(from.snap && to.snap),
+        isStraight: !from.isFree && !to.isFree,
       };
     }
     // A route starting on a line end that is off the network begins at that
@@ -284,7 +286,7 @@ export function createRouteTool(
         const position = end.atStart ? part[0] : part[part.length - 1];
         extend = { atStart: end.atStart, part: end.part };
         const snap = snapToNetwork(network, position, snapMeters(event.lngLat));
-        waypoints = [{ position, snap }];
+        waypoints = [{ isFree: false, position, snap }];
       } else {
         extend = null;
         waypoints = [waypointAt(event.lngLat, isFree)];

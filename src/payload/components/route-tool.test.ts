@@ -1,7 +1,52 @@
 import type mapboxgl from 'mapbox-gl';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NetworkWay } from '@/payload/osm/trail-network';
 import { createRouteTool, type RouteStatus } from './route-tool';
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('Follow trails straight fallback', () => {
+  it.each([false, true])(
+    'reports unsnapped legs unless Alt was intentional (Alt: %s)',
+    (isAlt) => {
+      vi.stubGlobal('requestAnimationFrame', () => 1);
+      const handlers = new Map<string, (event: unknown) => void>();
+      const statuses: RouteStatus[] = [];
+      const apply = vi.fn();
+      const map = {
+        on: (name: string, handler: (event: unknown) => void) =>
+          handlers.set(name, handler),
+        project: () => ({ dist: () => 100 }),
+        getZoom: () => 14,
+        getSource: () => undefined,
+      } as unknown as mapboxgl.Map;
+      const tool = createRouteTool(map, {
+        apply,
+        fetchNetwork: async () => [],
+        getParts: () => [],
+        isActive: () => true,
+        onStatus: (status) => statuses.push(status),
+      });
+      for (const lng of [-85.3, -85.31]) {
+        handlers.get('click')?.({
+          lngLat: { lng, lat: 35 },
+          point: { dist: () => 100 },
+          originalEvent: { altKey: isAlt },
+        });
+      }
+      expect(statuses.at(-1)?.waypoints).toBe(2);
+      if (isAlt) expect(statuses.at(-1)?.note).toBeNull();
+      else expect(statuses.at(-1)?.note).toContain('straight line');
+      tool.finish();
+      expect(apply).toHaveBeenCalledWith([
+        [
+          [-85.3, 35],
+          [-85.31, 35],
+        ],
+      ]);
+    },
+  );
+});
 
 function mapForView() {
   const handlers = new Map<string, () => void>();

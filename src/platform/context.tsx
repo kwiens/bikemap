@@ -1,23 +1,18 @@
 'use client';
 
 import { createContext, useContext, type ReactNode } from 'react';
-import { createNativePlatform } from './native/services';
-import { detectNativeHost } from './native/transport';
+import { createDetectedPlatform } from './detected';
 import type { PlatformServices } from './types';
-import { createWebPlatform } from './web';
 
-// Without a provider the platform is detected: the Expo shell announces itself
-// by injecting `window.__bikemapNative` before the page loads (see
-// docs/guides/native-shell.md), and anything else is the browser. The main app
-// never mounts a provider; tests and other hosts can.
+// Hosts and tests may supply services; the public app uses a lazy, stable
+// facade so the first render cannot permanently select the browser backend.
 const PlatformContext = createContext<PlatformServices | null>(null);
 
 let detectedPlatform: PlatformServices | null = null;
 
 function defaultPlatform(): PlatformServices {
   if (!detectedPlatform) {
-    const host = detectNativeHost();
-    detectedPlatform = host ? createNativePlatform(host) : createWebPlatform();
+    detectedPlatform = createDetectedPlatform();
   }
   return detectedPlatform;
 }

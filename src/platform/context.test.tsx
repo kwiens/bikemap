@@ -18,6 +18,61 @@ afterEach(() => {
 });
 
 describe('usePlatform detection', () => {
+  it('uses a late host without replacing services captured during render', async () => {
+    vi.resetModules();
+    const { usePlatform } = await import('./context');
+    const { result, rerender } = renderHook(() => usePlatform());
+    const services = result.current;
+    const positions = services.positions;
+    expect(services.kind).toBe('web');
+    services.geolocation.isSupported();
+
+    const postMessage = vi.fn();
+    hostWindow.ReactNativeWebView = { postMessage };
+    hostWindow.__bikemapNative = {
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: { geolocation: true, keepAwake: true, heading: true },
+    };
+    rerender();
+    expect(result.current).toBe(services);
+    expect(result.current.kind).toBe('native');
+    const stop = positions.subscribe(vi.fn());
+    expect(JSON.parse(postMessage.mock.calls[0][0]).type).toBe(
+      'geolocation/watch',
+    );
+    stop();
+    expect(JSON.parse(postMessage.mock.calls[1][0]).type).toBe(
+      'geolocation/clearWatch',
+    );
+  });
+
+  it('keeps a running browser session on the same backend after a late announcement', async () => {
+    vi.resetModules();
+    const watchPosition = vi.fn(() => 42);
+    const clearWatch = vi.fn();
+    vi.stubGlobal('navigator', { geolocation: { watchPosition, clearWatch } });
+    try {
+      const { usePlatform } = await import('./context');
+      const { result } = renderHook(() => usePlatform());
+      const stop = result.current.positions.subscribe(vi.fn());
+      const postMessage = vi.fn();
+      hostWindow.ReactNativeWebView = { postMessage };
+      hostWindow.__bikemapNative = {
+        protocolVersion: PROTOCOL_VERSION,
+        capabilities: { geolocation: true, keepAwake: true, heading: true },
+      };
+      expect(result.current.kind).toBe('web');
+      const stopSecond = result.current.positions.subscribe(vi.fn());
+      stop();
+      stopSecond();
+      expect(watchPosition).toHaveBeenCalledTimes(1);
+      expect(clearWatch).toHaveBeenCalledWith(42);
+      expect(postMessage).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it.each([
     { version: undefined, kind: 'web' },
     { version: PROTOCOL_VERSION, kind: 'native' },

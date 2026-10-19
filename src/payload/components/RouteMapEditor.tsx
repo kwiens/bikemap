@@ -22,6 +22,11 @@
  * 2. Nothing writes state at pointer-move rate. A waypoint drag updates the
  *    plan only on `dragend`.
  */
+import {
+  createEditorMap,
+  useEditorBasemap,
+  type EditorBasemap,
+} from './editor-map';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 // The (payload) route group has its own tree; without this the controls break.
@@ -74,12 +79,6 @@ import type { RouteNetworkResponse } from '@/payload/endpoints/route-network';
 import { cn } from '@/lib/utils';
 import { Banner } from './admin-ui';
 
-const STYLES = {
-  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
-  streets: 'mapbox://styles/mapbox/outdoors-v12',
-} as const;
-type StyleKey = keyof typeof STYLES;
-
 const NETWORK_SOURCE = 'route-editor-network';
 const TRAILS_SOURCE = 'route-editor-trails';
 const ROUTE_SOURCE = 'route-editor-route';
@@ -128,7 +127,7 @@ export function RouteMapEditor({
 
   const [plan, setPlan] = useState<RoutePlan>(() => initialPlan(planValue));
   const [ready, setReady] = useState(false);
-  const [basemap, setBasemap] = useState<StyleKey>('streets');
+  const [basemap, setBasemap] = useState<EditorBasemap>('streets');
   const [history, setHistory] = useState({ redo: 0, undo: 0 });
   const [pending, setPending] = useState(0);
   const [routing, setRouting] = useState(0);
@@ -142,7 +141,6 @@ export function RouteMapEditor({
   const readOnlyRef = useRef(Boolean(readOnly));
   const colorRef = useRef(colorValue || DEFAULT_ROUTE_COLOR);
   const trailsRef = useRef<GeoJSON.FeatureCollection>(EMPTY_COLLECTION);
-  const basemapRef = useRef<StyleKey>('streets');
   /** The last plan this editor wrote, so its own write isn't read back as external. */
   const writtenRef = useRef(normalized(plan));
   const setPlanValueRef = useRef(setPlanValue);
@@ -476,15 +474,9 @@ export function RouteMapEditor({
     ) {
       return;
     }
-    mapboxgl.accessToken = mapConfig.mapbox.accessToken;
     const view = initialView(planRef.current, cityValueAtMount(cityValue));
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: STYLES.streets,
-      ...view,
-    });
+    const map = createEditorMap(containerRef.current, view);
     mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     map.doubleClickZoom.disable();
 
     // Fires on first load and after every basemap switch, which discards our
@@ -584,14 +576,7 @@ export function RouteMapEditor({
     }
   }, [colorValue, paintRoute, ready]);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || basemapRef.current === basemap) {
-      return;
-    }
-    basemapRef.current = basemap;
-    map.setStyle(STYLES[basemap]);
-  }, [basemap]);
+  useEditorBasemap(mapRef, basemap);
 
   const fitRoute = useCallback(() => {
     const bounds = boundsOf(planRef.current.legs.map((leg) => leg.coordinates));
