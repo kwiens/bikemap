@@ -132,6 +132,7 @@ export default async function AboutPage({
         {/* Hero */}
         <div className="flex flex-col items-center text-center mb-14">
           <SiteLogo
+            cityId={siteConfig.cityId}
             alt={`${siteConfig.name} logo`}
             className="mb-6 max-h-56 max-w-56 object-contain"
           >

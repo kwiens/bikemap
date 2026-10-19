@@ -109,6 +109,7 @@ export function WelcomeModal() {
       >
         <div className="mb-5">
           <SiteLogo
+            cityId={siteConfig.cityId}
             alt={`${siteConfig.name} logo`}
             className="mx-auto mb-3 h-[60px] max-w-[220px] object-contain"
           >

@@ -1011,9 +1011,12 @@ export interface GeneralSetting {
 export interface Theme {
   id: number;
   /**
-   * Upload a PNG, JPEG, or WebP logo up to 3 MB. Used on the welcome screen, sidebar, and About page. App icons and downloadable artwork are separate.
+   * Upload a PNG, JPEG, or WebP logo up to 3 MB per city. Each city uses its own logo on the welcome screen, sidebar, and About page. Leave blank to keep its existing branding. App icons and downloadable artwork are separate.
    */
-  logo?: (number | null) | Media;
+  logos?: {
+    chattanooga?: (number | null) | Media;
+    bend?: (number | null) | Media;
+  };
   /**
    * Changes selected tabs, highlighted cards, icons, borders, and keyboard focus rings.
    */
@@ -1061,7 +1064,12 @@ export interface GeneralSettingsSelect<T extends boolean = true> {
  * via the `definition` "theme_select".
  */
 export interface ThemeSelect<T extends boolean = true> {
-  logo?: T;
+  logos?:
+    | T
+    | {
+        chattanooga?: T;
+        bend?: T;
+      };
   primaryColor?: T;
   sidebarColor?: T;
   surfaceColor?: T;

@@ -9,11 +9,13 @@ afterEach(cleanup);
 it('updates every logo and restores each fallback when the configured logo is removed', () => {
   function Branding({ url }: { url: string | null }) {
     return (
-      <SiteBrandingProvider branding={{ logoUrl: url, logoAlt: 'City logo' }}>
-        <SiteLogo alt="Welcome logo" className="h-12">
+      <SiteBrandingProvider
+        branding={{ chattanooga: { logoUrl: url, logoAlt: 'City logo' } }}
+      >
+        <SiteLogo cityId="chattanooga" alt="Welcome logo" className="h-12">
           <span>Welcome fallback</span>
         </SiteLogo>
-        <SiteLogo alt="About logo" className="h-56">
+        <SiteLogo cityId="chattanooga" alt="About logo" className="h-56">
           <span>About fallback</span>
         </SiteLogo>
       </SiteBrandingProvider>
@@ -38,10 +40,46 @@ it('updates every logo and restores each fallback when the configured logo is re
 it('uses the caller’s accessible name when the uploaded image has no alternative text', () => {
   render(
     <SiteBrandingProvider
-      branding={{ logoUrl: '/media/logo.png', logoAlt: null }}
+      branding={{ chattanooga: { logoUrl: '/media/logo.png', logoAlt: null } }}
     >
-      <SiteLogo alt="City logo" className="h-12" />
+      <SiteLogo cityId="chattanooga" alt="City logo" className="h-12" />
     </SiteBrandingProvider>,
   );
   expect(screen.getByRole('img', { name: 'City logo' })).toBeInTheDocument();
+});
+
+it('keeps city uploads separate and falls back only for the city without an upload', () => {
+  const { rerender } = render(
+    <SiteBrandingProvider
+      branding={{
+        chattanooga: { logoUrl: '/media/chatt.png', logoAlt: 'Bike Chatt' },
+        bend: { logoUrl: '/media/bend.png', logoAlt: 'Ride Bend' },
+      }}
+    >
+      <SiteLogo cityId="chattanooga" alt="Chatt" className="h-12" />
+      <SiteLogo cityId="bend" alt="Bend" className="h-12" />
+    </SiteBrandingProvider>,
+  );
+  expect(screen.getByRole('img', { name: 'Bike Chatt' })).toHaveAttribute(
+    'src',
+    '/media/chatt.png',
+  );
+  expect(screen.getByRole('img', { name: 'Ride Bend' })).toHaveAttribute(
+    'src',
+    '/media/bend.png',
+  );
+
+  rerender(
+    <SiteBrandingProvider
+      branding={{
+        chattanooga: { logoUrl: '/media/chatt.png', logoAlt: 'Bike Chatt' },
+      }}
+    >
+      <SiteLogo cityId="bend" alt="Bend" className="h-12">
+        <span>Ride Bend default</span>
+      </SiteLogo>
+    </SiteBrandingProvider>,
+  );
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  expect(screen.getByText('Ride Bend default')).toBeInTheDocument();
 });

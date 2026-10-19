@@ -1,4 +1,5 @@
 import type { GlobalConfig, TextField } from 'payload';
+import { siteConfigs } from '@/config/site.config';
 
 /** Site palette, editable at `/admin/globals/theme`. */
 
@@ -48,19 +49,19 @@ export const Theme: GlobalConfig = {
   },
   fields: [
     {
-      type: 'collapsible',
-      label: 'Logo',
-      fields: [
-        {
-          name: 'logo',
-          type: 'upload',
-          relationTo: 'media',
-          admin: {
-            description:
-              'Upload a PNG, JPEG, or WebP logo up to 3 MB. Used on the welcome screen, sidebar, and About page. App icons and downloadable artwork are separate.',
-          },
-        },
-      ],
+      name: 'logos',
+      type: 'group',
+      label: 'City logos',
+      admin: {
+        description:
+          'Upload a PNG, JPEG, or WebP logo up to 3 MB per city. Each city uses its own logo on the welcome screen, sidebar, and About page. Leave blank to keep its existing branding. App icons and downloadable artwork are separate.',
+      },
+      fields: Object.values(siteConfigs).map((city) => ({
+        name: city.cityId,
+        label: city.name,
+        type: 'upload',
+        relationTo: 'media',
+      })),
     },
     {
       type: 'collapsible',

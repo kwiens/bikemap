@@ -17,6 +17,7 @@ import * as migration_20261017_204000_split_general_settings from './20261017_20
 import * as migration_20261017_205000_add_casual_routes_setting from './20261017_205000_add_casual_routes_setting';
 import * as migration_20261018_035455_add_theme_logo from './20261018_035455_add_theme_logo';
 import * as migration_20261019_002725_add_blob_storage from './20261019_002725_add_blob_storage';
+import * as migration_20261019_003040_city_logos from './20261019_003040_city_logos';
 
 export const migrations = [
   {
@@ -112,6 +113,11 @@ export const migrations = [
   {
     up: migration_20261019_002725_add_blob_storage.up,
     down: migration_20261019_002725_add_blob_storage.down,
-    name: '20261019_002725_add_blob_storage'
+    name: '20261019_002725_add_blob_storage',
+  },
+  {
+    up: migration_20261019_003040_city_logos.up,
+    down: migration_20261019_003040_city_logos.down,
+    name: '20261019_003040_city_logos'
   },
 ];

@@ -141,7 +141,12 @@ describe('MapLegendProvider', () => {
   it('shows the configured logo at the top of the sidebar', () => {
     render(
       <SiteBrandingProvider
-        branding={{ logoAlt: 'City cycling logo', logoUrl: '/media/logo.png' }}
+        branding={{
+          [siteConfig.cityId]: {
+            logoAlt: 'City cycling logo',
+            logoUrl: '/media/logo.png',
+          },
+        }}
       >
         <MapLegendProvider>
           <div />

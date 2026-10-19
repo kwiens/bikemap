@@ -362,6 +362,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
         <div className="flex min-h-[72px] items-center justify-center border-b border-app-primary/40 bg-app-secondary px-5 pb-3 pt-[calc(12px+env(safe-area-inset-top))]">
           <div className="flex min-w-0 justify-center">
             <SiteLogo
+              cityId={siteConfig.cityId}
               alt={`${siteConfig.name} logo`}
               className="max-h-12 max-w-full object-contain"
             >

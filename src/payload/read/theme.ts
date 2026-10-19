@@ -2,7 +2,10 @@ import 'server-only';
 
 import { getPayload } from 'payload';
 import config from '@payload-config';
-import type { SiteBranding } from '@/components/SiteBrandingContext';
+import type { CityBranding } from '@/components/SiteBrandingContext';
+
+import { siteConfigs } from '@/config/site.config';
+import type { CityId } from '@/data/cities/types';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -12,16 +15,20 @@ export interface ThemeDoc {
   sidebarColor?: null | string;
   surfaceColor?: null | string;
   textColor?: null | string;
-  logo?:
-    | null
-    | number
-    | {
-        alt?: null | string;
-        url?: null | string;
-      };
+  logos?: Partial<
+    Record<
+      CityId,
+      | null
+      | number
+      | {
+          alt?: null | string;
+          url?: null | string;
+        }
+    >
+  > | null;
 }
 
-type ThemeColorField = Exclude<keyof ThemeDoc, 'logo'>;
+type ThemeColorField = Exclude<keyof ThemeDoc, 'logos'>;
 
 const FRONTEND_VARIABLES: Array<[ThemeColorField, string]> = [
   ['primaryColor', '--app-primary'],
@@ -82,18 +89,23 @@ export async function getThemeCss(): Promise<string> {
 }
 
 export async function getFrontendTheme(): Promise<{
-  branding: SiteBranding;
+  branding: CityBranding;
   css: string;
 }> {
   const theme = await readTheme(1);
-  const logo =
-    theme?.logo && typeof theme.logo === 'object' ? theme.logo : undefined;
+  const branding: CityBranding = {};
+  for (const { cityId } of Object.values(siteConfigs)) {
+    const logo = theme?.logos?.[cityId];
+    if (logo && typeof logo === 'object') {
+      branding[cityId] = {
+        logoAlt: logo.alt ?? null,
+        logoUrl: logo.url ?? null,
+      };
+    }
+  }
 
   return {
-    branding: {
-      logoAlt: logo?.alt ?? null,
-      logoUrl: logo?.url ?? null,
-    },
+    branding,
     css: theme ? buildFrontendThemeCss(theme) : '',
   };
 }
