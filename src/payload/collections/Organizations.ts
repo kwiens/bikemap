@@ -30,6 +30,10 @@ export const Organizations: CollectionConfig = {
     singular: 'Steward',
   },
   admin: {
+    // Trail stewards are hard-disabled for now and are not controlled by a
+    // General settings switch. Keep the collection registered so existing
+    // relationships and data remain recoverable.
+    hidden: true,
     useAsTitle: 'name',
     defaultColumns: ['name', 'abbreviation', 'city', 'url'],
     description:
@@ -40,10 +44,10 @@ export const Organizations: CollectionConfig = {
   access: {
     // Options are shared reference data, so any signed-in editor may read them,
     // but changing the list is an admin decision.
-    create: ({ req }) => req.user?.role === 'admin',
-    delete: ({ req }) => req.user?.role === 'admin',
+    create: () => false,
+    delete: () => false,
     read: ({ req }) => Boolean(req.user),
-    update: ({ req }) => req.user?.role === 'admin',
+    update: () => false,
   },
   fields: [
     {

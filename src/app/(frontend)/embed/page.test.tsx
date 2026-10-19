@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import EmbedPage from './page';
 
-const { routes, trails } = vi.hoisted(() => ({
+const { routes, settings, trails } = vi.hoisted(() => ({
   routes: vi.fn(async () => ({ routes: [] })),
+  settings: vi.fn(async () => ({ casualRoutes: true, embeds: true })),
   trails: vi.fn(async () => ({ trails: [] })),
+}));
+vi.mock('@/payload/read/general-settings', () => ({
+  getGeneralSettings: settings,
 }));
 vi.mock('@/payload/read/routes', () => ({ getCityRoutes: routes }));
 vi.mock('@/payload/read/trails', () => ({ getCityTrailSummaries: trails }));

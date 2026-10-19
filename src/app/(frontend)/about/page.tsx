@@ -8,6 +8,7 @@ import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
 import { getCityRoutes } from '@/payload/read/routes';
 import { getCityTrailSummaries } from '@/payload/read/trails';
+import { getGeneralSettings } from '@/payload/read/general-settings';
 import {
   ArrowLeft,
   MessageCircle,
@@ -98,15 +99,17 @@ export default async function AboutPage({
   const region = mapConfig.region.displayName;
   const showBikeChattAssets = siteConfig.cityId === 'chattanooga';
   const isBend = siteConfig.cityId === 'bend';
-  const [{ routes }, { trails }] = await Promise.all([
+  const [{ routes }, { trails }, settings] = await Promise.all([
     getCityRoutes(siteConfig.cityId),
     getCityTrailSummaries(siteConfig.cityId),
+    getGeneralSettings(),
   ]);
   const builderConfig = embedBuilderConfig(
     hostname,
     routes,
     trails,
     query.city,
+    settings,
   );
 
   return (
@@ -252,20 +255,22 @@ export default async function AboutPage({
         )}
 
         {/* Embed */}
-        <section className="mb-14">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
-            Put this map on your site
-          </h2>
-          <p className="text-sm text-gray-500 leading-relaxed mb-5">
-            Set it up below, then paste the snippet into your page — no account
-            or API key needed. The preview is the real thing, so what you see is
-            what your visitors get.
-          </p>
-          <EmbedSnippetBuilder
-            baseUrl={siteConfig.url}
-            config={builderConfig}
-          />
-        </section>
+        {settings.embeds && (
+          <section className="mb-14">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">
+              Put this map on your site
+            </h2>
+            <p className="text-sm text-gray-500 leading-relaxed mb-5">
+              Set it up below, then paste the snippet into your page — no
+              account or API key needed. The preview is the real thing, so what
+              you see is what your visitors get.
+            </p>
+            <EmbedSnippetBuilder
+              baseUrl={siteConfig.url}
+              config={builderConfig}
+            />
+          </section>
+        )}
 
         {/* Data & credits */}
         <section className="mb-14">

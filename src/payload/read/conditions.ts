@@ -212,12 +212,12 @@ export async function getConditionSummary(
         where: { active: { not_equals: false } },
       }),
       latestReports(payload, city),
-      payload.findGlobal({ slug: 'condition-reporting', depth: 0 }),
+      payload.findGlobal({ slug: 'general-settings', depth: 0 }),
     ]);
 
     // A global nobody has opened has no row at all, so absent means on.
-    const enabled = settings?.enabled !== false;
-    const siteNote = settings?.disabledMessage ?? '';
+    const enabled = settings?.conditionReporting !== false;
+    const siteNote = settings?.conditionReportingDisabledMessage ?? '';
 
     const latest: Record<string, ConditionReport> = {};
     for (const row of reports.docs) {

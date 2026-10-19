@@ -208,6 +208,10 @@ export const Trails: CollectionConfig = {
                   label: 'Steward',
                   filterOptions: stewardsForTrailCity,
                   admin: {
+                    // Trail stewards are hard-disabled for now, with no
+                    // settings toggle. Preserve the relationship only so data
+                    // can be restored later without a destructive migration.
+                    hidden: true,
                     width: '50%',
                     description:
                       'Who looks after this trail. Manage the list under Lists → Stewards.',
@@ -229,7 +233,8 @@ export const Trails: CollectionConfig = {
                   ),
                   admin: {
                     width: '50%',
-                    description: 'Manage the list under Lists → Trail ratings.',
+                    description:
+                      'Difficulty options are configured in src/config/trail-options.config.ts.',
                   },
                 },
                 {

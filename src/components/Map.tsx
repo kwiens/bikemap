@@ -86,6 +86,7 @@ import { clearMapReady, onMapReady, setMapReady } from '@/utils/map-ready';
 import { useTrailConditions } from '@/components/TrailConditionsProvider';
 import { closedTrails } from '@/data/trail-conditions';
 import { fetchRouteCollection, runtimeRouteIds } from '@/utils/route-source';
+import { useFeatureSettings } from '@/components/FeatureSettingsContext';
 
 // Ride recording is unreachable in embed mode, and its subtree (history, GPX,
 // ride stats and storage) is a sizeable chunk to make a partner's page
@@ -119,11 +120,12 @@ if (!hasMapboxToken) {
 
 // MapboxMap component - isolated from UI state changes
 const MapboxMap = memo(function MapboxMap() {
+  const features = useFeatureSettings();
   const { isEmbed, options: embedOptions } = useEmbed();
   const isMtbEmbed = isEmbed && embedOptions.mode === 'mtb';
   const bikeRoutes = useMemo(
-    () => (isMtbEmbed ? [] : getBikeRoutes()),
-    [isMtbEmbed],
+    () => (isMtbEmbed || !features.casualRoutes ? [] : getBikeRoutes()),
+    [features.casualRoutes, isMtbEmbed],
   );
   // Embed mode is fixed for the lifetime of the tree, but the init effect runs
   // once on mount and must not list it as a dependency.
@@ -500,11 +502,13 @@ const MapboxMap = memo(function MapboxMap() {
       // group), so just flip their visibility. Remember the desired state so it
       // can be replayed if the style hadn't finished loading yet.
       if (layer === 'osmTrails') {
+        if (!features.nationwideTrails) return;
         setOsmTrailsVisible(map.current, visible);
         return;
       }
 
       if (layer === 'bikeNetwork') {
+        if (!features.bikeNetwork) return;
         // Lazy-attach the (multi-MB) network GeoJSON on first enable rather than
         // at startup, so users who never open it don't pay the download. No
         // isStyleLoaded() gate: it reports false during any pending style
@@ -529,6 +533,7 @@ const MapboxMap = memo(function MapboxMap() {
       }
 
       if (layer === 'bikeRentals') {
+        if (!features.bikeRentals) return;
         if (visible) {
           bikeRentalMarkers.current.hide();
 
@@ -556,6 +561,7 @@ const MapboxMap = memo(function MapboxMap() {
       }
 
       if (layer === 'attractions') {
+        if (!features.attractions) return;
         if (visible) {
           bikeResourceMarkers.current.hide();
 
@@ -573,6 +579,7 @@ const MapboxMap = memo(function MapboxMap() {
       }
 
       if (layer === 'bikeResources') {
+        if (!features.bikeResources) return;
         if (visible) {
           attractionMarkers.current.hide();
 
@@ -589,7 +596,7 @@ const MapboxMap = memo(function MapboxMap() {
         }
       }
     },
-    [bikeRoutes, restingRouteOpacity],
+    [bikeRoutes, features, restingRouteOpacity],
   );
 
   // Handler for centering on a specific location
@@ -1026,7 +1033,7 @@ const MapboxMap = memo(function MapboxMap() {
           // leftover TPL trails layer) so they don't render over our routes.
           hideStrayStyleLayers(newMap);
 
-          if (showTrails) {
+          if (showTrails && features.nationwideTrails) {
             // Attach the nationwide OSM bike-trails layer (hidden until toggled).
             // Its click handler is registered later, after the curated
             // route/MTB query, so curated trails win overlapping clicks.
@@ -1124,7 +1131,7 @@ const MapboxMap = memo(function MapboxMap() {
           // then bails on the already-handled click. Clear any prior registration
           // first in case the style reloads and re-runs this block.
           osmSelectionCleanup.current?.();
-          if (showTrails) {
+          if (showTrails && features.nationwideTrails) {
             osmSelectionCleanup.current = registerOsmTrailSelection(newMap);
           }
 
@@ -1422,12 +1429,13 @@ function MapUnavailable() {
 // Main Map component - manages layout and UI chrome
 export default function BikeMap() {
   const { isEmbed } = useEmbed();
+  const { rideRecording } = useFeatureSettings();
   return (
     <MapLegendProvider>
       <div className="w-screen h-full relative overflow-visible">
         <MapboxMap />
         {/* Ride recording needs geolocation + persistent storage — not for embeds */}
-        {!isEmbed && <RidesPanel />}
+        {!isEmbed && rideRecording && <RidesPanel />}
       </div>
     </MapLegendProvider>
   );

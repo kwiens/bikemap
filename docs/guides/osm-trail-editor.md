@@ -540,14 +540,14 @@ page. The markup mirrors `DefaultNavClient` in `@payloadcms/next`.
 | Group | What's in it |
 |---|---|
 | **Trails** | Trails. The daily job, on its own so it is never something to scroll past. |
-| **Lists** | Trail complexes, ratings, kinds, stewards — everything that exists only to populate a dropdown on a trail. Named for what a curator does with them rather than what they are; "Vocabulary" and "Taxonomy" are terms for people who build CMSes, not people who maintain trails. |
-| **Settings** | Theme, users. |
+| **Lists** | Trail complexes and kinds — editable options that populate dropdowns on a trail. |
+| **Settings** | General settings (feature switches), Theme (color palette), users. |
 
 **The trail form** has two unnamed tabs:
 
 | Tab | Holds |
 |---|---|
-| **Details** | Trail name, complex, steward, rating, kind — plus an **Advanced** section, collapsed, for the fields that fill themselves in |
+| **Details** | Trail name, complex, rating, and kind — plus an **Advanced** section, collapsed, for the fields that fill themselves in |
 | **Trail line** | The map editor, selected OSM segments, preview refresh action, and trail-line report |
 
 The elevation chart, formatted measurements, and calculation action sit below
@@ -593,23 +593,20 @@ whether those fields exist.
 
 ## Reference collections
 
-Four fields on a trail are dropdowns backed by their own collections rather than
-free text or a hardcoded `select`, so their options are editable without a
-deploy:
+Trail fields use relationship-backed dropdowns for referential integrity:
 
 | Collection | What it is |
 |---|---|
 | **Trail complexes** | What trails group under — "Phil's Trail Complex", "Swampy Lakes" |
-| **Stewards** | Whoever looks after a trail — volunteer clubs (COTA, SORBA) and the land managers whose ground it crosses |
-| **Trail ratings** | How trails are graded, and the colour each grade draws in |
+| **Trail ratings** | How trails are graded, and the colour each grade draws in. Code-owned in `src/config/trail-options.config.ts`. |
 | **Trail kinds** | What sort of thing a trail is, and its colour override and icon |
 
 The sidebar hierarchy is **region → trail complex → trail**, so a complex is the
 middle level and `region` is a field on it.
 
-Payload keeps both honest: renaming one updates every trail pointing at it, and
-it blocks deleting one still in use. Curating the lists is admin-only — which
-is everyone today, see [Roles](#roles).
+Payload keeps the relationships honest. Trail stewards are currently hidden
+without dropping their collection or stored relationships, so they can be
+restored later without data loss.
 
 `recArea` used to be free text, which meant a typo silently created a new
 sidebar grouping that looked real.

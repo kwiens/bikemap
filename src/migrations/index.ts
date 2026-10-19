@@ -12,6 +12,9 @@ import * as migration_20261001_221021_add_composed_routes from './20261001_22102
 import * as migration_20261002_041000_ensure_theme_global from './20261002_041000_ensure_theme_global';
 import * as migration_20261002_043000_expand_theme_palette from './20261002_043000_expand_theme_palette';
 import * as migration_20261002_050000_simplify_theme_palette from './20261002_050000_simplify_theme_palette';
+import * as migration_20261017_203000_general_settings from './20261017_203000_general_settings';
+import * as migration_20261017_204000_split_general_settings from './20261017_204000_split_general_settings';
+import * as migration_20261017_205000_add_casual_routes_setting from './20261017_205000_add_casual_routes_setting';
 
 export const migrations = [
   {
@@ -83,5 +86,20 @@ export const migrations = [
     up: migration_20261002_050000_simplify_theme_palette.up,
     down: migration_20261002_050000_simplify_theme_palette.down,
     name: '20261002_050000_simplify_theme_palette',
+  },
+  {
+    up: migration_20261017_203000_general_settings.up,
+    down: migration_20261017_203000_general_settings.down,
+    name: '20261017_203000_general_settings',
+  },
+  {
+    up: migration_20261017_204000_split_general_settings.up,
+    down: migration_20261017_204000_split_general_settings.down,
+    name: '20261017_204000_split_general_settings',
+  },
+  {
+    up: migration_20261017_205000_add_casual_routes_setting.up,
+    down: migration_20261017_205000_add_casual_routes_setting.down,
+    name: '20261017_205000_add_casual_routes_setting',
   },
 ];

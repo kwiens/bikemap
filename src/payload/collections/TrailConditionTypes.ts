@@ -30,10 +30,9 @@ const blockDeleteWhenReferenced: CollectionBeforeDeleteHook = async ({
 };
 
 /**
- * The options behind the dropdown on the public report form.
- *
- * Curated like trail-ratings because conditions are local: "Dusty / loose"
- * matters in Bend in August and nowhere in a Tennessee spring.
+ * Backing rows for the code-owned options behind the public report form.
+ * Keeping relationships preserves historical report meaning and referential
+ * integrity; changes originate in `trail-options.config.ts`.
  */
 export const TrailConditionTypes: CollectionConfig = {
   slug: 'trail-condition-types',
@@ -44,18 +43,18 @@ export const TrailConditionTypes: CollectionConfig = {
   // Best to worst, so the rider's dropdown reads as a scale.
   defaultSort: 'sortOrder',
   admin: {
+    hidden: true,
     useAsTitle: 'name',
     defaultColumns: ['name', 'value', 'color', 'sortOrder', 'active'],
-    description:
-      'What riders can report a trail as being. Anything added here becomes selectable on the report form.',
+    description: 'Code-owned trail condition options.',
     group: 'Lists',
     listSearchableFields: ['name', 'value'],
   },
   access: {
-    create: ({ req }) => req.user?.role === 'admin',
-    delete: ({ req }) => req.user?.role === 'admin',
+    create: () => false,
+    delete: () => false,
     read: ({ req }) => Boolean(req.user),
-    update: ({ req }) => req.user?.role === 'admin',
+    update: () => false,
   },
   hooks: {
     beforeDelete: [blockDeleteWhenReferenced],

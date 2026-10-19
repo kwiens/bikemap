@@ -167,7 +167,8 @@ export function TrailConditionLog() {
     return (
       <div className="field-type">
         <Banner tone="warning">
-          No conditions to pick from. Add some under Lists → Trail conditions.
+          No conditions to pick from. Check the configured trail condition
+          options and seed the database.
         </Banner>
       </div>
     );

@@ -37,7 +37,7 @@ function database() {
           ? [{ id: 1, slug: 'pondo' }]
           : [{ id: 2, name: 'Dry', value: 'dry' }],
     })),
-    findGlobal: vi.fn().mockResolvedValue({ enabled: true }),
+    findGlobal: vi.fn().mockResolvedValue({ conditionReporting: true }),
     count: vi.fn().mockResolvedValue({ totalDocs: 0 }),
     create: vi
       .fn()
