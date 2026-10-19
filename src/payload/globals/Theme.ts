@@ -54,7 +54,7 @@ export const Theme: GlobalConfig = {
       label: 'City logos',
       admin: {
         description:
-          'Upload a PNG, JPEG, or WebP logo up to 3 MB per city. Each city uses its own logo on the welcome screen, sidebar, and About page. Leave blank to keep its existing branding. App icons and downloadable artwork are separate.',
+          'Upload a PNG, JPEG, or WebP logo up to 3 MB per city. Each city uses its own logo on the welcome screen, sidebar, and About page. Leave blank to keep its existing branding. Favicons and app icons also use this logo. Downloadable artwork is separate.',
       },
       fields: Object.values(siteConfigs).map((city) => ({
         name: city.cityId,

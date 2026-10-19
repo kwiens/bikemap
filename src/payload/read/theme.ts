@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getPayload } from 'payload';
+import { cache } from 'react';
 import config from '@payload-config';
 import type { CityBranding } from '@/components/SiteBrandingContext';
 
@@ -111,7 +112,9 @@ export async function getFrontendTheme(): Promise<{
 }
 
 /** Database failures must never take either the map or admin login down. */
-async function readTheme(depth = 0): Promise<ThemeDoc | null> {
+const readTheme = cache(async function readTheme(
+  depth = 0,
+): Promise<ThemeDoc | null> {
   if (!process.env.DATABASE_URL) return null;
 
   try {
@@ -124,4 +127,4 @@ async function readTheme(depth = 0): Promise<ThemeDoc | null> {
     console.error('Could not read the site theme; using defaults.', error);
     return null;
   }
-}
+});

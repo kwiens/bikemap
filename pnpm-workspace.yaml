@@ -7,7 +7,7 @@ overrides:
   'undici@7': 7.29.0
 
 allowBuilds:
-  # Biome and Sharp are direct development dependencies with native binaries.
+  # Biome and Sharp use native binaries.
   '@biomejs/biome': true
   sharp: true
   # Both packages publish platform-specific binaries, so their install scripts

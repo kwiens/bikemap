@@ -1,3 +1,4 @@
+import { getSiteIcons } from '@/payload/read/site-icons';
 import Image from 'next/image';
 import { SiteLogo } from '@/components/SiteBrandingContext';
 import Link from 'next/link';
@@ -43,6 +44,7 @@ export async function generateMetadata({
   const siteConfig = siteConfigForHostname(hostname, query.city);
 
   return {
+    icons: (await getSiteIcons(siteConfig.cityId)).icons,
     title: `About — ${siteConfig.name}`,
     description: `About the ${siteConfig.name} project — a free interactive map of bike routes, trails, and resources.`,
   };

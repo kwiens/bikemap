@@ -1,3 +1,4 @@
+import { getSiteIcons } from '@/payload/read/site-icons';
 /**
  * The public map, rendered on the server so trail content comes from Payload.
  *
@@ -31,6 +32,7 @@ export async function generateMetadata({
   const config = siteConfigForHostname(hostname, query.city);
 
   return {
+    icons: (await getSiteIcons(config.cityId)).icons,
     title: config.name,
     description: config.description,
     alternates: {

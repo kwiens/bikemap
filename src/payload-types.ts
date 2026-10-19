@@ -1011,7 +1011,7 @@ export interface GeneralSetting {
 export interface Theme {
   id: number;
   /**
-   * Upload a PNG, JPEG, or WebP logo up to 3 MB per city. Each city uses its own logo on the welcome screen, sidebar, and About page. Leave blank to keep its existing branding. App icons and downloadable artwork are separate.
+   * Upload a PNG, JPEG, or WebP logo up to 3 MB per city. Each city uses its own logo on the welcome screen, sidebar, and About page. Leave blank to keep its existing branding. Favicons and app icons also use this logo. Downloadable artwork is separate.
    */
   logos?: {
     chattanooga?: (number | null) | Media;
