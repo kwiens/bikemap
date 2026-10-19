@@ -178,9 +178,10 @@ The converter writes `public/data/chattanooga/trails.geojson`, grouping source
 pieces into one `MultiLineString` per raw `Trail` value and merging
 `public/data/chattanooga/trails-supplemental.geojson`. That data-only supplement
 contains the six permitted Godsey Ridge lines absent from the regional
-shapefile; their coordinates came from the checked-in elevation profiles that
-were originally sampled from the legacy Mapbox layer. The seed matches all 224
-curated rows and stores geometry as `geometrySource: 'imported'`.
+shapefile and the connector omitted from its multipart Cherokee Trail record;
+their coordinates came from checked-in elevation profiles that were originally
+sampled from the legacy Mapbox layer. The seed matches all 224 curated rows and
+stores geometry as `geometrySource: 'imported'`.
 `prepare:chattanooga-measurements` uses the same `measureParts` implementation
 as Payload to regenerate summary metadata and the city-scoped static profiles
 from those exact 224 lines. The seed imports the prepared profile alongside
@@ -198,8 +199,14 @@ Production deploys run committed Payload migrations before the new code goes
 live. Migration `20260919_223908_backfill_chattanooga_supplemental_trails`
 backfills the six supplemental lines and profiles into existing Chattanooga
 rows and their latest Payload versions. It preserves both records if either
-copy's geometry source is already `edited`. The city seed remains the
-repeatable full import for a new or rebuilt database.
+copy's geometry source is already `edited`. Migration
+`20260921_152202_repair_cherokee_trail_geometry` similarly repairs only the
+known two-part Cherokee geometry and preserves diverged or curator-owned rows.
+The city seed remains the repeatable full import for a new or rebuilt database.
+Raw-SQL migrations skip the hooks that expire the public trail cache, so a
+migration that changes trail rows must also set
+`PUBLIC_TRAIL_CACHE_DATA_VERSION` (`src/payload/cache/public-trails.ts`) to its
+name; otherwise the new build serves cached pre-migration trails for a day.
 
 `ensureMtnBikeSource(map)` attaches `MTN_BIKE_SOURCE_ID` as GeoJSON, reads
 `/api/map/trails?city=chattanooga`, and falls back to the checked-in GeoJSON if
@@ -356,12 +363,12 @@ clicked way, those stats drive the pane's **headline numbers** (via
 
 ### Embed Mode (`/embed`)
 
-The map can be framed on third-party sites via `<iframe src="https://bikechatt.com/embed?...">`. `EmbedSnippetBuilder` (`src/components/embed/`) takes its routes and available layers as a prop from `embedBuilderConfig()` (`src/utils/embed-options.ts`), resolved server-side from the request hostname — it must never import `@/data/geo_data`, which binds the active city at module load and so resolves to the default city during SSR. It is the self-serve setup form — controls, a live preview, and a copy-paste snippet — rendered in two places: the **About page** (the canonical place partners are pointed at) and `/embed/demo`, a mock partner page showing the embed in context. It renders no heading of its own, so each host page supplies its own; it validates `center` with the embed's own `parseCenter` so the form can't accept a value the map would drop.
+The map can be framed on third-party sites via `<iframe src="https://bikechatt.com/embed?...">`. `EmbedSnippetBuilder` (`src/components/embed/`) takes its routes, trails, and available layers as a prop from `embedBuilderConfig()` (`src/utils/embed-options.ts`), resolved server-side from the request hostname — it must never import `@/data/geo_data`, which binds the active city at module load and so resolves to the default city during SSR. It is the self-serve setup form — a Casual/MTB choice, an always-visible live preview, collapsed advanced controls, and a copy-paste snippet — rendered in two places: the **About page** (the canonical place partners are pointed at) and `/embed/demo`, a mock partner page showing the embed in context. It renders no heading of its own, so each host page supplies its own; it validates `center` with the embed's own `parseCenter` so the form can't accept a value the map would drop.
 
-- **Everything is URL-driven.** `parseEmbedOptions` / `buildEmbedSearch` in `src/utils/embed.ts` are the single encoder/decoder for the supported params (`sidebar`, `route`, `center`, `zoom`, `layers`). Never rely on cookies or `localStorage` in embed mode — browsers drop the settings cookie (no `SameSite=None`) and partition storage inside a third-party frame. Anything that also needs a decoded param (e.g. `useUrlDeepLink`) takes it as an argument rather than re-reading the query string, so there is exactly one decoder.
+- **Everything is URL-driven.** `parseEmbedOptions` / `buildEmbedSearch` in `src/utils/embed.ts` are the single encoder/decoder for the supported params (`mode`, `sidebar`, `route`, `trail`, `center`, `zoom`, `layers`). Never rely on cookies or `localStorage` in embed mode — browsers drop the settings cookie (no `SameSite=None`) and partition storage inside a third-party frame. Anything that also needs a decoded param (e.g. `useUrlDeepLink`) takes it as an argument rather than re-reading the query string, so there is exactly one decoder.
 - **`layers` keeps at most one marker layer.** `attractions` / `bikeResources` / `bikeRentals` (`MARKER_LAYERS`) are a radio group in the map — `handleLayerToggle` hides the others when one is shown — so `parseLayers` keeps only the first of them and drops the rest; `bikeNetwork` is an independent line overlay and may accompany it. The snippet builder mirrors this with a radio group so a partner cannot generate an impossible combination.
-- **Embed mode skips the trail stack entirely.** `Map.tsx` gates `ensureMtnBikeSource` / `initMtnBikeLayers` / `ensureOsmTrailsSource` / `registerOsmTrailSelection` on `!isEmbed`. That keeps two vector sources and their tile traffic off the critical path on a partner's page, and — just as important — stops trail lines being clickable when there is no trails UI to show the result.
-- **`EmbedProvider` / `useEmbed()`** (`src/components/EmbedContext.tsx`) is how `Map.tsx` and `MapLegend.tsx` learn they are embedded. Outside `/embed` the context defaults to `isEmbed: false`, so the main app never branches on it. In embed mode: Casual (routes) tab only, no MTB pill, sidebar closed by default, no `RidesPanel` / `WelcomeModal` / `PwaInstallPrompt`, no cookie writes, and an `EmbedAttribution` "Open in …" link overlays the map.
+- **Embed mode loads one route family.** Casual embeds skip `ensureMtnBikeSource` / `initMtnBikeLayers` / `ensureOsmTrailsSource` / `registerOsmTrailSelection`, keeping trail tile traffic off the critical path. MTB embeds attach that stack and suppress Casual route data and interactions.
+- **`EmbedProvider` / `useEmbed()`** (`src/components/EmbedContext.tsx`) is how `Map.tsx` and `MapLegend.tsx` learn they are embedded. Outside `/embed` the context defaults to `isEmbed: false`, so the main app never branches on it. In embed mode: the host fixes the Casual or MTB section, there is no in-frame route-family pill, the sidebar is closed by default, there is no `RidesPanel` / `WelcomeModal` / `PwaInstallPrompt`, settings never write cookies, and an `EmbedAttribution` "Open in …" link overlays the map.
 - **Framing headers** come from `embedHeaders()` in `src/utils/embed-headers.ts`, wired into `next.config.ts`. `/embed` — that exact path, not a prefix — gets `frame-ancestors` from the `EMBED_ALLOWED_ORIGINS` env var (unset = any site); every other path, `/embed/demo` included, gets `frame-ancestors 'self'`. The two `source` patterns must stay mutually exclusive: Next appends the headers of every matching rule and browsers intersect multiple CSPs, so an overlap silently applies the stricter one and blanks the frame. `EMBED_ALLOWED_ORIGINS` is read at **build** time, so changing it needs a redeploy. The Mapbox token's URL restriction keeps working because the iframe document's origin is ours.
 - **Partner snippet requirements:** `allow="geolocation; fullscreen; gyroscope; accelerometer; magnetometer"` for locate-me/compass, and an explicit height (the snippet uses `aspect-ratio`). `public/register-sw.js` skips registration inside frames.
 - CORS is not involved: the iframe runs on our origin, so tile/GBFS/data fetches are unchanged. Parent↔iframe control, if ever needed, is a `postMessage` adapter over `MAP_EVENTS` with an origin check.
@@ -467,7 +474,8 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
 - `src/payload/components/TrailMapEditor.tsx` — the one admin map (pick/move/draw)
 - `src/payload/read/trails.ts` — reads trails back out for the public map
 - `src/payload/collections/Routes.ts` + `src/payload/read/routes.ts` — Casual
-  route records and the public map read path. A route either owns imported
+  route records and the public map read path. A route is either built on the
+  map (`composed`, the default — see "Route editor" below), owns imported
   geometry, selects a same-city Trail and reuses its current measurements, or
   explicitly names a legacy Mapbox Studio layer that has not been migrated.
   Casual reads Routes only; linking a Trail is how a curator exposes it there
@@ -475,6 +483,10 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   `pnpm db:import:chattanooga-routes` rather than committing generated route
   GeoJSON. Bend's seed derives its eight imported routes directly from the
   committed bike-network source.
+- `src/payload/routing/` + `components/RouteMapEditor.tsx` — the route editor.
+  A curator clicks waypoints; each leg is routed over a graph of the city's
+  published trails plus OSM roads and paths, so two waypoints on one trail take
+  just the stretch between them. See "Route editor" below.
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
 - `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind
@@ -550,6 +562,30 @@ Things to know before touching it:
   `slugify('Tiddlywinks (Upper)')` is `tiddlywinks-(upper)` against a stored
   `tiddlywinks-upper` whose static elevation file is named after it. Overwriting
   on open would break charts by looking at a page.
+- **Route editor (`geometrySource: 'composed'`).** The editor writes only the
+  route's `plan` (waypoints + routed legs, `routing/plan.ts`);
+  `resolveRouteSource` derives `geom`, `distance`, and `bounds` from it on
+  every save, so never accept those from the client for a composed route.
+  Things to know:
+  - **The graph** (`routing/graph.ts`) joins OSM ways by shared node ids and
+    our curated trails by *stitching*: any dead end within `STITCH_METERS` of
+    another line is connected to it. Chattanooga's GIS trails share no nodes
+    with OSM, so without stitching they are islands. Edge cost is length ×
+    `COST_FACTORS` (trails cheapest, primary roads dearest — discouraged,
+    never excluded; motorways and trunks are not fetched at all).
+  - **The network comes from Overpass in fixed 0.04° cells** through the
+    admin-only `GET /api/routes/network?cell=x,y`, cached per server instance
+    for six hours. Every cell is a query against the public instance, which
+    sheds load (504) after a burst, so keep cells large and requests few —
+    don't shrink `ROUTE_CELL_DEG` or widen `LEG_MARGIN_DEG` casually.
+  - **Snapping prefers a curated trail** within `TRAIL_SNAP_PREFERENCE_METERS`
+    of the nearest line, because OSM often maps the same trail a few meters
+    off ours and the route should ride on (and be named for) our trail.
+  - **A route is a snapshot.** Editing a trail does not move routes built
+    along it; reopen the route and move a waypoint to re-route.
+  - The enum default is a function (`() => 'composed'`) on purpose: Postgres
+    can't use an enum value as a column default in the transaction that adds
+    it.
 - **There is one user role: admin.** Everyone signed in can edit everything.
   Keep writing access rules as `req.user?.role === 'admin'` rather than
   `Boolean(req.user)` — that way a second role added later starts with no

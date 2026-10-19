@@ -1,5 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { getMountainBikeTrails } from '@/data/trail-source';
+import { slugForTrail } from '@/data/mountain-bike-trails';
+import { getBikeRoutes } from '@/data/route-source';
+import { MAP_EVENTS } from '@/events';
+import { slugify } from '@/utils/string';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 import { useEmbed } from '@/components/EmbedContext';
@@ -12,11 +18,55 @@ import { siteConfig } from '@/config/site.config';
 export function EmbedAttribution() {
   const { isEmbed, options } = useEmbed();
 
+  const [selection, setSelection] = useState(() => {
+    const slug = options.mode === 'mtb' ? options.trail : options.route;
+    return slug
+      ? `${options.mode === 'mtb' ? 'trail' : 'route'}=${encodeURIComponent(slug)}`
+      : '';
+  });
+
+  useEffect(() => {
+    if (!isEmbed) return;
+    const selectEvent =
+      options.mode === 'mtb'
+        ? MAP_EVENTS.TRAIL_SELECT
+        : MAP_EVENTS.ROUTE_SELECT;
+    const deselectEvent =
+      options.mode === 'mtb'
+        ? MAP_EVENTS.TRAIL_DESELECT
+        : MAP_EVENTS.ROUTE_DESELECT;
+    function handleSelect(event: Event) {
+      if (options.mode === 'mtb') {
+        const { trailName } = (event as CustomEvent<{ trailName: string }>)
+          .detail;
+        const trail = getMountainBikeTrails().find(
+          (item) => item.trailName === trailName,
+        );
+        setSelection(
+          `trail=${encodeURIComponent(trail ? slugForTrail(trail) : slugify(trailName))}`,
+        );
+      } else {
+        const { routeId } = (event as CustomEvent<{ routeId: string }>).detail;
+        const route = getBikeRoutes().find((item) => item.id === routeId);
+        setSelection(
+          route ? `route=${encodeURIComponent(slugify(route.name))}` : '',
+        );
+      }
+    }
+    function handleDeselect() {
+      setSelection('');
+    }
+    window.addEventListener(selectEvent, handleSelect);
+    window.addEventListener(deselectEvent, handleDeselect);
+    return () => {
+      window.removeEventListener(selectEvent, handleSelect);
+      window.removeEventListener(deselectEvent, handleDeselect);
+    };
+  }, [isEmbed, options.mode]);
+
   if (!isEmbed) return null;
 
-  const href = options.route
-    ? `${siteConfig.url}?route=${encodeURIComponent(options.route)}`
-    : siteConfig.url;
+  const href = selection ? `${siteConfig.url}?${selection}` : siteConfig.url;
 
   return (
     <a
