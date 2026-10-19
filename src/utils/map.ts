@@ -201,7 +201,7 @@ export async function loadOptimizedMapStyle(
 
   const [, owner, styleId] = match;
   const apiUrl = new URL(
-    `https://api.mapbox.com/styles/v1/${owner}/${styleId}`,
+    `https://api.mapbox.com/styles/v1/${owner}/${styleId}${new URL(styleUrl).search}`,
   );
   apiUrl.searchParams.set('optimize', 'true');
   apiUrl.searchParams.set('access_token', accessToken);

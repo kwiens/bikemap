@@ -1733,7 +1733,7 @@ describe('optimized Studio trail cleanup', () => {
       'riverwalk-loop-v3-public',
     ]);
     expect(composite.url).not.toContain(STYLE_STRAY_TILESET_IDS[0]);
-    expect(composite.url).toContain('swuller.cz2gq1fn');
+    expect(composite.url).not.toContain('swuller.cz2gq1fn');
     expect(composite.url).toContain('swuller.a2odh3pm');
     expect(composite.url).toContain('?style=test');
     expect(style.layers).toHaveLength(3);
@@ -1765,7 +1765,7 @@ describe('optimized Studio trail cleanup', () => {
 
     try {
       const result = (await loadOptimizedMapStyle(
-        'mapbox://styles/example/style?optimize=true',
+        'mapbox://styles/example/style?draft=true&optimize=false&access_token=old-token',
         'test-token',
         false,
       )) as mapboxgl.StyleSpecification;
@@ -1775,6 +1775,7 @@ describe('optimized Studio trail cleanup', () => {
       expect(request.pathname).toBe('/styles/v1/example/style');
       expect(request.searchParams.get('optimize')).toBe('true');
       expect(request.searchParams.get('access_token')).toBe('test-token');
+      expect(request.searchParams.get('draft')).toBe('true');
       expect(result.layers).toEqual([]);
     } finally {
       global.fetch = previousFetch;
@@ -1955,7 +1956,7 @@ describe('removeStyleOwnedBikeRoutes', () => {
 
     try {
       const result = (await loadOptimizedMapStyle(
-        'mapbox://styles/example/style?optimize=true',
+        'mapbox://styles/example/style?draft=true&optimize=false&access_token=old-token',
         'test-token',
         false,
       )) as mapboxgl.StyleSpecification;
