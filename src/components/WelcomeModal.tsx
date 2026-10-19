@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { siteConfig } from '@/config/site.config';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { getSetting, setSetting, type RideStyle } from '@/utils/settings';
+import { SiteLogo } from './SiteBrandingContext';
 
 const features: {
   icon: IconDefinition;
@@ -107,9 +108,15 @@ export function WelcomeModal() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5">
-          <span className="inline-flex items-center justify-center w-[60px] h-[60px] rounded-full bg-app-primary text-app-secondary text-[28px] mb-3">
-            <FontAwesomeIcon icon={faBicycle} />
-          </span>
+          <SiteLogo
+            cityId={siteConfig.cityId}
+            alt={`${siteConfig.name} logo`}
+            className="mx-auto mb-3 h-[60px] max-w-[220px] object-contain"
+          >
+            <span className="inline-flex items-center justify-center w-[60px] h-[60px] rounded-full bg-app-primary text-app-secondary text-[28px] mb-3">
+              <FontAwesomeIcon icon={faBicycle} />
+            </span>
+          </SiteLogo>
           <h1 className="text-[28px] font-bold text-app-secondary mb-1 tracking-tight">
             {siteConfig.name}
           </h1>

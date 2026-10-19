@@ -67,6 +67,7 @@ export interface Config {
   };
   blocks: {};
   collections: {
+    media: Media;
     routes: Route;
     trails: Trail;
     'trail-conditions': TrailCondition;
@@ -83,6 +84,7 @@ export interface Config {
   };
   collectionsJoins: {};
   collectionsSelect: {
+    media: MediaSelect<false> | MediaSelect<true>;
     routes: RoutesSelect<false> | RoutesSelect<true>;
     trails: TrailsSelect<false> | TrailsSelect<true>;
     'trail-conditions': TrailConditionsSelect<false> | TrailConditionsSelect<true>;
@@ -136,6 +138,30 @@ export interface UserAuthOperations {
     email: string;
     password: string;
   };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media".
+ */
+export interface Media {
+  id: number;
+  /**
+   * A short description of the logo for screen readers.
+   */
+  alt: string;
+  prefix?: string | null;
+  _objectKey?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * Every published Route appears in Casual mode. Build one on the map from trails and roads, or reuse an import, an existing Trail, or a current Mapbox Studio layer.
@@ -614,6 +640,10 @@ export interface PayloadLockedDocument {
   id: number;
   document?:
     | ({
+        relationTo: 'media';
+        value: number | Media;
+      } | null)
+    | ({
         relationTo: 'routes';
         value: number | Route;
       } | null)
@@ -690,6 +720,26 @@ export interface PayloadMigration {
   batch?: number | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "media_select".
+ */
+export interface MediaSelect<T extends boolean = true> {
+  alt?: T;
+  prefix?: T;
+  _objectKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -961,6 +1011,13 @@ export interface GeneralSetting {
 export interface Theme {
   id: number;
   /**
+   * Upload a PNG, JPEG, or WebP logo up to 3 MB per city. Each city uses its own logo on the welcome screen, sidebar, and About page. Leave blank to keep its existing branding. Favicons and app icons also use this logo. Downloadable artwork is separate.
+   */
+  logos?: {
+    chattanooga?: (number | null) | Media;
+    bend?: (number | null) | Media;
+  };
+  /**
    * Changes selected tabs, highlighted cards, icons, borders, and keyboard focus rings.
    */
   primaryColor?: string | null;
@@ -1007,6 +1064,12 @@ export interface GeneralSettingsSelect<T extends boolean = true> {
  * via the `definition` "theme_select".
  */
 export interface ThemeSelect<T extends boolean = true> {
+  logos?:
+    | T
+    | {
+        chattanooga?: T;
+        bend?: T;
+      };
   primaryColor?: T;
   sidebarColor?: T;
   surfaceColor?: T;

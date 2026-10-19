@@ -1,4 +1,6 @@
+import { getSiteIcons } from '@/payload/read/site-icons';
 import Image from 'next/image';
+import { SiteLogo } from '@/components/SiteBrandingContext';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { cityIdForQuery, mapConfigForHostname } from '@/config/map.config';
@@ -42,6 +44,7 @@ export async function generateMetadata({
   const siteConfig = siteConfigForHostname(hostname, query.city);
 
   return {
+    icons: (await getSiteIcons(siteConfig.cityId)).icons,
     title: `About — ${siteConfig.name}`,
     description: `About the ${siteConfig.name} project — a free interactive map of bike routes, trails, and resources.`,
   };
@@ -130,26 +133,32 @@ export default async function AboutPage({
       <main className="max-w-2xl mx-auto px-5 py-12">
         {/* Hero */}
         <div className="flex flex-col items-center text-center mb-14">
-          {showBikeChattAssets ? (
-            <Image
-              src="/Bike-Chatt_Logo-blue-text-green.svg"
-              alt={`${siteConfig.name} logo`}
-              width={224}
-              height={210}
-              className="w-56 mb-6"
-              style={{ height: 'auto' }}
-              priority
-            />
-          ) : (
-            <div className="mb-6 flex flex-col items-center gap-3">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-app-secondary text-app-primary">
-                <MapIcon className="h-8 w-8" />
+          <SiteLogo
+            cityId={siteConfig.cityId}
+            alt={`${siteConfig.name} logo`}
+            className="mb-6 max-h-56 max-w-56 object-contain"
+          >
+            {showBikeChattAssets ? (
+              <Image
+                src="/Bike-Chatt_Logo-blue-text-green.svg"
+                alt={`${siteConfig.name} logo`}
+                width={224}
+                height={210}
+                className="w-56 mb-6"
+                style={{ height: 'auto' }}
+                priority
+              />
+            ) : (
+              <div className="mb-6 flex flex-col items-center gap-3">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-app-secondary text-app-primary">
+                  <MapIcon className="h-8 w-8" />
+                </div>
+                <h1 className="text-4xl font-bold tracking-tight text-app-secondary">
+                  {siteConfig.name}
+                </h1>
               </div>
-              <h1 className="text-4xl font-bold tracking-tight text-app-secondary">
-                {siteConfig.name}
-              </h1>
-            </div>
-          )}
+            )}
+          </SiteLogo>
           <p className="text-gray-600 text-lg leading-relaxed max-w-md">
             A free, open-source interactive map of {region} bike routes,
             mountain bike trails, and cycling resources.

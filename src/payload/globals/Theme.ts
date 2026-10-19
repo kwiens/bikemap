@@ -1,4 +1,5 @@
 import type { GlobalConfig, TextField } from 'payload';
+import { siteConfigs } from '@/config/site.config';
 
 /** Site palette, editable at `/admin/globals/theme`. */
 
@@ -48,8 +49,23 @@ export const Theme: GlobalConfig = {
   },
   fields: [
     {
+      name: 'logos',
+      type: 'group',
+      label: 'City logos',
+      admin: {
+        description:
+          'Upload a PNG, JPEG, or WebP logo up to 3 MB per city. Each city uses its own logo on the welcome screen, sidebar, and About page. Leave blank to keep its existing branding. Favicons and app icons also use this logo. Downloadable artwork is separate.',
+      },
+      fields: Object.values(siteConfigs).map((city) => ({
+        name: city.cityId,
+        label: city.name,
+        type: 'upload',
+        relationTo: 'media',
+      })),
+    },
+    {
       type: 'collapsible',
-      label: 'Frontend color palette',
+      label: 'Color palette',
       fields: [
         {
           type: 'row',

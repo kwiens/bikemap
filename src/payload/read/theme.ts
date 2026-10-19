@@ -1,7 +1,12 @@
 import 'server-only';
 
 import { getPayload } from 'payload';
+import { cache } from 'react';
 import config from '@payload-config';
+import type { CityBranding } from '@/components/SiteBrandingContext';
+
+import { siteConfigs } from '@/config/site.config';
+import type { CityId } from '@/data/cities/types';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -11,9 +16,22 @@ export interface ThemeDoc {
   sidebarColor?: null | string;
   surfaceColor?: null | string;
   textColor?: null | string;
+  logos?: Partial<
+    Record<
+      CityId,
+      | null
+      | number
+      | {
+          alt?: null | string;
+          url?: null | string;
+        }
+    >
+  > | null;
 }
 
-const FRONTEND_VARIABLES: Array<[keyof ThemeDoc, string]> = [
+type ThemeColorField = Exclude<keyof ThemeDoc, 'logos'>;
+
+const FRONTEND_VARIABLES: Array<[ThemeColorField, string]> = [
   ['primaryColor', '--app-primary'],
   ['sidebarColor', '--app-secondary'],
   ['surfaceColor', '--app-surface'],
@@ -71,23 +89,42 @@ export async function getThemeCss(): Promise<string> {
   return theme ? buildThemeCss(theme) : '';
 }
 
-export async function getFrontendThemeCss(): Promise<string> {
-  const theme = await readTheme();
-  return theme ? buildFrontendThemeCss(theme) : '';
+export async function getFrontendTheme(): Promise<{
+  branding: CityBranding;
+  css: string;
+}> {
+  const theme = await readTheme(1);
+  const branding: CityBranding = {};
+  for (const { cityId } of Object.values(siteConfigs)) {
+    const logo = theme?.logos?.[cityId];
+    if (logo && typeof logo === 'object') {
+      branding[cityId] = {
+        logoAlt: logo.alt ?? null,
+        logoUrl: logo.url ?? null,
+      };
+    }
+  }
+
+  return {
+    branding,
+    css: theme ? buildFrontendThemeCss(theme) : '',
+  };
 }
 
 /** Database failures must never take either the map or admin login down. */
-async function readTheme(): Promise<ThemeDoc | null> {
+const readTheme = cache(async function readTheme(
+  depth = 0,
+): Promise<ThemeDoc | null> {
   if (!process.env.DATABASE_URL) return null;
 
   try {
     const payload = await getPayload({ config });
     return (await payload.findGlobal({
       slug: 'theme',
-      depth: 0,
+      depth,
     })) as ThemeDoc;
   } catch (error) {
     console.error('Could not read the site theme; using defaults.', error);
     return null;
   }
-}
+});

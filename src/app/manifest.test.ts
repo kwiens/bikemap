@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import manifest from './manifest';
 import { siteConfig } from '@/config/site.config';
+
+vi.mock('server-only', () => ({}));
+vi.mock('@/payload/read/theme', () => ({
+  getFrontendTheme: vi.fn(async () => ({ branding: {}, css: '' })),
+}));
 
 describe('manifest', () => {
   it('builds the PWA manifest from siteConfig', async () => {

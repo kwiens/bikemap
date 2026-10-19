@@ -878,3 +878,26 @@ the most time to diagnose, because nothing about it looks like a failure.
   Whether they can move from `imported` to the maintained-upstream model is an
   open question worth testing with `scripts/align_bend_geometry.py` against
   Tennessee.
+
+
+### Logo upload storage
+
+Theme logo uploads use Payload's Vercel Blob adapter when
+`BLOB_READ_WRITE_TOKEN` is set. Connect a **public** Blob store to the Vercel
+project for production and preview; logos are public map assets. The adapter
+stores files outside the function filesystem, so they survive restarts and
+redeploys. PNG, JPEG, and WebP logos are limited to 3 MB.
+
+Local development without a Blob token keeps files in the gitignored
+`public/media` directory. On Vercel, uploads fail explicitly if the token is
+missing. When moving from local storage, re-upload any existing logos to Blob;
+copying the database alone does not copy their files.
+
+Theme → City logos has a separate upload for each city. The selected upload
+appears on its welcome screen, sidebar, and About page, and generates its
+favicon, Apple touch icon, and PWA icons. Images keep their proportions;
+maskable icons include safe padding. Replacing an upload changes the icon URLs
+so browsers can refresh them. Already installed apps refresh icons on the
+browser or operating system's schedule. An unset or unavailable logo keeps the
+existing branding; the old deployment-wide upload remains in Media for explicit
+selection rather than being assigned to a city automatically.
