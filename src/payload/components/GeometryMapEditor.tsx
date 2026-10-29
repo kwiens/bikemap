@@ -513,8 +513,10 @@ export function GeometryMapEditor({
             'Terra Draw rejected this trail’s geometry',
             rejected.map((validation) => validation.reason),
           );
-          setDrawFailed(true);
         }
+        setDrawFailed(rejected.length > 0);
+      } else {
+        setDrawFailed(false);
       }
     } finally {
       queueMicrotask(() => {
@@ -986,7 +988,9 @@ export function GeometryMapEditor({
     if (!draw || !ready) {
       return;
     }
-    const incoming = parseTrailGeometry(geomValue).parts ?? [];
+    // Compare and track the same precision as Terra Draw's editable copy.
+    // Keep the stored form value intact until the curator makes an edit.
+    const incoming = roundParts(parseTrailGeometry(geomValue).parts ?? []);
     if (samePartsAs(incoming, partsRef.current)) {
       return;
     }

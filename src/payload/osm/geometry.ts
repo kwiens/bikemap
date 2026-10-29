@@ -179,10 +179,12 @@ export function partsToFeatures(
   parts: [number, number][][],
   mode: string,
 ): LinePartFeature[] {
-  return parts
+  // Snapped route plans can carry full floating-point precision. Normalize at
+  // the Terra Draw boundary so loading them cannot silently drop the line.
+  return roundParts(parts)
     .filter((part) => part.length >= MIN_POINTS_PER_PART)
     .map((part) => ({
-      geometry: { coordinates: cloneParts([part])[0], type: 'LineString' },
+      geometry: { coordinates: part, type: 'LineString' },
       properties: { mode },
       type: 'Feature',
     }));

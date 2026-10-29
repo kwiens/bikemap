@@ -23,6 +23,7 @@ import {
   TerraDrawSessionUndoRedo,
 } from 'terra-draw';
 import { TerraDrawMapboxGLAdapter } from 'terra-draw-mapbox-gl-adapter';
+import { partsToFeatures } from '@/payload/osm/geometry';
 import { removeSelectedLinePointAt } from './terra-draw-point-removal';
 
 /** Only as much of a Mapbox map as the adapter reaches for. */
@@ -272,4 +273,29 @@ describe('the Delete key', () => {
     expect(h.draw.undo()).toBe(true);
     expect(h.pieces()).toBe(0);
   });
+});
+
+it('loads full-precision snapped route coordinates into the point editor', () => {
+  const { draw, lines } = harness();
+  draw.clear();
+  const parts: [number, number][][] = [
+    [
+      [-85.30912345678901, 35.05312345678901],
+      [-85.30523456789012, 35.05423456789012],
+      [-85.30134567890123, 35.05834567890123],
+    ],
+  ];
+  const result = draw.addFeatures(
+    partsToFeatures(parts, LINESTRING) as Parameters<
+      TerraDraw['addFeatures']
+    >[0],
+  );
+  expect(
+    result.every((validation) => validation.valid),
+    JSON.stringify(result),
+  ).toBe(true);
+  expect(lines()).toHaveLength(1);
+  expect(lines()[0].geometry.coordinates).toHaveLength(3);
+  expect(parts[0][0]).toEqual([-85.30912345678901, 35.05312345678901]);
+  draw.stop();
 });

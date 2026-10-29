@@ -9,7 +9,11 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { partsToFeatures, type TrailGeometry } from '@/payload/osm/geometry';
+import {
+  partsToFeatures,
+  roundParts,
+  type TrailGeometry,
+} from '@/payload/osm/geometry';
 import { geometryPlan } from '@/payload/routing/plan';
 import { RouteLineEditor } from './RouteLineEditor';
 import { RouteMapEditor } from './RouteMapEditor';
@@ -237,6 +241,43 @@ describe('shared geometry editor', () => {
     );
     expect(ui.writes.plan).toEqual(baseline);
     expect(screen.getByText('Snapping route planner')).toBeInTheDocument();
+  });
+
+  it('opens a snapped route with full-precision points without changing its stored plan', async () => {
+    const coordinates: TrailGeometry['coordinates'] = [
+      [
+        [-85.30912345678901, 35.05312345678901],
+        [-85.30523456789012, 35.05423456789012],
+        [-85.30134567890123, 35.05834567890123],
+      ],
+    ];
+    const baseline = {
+      version: 1 as const,
+      waypoints: [coordinates[0][0], coordinates[0][2]],
+      legs: [
+        { coordinates: coordinates[0], mode: 'network' as const, steps: [] },
+      ],
+    };
+    ui.values.plan = baseline;
+    render(<RouteMapEditor path="plan" />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Edit points directly' }),
+    );
+    await act(async () => ui.loadStyle());
+    expect(ui.features[0].geometry).toEqual({
+      type: 'LineString',
+      coordinates: roundParts(coordinates)[0],
+    });
+    expect(screen.getByRole('button', { name: 'Adjust line' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Select points' })).toBeEnabled();
+    expect(screen.queryByText(/could not attach/)).not.toBeInTheDocument();
+    expect(ui.writes).not.toHaveProperty('plan');
+    expect(baseline.legs[0].coordinates[0]).toEqual([
+      -85.30912345678901, 35.05312345678901,
+    ]);
   });
 
   it('starts a blank route in path snapping and switches to point editing without losing the line', async () => {
