@@ -7,6 +7,8 @@ import {
   screen,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StrictMode } from 'react';
+import { createEditorMap } from './editor-map';
 import type { Position } from '@/payload/routing/graph';
 import { EMPTY_PLAN, type RoutePlan } from '@/payload/routing/plan';
 import { RouteMapEditor } from './RouteMapEditor';
@@ -29,14 +31,14 @@ vi.mock('@/config/map.config', () => ({
   isCityId: (value: unknown) => value === 'bend',
 }));
 vi.mock('./editor-map', () => ({
-  createEditorMap: () => ({
+  createEditorMap: vi.fn(() => ({
     on: (name: string, ...args: unknown[]) =>
       mocks.handlers.set(name, args.at(-1) as (event: unknown) => void),
     doubleClickZoom: { disable: vi.fn() },
     queryRenderedFeatures: () => [],
     getSource: () => undefined,
     remove: vi.fn(),
-  }),
+  })),
   useEditorBasemap: vi.fn(),
 }));
 vi.mock('mapbox-gl', () => ({
@@ -83,6 +85,7 @@ function deferred() {
 }
 
 beforeEach(() => {
+  vi.mocked(createEditorMap).mockClear();
   mocks.handlers.clear();
   mocks.plan = EMPTY_PLAN;
   mocks.write.mockReset();
@@ -214,6 +217,37 @@ describe('route waypoint network races', () => {
       [-121.4, 44],
       [-121.38, 44.02],
     ]);
+  });
+
+  it('keeps one map instance through edits after Strict Mode effect replay', async () => {
+    render(
+      <StrictMode>
+        <RouteMapEditor path="plan" />
+      </StrictMode>,
+    );
+    expect(createEditorMap).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      click([-121.4, 44]);
+    });
+    await act(async () => {
+      click([-121.39, 44.01]);
+    });
+    expect(mocks.write.mock.calls.at(-1)?.[0].waypoints).toHaveLength(2);
+    expect(createEditorMap).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts a new document without rebuilding the map or writing it back', async () => {
+    const view = render(<RouteMapEditor path="plan" />);
+    await act(async () => {
+      click([-121.4, 44]);
+    });
+    mocks.write.mockClear();
+    mocks.plan = { version: 1, waypoints: [[-121.38, 44.02]], legs: [] };
+    view.rerender(<RouteMapEditor path="plan" />);
+    expect(screen.getByText('44.02000, -121.38000')).toBeInTheDocument();
+    expect(mocks.write).not.toHaveBeenCalled();
+    expect(createEditorMap).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
   });
 
   it('ignores a pending click after unmount', async () => {
