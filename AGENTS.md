@@ -650,6 +650,16 @@ Things to know before touching it:
   `resolveRouteSource` derives `geom`, `distance`, and `bounds` from it on
   every save, so never accept those from the client for a composed route.
   Things to know:
+  - **The controller** (`routing/editor-controller.ts`) owns the plan, undo/redo,
+    ordered pending clicks, and asynchronous routing. `RouteMapEditor` binds it
+    to Payload and renders Mapbox layers and markers. Keep document state in
+    the controller; its immutable leg identities reject stale routing results.
+    `dispose` invalidates pending work; `activate` supports React's effect replay.
+  - **Routing primitives are shared** with the trail tracer: `shortest-path.ts`,
+    `segment-snap.ts`, `segment-index.ts`, and `geometry.ts` under `routing/`.
+    Keep costs and stitching in `graph.ts` and strict OSM topology in
+    `osm/trail-network.ts`. The spatial index caps geographic expansion at 256
+    cells and scans existing segments for longer lines or larger searches.
   - **The graph** (`routing/graph.ts`) joins OSM ways by shared node ids and
     our curated trails by *stitching*: any dead end within `STITCH_METERS` of
     another line is connected to it. Chattanooga's GIS trails share no nodes

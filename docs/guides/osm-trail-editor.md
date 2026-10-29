@@ -231,9 +231,20 @@ points, each entering the graph as a virtual node part-way along its segment.
 
 The network loads in fixed 0.1° cells, one request at a time, from zoom 12 up.
 Fixed cells make the requests cacheable at both ends — the endpoint keeps the
-last 64 boxes for six hours, so an editor panning around one area doesn't
+last 16 boxes for six hours, so an editor panning around one area doesn't
 re-query the public Overpass instance. Where no trail connects two clicks the
 leg goes straight and the bar says so.
+
+The tracer and Casual route planner share A* traversal, snapping projection,
+and the bounded spatial index in `routing/`. Their policies stay separate:
+`osm/trail-network.ts` follows shared OSM node ids, while `routing/graph.ts`
+also prices roads and stitches curated geometry into the network. Long segments
+remain snappable without expanding their full geographic bounding boxes.
+
+The Casual editor's document state lives in `routing/editor-controller.ts`:
+plan edits, undo/redo, ordered clicks, and stale asynchronous results. Its React
+component handles Mapbox rendering and Payload field synchronization. The
+controller can be tested without a map or a form.
 
 A finished route is one undo step. A route still in progress lives in the tool,
 not the line: Undo and Backspace take back its last click, and switching modes

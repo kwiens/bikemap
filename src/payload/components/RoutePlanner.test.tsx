@@ -7,6 +7,8 @@ import {
   screen,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StrictMode } from 'react';
+import { createEditorMap } from './editor-map';
 import type { Position } from '@/payload/routing/graph';
 import { EMPTY_PLAN, type RoutePlan } from '@/payload/routing/plan';
 import { RoutePlanner } from './RoutePlanner';
@@ -29,14 +31,14 @@ vi.mock('@/config/map.config', () => ({
   isCityId: (value: unknown) => value === 'bend',
 }));
 vi.mock('./editor-map', () => ({
-  createEditorMap: () => ({
+  createEditorMap: vi.fn(() => ({
     on: (name: string, ...args: unknown[]) =>
       mocks.handlers.set(name, args.at(-1) as (event: unknown) => void),
     doubleClickZoom: { disable: vi.fn() },
     queryRenderedFeatures: () => [],
     getSource: () => undefined,
     remove: vi.fn(),
-  }),
+  })),
   useEditorBasemap: vi.fn(),
 }));
 vi.mock('mapbox-gl', () => ({
@@ -83,6 +85,7 @@ function deferred() {
 }
 
 beforeEach(() => {
+  vi.mocked(createEditorMap).mockClear();
   mocks.handlers.clear();
   mocks.plan = EMPTY_PLAN;
   mocks.write.mockReset();
@@ -182,6 +185,69 @@ describe('route waypoint network races', () => {
       pending.resolve();
     });
     expect(mocks.write).toHaveBeenCalledTimes(2);
+  });
+
+  it('restores a routed plan with Undo/Redo and clears Redo after a new edit', async () => {
+    render(<RoutePlanner path="plan" />);
+    await act(async () => {
+      click([-121.4, 44]);
+    });
+    await act(async () => {
+      click([-121.39, 44.01]);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    });
+    expect(mocks.write.mock.calls.at(-1)?.[0].waypoints).toHaveLength(1);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
+    });
+    expect(mocks.write.mock.calls.at(-1)?.[0].waypoints).toEqual([
+      [-121.4, 44],
+      [-121.39, 44.01],
+    ]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    });
+    await act(async () => {
+      click([-121.38, 44.02]);
+    });
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+    expect(mocks.write.mock.calls.at(-1)?.[0].waypoints).toEqual([
+      [-121.4, 44],
+      [-121.38, 44.02],
+    ]);
+  });
+
+  it('keeps one map instance through edits after Strict Mode effect replay', async () => {
+    render(
+      <StrictMode>
+        <RoutePlanner path="plan" />
+      </StrictMode>,
+    );
+    expect(createEditorMap).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      click([-121.4, 44]);
+    });
+    await act(async () => {
+      click([-121.39, 44.01]);
+    });
+    expect(mocks.write.mock.calls.at(-1)?.[0].waypoints).toHaveLength(2);
+    expect(createEditorMap).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts a new document without rebuilding the map or writing it back', async () => {
+    const view = render(<RoutePlanner path="plan" />);
+    await act(async () => {
+      click([-121.4, 44]);
+    });
+    mocks.write.mockClear();
+    mocks.plan = { version: 1, waypoints: [[-121.38, 44.02]], legs: [] };
+    view.rerender(<RoutePlanner path="plan" />);
+    expect(screen.getByText('44.02000, -121.38000')).toBeInTheDocument();
+    expect(mocks.write).not.toHaveBeenCalled();
+    expect(createEditorMap).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
   });
 
   it('ignores a pending click after unmount', async () => {

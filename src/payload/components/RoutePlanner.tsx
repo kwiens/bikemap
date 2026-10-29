@@ -10,6 +10,8 @@
  * a waypoint can land part-way along a line, two waypoints on one trail take
  * just the stretch between them — which is how a route uses part of a trail.
  *
+ * `routing/editor-controller.ts` owns the plan, history, and asynchronous edits.
+ * This component renders the map and binds the controller to the Payload field.
  * The component authors the route's `plan` field and nothing else. The line,
  * distance, and bounds are derived from the plan on save, so there is no way
  * for them to disagree with what is on screen.
@@ -27,18 +29,28 @@ import {
   useEditorBasemap,
   type EditorBasemap,
 } from './editor-map';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import mapboxgl from 'mapbox-gl';
 // The (payload) route group has its own tree; without this the controls break.
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useField } from '@payloadcms/ui';
 import { cityConfigs, isCityId, mapConfig } from '@/config/map.config';
 import { boundsOf } from '@/payload/osm/assemble';
+import {
+  createRouteEditorController,
+  type RouteEditorController,
+} from '@/payload/routing/editor-controller';
 import { METERS_TO_MILES } from '@/payload/osm/units';
 import {
   type CellKey,
   cellsCovering,
-  MAX_LEG_CELLS,
   MIN_NETWORK_ZOOM,
   MIN_VIEW_LOAD_ZOOM,
 } from '@/payload/routing/cells';
@@ -47,36 +59,16 @@ import {
   type NetworkWay,
   type Position,
   type RouteStep,
-  SNAP_METERS,
-  snapToGraph,
 } from '@/payload/routing/graph';
+import { RouteNetworkStore } from '@/payload/routing/network-store';
 import {
-  cellsAround,
-  cellsForLeg,
-  RouteNetworkStore,
-} from '@/payload/routing/network-store';
-import {
-  appendWaypoint,
-  closeLoop,
   EMPTY_PLAN,
-  insertWaypoint,
-  type LegMode,
-  MAX_WAYPOINTS,
-  moveWaypoint,
-  type PlanEdit,
   parseRoutePlan,
   planMeters,
   planSteps,
-  replacePendingLeg,
   type RouteLeg,
   type RoutePlan,
-  removeWaypoint,
-  reversePlan,
-  setLegMode,
-  straightLeg,
-  unroutedLegs,
 } from '@/payload/routing/plan';
-import { routeLeg } from '@/payload/routing/router';
 import type { RouteNetworkResponse } from '@/payload/endpoints/route-network';
 import { cn } from '@/lib/utils';
 import { Banner } from './admin-ui';
@@ -101,9 +93,6 @@ const MAX_VIEW_CELLS = 4;
  * to the map's limit on a blank tile.
  */
 const FIT_OPTIONS = { maxZoom: 16, padding: 60 };
-
-/** Undo depth. Each entry is a whole plan, which is small. */
-const MAX_HISTORY = 100;
 
 const EMPTY_COLLECTION: GeoJSON.FeatureCollection = {
   features: [],
@@ -130,35 +119,19 @@ export function RoutePlanner({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
 
-  const [plan, setPlan] = useState<RoutePlan>(() => initialPlan(planValue));
   const [ready, setReady] = useState(false);
   const [basemap, setBasemap] = useState<EditorBasemap>('streets');
-  const [history, setHistory] = useState({ redo: 0, undo: 0 });
   const [pending, setPending] = useState(0);
-  const [routing, setRouting] = useState(0);
   const [zoom, setZoom] = useState(mapConfig.defaultView.zoom);
-  const [note, setNote] = useState<string | null>(null);
   const [trailCount, setTrailCount] = useState<number | null>(null);
 
-  const planRef = useRef(plan);
-  const undoRef = useRef<RoutePlan[]>([]);
-  const redoRef = useRef<RoutePlan[]>([]);
-  const clickQueueRef = useRef(Promise.resolve());
-  const editGenerationRef = useRef(0);
+  const controllerRef = useRef<RouteEditorController | null>(null);
   const readOnlyRef = useRef(Boolean(readOnly));
   const colorRef = useRef(colorValue || DEFAULT_ROUTE_COLOR);
   const trailsRef = useRef<GeoJSON.FeatureCollection>(EMPTY_COLLECTION);
   /** The last plan this editor wrote, so its own write isn't read back as external. */
-  const writtenRef = useRef(normalized(plan));
+  const writtenRef = useRef(normalized(planValue));
   const setPlanValueRef = useRef(setPlanValue);
-  // Marker handlers are created imperatively and outlive renders; they reach
-  // the current `applyEdit` through this ref, kept current by an effect below.
-  const applyEditRef = useRef<
-    (
-      edit: (current: RoutePlan) => PlanEdit,
-      isQueuedClick?: boolean,
-    ) => Promise<void>
-  >(async () => {});
   readOnlyRef.current = Boolean(readOnly);
   colorRef.current = colorValue || DEFAULT_ROUTE_COLOR;
   setPlanValueRef.current = setPlanValue;
@@ -168,6 +141,7 @@ export function RoutePlanner({
   const storeRef = useRef<RouteNetworkStore | null>(null);
   if (!storeRef.current) {
     storeRef.current = new RouteNetworkStore(fetchCell, () => {
+      if (!mapRef.current) return;
       setPending(storeRef.current?.pending ?? 0);
       scheduleNetworkPaint();
     });
@@ -207,37 +181,32 @@ export function RoutePlanner({
     if (!map || !source) {
       return;
     }
-    source.setData(routeCollection(planRef.current));
+    source.setData(
+      routeCollection(controllerRef.current?.getSnapshot().plan ?? EMPTY_PLAN),
+    );
     map.setPaintProperty(ROUTE_LAYER, 'line-color', colorRef.current);
   }, []);
 
   // --- network -------------------------------------------------------------
 
-  /** Loads cells, reporting a failure instead of throwing it. */
-  const ensureCells = useCallback(async (keys: CellKey[]) => {
-    try {
-      await storeRef.current?.ensure(keys);
-      return true;
-    } catch (error) {
-      setNote(
-        `Some trails and roads could not be loaded from OpenStreetMap: ${
-          error instanceof Error ? error.message : String(error)
-        }. Legs there are drawn straight; move a waypoint to retry.`,
-      );
-      return false;
-    }
-  }, []);
-
-  /** Snaps a point to the nearest trail or road, or leaves it where it is. */
-  const snapPoint = useCallback(
-    async (point: Position): Promise<Position> => {
-      const keys = cellsAround(point);
-      await ensureCells(keys);
-      const graph = storeRef.current?.graphFor(keys);
-      const snap = graph ? snapToGraph(graph, point, SNAP_METERS) : null;
-      return snap?.point ?? point;
-    },
-    [ensureCells],
+  if (!controllerRef.current) {
+    controllerRef.current = createRouteEditorController(
+      initialPlan(planValue),
+      storeRef.current,
+      (next) => {
+        writtenRef.current = normalized(next);
+        setPlanValueRef.current(next);
+        paintRoute();
+        paintMarkers();
+      },
+    );
+  }
+  const controller = controllerRef.current;
+  controller.setReadOnly(Boolean(readOnly));
+  const { plan, canUndo, canRedo, routing, note } = useSyncExternalStore(
+    controller.subscribe,
+    controller.getSnapshot,
+    controller.getSnapshot,
   );
 
   /** Loads what is on screen, so the curator can see what the route can use. */
@@ -257,9 +226,9 @@ export function RoutePlanner({
       bounds.getNorth(),
     ]);
     if (keys.length <= MAX_VIEW_CELLS) {
-      void ensureCells(keys);
+      void controller.ensureCells(keys);
     }
-  }, [ensureCells]);
+  }, [controller]);
 
   /**
    * Rebuilds the waypoint markers. Plans hold at most a couple of hundred
@@ -274,7 +243,7 @@ export function RoutePlanner({
     for (const marker of markersRef.current) {
       marker.remove();
     }
-    const waypoints = planRef.current.waypoints;
+    const waypoints = controller.getSnapshot().plan.waypoints;
     markersRef.current = waypoints.map((point, index) => {
       const element = document.createElement('div');
       element.className = cn(
@@ -290,9 +259,7 @@ export function RoutePlanner({
       element.addEventListener('contextmenu', (event) => {
         event.preventDefault();
         if (!readOnlyRef.current) {
-          void applyEditRef.current((current) =>
-            removeWaypoint(current, waypointIndex(current, index, point)),
-          );
+          void controller.removeWaypoint(index, point);
         }
       });
 
@@ -304,224 +271,32 @@ export function RoutePlanner({
         .addTo(map);
       marker.on('dragend', () => {
         const { lat, lng } = marker.getLngLat();
-        const generation = editGenerationRef.current;
-        // The snap may wait on the network, and the plan can change
-        // meanwhile (an undo, say) — so the waypoint is found again by where
-        // it was, not trusted to still be at `index`.
-        void snapPoint([lng, lat]).then((snapped) => {
-          if (
-            mapRef.current !== map ||
-            generation !== editGenerationRef.current ||
-            readOnlyRef.current
-          )
-            return;
-          return applyEditRef.current((current) =>
-            moveWaypoint(
-              current,
-              waypointIndex(current, index, point),
-              snapped,
-            ),
-          );
-        });
+        void controller.moveWaypoint(index, point, [lng, lat]);
       });
       return marker;
     });
-  }, [snapPoint]);
-
-  // --- editing -------------------------------------------------------------
-
-  /** Writes a plan to the screen and the form, without touching history. */
-  const showPlan = useCallback(
-    (next: RoutePlan) => {
-      planRef.current = next;
-      setPlan(next);
-      writtenRef.current = normalized(next);
-      setPlanValueRef.current(next);
-      paintRoute();
-      paintMarkers();
-    },
-    [paintMarkers, paintRoute],
-  );
-
-  const routeOne = useCallback(
-    async (from: Position, to: Position, mode: LegMode): Promise<RouteLeg> => {
-      if (mode === 'straight') {
-        return straightLeg(from, to, 'straight');
-      }
-      const keys = cellsForLeg(from, to);
-      if (keys.length > MAX_LEG_CELLS) {
-        setNote(
-          'Two waypoints are too far apart to route between. Add a waypoint in between.',
-        );
-        return straightLeg(from, to, 'network');
-      }
-      await ensureCells(keys);
-      const graph = storeRef.current?.graphFor(keys);
-      return graph
-        ? routeLeg(graph, from, to, mode)
-        : straightLeg(from, to, mode);
-    },
-    [ensureCells],
-  );
-
-  /**
-   * Routes the given legs and swaps them into whatever the plan is by then.
-   *
-   * A leg is only replaced if it is still the same placeholder. Undo, redo,
-   * or another edit can restore the same endpoints while changing the leg's
-   * intended shape, and an older routing result must not overwrite that edit.
-   */
-  const routeLegs = useCallback(
-    async (target: RoutePlan, indexes: number[]) => {
-      if (indexes.length === 0) {
-        return;
-      }
-      const routingMap = mapRef.current;
-      setRouting((count) => count + 1);
-      try {
-        const routed = await Promise.all(
-          indexes.map(async (index) => {
-            const from = target.waypoints[index];
-            const to = target.waypoints[index + 1];
-            const leg = target.legs[index];
-            if (!from || !to || !leg) {
-              return null;
-            }
-            return { index, leg: await routeOne(from, to, leg.mode) };
-          }),
-        );
-
-        if (!routingMap || mapRef.current !== routingMap) return;
-        let next = planRef.current;
-        for (const result of routed) {
-          if (!result) {
-            continue;
-          }
-          next = replacePendingLeg(next, target, result.index, result.leg);
-        }
-        if (next !== planRef.current) {
-          showPlan(next);
-        }
-      } finally {
-        setRouting((count) => count - 1);
-      }
-    },
-    [routeOne, showPlan],
-  );
-
-  /** Applies an edit: record history, draw it, then route what it changed. */
-  const applyEdit = useCallback(
-    async (edit: (current: RoutePlan) => PlanEdit, isQueuedClick = false) => {
-      if (!isQueuedClick) {
-        editGenerationRef.current += 1;
-        clickQueueRef.current = Promise.resolve();
-      }
-      const before = planRef.current;
-      const { plan: next, reroute } = edit(before);
-      if (next === before) {
-        return;
-      }
-      undoRef.current = [...undoRef.current, before].slice(-MAX_HISTORY);
-      redoRef.current = [];
-      setHistory({ redo: 0, undo: undoRef.current.length });
-      setNote(null);
-      showPlan(next);
-      await routeLegs(next, reroute);
-    },
-    [routeLegs, showPlan],
-  );
-  useEffect(() => {
-    applyEditRef.current = applyEdit;
-  }, [applyEdit]);
-
-  const stepHistory = useCallback(
-    (direction: 'redo' | 'undo') => {
-      editGenerationRef.current += 1;
-      clickQueueRef.current = Promise.resolve();
-      const from = direction === 'undo' ? undoRef : redoRef;
-      const to = direction === 'undo' ? redoRef : undoRef;
-      const target = from.current.at(-1);
-      if (!target) {
-        return;
-      }
-      from.current = from.current.slice(0, -1);
-      to.current = [...to.current, planRef.current];
-      setHistory({
-        redo: redoRef.current.length,
-        undo: undoRef.current.length,
-      });
-      showPlan(target);
-      // A history entry can hold a placeholder whose routing result landed
-      // on a later copy of the plan, not on this one.
-      void routeLegs(target, unroutedLegs(target));
-    },
-    [routeLegs, showPlan],
-  );
+  }, [controller]);
 
   const handleMapClick = useCallback(
     (event: mapboxgl.MapMouseEvent) => {
       const map = mapRef.current;
-      // Markers live inside the canvas container, so a click on one bubbles
-      // up as a map click — which would drop a second waypoint on top of it.
       const target = event.originalEvent.target;
       if (
         !map ||
         readOnlyRef.current ||
         (target instanceof Element && target.closest('.mapboxgl-marker'))
-      ) {
+      )
         return;
-      }
-      const point: Position = [event.lngLat.lng, event.lngLat.lat];
-      // A click on the route itself inserts a waypoint into that leg; anywhere
-      // else extends the route.
       const hit = map.queryRenderedFeatures(event.point, {
         layers: [ROUTE_HIT_LAYER],
       })[0];
       const legIndex = Number(hit?.properties?.leg);
-      const hitFrom = planRef.current.waypoints[legIndex];
-      const hitTo = planRef.current.waypoints[legIndex + 1];
-      const generation = editGenerationRef.current;
-      // Snapping may load different cells for consecutive clicks. Prepare in
-      // parallel, but commit in click order; Undo/Clear invalidate pending clicks.
-      const snapped = snapPoint(point);
-      clickQueueRef.current = clickQueueRef.current
-        .then(async () => {
-          const position = await snapped;
-          if (
-            generation !== editGenerationRef.current ||
-            !mapRef.current ||
-            readOnlyRef.current
-          )
-            return;
-          if (planRef.current.waypoints.length >= MAX_WAYPOINTS) {
-            setNote(`A route can have at most ${MAX_WAYPOINTS} waypoints.`);
-            return;
-          }
-          void applyEditRef.current((current) => {
-            const currentIndex =
-              hitFrom && hitTo
-                ? current.legs.findIndex(
-                    (_, index) =>
-                      current.waypoints[index] === hitFrom &&
-                      current.waypoints[index + 1] === hitTo,
-                  )
-                : -1;
-            if (hitFrom && hitTo && currentIndex < 0) {
-              setNote(
-                'That leg changed while loading. Click it again to insert a waypoint.',
-              );
-              return { plan: current, reroute: [] };
-            }
-            return currentIndex >= 0
-              ? insertWaypoint(current, currentIndex, position)
-              : appendWaypoint(current, position);
-          }, true);
-        })
-        .catch((error: unknown) => {
-          console.error('Could not place route waypoint', error);
-        });
+      void controller.addWaypoint(
+        [event.lngLat.lng, event.lngLat.lat],
+        Number.isInteger(legIndex) ? legIndex : undefined,
+      );
     },
-    [snapPoint],
+    [controller],
   );
 
   // --- the map -------------------------------------------------------------
@@ -538,9 +313,13 @@ export function RoutePlanner({
     ) {
       return;
     }
-    const view = initialView(planRef.current, cityValueAtMount(cityValue));
+    const view = initialView(
+      controller.getSnapshot().plan,
+      cityValueAtMount(cityValue),
+    );
     const map = createEditorMap(containerRef.current, view);
     mapRef.current = map;
+    controller.activate();
     map.doubleClickZoom.disable();
 
     // Fires on first load and after every basemap switch, which discards our
@@ -572,7 +351,7 @@ export function RoutePlanner({
 
     paintMarkers();
     return () => {
-      editGenerationRef.current += 1;
+      controller.dispose();
       if (networkFrameRef.current !== null) {
         cancelAnimationFrame(networkFrameRef.current);
         networkFrameRef.current = null;
@@ -588,7 +367,14 @@ export function RoutePlanner({
     // `cityValue` is read once for the starting view and deliberately not a
     // dependency: a change must not tear the map down.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handleMapClick, loadView, paintMarkers, paintNetwork, paintRoute]);
+  }, [
+    controller,
+    handleMapClick,
+    loadView,
+    paintMarkers,
+    paintNetwork,
+    paintRoute,
+  ]);
 
   // Curated trails for the route's city: drawn, and routed over.
   useEffect(() => {
@@ -623,18 +409,12 @@ export function RoutePlanner({
     if (normalized(planValue) === writtenRef.current) {
       return;
     }
-    editGenerationRef.current += 1;
-    clickQueueRef.current = Promise.resolve();
     const incoming = initialPlan(planValue);
     writtenRef.current = normalized(incoming);
-    planRef.current = incoming;
-    setPlan(incoming);
-    undoRef.current = [];
-    redoRef.current = [];
-    setHistory({ redo: 0, undo: 0 });
+    controller.replacePlan(incoming);
     paintRoute();
     paintMarkers();
-  }, [paintMarkers, paintRoute, planValue]);
+  }, [controller, paintMarkers, paintRoute, planValue]);
 
   // The route draws in its own colour.
   useEffect(() => {
@@ -646,11 +426,13 @@ export function RoutePlanner({
   useEditorBasemap(mapRef, basemap);
 
   const fitRoute = useCallback(() => {
-    const bounds = boundsOf(planRef.current.legs.map((leg) => leg.coordinates));
+    const bounds = boundsOf(
+      controller.getSnapshot().plan.legs.map((leg) => leg.coordinates),
+    );
     if (bounds) {
       mapRef.current?.fitBounds(bounds, FIT_OPTIONS);
     }
-  }, []);
+  }, [controller]);
 
   // --- render --------------------------------------------------------------
 
@@ -689,24 +471,24 @@ export function RoutePlanner({
         role="group"
       >
         <ToolButton
-          disabled={!editable || history.undo === 0}
+          disabled={!editable || !canUndo}
           label="Undo"
-          onClick={() => stepHistory('undo')}
+          onClick={() => controller.undo()}
         />
         <ToolButton
-          disabled={!editable || history.redo === 0}
+          disabled={!editable || !canRedo}
           label="Redo"
-          onClick={() => stepHistory('redo')}
+          onClick={() => controller.redo()}
         />
         <ToolButton
           disabled={!editable || plan.waypoints.length < 2}
           label="Reverse"
-          onClick={() => void applyEdit(reversePlan)}
+          onClick={() => void controller.reverse()}
         />
         <ToolButton
           disabled={!editable || plan.waypoints.length < 2}
           label="Back to start"
-          onClick={() => void applyEdit(closeLoop)}
+          onClick={() => void controller.closeLoop()}
         />
         <ToolButton
           disabled={plan.legs.length === 0}
@@ -718,7 +500,7 @@ export function RoutePlanner({
           label="Clear"
           onClick={() => {
             if (window.confirm('Remove every waypoint from this route?')) {
-              void applyEdit(() => ({ plan: EMPTY_PLAN, reroute: [] }));
+              void controller.clear();
             }
           }}
         />
@@ -820,11 +602,7 @@ export function RoutePlanner({
                     <button
                       className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={!editable}
-                      onClick={() =>
-                        void applyEdit((current) =>
-                          removeWaypoint(current, index),
-                        )
-                      }
+                      onClick={() => void controller.removeWaypoint(index)}
                       type="button"
                     >
                       Remove
@@ -846,12 +624,9 @@ export function RoutePlanner({
                           checked={leg.mode === 'straight'}
                           disabled={!editable}
                           onChange={(event) =>
-                            void applyEdit((current) =>
-                              setLegMode(
-                                current,
-                                index,
-                                event.target.checked ? 'straight' : 'network',
-                              ),
+                            void controller.setLegMode(
+                              index,
+                              event.target.checked ? 'straight' : 'network',
                             )
                           }
                           type="checkbox"
@@ -1094,10 +869,6 @@ function legMeters(leg: RouteLeg): number {
   return leg.steps.reduce((total, step) => total + step.meters, 0);
 }
 
-function samePoint(a: Position | undefined, b: Position): boolean {
-  return Boolean(a && a[0] === b[0] && a[1] === b[1]);
-}
-
 /**
  * Pairs each item with a key built from its content plus how many times that
  * content has appeared so far — stable across re-renders without leaning on
@@ -1114,18 +885,4 @@ function withKeys<T>(
     seen.set(base, count + 1);
     return { item, key: `${base}#${count}` };
   });
-}
-
-/**
- * Where a waypoint is now. Its creation-time index is right unless the plan
- * changed underneath; then it is found by position. -1 makes the edit a no-op.
- */
-function waypointIndex(
-  plan: RoutePlan,
-  index: number,
-  point: Position,
-): number {
-  return samePoint(plan.waypoints[index], point)
-    ? index
-    : plan.waypoints.findIndex((candidate) => samePoint(candidate, point));
 }

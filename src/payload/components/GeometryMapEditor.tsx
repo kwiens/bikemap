@@ -250,7 +250,7 @@ export function GeometryMapEditor({
   /** Terra Draw throws if started twice or stopped before starting. */
   const startedRef = useRef(false);
   /** Undo and redo for every edit. See `edit-history.ts`. */
-  const historyRef = useRef(createEditHistory());
+  const historyRef = useRef(createEditHistory(cloneParts));
   const refreshRequestRef = useRef<AbortController | null>(null);
 
   const [ready, setReady] = useState(false);
