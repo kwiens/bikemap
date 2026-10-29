@@ -1,7 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
+import { useMapEvent } from '@/hooks/useMapEvent';
+import {
+  getLayout,
+  isMobileViewport,
+  setSidebarOpen,
+  toggleSidebar,
+  useLayout,
+  useSeedLayout,
+} from '@/hooks/useLayout';
+import { useOutsideTap } from '@/hooks/useOutsideTap';
 import { onMapReady } from '@/utils/map-ready';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -25,7 +35,11 @@ import {
 } from './sidebar';
 import { getRideStyle } from './WelcomeModal';
 import { getSetting, setSetting } from '@/utils/settings';
-import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from './styles';
+import {
+  SIDEBAR_THEME_CLASS,
+  TOGGLE_BTN_CLASS,
+  TOGGLE_ICON_CLASS,
+} from './styles';
 import { cn } from '@/lib/utils';
 import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
@@ -43,15 +57,21 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     bikeResources.length > 0 ||
     Boolean(mapConfig.gbfs);
   const { isEmbed, options: embedOptions } = useEmbed();
-  // Track state in this parent component
-  const [isOpen, setIsOpen] = useState(() =>
-    isEmbed ? embedOptions.sidebarOpen : (getSetting('sidebarOpen') ?? true),
-  );
+  // Embeds never carry the settings cookie, so they take the host page's
+  // option instead.
+  useSeedLayout(() => ({
+    sidebarOpen: isEmbed
+      ? embedOptions.sidebarOpen
+      : (getSetting('sidebarOpen') ?? true),
+  }));
+  const { sidebarOpen: isOpen } = useLayout();
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
     () => {
-      if (isEmbed) return 'routes';
+      if (isEmbed) {
+        return embedOptions.mode === 'mtb' ? 'trails' : 'routes';
+      }
       const saved = getSetting('activeTab');
       if (saved === 'routes' && hasRoutesSection) return saved;
       if (saved === 'trails') return saved;
@@ -59,16 +79,19 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       return hasRoutesSection ? 'routes' : 'trails';
     },
   );
-  // Embed mode is Casual-only — no MTB tab, so tab switching is a no-op.
+  // Embed mode is fixed to the route family chosen by the host page, so tab
+  // switching remains a no-op there.
   const switchTab = (tab: 'routes' | 'trails') => {
     if (isEmbed) return;
     if (tab === 'routes' && !hasRoutesSection) return;
     setActiveSection(tab);
     setSetting('activeTab', tab);
   };
-  // What section actually renders — embed mode always shows Casual/routes
-  // regardless of activeSection (kept only so non-embed logic is untouched).
-  const visibleSection = isEmbed ? 'routes' : activeSection;
+  const visibleSection = isEmbed
+    ? embedOptions.mode === 'mtb'
+      ? 'trails'
+      : 'routes'
+    : activeSection;
   // Add state for map layers
   const [showAttractions, setShowAttractions] = useState(false);
   const [showBikeResources, setShowBikeResources] = useState(false);
@@ -78,86 +101,41 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
-  const isOpenRef = useRef(isOpen);
-  isOpenRef.current = isOpen;
+  // Third-party frames drop the settings cookie anyway (no SameSite=None).
+  const toggle = useCallback(
+    () => toggleSidebar({ persist: !isEmbed }),
+    [isEmbed],
+  );
 
-  const toggle = useCallback(() => {
-    const next = !isOpenRef.current;
-    setIsOpen(next);
-    // Third-party frames drop this cookie anyway (no SameSite=None) — skip it.
-    if (!isEmbed) setSetting('sidebarOpen', next);
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
-        detail: { isOpen: next },
-      }),
-    );
-  }, [isEmbed]);
-
-  // Handle clicks/taps outside the sidebar (mobile only)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (window.innerWidth > 768) return;
-      if (!isOpen) return;
-      if (toggleButtonRef.current?.contains(event.target as Node)) return;
-      if (sidebarRef.current?.contains(event.target as Node)) return;
-
-      toggle();
-    };
-
-    // Use capture phase so we see the event before it reaches sidebar children
-    document.addEventListener('pointerdown', handleClickOutside);
-    return () => {
-      document.removeEventListener('pointerdown', handleClickOutside);
-    };
-  }, [isOpen, toggle]);
-
-  // Listen for route-select events from the map (when user clicks on a route in the map)
-  useEffect(() => {
-    const handleMapRouteSelect = (event: Event) => {
-      const customEvent = event as CustomEvent<{ routeId: string }>;
-      const { routeId } = customEvent.detail;
-      // Only update state, don't dispatch another event (map already handles the visual update)
-      setSelectedRoute(routeId);
-      setSelectedTrail(null);
-    };
-
-    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleMapRouteSelect);
-    return () => {
-      window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, handleMapRouteSelect);
-    };
+  // On a phone the sidebar overlays the map, so it gets out of the way after
+  // a selection or a tap on the map. Neither is a preference worth saving.
+  const closeOnMobile = useCallback(() => {
+    if (isMobileViewport()) setSidebarOpen(false);
   }, []);
+  useOutsideTap(
+    [sidebarRef, toggleButtonRef],
+    () => getLayout().sidebarOpen,
+    closeOnMobile,
+  );
 
-  // Listen for trail-select events from the map (when user clicks on a mountain bike trail)
-  useEffect(() => {
-    const handleMapTrailSelect = (event: Event) => {
-      const customEvent = event as CustomEvent<{ trailName: string }>;
-      const { trailName } = customEvent.detail;
-      setSelectedTrail(trailName);
-      setSelectedRoute(null);
-      setActiveSection('trails');
-    };
+  // Selections made on the map itself. Only state changes here — the map
+  // already handled the visual update before dispatching.
+  useMapEvent(MAP_EVENTS.ROUTE_SELECT, ({ routeId }) => {
+    setSelectedRoute(routeId);
+    setSelectedTrail(null);
+  });
+  useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName }) => {
+    setSelectedTrail(trailName);
+    setSelectedRoute(null);
+    setActiveSection('trails');
+  });
+  useMapEvent(MAP_EVENTS.ROUTE_DESELECT, () => setSelectedRoute(null));
+  useMapEvent(MAP_EVENTS.TRAIL_DESELECT, () => setSelectedTrail(null));
 
-    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleMapTrailSelect);
-    return () => {
-      window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleMapTrailSelect);
-    };
-  }, []);
-
-  // Listen for ride style chosen from welcome modal
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { style } = (e as CustomEvent).detail;
-      const tab = style === 'mountain' ? 'trails' : 'routes';
-      switchTab(tab);
-    };
-
-    window.addEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
-    return () =>
-      window.removeEventListener(MAP_EVENTS.RIDE_STYLE_CHOSEN, handler);
-    // switchTab is a plain (non-memoized) function redefined every render;
-    // this listener wiring must run exactly once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Ride style chosen in the welcome modal picks the matching tab.
+  useMapEvent(MAP_EVENTS.RIDE_STYLE_CHOSEN, ({ style }) => {
+    switchTab(style === 'mountain' ? 'trails' : 'routes');
+  });
 
   // Function to handle route selection
   const handleRouteSelect = useCallback(
@@ -166,19 +144,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       setSelectedTrail(null);
 
       // Dispatch event for map to update route opacity
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
-          detail: { routeId },
-        }),
-      );
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
-
-      // Close sidebar on mobile after selection
-      if (window.innerWidth <= 768 && isOpen) {
-        toggle();
-      }
+      dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId });
+      dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
+      closeOnMobile();
     },
-    [isOpen, toggle],
+    [closeOnMobile],
   );
 
   // Function to handle trail selection
@@ -187,18 +157,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       setSelectedTrail(trailName);
       setSelectedRoute(null);
 
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-          detail: { trailName },
-        }),
-      );
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-
-      if (window.innerWidth <= 768 && isOpen) {
-        toggle();
-      }
+      dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, { trailName });
+      dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
+      closeOnMobile();
     },
-    [isOpen, toggle],
+    [closeOnMobile],
   );
 
   // Function to handle area (rec area heading) selection
@@ -208,13 +171,9 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
 
     // Deselect first — trail-deselect resets mountain bike opacity,
     // so it must fire before area-select sets the highlight
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.AREA_SELECT, {
-        detail: { areaName },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
+    dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
+    dispatchMapEvent(MAP_EVENTS.AREA_SELECT, { areaName });
   }, []);
 
   // Helper to toggle a layer with radio-button behavior:
@@ -247,11 +206,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       for (const key of ordered) {
         const newValue = key === layer ? turningOn : false;
         setterMap[key](newValue);
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-            detail: { layer: key, visible: newValue },
-          }),
-        );
+        dispatchMapEvent(MAP_EVENTS.LAYER_TOGGLE, {
+          layer: key,
+          visible: newValue,
+        });
       }
     },
     [showAttractions, showBikeResources, showBikeRentals],
@@ -279,22 +237,20 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const toggleOsmTrailsLayer = useCallback(() => {
     const next = !showOsmTrails;
     setShowOsmTrails(next);
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-        detail: { layer: 'osmTrails', visible: next },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.LAYER_TOGGLE, {
+      layer: 'osmTrails',
+      visible: next,
+    });
   }, [showOsmTrails]);
 
   // Classified bike-network overlay (Casual mode), independent of the markers.
   const toggleBikeNetworkLayer = useCallback(() => {
     const next = !showBikeNetwork;
     setShowBikeNetwork(next);
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-        detail: { layer: 'bikeNetwork', visible: next },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.LAYER_TOGGLE, {
+      layer: 'bikeNetwork',
+      visible: next,
+    });
   }, [showBikeNetwork]);
 
   // Embed layer presets: turn on whatever layers the host page requested via
@@ -339,11 +295,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     const dispatchLayers = () => {
       for (const layer of embedOptions.layers) {
         const visible = presetLayersRef.current[layer];
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-            detail: { layer, visible },
-          }),
-        );
+        dispatchMapEvent(MAP_EVENTS.LAYER_TOGGLE, { layer, visible });
       }
     };
 
@@ -356,75 +308,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const centerOnLocation = useCallback(
     (location: LocationProps) => {
       // Dispatch event for map to center and show pin
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.CENTER_LOCATION, {
-          detail: {
-            location: location,
-          },
-        }),
-      );
-
-      // Close sidebar on mobile after selection
-      if (window.innerWidth <= 768 && isOpen) {
-        toggle();
-      }
+      dispatchMapEvent(MAP_EVENTS.CENTER_LOCATION, { location });
+      closeOnMobile();
     },
-    [isOpen, toggle],
+    [closeOnMobile],
   );
-
-  // Listen for route-deselect event
-  useEffect(() => {
-    const handleRouteDeselect = () => {
-      setSelectedRoute(null);
-    };
-
-    window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
-
-    return () => {
-      window.removeEventListener(
-        MAP_EVENTS.ROUTE_DESELECT,
-        handleRouteDeselect,
-      );
-    };
-  }, []);
-
-  // Listen for trail-deselect event
-  useEffect(() => {
-    const handleTrailDeselect = () => {
-      setSelectedTrail(null);
-    };
-
-    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
-
-    return () => {
-      window.removeEventListener(
-        MAP_EVENTS.TRAIL_DESELECT,
-        handleTrailDeselect,
-      );
-    };
-  }, []);
-
-  // Close when rides panel opens. Dispatch SIDEBAR_TOGGLE too — the elevation
-  // pane and map-resize hook track sidebar state solely via that event, so a
-  // silent close would leave them laid out for an open sidebar. (Unlike
-  // toggle(), this doesn't persist the closed state: the panel closing the
-  // sidebar isn't a user preference.)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { isOpen: panelOpen } = (e as CustomEvent).detail;
-      if (panelOpen && isOpenRef.current) {
-        setIsOpen(false);
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
-            detail: { isOpen: false },
-          }),
-        );
-      }
-    };
-    window.addEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
-    return () =>
-      window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
-  }, []);
 
   return (
     <>
@@ -454,29 +342,30 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       <div
         ref={sidebarRef}
         className={cn(
-          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-[950] overflow-hidden transition-transform duration-300 ease-in-out flex flex-col max-md:w-full max-md:max-w-[320px]',
+          SIDEBAR_THEME_CLASS,
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         {isEmbed ? (
-          /* Embed mode is Casual-only — a compact label instead of the pill */
-          <div className="flex items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
-            <span className="text-sm font-medium text-gray-700">
-              {siteConfig.name}
+          /* The host fixes the embed mode, so a compact label replaces tabs. */
+          <div className="flex items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-app-primary/40 bg-app-secondary pt-[calc(17px+env(safe-area-inset-top))]">
+            <span className="text-sm font-medium text-app-surface">
+              {siteConfig.name} ·{' '}
+              {embedOptions.mode === 'mtb' ? 'MTB routes' : 'Casual routes'}
             </span>
           </div>
         ) : (
           /* Casual / MTB toggle in header */
-          <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-gray-200 bg-gray-50 pt-[calc(17px+env(safe-area-inset-top))]">
-            <div className="flex bg-gray-100 rounded-full p-1 w-full border border-gray-200">
+          <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-app-primary/40 bg-app-secondary pt-[calc(17px+env(safe-area-inset-top))]">
+            <div className="flex bg-app-surface/10 rounded-full p-1 w-full border border-app-surface/20">
               {hasRoutesSection && (
                 <button
                   type="button"
                   className={cn(
                     'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                     activeSection === 'routes'
-                      ? 'bg-white text-gray-800 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700',
+                      ? 'bg-app-primary text-app-secondary shadow-sm'
+                      : 'text-app-surface/70 hover:text-app-surface',
                   )}
                   onClick={() => switchTab('routes')}
                 >
@@ -488,8 +377,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                 className={cn(
                   'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                   activeSection === 'trails'
-                    ? 'bg-white text-gray-800 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700',
+                    ? 'bg-app-primary text-app-secondary shadow-sm'
+                    : 'text-app-surface/70 hover:text-app-surface',
                 )}
                 onClick={() => switchTab('trails')}
               >
@@ -499,7 +388,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <div className="overflow-y-auto flex-1 min-h-0">
+        <div className="overflow-y-auto flex-1 min-h-0 border-t border-app-surface/10">
           <div className="px-4 pb-4 pt-2">
             {visibleSection === 'routes' && (
               <>

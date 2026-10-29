@@ -3,10 +3,9 @@
 import type { ReactElement } from 'react';
 import dynamic from 'next/dynamic';
 import React from 'react';
-import { activeCityId } from '@/config/map.config';
-import type { BikeRoute } from '@/data/bike-routes';
-import type { CityId } from '@/data/cities/types';
-import { setBikeRoutes } from '@/data/route-source';
+import { TrailConditionsProvider } from '@/components/TrailConditionsProvider';
+import { type CityContent, publishCityContent } from '@/data/city-content';
+import type { EmbedMode } from '@/utils/embed';
 
 const EmbedMap = dynamic(() => import('@/components/embed/EmbedMap'), {
   ssr: false,
@@ -18,19 +17,27 @@ const EmbedMap = dynamic(() => import('@/components/embed/EmbedMap'), {
 });
 
 export default function EmbedClient({
-  cityId,
-  routes,
+  content,
+  mode,
 }: {
-  cityId: CityId;
-  routes: BikeRoute[];
+  /** Only the content family selected by the embed mode is loaded. */
+  content: CityContent;
+  mode: EmbedMode;
 }): ReactElement {
-  if (cityId === activeCityId) {
-    setBikeRoutes(routes);
-  }
+  publishCityContent(content);
 
   return (
     <main className="overflow-hidden fixed inset-0 m-0 p-0">
-      <EmbedMap />
+      {/* Trails embeds show conditions and closures, read-only: there is no
+          ConditionReportModal, so nothing on a partner's page files a report.
+          A routes embed has no trails to badge, so it skips the fetch. */}
+      {mode === 'mtb' ? (
+        <TrailConditionsProvider>
+          <EmbedMap />
+        </TrailConditionsProvider>
+      ) : (
+        <EmbedMap />
+      )}
     </main>
   );
 }

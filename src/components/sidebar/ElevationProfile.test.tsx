@@ -18,8 +18,14 @@ import {
   loadProfile,
   profilePointToXY,
 } from './ElevationProfile';
+import { EmbedProvider } from '@/components/EmbedContext';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { MAP_EVENTS } from '@/events';
+import type { RecordedRide } from '@/data/ride';
+
+const loadRideMock = vi.hoisted(() => vi.fn());
+vi.mock('@/utils/ride-storage', () => ({ loadRide: loadRideMock }));
+import { parseEmbedOptions } from '@/utils/embed';
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -467,5 +473,152 @@ describe('ElevationProfile selection source', () => {
       );
       expect(screen.getByText('+123 ft climbing')).toBeInTheDocument();
     });
+  });
+});
+
+describe('ElevationProfile ride selection', () => {
+  const ride: RecordedRide = {
+    id: 'ride-1',
+    name: 'Morning Ride',
+    startTime: 0,
+    endTime: 400_000,
+    points: Array.from({ length: 6 }, (_, i) => ({
+      lng: -85.3 - i * 0.001,
+      lat: 35 + i * 0.001,
+      altitude: 200 + i * 5,
+      timestamp: i * 60_000,
+    })),
+    stats: {
+      distance: 600,
+      elapsedTime: 300_000,
+      movingTime: 300_000,
+      avgSpeed: 2,
+      maxSpeed: 3,
+      elevationGain: 25,
+      elevationLoss: 0,
+      elevationMin: 200,
+      elevationMax: 225,
+    },
+    bounds: [-85.305, 35, -85.3, 35.005],
+  };
+
+  afterEach(() => {
+    loadRideMock.mockReset();
+  });
+
+  it('shows a selected ride', async () => {
+    loadRideMock.mockResolvedValue(ride);
+    render(<ElevationProfile />);
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
+          detail: { rideId: 'ride-1' },
+        }),
+      );
+    });
+    expect(screen.getByText('Morning Ride')).toBeInTheDocument();
+  });
+
+  it('drops a ride that finishes loading after a route was selected', async () => {
+    let resolveRide: (value: RecordedRide) => void = () => {};
+    loadRideMock.mockReturnValue(
+      new Promise<RecordedRide>((resolve) => {
+        resolveRide = resolve;
+      }),
+    );
+    render(<ElevationProfile />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
+          detail: { rideId: 'ride-1' },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
+          detail: { routeId: 'zoo-loop' },
+        }),
+      );
+    });
+    await act(async () => {
+      resolveRide(ride);
+    });
+    expect(screen.queryByText('Morning Ride')).toBeNull();
+  });
+
+  it('drops a ride that finishes loading after it was deselected', async () => {
+    let resolveRide: (value: RecordedRide) => void = () => {};
+    loadRideMock.mockReturnValue(
+      new Promise<RecordedRide>((resolve) => {
+        resolveRide = resolve;
+      }),
+    );
+    render(<ElevationProfile />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
+          detail: { rideId: 'ride-1' },
+        }),
+      );
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
+    });
+    await act(async () => {
+      resolveRide(ride);
+    });
+    expect(screen.queryByText('Morning Ride')).toBeNull();
+  });
+
+  it('ignores a ride that cannot be read', async () => {
+    loadRideMock.mockRejectedValue(new Error('IndexedDB blocked'));
+    render(<ElevationProfile />);
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
+          detail: { rideId: 'ride-1' },
+        }),
+      );
+    });
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(console.error).toHaveBeenCalledWith(
+      'Failed to load ride:',
+      expect.any(Error),
+    );
+  });
+});
+
+describe('ElevationProfile embed URL state', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('rewrites only the trail and keeps the embed configuration', () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 404 } as Response);
+    window.history.replaceState(
+      null,
+      '',
+      '/embed?mode=mtb&zoom=12&route=riverwalk&trail=old-trail',
+    );
+
+    render(
+      <EmbedProvider options={parseEmbedOptions(window.location.search)}>
+        <ElevationProfile />
+      </EmbedProvider>,
+    );
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
+          detail: { trailName: 'Big Forest' },
+        }),
+      );
+    });
+    expect(window.location.pathname).toBe('/embed');
+    expect(
+      Object.fromEntries(new URLSearchParams(window.location.search)),
+    ).toEqual({ mode: 'mtb', zoom: '12', trail: 'big-forest' });
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
+    });
+    expect(window.location.search).toBe('?mode=mtb&zoom=12');
   });
 });

@@ -23,6 +23,6 @@ run(async () => {
   const preserved = results.filter((result) => result === 'preserved').length;
   const unchanged = results.length - created - updated - preserved;
   payload.logger.info(
-    `bend routes: created ${created}, updated ${updated}, unchanged ${unchanged}, kept ${preserved} trail-linked.`,
+    `bend routes: created ${created}, updated ${updated}, unchanged ${unchanged}, kept ${preserved} migrated.`,
   );
 });

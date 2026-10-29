@@ -9,11 +9,11 @@ if (shouldRunMigrations(process.env)) {
   runPnpm('db:seed:bend-routes');
   // Keep the five Chattanooga routes that have not yet been migrated in the
   // database-backed Casual list. Their geometry source remains explicitly
-  // Studio; imported or trail-linked replacements are always preserved.
+  // Studio; imported, trail-linked, or composed replacements are preserved.
   runPnpm('db:seed:chattanooga-routes');
 } else if (process.env.DATABASE_URL && process.env.VERCEL_ENV) {
   console.log(
-    `Skipping Payload migrations in the ${process.env.VERCEL_ENV} Vercel environment; only production may migrate the shared database.`,
+    `Skipping Payload migrations in the ${process.env.VERCEL_ENV} Vercel environment; previews need an isolated database and PREVIEW_DATABASE_ISOLATED=true before they may migrate.`,
   );
 } else {
   console.log('DATABASE_URL is not set; skipping Payload migrations.');

@@ -9,6 +9,12 @@ import type {
 } from '../data/ride';
 import { FEET_PER_METER } from '../utils/format';
 
+import {
+  createAltitudeSpikeFilter,
+  createElevationAccumulator,
+  type ElevationTotals,
+} from './elevation';
+
 // Functions accept both full RidePoint (during recording) and StoredRidePoint (from storage).
 // Missing speed/accuracy fields are handled gracefully.
 type AnyRidePoint = RidePoint | StoredRidePoint;
@@ -27,33 +33,6 @@ const STOP_DURATION_MS = 10_000;
 const MAX_SEGMENT_MS = 30_000;
 // Max plausible cycling speed (m/s, ~89 mph)
 const MAX_PLAUSIBLE_SPEED = 40;
-// EMA smoothing factor for elevation (0–1).  Lower = heavier smoothing.
-// 0.1 filters GPS altitude noise well while preserving real climbs.
-export const ELEVATION_EMA_ALPHA = 0.1;
-// Dead-band threshold for elevation gain/loss (meters).  Accumulated
-// elevation change must exceed this before it counts as gain or loss.
-// Filters GPS altitude jitter that otherwise inflates totals ~3-4×.
-export const ELEVATION_DEAD_BAND = 3;
-// Max plausible single-point altitude jump (meters).  Readings that
-// differ from the last accepted reading by more than this are treated
-// as spikes and replaced before smoothing.  Must exceed the largest real
-// sample-to-sample step (~18 m observed on sustained ~30% grades).
-export const ELEVATION_SPIKE_THRESHOLD = 25;
-// How many consecutive readings may be rejected as spikes before the series
-// is taken at face value.  Run length is what separates bad data from real
-// ground: a dropout is a short burst — ~5 s of GPS at 1 Hz for live rides,
-// or 100 m of trail for the DEM consumers that resample geometry every
-// SAMPLE_STEP_M = 20 m — while a hillside keeps going.  Trade-off: a burst
-// longer than the cap is accepted at face value and leaks phantom gain/loss
-// bounded by the excursion size (see the "dropout longer than the cap" test).
-export const ELEVATION_SPIKE_MAX_RUN = 5;
-// Minimum horizontal distance (meters) between deadband anchor updates.
-// Prevents counting altitude jitter while stopped or barely moving.
-export const ELEVATION_MIN_DISTANCE = 15;
-// Maximum altitude accuracy (meters) to trust a GPS reading.
-// Readings with worse accuracy are treated as null.
-export const ELEVATION_MAX_ALT_ACCURACY = 15;
-
 export function haversineDistance(
   lat1: number,
   lng1: number,
@@ -194,24 +173,10 @@ function smoothAltitudeSegment(
   // bad startup value doesn't poison the series.
   const SEED_COUNT = Math.min(5, rawVals.length);
   const seedSlice = rawVals.slice(0, SEED_COUNT).sort((a, b) => a - b);
-  let ref = seedSlice[Math.floor(seedSlice.length / 2)];
-  const vals: number[] = [];
-  let rejectRun = 0;
-  for (let i = 0; i < rawVals.length; i++) {
-    if (
-      Math.abs(rawVals[i] - ref) > ELEVATION_SPIKE_THRESHOLD &&
-      rejectRun < ELEVATION_SPIKE_MAX_RUN
-    ) {
-      vals.push(ref);
-      rejectRun += 1;
-    } else {
-      // A normal reading, or a deviation that outlasted the cap — that is
-      // the ground, not a spike, so accept it and move the reference.
-      vals.push(rawVals[i]);
-      rejectRun = 0;
-      ref = rawVals[i];
-    }
-  }
+  const spikes = createAltitudeSpikeFilter(
+    seedSlice[Math.floor(seedSlice.length / 2)],
+  );
+  const vals = rawVals.map((altitude) => spikes.add(altitude));
 
   // Centered moving average
   for (let i = 0; i < vals.length; i++) {
@@ -223,72 +188,25 @@ function smoothAltitudeSegment(
   }
 }
 
-export function computeElevation(points: AnyRidePoint[]): {
-  gain: number;
-  loss: number;
-  min: number;
-  max: number;
-} {
+export function computeElevation(points: AnyRidePoint[]): ElevationTotals {
   const smoothed = smoothAltitudes(points);
-  let gain = 0;
-  let loss = 0;
-  let min = Infinity;
-  let max = -Infinity;
-
-  // Dead-band accumulator: track the last "committed" altitude and
-  // only count gain/loss once the change exceeds the threshold.
-  // Also require minimum horizontal distance since last anchor update
-  // to prevent counting altitude jitter while stopped.
-  let anchor: number | null = null;
-
-  let distSinceAnchor = 0;
-
+  const elevation = createElevationAccumulator();
   for (let i = 0; i < smoothed.length; i++) {
-    if (points[i].segmentStart) {
-      anchor = null;
-      distSinceAnchor = 0;
-    }
-
-    const alt = smoothed[i];
-    if (Number.isNaN(alt)) continue;
-    if (alt < min) min = alt;
-    if (alt > max) max = alt;
-
-    // Accumulate horizontal distance since last anchor update
-    if (anchor !== null && i > 0 && !points[i].segmentStart) {
-      distSinceAnchor += haversineDistance(
-        points[i - 1].lat,
-        points[i - 1].lng,
-        points[i].lat,
-        points[i].lng,
-      );
-    }
-
-    if (anchor === null) {
-      anchor = alt;
-
-      continue;
-    }
-
-    const delta = alt - anchor;
-    // Only update anchor if we've traveled enough horizontally
-    if (distSinceAnchor < ELEVATION_MIN_DISTANCE) continue;
-
-    if (delta > ELEVATION_DEAD_BAND) {
-      gain += delta;
-      anchor = alt;
-      distSinceAnchor = 0;
-    } else if (delta < -ELEVATION_DEAD_BAND) {
-      loss += Math.abs(delta);
-      anchor = alt;
-      distSinceAnchor = 0;
-    }
+    if (points[i].segmentStart) elevation.resetSegment();
+    const altitude = smoothed[i];
+    if (Number.isNaN(altitude)) continue;
+    const distanceMeters =
+      elevation.isSeeded && i > 0
+        ? haversineDistance(
+            points[i - 1].lat,
+            points[i - 1].lng,
+            points[i].lat,
+            points[i].lng,
+          )
+        : 0;
+    elevation.add(altitude, distanceMeters);
   }
-
-  if (min === Infinity) min = 0;
-  if (max === -Infinity) max = 0;
-
-  return { gain, loss, min, max };
+  return elevation.totals();
 }
 
 export function computeMaxSpeed(points: AnyRidePoint[]): number {

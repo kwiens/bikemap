@@ -42,9 +42,9 @@ The converter reads the projection from `.prj`, transforms NAD83 / UTM zone
 duplicate line parts, and writes
 `public/data/chattanooga/trails.geojson` deterministically.
 
-The source contains 320 records. The generated file contains 224 named
-MultiLineStrings and 397 line parts. Of the app's 224 curated trails, 218 match
-by exact `Trail` name and import with geometry. The six without geometry are:
+The source contains 320 records and normalizes to 224 named MultiLineStrings
+with 397 line parts. Of the app's 224 curated trails, 218 match by exact
+`Trail` name. The six absent from the regional source are:
 
 - Godsey Ridge Blue 1
 - Godsey Ridge Blue 2
@@ -53,13 +53,19 @@ by exact `Trail` name and import with geometry. The six without geometry are:
 - Godsey Ridge Expert Spur
 - Godsey Ridge Green
 
-Those six are expected: they render from the separate `Godsey Ridge Trails`
-layer baked into the Chattanooga Mapbox style. The regional source also has six
-named geometries not represented in the curated sidebar (`River Walk`, `South
-Chick Greenway`, `South Chickamauga Creek Greenway`, `Tennessee Riverwalk`,
-`Valley`, and `unmaintained`). The map's curated-name filter prevents them from
-appearing as orphan lines; the seed ignores them because no matching trail row
-exists.
+The supplemental GeoJSON adds those six permitted lines and fills one documented
+source gap: the regional Cherokee Trail record has two parts but omits the
+connector between them. The connector came from the pre-import checked-in
+profile, originally sampled from the legacy Mapbox layer. The converter accepts
+that correction only when its endpoints exactly match two regional part
+endpoints, then emits one continuous line. The combined generated file contains
+230 named MultiLineStrings and 402 line parts.
+
+The regional source also has six named geometries not represented in the curated
+sidebar (`River Walk`, `South Chick Greenway`, `South Chickamauga Creek
+Greenway`, `Tennessee Riverwalk`, `Valley`, and `unmaintained`). The map's
+curated-name filter prevents them from appearing as orphan lines; the seed
+ignores them because no matching trail row exists.
 
 Imported Chattanooga rows use `geometrySource: 'imported'`. They keep the
 archived line until a curator draws a replacement or the trail is matched to
