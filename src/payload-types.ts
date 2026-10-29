@@ -156,9 +156,9 @@ export interface Route {
   routeId?: string | null;
   kind?: ('ride' | 'greenway' | 'path' | 'trail') | null;
   /**
-   * Built, Imported, and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.
+   * Start new to draw a line, build a route with trail and road snapping, or reuse existing geometry.
    */
-  geometrySource: 'composed' | 'imported' | 'trail' | 'studio';
+  geometrySource: 'drawn' | 'composed' | 'imported' | 'trail' | 'studio';
   /**
    * Select a curated trail to expose it in the Casual routes tab.
    */
@@ -210,7 +210,7 @@ export interface Route {
     | boolean
     | null;
   /**
-   * Normalized WGS84 route geometry. Import tooling owns this value when the source is Imported geometry.
+   * Draw a line, import a GPX file, or adjust its points. Save to measure distance and bounds.
    */
   geom?:
     | {

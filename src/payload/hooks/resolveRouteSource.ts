@@ -1,13 +1,9 @@
 import { ValidationError, type CollectionBeforeValidateHook } from 'payload';
 import { isCityId } from '@/config/map.config';
-import { boundsOf } from '@/payload/osm/assemble';
+import { boundsOf, lengthMeters } from '@/payload/osm/assemble';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
 import { METERS_TO_MILES } from '@/payload/osm/units';
-import {
-  parseRoutePlan,
-  planGeometry,
-  planMeters,
-} from '@/payload/routing/plan';
+import { parseRoutePlan, planGeometry } from '@/payload/routing/plan';
 import { STYLE_OWNED_ROUTE_LAYER_IDS } from '@/data/mapbox-style';
 import { slugify } from '@/utils/string';
 
@@ -128,8 +124,8 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
     return current;
   }
 
-  if (source === 'composed') {
-    return await resolveComposedRoute(current, stored, req, isPublishing);
+  if (source === 'composed' || source === 'drawn') {
+    return await resolveAuthoredRoute(current, stored, req, isPublishing);
   }
 
   if (source !== 'imported' && source !== 'studio') {
@@ -191,14 +187,14 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
 };
 
 /**
- * A route built in the route editor: everything public is derived from its
- * plan.
+ * Authored routes derive their public geometry and measurements from the
+ * drawn line or snapping plan.
  *
  * The line, distance, and bounds are computed here on every save, never taken
  * from the request, so a built route's numbers cannot disagree with the line
  * it draws — the same rule a hand-edited trail follows.
  */
-async function resolveComposedRoute(
+async function resolveAuthoredRoute(
   current: RouteData,
   stored: RouteData | undefined,
   req: Parameters<CollectionBeforeValidateHook>[0]['req'],
@@ -206,15 +202,28 @@ async function resolveComposedRoute(
 ): Promise<RouteData> {
   current.sourceTrail = null;
 
-  const parsed = parseRoutePlan(valueOf(current, stored, 'plan'));
-  if (!parsed.ok) {
-    error(req, 'plan', parsed.error);
+  const isDrawn = current.geometrySource === 'drawn';
+  let geom;
+  if (isDrawn) {
+    const parsed = parseTrailGeometry(valueOf(current, stored, 'geom'));
+    if (!parsed.ok) error(req, 'geom', parsed.error);
+    geom =
+      parsed.parts.length > 0
+        ? { type: 'MultiLineString' as const, coordinates: parsed.parts }
+        : null;
+    current.plan = null;
+    current.sourcePath = null;
+    current.sourceSha256 = null;
+    current.sourceFeatureCount = null;
+  } else {
+    const parsed = parseRoutePlan(valueOf(current, stored, 'plan'));
+    if (!parsed.ok) error(req, 'plan', parsed.error);
+    geom = planGeometry(parsed.plan);
+    current.plan = parsed.plan;
   }
-  const geom = planGeometry(parsed.plan);
-  current.plan = parsed.plan;
   current.geom = geom;
   current.distance = geom
-    ? Math.round(planMeters(parsed.plan) * METERS_TO_MILES * 100) / 100
+    ? Math.round(lengthMeters(geom.coordinates) * METERS_TO_MILES * 100) / 100
     : null;
   current.bounds = geom ? boundsOf(geom.coordinates) : null;
 
@@ -242,8 +251,8 @@ async function resolveComposedRoute(
   if (!geom) {
     error(
       req,
-      'plan',
-      'Place at least two waypoints on the map to publish this route.',
+      isDrawn ? 'geom' : 'plan',
+      'Draw or import a line with at least two points to publish this route.',
     );
   }
   return current;

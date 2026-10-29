@@ -120,6 +120,33 @@ modes and they are silent unless surfaced:
 | The picked ways don't connect | kept as separate parts, with the gap measured |
 | Overpass was busy | previous geometry kept, save still succeeds — save again to retry |
 
+## Route snapping and direct point editing
+
+**Start new** is a geometry source for drawing a route from scratch. It opens
+a blank map with Draw active, using the same point editor as Trails. Blank
+drafts can be saved; publishing requires a line. Distance, bounds, and a default
+route id are derived on save, without import provenance.
+
+Routes built on the map offer two tools. **Snap route to trails and roads**
+keeps the numbered waypoint planner and its road/trail routing, leg options,
+and route breakdown. **Edit points directly** opens the same `GeometryMapEditor`
+used by Trails: drag vertices, insert midpoints, remove points, select or move
+several points, split/join/reverse/simplify pieces, draw, import GPX, and undo/redo.
+Switching tools before changing points does not modify the route.
+
+The first direct edit stores an exact geometry override in the route plan.
+Distance and bounds are measured from that override on save, including all
+pieces of a multipart line. The original waypoints and legs stay in the plan
+as a baseline, but do not overwrite point edits. Reopening the route shows the
+point editor when an override exists. **Rebuild from waypoints** explicitly
+replaces the override with the original snapped plan and returns to routing.
+Existing waypoint-only plans keep working without a database migration.
+
+`RouteMapEditor` adapts the plan field, `RoutePlanner` owns snapping, and
+`TrailMapEditor` adapts trail fields and OSM preview measurements. Both point
+editing surfaces render `GeometryMapEditor`; changes to its gestures, toolbar,
+selection, or history apply to routes and trails together.
+
 ## The map
 
 `TrailMapEditor` (`src/payload/components/TrailMapEditor.tsx`) is the **Trail

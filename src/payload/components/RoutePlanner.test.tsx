@@ -9,7 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Position } from '@/payload/routing/graph';
 import { EMPTY_PLAN, type RoutePlan } from '@/payload/routing/plan';
-import { RouteMapEditor } from './RouteMapEditor';
+import { RoutePlanner } from './RoutePlanner';
 
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown) => void>(),
@@ -101,7 +101,7 @@ describe('route waypoint network races', () => {
     mocks.ensure.mockImplementation((keys: string[]) =>
       keys[0] === '-121.4' ? first.promise : second.promise,
     );
-    render(<RouteMapEditor path="plan" />);
+    render(<RoutePlanner path="plan" />);
     act(() => {
       click([-121.4, 44]);
       click([-121.39, 44.01]);
@@ -121,7 +121,7 @@ describe('route waypoint network races', () => {
 
   it('does not resurrect a cleared route when a pending snap finishes', async () => {
     const pending = deferred();
-    render(<RouteMapEditor path="plan" />);
+    render(<RoutePlanner path="plan" />);
     await act(async () => {
       click([-121.4, 44]);
     });
@@ -139,7 +139,7 @@ describe('route waypoint network races', () => {
 
   it('does not add a pending waypoint after Undo', async () => {
     const pending = deferred();
-    render(<RouteMapEditor path="plan" />);
+    render(<RoutePlanner path="plan" />);
     await act(async () => {
       click([-121.4, 44]);
     });
@@ -169,7 +169,7 @@ describe('route waypoint network races', () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockReturnValueOnce(pending.promise);
-    const view = render(<RouteMapEditor path="plan" />);
+    const view = render(<RoutePlanner path="plan" />);
     await act(async () => {
       click([-121.4, 44]);
     });
@@ -187,7 +187,7 @@ describe('route waypoint network races', () => {
   it('ignores a pending click after unmount', async () => {
     const pending = deferred();
     mocks.ensure.mockReturnValue(pending.promise);
-    const view = render(<RouteMapEditor path="plan" />);
+    const view = render(<RoutePlanner path="plan" />);
     act(() => {
       click([-121.4, 44]);
     });

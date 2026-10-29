@@ -4,6 +4,7 @@ import {
   appendWaypoint,
   closeLoop,
   EMPTY_PLAN,
+  geometryPlan,
   insertWaypoint,
   MAX_WAYPOINTS,
   moveWaypoint,
@@ -320,5 +321,48 @@ describe('waypoint limit while editing', () => {
     expect(insertWaypoint(plan, 0, at(1, 1))).toEqual({ plan, reroute: [] });
     expect(closeLoop(plan)).toEqual({ plan, reroute: [] });
     expect(parseRoutePlan(plan).ok).toBe(true);
+  });
+});
+
+describe('direct route point overrides', () => {
+  it('round-trips disconnected edited pieces and retains the snapped baseline', () => {
+    const baseline = planThrough(at(0, 0), at(0.01, 0));
+    const geometry = {
+      type: 'MultiLineString' as const,
+      coordinates: [
+        [at(0, 0), at(0.01, 0.01)],
+        [at(1, 1), at(1.01, 1)],
+      ],
+    };
+    const edited = geometryPlan(geometry, baseline);
+    const parsed = parseRoutePlan(JSON.stringify(edited));
+    expect(parsed.ok).toBe(true);
+    expect(parsed.plan).toEqual(edited);
+    expect(planGeometry(edited)).toEqual(geometry);
+    expect(planMeters(edited)).toBeCloseTo(planMeters(geometryPlan(geometry)));
+    expect(planSteps(edited)).toEqual([]);
+    expect(edited.legs).toEqual(baseline.legs);
+  });
+  it('keeps a deliberately cleared line empty rather than falling back to its waypoints', () => {
+    const edited = geometryPlan(null, planThrough(at(0, 0), at(0.01, 0)));
+    expect(parseRoutePlan(edited).plan).toEqual(edited);
+    expect(planGeometry(edited)).toBeNull();
+    expect(planMeters(edited)).toBe(0);
+  });
+  it('rejects invalid override coordinates', () => {
+    expect(
+      parseRoutePlan({
+        ...EMPTY_PLAN,
+        geometry: {
+          type: 'MultiLineString',
+          coordinates: [
+            [
+              [999, 0],
+              [0, 0],
+            ],
+          ],
+        },
+      }).ok,
+    ).toBe(false);
   });
 });

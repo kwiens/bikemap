@@ -16,6 +16,7 @@
 import { lengthMeters } from '@/payload/osm/assemble';
 import {
   isPosition,
+  parseTrailGeometry,
   safeParse,
   type TrailGeometry,
 } from '@/payload/osm/geometry';
@@ -43,6 +44,8 @@ export interface RouteLeg {
 }
 
 export interface RoutePlan {
+  /** A line edited with the shared points editor, including disconnected pieces. */
+  geometry?: TrailGeometry | null;
   /** Always one fewer than `waypoints`. */
   legs: RouteLeg[];
   version: 1;
@@ -75,7 +78,8 @@ export function parseRoutePlan(value: unknown): PlanParse {
   if (!raw || typeof raw !== 'object') {
     return fail('The route plan must be an object.');
   }
-  const { legs, version, waypoints } = raw as {
+  const { legs, version, waypoints, geometry } = raw as {
+    geometry?: unknown;
     legs?: unknown;
     version?: unknown;
     waypoints?: unknown;
@@ -132,10 +136,21 @@ export function parseRoutePlan(value: unknown): PlanParse {
     });
   }
 
+  let editedGeometry: TrailGeometry | null | undefined;
+  if ('geometry' in raw) {
+    const parsed = parseTrailGeometry(geometry);
+    if (!parsed.ok) return fail(parsed.error);
+    editedGeometry =
+      parsed.parts.length > 0
+        ? { type: 'MultiLineString', coordinates: parsed.parts }
+        : null;
+  }
+
   return {
     error: null,
     ok: true,
     plan: {
+      ...(editedGeometry !== undefined ? { geometry: editedGeometry } : {}),
       legs: parsedLegs,
       version: 1,
       waypoints: waypoints.map(([lng, lat]) => [Number(lng), Number(lat)]),
@@ -161,6 +176,7 @@ function samePosition(
  * across the gap.
  */
 export function planGeometry(plan: RoutePlan): TrailGeometry | null {
+  if ('geometry' in plan) return plan.geometry ?? null;
   const parts: Position[][] = [];
   for (const leg of plan.legs) {
     const current = parts.at(-1);
@@ -179,11 +195,16 @@ export function planGeometry(plan: RoutePlan): TrailGeometry | null {
 
 /** Total length of the plan, in meters. */
 export function planMeters(plan: RoutePlan): number {
-  return lengthMeters(plan.legs.map((leg) => leg.coordinates));
+  return lengthMeters(
+    'geometry' in plan
+      ? (plan.geometry?.coordinates ?? [])
+      : plan.legs.map((leg) => leg.coordinates),
+  );
 }
 
 /** What the whole route rides on, in order, with neighbouring stretches merged. */
 export function planSteps(plan: RoutePlan): RouteStep[] {
+  if ('geometry' in plan) return [];
   const steps: RouteStep[] = [];
   for (const leg of plan.legs) {
     for (const step of leg.steps) {
@@ -425,3 +446,11 @@ const STEP_KINDS = new Set<StepSource['kind']>([
   'straight',
   'trail',
 ]);
+
+/** Keeps the exact edited line and retains the snapped plan for an explicit rebuild. */
+export function geometryPlan(
+  geometry: TrailGeometry | null,
+  baseline: RoutePlan = EMPTY_PLAN,
+): RoutePlan {
+  return { ...baseline, geometry };
+}

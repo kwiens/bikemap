@@ -12,6 +12,7 @@ import * as migration_20261001_221021_add_composed_routes from './20261001_22102
 import * as migration_20261002_041000_ensure_theme_global from './20261002_041000_ensure_theme_global';
 import * as migration_20261002_043000_expand_theme_palette from './20261002_043000_expand_theme_palette';
 import * as migration_20261002_050000_simplify_theme_palette from './20261002_050000_simplify_theme_palette';
+import * as migration_20261029_220844_add_drawn_routes from './20261029_220844_add_drawn_routes';
 
 export const migrations = [
   {
@@ -83,5 +84,10 @@ export const migrations = [
     up: migration_20261002_050000_simplify_theme_palette.up,
     down: migration_20261002_050000_simplify_theme_palette.down,
     name: '20261002_050000_simplify_theme_palette',
+  },
+  {
+    up: migration_20261029_220844_add_drawn_routes.up,
+    down: migration_20261029_220844_add_drawn_routes.down,
+    name: '20261029_220844_add_drawn_routes'
   },
 ];

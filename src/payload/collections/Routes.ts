@@ -122,6 +122,7 @@ export const Routes: CollectionConfig = {
           // value as a default in the transaction that adds it.
           defaultValue: () => 'composed',
           options: [
+            { label: 'Start new', value: 'drawn' },
             { label: 'Built on the map', value: 'composed' },
             { label: 'Imported geometry', value: 'imported' },
             { label: 'Existing trail', value: 'trail' },
@@ -130,7 +131,7 @@ export const Routes: CollectionConfig = {
           admin: {
             width: '25%',
             description:
-              'Built, Imported, and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.',
+              'Start new to draw a line, build a route with trail and road snapping, or reuse existing geometry.',
           },
         },
         {
@@ -192,7 +193,8 @@ export const Routes: CollectionConfig = {
             // shown by the editor, so there is nothing here to type.
             condition: (_, siblingData) =>
               siblingData.geometrySource !== 'trail' &&
-              siblingData.geometrySource !== 'composed',
+              siblingData.geometrySource !== 'composed' &&
+              siblingData.geometrySource !== 'drawn',
             description: 'Route distance in miles.',
           },
         },
@@ -221,7 +223,8 @@ export const Routes: CollectionConfig = {
             readOnly: true,
             condition: (_, siblingData) =>
               siblingData.geometrySource !== 'trail' &&
-              siblingData.geometrySource !== 'composed',
+              siblingData.geometrySource !== 'composed' &&
+              siblingData.geometrySource !== 'drawn',
             description: '[west, south, east, north] bounds.',
           },
         },
@@ -254,10 +257,13 @@ export const Routes: CollectionConfig = {
       type: 'json',
       admin: {
         condition: (_, siblingData) =>
-          siblingData.geometrySource === 'imported',
+          siblingData.geometrySource === 'imported' ||
+          siblingData.geometrySource === 'drawn',
         description:
-          'Normalized WGS84 route geometry. Import tooling owns this value when the source is Imported geometry.',
-        readOnly: true,
+          'Draw a line, import a GPX file, or adjust its points. Save to measure distance and bounds.',
+        components: {
+          Field: '@/payload/components/RouteLineEditor#RouteLineEditor',
+        },
       },
       validate: validateRouteGeometry,
     },
@@ -307,13 +313,15 @@ export function validateRouteGeometry(
   options: { siblingData?: Record<string, unknown> } = {},
 ): string | true {
   const source = options.siblingData?.geometrySource ?? 'imported';
-  if (source !== 'imported') {
+  if (source !== 'imported' && source !== 'drawn') {
     return true;
   }
   const parsed = parseTrailGeometry(value);
   if (!parsed.ok) {
     return parsed.error;
   }
+  if (source === 'drawn' && options.siblingData?._status === 'draft')
+    return true;
   return parsed.parts.length > 0
     ? true
     : 'Route geometry must contain at least one line.';

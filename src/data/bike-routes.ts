@@ -22,7 +22,12 @@ export interface BikeRoute {
 }
 
 export type RouteKind = 'ride' | 'greenway' | 'path' | 'trail';
-export type RouteGeometrySource = 'composed' | 'imported' | 'studio' | 'trail';
+export type RouteGeometrySource =
+  | 'composed'
+  | 'drawn'
+  | 'imported'
+  | 'studio'
+  | 'trail';
 
 export const bikeRoutes: BikeRoute[] = [
   {

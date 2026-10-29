@@ -259,3 +259,74 @@ describe('resolveRouteSource', () => {
     });
   });
 });
+
+it('saves direct point overrides as the authoritative route geometry and measurements', async () => {
+  const geometry = {
+    type: 'MultiLineString',
+    coordinates: [
+      [
+        [-85, 35],
+        [-85.01, 35.01],
+      ],
+      [
+        [-85.1, 35.1],
+        [-85.11, 35.11],
+      ],
+    ],
+  };
+  const { result } = run({
+    city: 'chattanooga',
+    name: 'Custom route',
+    routeId: 'custom-route',
+    geometrySource: 'composed',
+    _status: 'published',
+    plan: { version: 1, waypoints: [], legs: [], geometry },
+  });
+  await expect(result).resolves.toMatchObject({
+    geom: geometry,
+    bounds: [-85.11, 35, -85, 35.11],
+    distance: expect.any(Number),
+  });
+});
+
+describe('Start new drawn routes', () => {
+  it('allows a blank draft without import provenance', async () => {
+    const { result } = run({
+      city: 'chattanooga',
+      geometrySource: 'drawn',
+      _status: 'draft',
+    });
+    await expect(result).resolves.toMatchObject({
+      geom: null,
+      distance: null,
+      bounds: null,
+      plan: null,
+    });
+  });
+  it('measures a drawn route and generates its public id', async () => {
+    const { result } = run({
+      city: 'chattanooga',
+      name: 'New drawing',
+      geometrySource: 'drawn',
+      _status: 'published',
+      geom: GEOMETRY,
+      distance: 9999,
+    });
+    await expect(result).resolves.toMatchObject({
+      geom: GEOMETRY,
+      routeId: 'new-drawing',
+      distance: expect.any(Number),
+      plan: null,
+    });
+    expect((await result)?.distance).not.toBe(9999);
+  });
+  it('rejects publishing a blank drawing', async () => {
+    const { result } = run({
+      city: 'chattanooga',
+      name: 'Empty route',
+      geometrySource: 'drawn',
+      _status: 'published',
+    });
+    await expect(result).rejects.toThrow(/invalid/);
+  });
+});
