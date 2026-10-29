@@ -79,6 +79,9 @@ const NO_SUMMARY: ConditionSummary = {
   reporting: { enabled: true, message: '' },
 };
 
+// Match the short API cache while keeping background tabs idle.
+const REFRESH_INTERVAL_MS = 60_000;
+
 const EMPTY: TrailConditionsValue = {
   latest: {},
   historyRevision: 0,
@@ -170,6 +173,18 @@ export function TrailConditionsProvider({
 
     return () => controller.abort();
   }, [reloads]);
+
+  useEffect(() => {
+    function refreshIfVisible() {
+      if (document.visibilityState === 'visible') refresh();
+    }
+    const timer = setInterval(refreshIfVisible, REFRESH_INTERVAL_MS);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
+  }, [refresh]);
 
   const value = useMemo(
     () => ({

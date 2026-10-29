@@ -240,6 +240,7 @@ export interface PlanEdit {
 }
 
 export function appendWaypoint(plan: RoutePlan, point: Position): PlanEdit {
+  if (plan.waypoints.length >= MAX_WAYPOINTS) return { plan, reroute: [] };
   const last = plan.waypoints.at(-1);
   if (!last) {
     return { plan: { ...plan, waypoints: [point] }, reroute: [] };
@@ -261,6 +262,7 @@ export function insertWaypoint(
   legIndex: number,
   point: Position,
 ): PlanEdit {
+  if (plan.waypoints.length >= MAX_WAYPOINTS) return { plan, reroute: [] };
   const leg = plan.legs[legIndex];
   if (!leg) {
     return { plan, reroute: [] };

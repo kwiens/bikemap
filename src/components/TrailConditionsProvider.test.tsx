@@ -1,6 +1,13 @@
 /** @vitest-environment jsdom */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ConditionReport } from '@/data/trail-conditions';
 import {
@@ -38,7 +45,12 @@ function Reports({ local }: { local: ConditionReport }) {
   );
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('condition report ordering', () => {
   it('retains a same-day local closure through stale cache and accepts a later server report', async () => {
@@ -101,5 +113,54 @@ describe('condition report ordering', () => {
     fireEvent.click(screen.getByText('Report'));
     expect(screen.getByRole('status')).toHaveTextContent('closed');
     expect(screen.getByTestId('history-revision')).toHaveTextContent('1');
+  });
+});
+
+describe('condition updates during a ride', () => {
+  it('fetches new closures while visible, pauses while hidden, and refreshes on return', async () => {
+    vi.useFakeTimers();
+    let current = report(1, 'dry');
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        latest: { trail: current },
+        options: [],
+        locked: {},
+        reporting: { enabled: true, message: '' },
+      }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const visibility = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('visible');
+    const view = render(
+      <TrailConditionsProvider>
+        <Reports local={report(3, 'wet')} />
+      </TrailConditionsProvider>,
+    );
+    await act(async () => {});
+    expect(screen.getByRole('status')).toHaveTextContent('dry');
+    current = report(2, 'closed');
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('closed');
+    visibility.mockReturnValue('hidden');
+    await act(async () => {
+      vi.advanceTimersByTime(120_000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    current = report(3, 'wet');
+    visibility.mockReturnValue('visible');
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('wet');
+    view.unmount();
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

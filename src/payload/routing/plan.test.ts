@@ -310,3 +310,15 @@ describe('routeLeg', () => {
     expect(planMeters(plan)).toBeCloseTo(80, -1);
   });
 });
+
+describe('waypoint limit while editing', () => {
+  it('keeps a full plan saveable when appending, inserting, or closing a loop', () => {
+    const plan = planThrough(
+      ...Array.from({ length: MAX_WAYPOINTS }, (_, i) => at(i, 0)),
+    );
+    expect(appendWaypoint(plan, at(1, 1))).toEqual({ plan, reroute: [] });
+    expect(insertWaypoint(plan, 0, at(1, 1))).toEqual({ plan, reroute: [] });
+    expect(closeLoop(plan)).toEqual({ plan, reroute: [] });
+    expect(parseRoutePlan(plan).ok).toBe(true);
+  });
+});

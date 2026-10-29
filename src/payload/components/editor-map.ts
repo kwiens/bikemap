@@ -12,13 +12,15 @@ export type EditorBasemap = keyof typeof STYLES;
 /** Both editors restore their own layers on style.load. */
 export function createEditorMap(
   container: HTMLElement,
-  view: Pick<mapboxgl.MapOptions, 'center' | 'zoom'>,
+  view: Pick<
+    mapboxgl.MapOptions,
+    'bounds' | 'center' | 'fitBoundsOptions' | 'zoom'
+  >,
   boxZoom = true,
 ): mapboxgl.Map {
   mapboxgl.accessToken = mapConfig.mapbox.accessToken;
   const map = new mapboxgl.Map({
-    center: view.center,
-    zoom: view.zoom,
+    ...view,
     boxZoom,
     container,
     style: STYLES.streets,
