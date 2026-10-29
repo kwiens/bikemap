@@ -184,6 +184,38 @@ describe('route waypoint network races', () => {
     expect(mocks.write).toHaveBeenCalledTimes(2);
   });
 
+  it('restores a routed plan with Undo/Redo and clears Redo after a new edit', async () => {
+    render(<RouteMapEditor path="plan" />);
+    await act(async () => {
+      click([-121.4, 44]);
+    });
+    await act(async () => {
+      click([-121.39, 44.01]);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    });
+    expect(mocks.write.mock.calls.at(-1)?.[0].waypoints).toHaveLength(1);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
+    });
+    expect(mocks.write.mock.calls.at(-1)?.[0].waypoints).toEqual([
+      [-121.4, 44],
+      [-121.39, 44.01],
+    ]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    });
+    await act(async () => {
+      click([-121.38, 44.02]);
+    });
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+    expect(mocks.write.mock.calls.at(-1)?.[0].waypoints).toEqual([
+      [-121.4, 44],
+      [-121.38, 44.02],
+    ]);
+  });
+
   it('ignores a pending click after unmount', async () => {
     const pending = deferred();
     mocks.ensure.mockReturnValue(pending.promise);

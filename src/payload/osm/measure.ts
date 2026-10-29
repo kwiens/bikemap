@@ -22,6 +22,7 @@ import { sampleTerrainParts, type TerrainPoint } from './terrain';
 import { M_TO_FT, METERS_TO_MILES } from './units';
 import { computeElevation, pointsToElevationProfile } from '@/utils/ride-stats';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
+import type { ElevationTotals } from '@/utils/elevation';
 
 export interface Measurements {
   /** [swLng, swLat, neLng, neLat], for zoom-to-fit. */
@@ -133,14 +134,6 @@ export async function measureParts(
     profile,
     warnings,
   };
-}
-
-/** Meters, the unit `computeElevation` reports and the `stats` override takes. */
-interface ElevationTotals {
-  gain: number;
-  loss: number;
-  max: number;
-  min: number;
 }
 
 /**

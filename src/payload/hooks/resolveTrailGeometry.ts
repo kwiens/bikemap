@@ -28,6 +28,7 @@ import {
 } from '@/payload/osm/geometry';
 import { parseOsmIds } from '@/payload/osm/ids';
 import { measureParts } from '@/payload/osm/measure';
+import { trailFieldsFromMeasurements } from '@/payload/osm/measurement-fields';
 import { getBundledElevationProfile } from '@/payload/read/bundled-elevation';
 import { measurementsFromElevationProfile } from '@/utils/elevation-profile';
 
@@ -226,18 +227,7 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
 
     return {
       ...data,
-      bounds: measured.bounds,
-      distance: measured.distance,
-      elevationGain: measured.elevationGain,
-      elevationLoss: measured.elevationLoss,
-      elevationMax: measured.elevationMax,
-      elevationMin: measured.elevationMin,
-      // The chart the elevation pane draws. Sampling already happened to get
-      // the totals above — throwing the per-point profile away meant a trail
-      // created here had no chart at all, because the pane's only other source
-      // is a static file that the checked-in trails ship with and a new one
-      // never gets.
-      elevationProfile: measured.profile,
+      ...trailFieldsFromMeasurements(measured),
       geom,
       osmReport: {
         builtAt: new Date().toISOString(),
@@ -443,13 +433,7 @@ async function saveOsmPreview(
 
   return {
     ...data,
-    bounds: measured.bounds,
-    distance: measured.distance,
-    elevationGain: measured.elevationGain,
-    elevationLoss: measured.elevationLoss,
-    elevationMax: measured.elevationMax,
-    elevationMin: measured.elevationMin,
-    elevationProfile: measured.profile,
+    ...trailFieldsFromMeasurements(measured),
     geom: toTrailGeometry(parsed.parts),
     osmIds,
     osmReport: {
@@ -566,13 +550,7 @@ async function refreshElevationFromCurrentLine({
 
   return {
     ...data,
-    bounds: measured.bounds,
-    distance: measured.distance,
-    elevationGain: measured.elevationGain,
-    elevationLoss: measured.elevationLoss,
-    elevationMax: measured.elevationMax,
-    elevationMin: measured.elevationMin,
-    elevationProfile: measured.profile,
+    ...trailFieldsFromMeasurements(measured),
     geom: toTrailGeometry(parsed.parts),
     rebuildElevation: false,
     rebuildGeometry: false,

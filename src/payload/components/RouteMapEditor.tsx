@@ -34,6 +34,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { useField } from '@payloadcms/ui';
 import { cityConfigs, isCityId, mapConfig } from '@/config/map.config';
 import { boundsOf } from '@/payload/osm/assemble';
+import { createEditHistory } from '@/payload/osm/edit-history';
 import { METERS_TO_MILES } from '@/payload/osm/units';
 import {
   type CellKey,
@@ -102,9 +103,6 @@ const MAX_VIEW_CELLS = 4;
  */
 const FIT_OPTIONS = { maxZoom: 16, padding: 60 };
 
-/** Undo depth. Each entry is a whole plan, which is small. */
-const MAX_HISTORY = 100;
-
 const EMPTY_COLLECTION: GeoJSON.FeatureCollection = {
   features: [],
   type: 'FeatureCollection',
@@ -133,7 +131,7 @@ export function RouteMapEditor({
   const [plan, setPlan] = useState<RoutePlan>(() => initialPlan(planValue));
   const [ready, setReady] = useState(false);
   const [basemap, setBasemap] = useState<EditorBasemap>('streets');
-  const [history, setHistory] = useState({ redo: 0, undo: 0 });
+  const [history, setHistory] = useState({ canRedo: false, canUndo: false });
   const [pending, setPending] = useState(0);
   const [routing, setRouting] = useState(0);
   const [zoom, setZoom] = useState(mapConfig.defaultView.zoom);
@@ -141,8 +139,9 @@ export function RouteMapEditor({
   const [trailCount, setTrailCount] = useState<number | null>(null);
 
   const planRef = useRef(plan);
-  const undoRef = useRef<RoutePlan[]>([]);
-  const redoRef = useRef<RoutePlan[]>([]);
+  // Plans are immutable. Retain leg identities so stale routing results are
+  // rejected by replacePendingLeg, including after a history step.
+  const historyRef = useRef(createEditHistory<RoutePlan>((value) => value));
   const clickQueueRef = useRef(Promise.resolve());
   const editGenerationRef = useRef(0);
   const readOnlyRef = useRef(Boolean(readOnly));
@@ -421,9 +420,8 @@ export function RouteMapEditor({
       if (next === before) {
         return;
       }
-      undoRef.current = [...undoRef.current, before].slice(-MAX_HISTORY);
-      redoRef.current = [];
-      setHistory({ redo: 0, undo: undoRef.current.length });
+      historyRef.current.push(before);
+      setHistory({ canRedo: false, canUndo: historyRef.current.canUndo() });
       setNote(null);
       showPlan(next);
       await routeLegs(next, reroute);
@@ -438,17 +436,11 @@ export function RouteMapEditor({
     (direction: 'redo' | 'undo') => {
       editGenerationRef.current += 1;
       clickQueueRef.current = Promise.resolve();
-      const from = direction === 'undo' ? undoRef : redoRef;
-      const to = direction === 'undo' ? redoRef : undoRef;
-      const target = from.current.at(-1);
-      if (!target) {
-        return;
-      }
-      from.current = from.current.slice(0, -1);
-      to.current = [...to.current, planRef.current];
+      const target = historyRef.current[direction](planRef.current);
+      if (!target) return;
       setHistory({
-        redo: redoRef.current.length,
-        undo: undoRef.current.length,
+        canRedo: historyRef.current.canRedo(),
+        canUndo: historyRef.current.canUndo(),
       });
       showPlan(target);
       // A history entry can hold a placeholder whose routing result landed
@@ -629,9 +621,8 @@ export function RouteMapEditor({
     writtenRef.current = normalized(incoming);
     planRef.current = incoming;
     setPlan(incoming);
-    undoRef.current = [];
-    redoRef.current = [];
-    setHistory({ redo: 0, undo: 0 });
+    historyRef.current.clear();
+    setHistory({ canRedo: false, canUndo: false });
     paintRoute();
     paintMarkers();
   }, [paintMarkers, paintRoute, planValue]);
@@ -689,12 +680,12 @@ export function RouteMapEditor({
         role="group"
       >
         <ToolButton
-          disabled={!editable || history.undo === 0}
+          disabled={!editable || !history.canUndo}
           label="Undo"
           onClick={() => stepHistory('undo')}
         />
         <ToolButton
-          disabled={!editable || history.redo === 0}
+          disabled={!editable || !history.canRedo}
           label="Redo"
           onClick={() => stepHistory('redo')}
         />

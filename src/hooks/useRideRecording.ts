@@ -14,13 +14,11 @@ import {
   computeRideStats,
   haversineDistance,
   MAX_ACCURACY_M,
-  ELEVATION_EMA_ALPHA as ALT_EMA_ALPHA,
-  ELEVATION_DEAD_BAND as ALT_DEADBAND_M,
-  ELEVATION_SPIKE_THRESHOLD as ALT_SPIKE_M,
-  ELEVATION_SPIKE_MAX_RUN as ALT_SPIKE_MAX_RUN,
-  ELEVATION_MIN_DISTANCE as ALT_MIN_DIST_M,
-  ELEVATION_MAX_ALT_ACCURACY as ALT_MAX_ACCURACY,
 } from '../utils/ride-stats';
+import {
+  createLiveElevationAccumulator,
+  ELEVATION_MAX_ALT_ACCURACY,
+} from '@/utils/elevation';
 import {
   saveRide,
   saveInProgress,
@@ -73,12 +71,7 @@ export function useRideRecording(
   const [liveDistance, setLiveDistance] = useState(0);
   const [liveElevationGain, setLiveElevationGain] = useState(0);
   const distanceRef = useRef(0);
-  const elevGainRef = useRef(0);
-  const emaAltRef = useRef<number | null>(null); // EMA-smoothed altitude
-  const lastAltRef = useRef<number | null>(null); // last accepted raw altitude (spike-filter reference)
-  const altRejectRunRef = useRef(0); // consecutive spike rejections
-  const altAnchorRef = useRef<number | null>(null); // last committed altitude for deadband
-  const distSinceAnchorRef = useRef(0); // horizontal meters since last anchor update
+  const elevationRef = useRef(createLiveElevationAccumulator());
   const pausedRef = useRef(false);
   const manualPauseRef = useRef(false); // true when user explicitly paused
   const pausedTimeRef = useRef(0); // accumulated paused ms
@@ -240,90 +233,28 @@ export function useRideRecording(
           segmentStart: startsNewSegment,
         });
 
-        // Compute horizontal distance once and reuse for both
-        // distance tracking and elevation min-distance filter. The first
-        // segment after a manual pause is skipped entirely: points were
-        // dropped while paused, so this segment may teleport across whatever
-        // ground was covered in the meantime.
-        if (prev && !startsNewSegment) {
-          const segDist = haversineDistance(
-            prev.lat,
-            prev.lng,
-            point.lat,
-            point.lng,
-          );
-          distSinceAnchorRef.current += segDist;
-          if (
-            point.accuracy < MAX_ACCURACY_M &&
-            prev.accuracy < MAX_ACCURACY_M
-          ) {
-            distanceRef.current += segDist;
-            setLiveDistance(distanceRef.current);
-          }
-        }
-
-        // Filter 1: skip readings with poor altitude accuracy
-        const altAccuracy = fix.altitudeAccuracy;
-        const altValue = point.altitude;
-
-        if (startsNewSegment) {
-          emaAltRef.current = null;
-          altAnchorRef.current = null;
-          distSinceAnchorRef.current = 0;
-        }
-
+        // The first segment after a pause may cross unrecorded ground.
+        const distanceMeters =
+          prev && !startsNewSegment
+            ? haversineDistance(prev.lat, prev.lng, point.lat, point.lng)
+            : 0;
         if (
-          altValue !== null &&
-          (altAccuracy === null || altAccuracy <= ALT_MAX_ACCURACY)
+          prev &&
+          point.accuracy < MAX_ACCURACY_M &&
+          prev.accuracy < MAX_ACCURACY_M
         ) {
-          let alt = altValue;
-
-          // Filter 2: spike rejection — replace outlier jumps with the last
-          // accepted reading.  The reference must be a raw reading, not the
-          // EMA: the EMA lags sustained climbs until every reading rejects,
-          // and substituting it into its own update freezes it permanently
-          // (see smoothAltitudes in ride-stats.ts).  Bursts longer than
-          // ALT_SPIKE_MAX_RUN are accepted as real ground.
-          const lastAccepted = lastAltRef.current;
-          if (
-            lastAccepted !== null &&
-            Math.abs(alt - lastAccepted) > ALT_SPIKE_M &&
-            altRejectRunRef.current < ALT_SPIKE_MAX_RUN
-          ) {
-            alt = lastAccepted;
-            altRejectRunRef.current += 1;
-          } else {
-            lastAltRef.current = alt;
-            altRejectRunRef.current = 0;
-          }
-
-          // EMA smoothing
-          if (emaAltRef.current === null) {
-            emaAltRef.current = alt;
-            altAnchorRef.current = alt;
-          } else {
-            emaAltRef.current =
-              ALT_EMA_ALPHA * alt + (1 - ALT_EMA_ALPHA) * emaAltRef.current;
-
-            // Filter 3: require minimum horizontal distance before anchor update
-            const anchor = altAnchorRef.current;
-            if (
-              distSinceAnchorRef.current >= ALT_MIN_DIST_M &&
-              anchor !== null
-            ) {
-              const delta = emaAltRef.current - anchor;
-              if (delta > ALT_DEADBAND_M) {
-                elevGainRef.current += delta;
-                setLiveElevationGain(elevGainRef.current);
-                altAnchorRef.current = emaAltRef.current;
-                distSinceAnchorRef.current = 0;
-              } else if (delta < -ALT_DEADBAND_M) {
-                altAnchorRef.current = emaAltRef.current;
-                distSinceAnchorRef.current = 0;
-              }
-            }
-          }
+          distanceRef.current += distanceMeters;
+          setLiveDistance(distanceRef.current);
         }
+
+        const altitude =
+          fix.altitudeAccuracy === null ||
+          fix.altitudeAccuracy <= ELEVATION_MAX_ALT_ACCURACY
+            ? point.altitude
+            : null;
+        setLiveElevationGain(
+          elevationRef.current.add(altitude, distanceMeters, startsNewSegment),
+        );
       },
       (error: PositionError, isFatal: boolean) => {
         if (session !== gpsSessionRef.current) return;
@@ -392,12 +323,7 @@ export function useRideRecording(
     pointsRef.current = [];
     startTimeRef.current = Date.now();
     distanceRef.current = 0;
-    elevGainRef.current = 0;
-    emaAltRef.current = null;
-    lastAltRef.current = null;
-    altRejectRunRef.current = 0;
-    altAnchorRef.current = null;
-    distSinceAnchorRef.current = 0;
+    elevationRef.current = createLiveElevationAccumulator();
     pausedRef.current = false;
     manualPauseRef.current = false;
     pausedTimeRef.current = 0;
@@ -634,17 +560,7 @@ export function useRideRecording(
 
     // Use smoothed elevation computation (matches saved ride stats)
     const elev = computeElevation(data.points);
-    elevGainRef.current = elev.gain;
-
-    // Seed EMA from the last altitude in saved points for live smoothing
-    const lastAlt =
-      [...data.points].reverse().find((p) => p.altitude !== null)?.altitude ??
-      null;
-    emaAltRef.current = lastAlt;
-    lastAltRef.current = lastAlt;
-    altRejectRunRef.current = 0;
-    altAnchorRef.current = lastAlt;
-    distSinceAnchorRef.current = 0;
+    elevationRef.current = createLiveElevationAccumulator(elev);
 
     setLiveDistance(dist);
     setLiveElevationGain(elev.gain);

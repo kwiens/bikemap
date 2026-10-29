@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { cloneParts } from './geometry';
 import { createEditHistory } from './edit-history';
 
 const A: [number, number][][] = [
@@ -22,7 +23,7 @@ const C: [number, number][][] = [
 
 describe('createEditHistory', () => {
   it('undoes and redoes in order', () => {
-    const history = createEditHistory();
+    const history = createEditHistory(cloneParts);
     history.push(A); // A -> B
     history.push(B); // B -> C
     expect(history.undo(C)).toEqual(B);
@@ -34,7 +35,7 @@ describe('createEditHistory', () => {
   });
 
   it('drops the redo stack on a new edit', () => {
-    const history = createEditHistory();
+    const history = createEditHistory(cloneParts);
     history.push(A);
     history.undo(B);
     history.push(A);
@@ -42,7 +43,7 @@ describe('createEditHistory', () => {
   });
 
   it('keeps its own copies, so later mutation cannot rewrite history', () => {
-    const history = createEditHistory();
+    const history = createEditHistory(cloneParts);
     const before: [number, number][][] = [
       [
         [0, 0],
@@ -55,7 +56,7 @@ describe('createEditHistory', () => {
   });
 
   it('forgets the oldest entries past its limit', () => {
-    const history = createEditHistory(2);
+    const history = createEditHistory(cloneParts, 2);
     history.push(A);
     history.push(B);
     history.push(C);

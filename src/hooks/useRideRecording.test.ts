@@ -13,7 +13,7 @@ vi.mock('@/utils/ride-storage', () => ({
   loadInProgress: vi.fn().mockResolvedValue(null),
 }));
 
-// Mock ride-stats — use importOriginal to preserve exported constants
+// Keep the real elevation calculations; mock saved statistics and distance
 vi.mock('@/utils/ride-stats', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/utils/ride-stats')>();
   return {
@@ -298,6 +298,29 @@ describe('useRideRecording', () => {
     } finally {
       window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, handler);
     }
+  });
+
+  it('starts a fresh elevation filter after moving while manually paused', () => {
+    const { result } = renderHook(() => useRideRecording());
+    act(() => {
+      result.current.startRecording();
+    });
+    act(() => {
+      simulatePosition(-85.3, 35, { altitude: 100 });
+    });
+    act(() => {
+      result.current.pauseRecording();
+    });
+    act(() => {
+      result.current.resumeRecording();
+    });
+    act(() => {
+      for (const altitude of [1000, 1010, 1020, 1030]) {
+        simulatePosition(-85.2, 35, { altitude });
+      }
+    });
+    // Only the new segment's smoothed climb, never the paused 900 m jump.
+    expect(result.current.liveElevationGain).toBeCloseTo(5.61);
   });
 
   it('auto-pauses silently without updating UI isPaused state', () => {
