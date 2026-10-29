@@ -175,6 +175,7 @@ const IDLE_ROUTE: RouteStatus = {
 };
 
 export interface GeometryEditorProps {
+  hasPathSnappingToggle?: boolean;
   readOnly?: boolean;
   label: string;
   geometry: {
@@ -202,6 +203,7 @@ export function GeometryMapEditor({
   geometry,
   name,
   osm,
+  hasPathSnappingToggle = false,
 }: GeometryEditorProps) {
   const {
     value: geomValue,
@@ -258,7 +260,9 @@ export function GeometryMapEditor({
       ? 'pick'
       : parseTrailGeometry(geomValue).parts?.length
         ? 'move'
-        : 'draw',
+        : hasPathSnappingToggle
+          ? 'route'
+          : 'draw',
   );
   const [basemap, setBasemap] = useState<EditorBasemap>('streets');
   const [names, setNames] = useState<Record<number, string>>({});
@@ -1375,30 +1379,56 @@ export function GeometryMapEditor({
               onClick={() => setMode('pick')}
             />
           )}
-          <ModeButton
-            active={mode === 'route'}
-            disabled={!editable || drawFailed}
-            label="Follow trails"
-            onClick={() => setMode('route')}
-          />
-          <ModeButton
-            active={mode === 'draw'}
-            disabled={!editable || drawFailed}
-            label="Draw line"
-            onClick={() => setMode('draw')}
-          />
-          <ModeButton
-            active={mode === 'move'}
-            disabled={!editable || drawFailed}
-            label="Adjust line"
-            onClick={() => setMode('move')}
-          />
-          <ModeButton
-            active={mode === 'select'}
-            disabled={!editable || drawFailed || !hasLine}
-            label="Select points"
-            onClick={() => setMode('select')}
-          />
+          {hasPathSnappingToggle ? (
+            <>
+              <ModeButton
+                active={mode === 'route'}
+                disabled={!editable || drawFailed}
+                label="Path snapping"
+                onClick={() => setMode('route')}
+              />
+              <ModeButton
+                active={mode !== 'route'}
+                disabled={!editable || drawFailed}
+                label="Point editing"
+                onClick={() => {
+                  // Settle the snapped line before choosing the point tool so
+                  // an in-progress route opens with its vertex handles ready.
+                  routeToolRef.current?.finish();
+                  setMode(partsRef.current.length > 0 ? 'move' : 'draw');
+                }}
+              />
+            </>
+          ) : (
+            <ModeButton
+              active={mode === 'route'}
+              disabled={!editable || drawFailed}
+              label="Follow trails"
+              onClick={() => setMode('route')}
+            />
+          )}
+          {(!hasPathSnappingToggle || mode !== 'route') && (
+            <>
+              <ModeButton
+                active={mode === 'draw'}
+                disabled={!editable || drawFailed}
+                label="Draw line"
+                onClick={() => setMode('draw')}
+              />
+              <ModeButton
+                active={mode === 'move'}
+                disabled={!editable || drawFailed}
+                label="Adjust line"
+                onClick={() => setMode('move')}
+              />
+              <ModeButton
+                active={mode === 'select'}
+                disabled={!editable || drawFailed || !hasLine}
+                label="Select points"
+                onClick={() => setMode('select')}
+              />
+            </>
+          )}
         </div>
         <div
           aria-label={`${label} tools`}

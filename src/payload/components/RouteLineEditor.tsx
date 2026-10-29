@@ -4,7 +4,7 @@ import { useField } from '@payloadcms/ui';
 import type { TrailGeometry } from '@/payload/osm/geometry';
 import { GeometryMapEditor } from './GeometryMapEditor';
 
-/** A new drawn route starts with no geometry and the shared Draw tool active. */
+/** New routes snap to paths by default and share the trail point editing tools. */
 export function RouteLineEditor({
   path,
   readOnly,
@@ -19,6 +19,8 @@ export function RouteLineEditor({
   const { value: source } = useField<string>({ path: 'geometrySource' });
   return (
     <GeometryMapEditor
+      key={source}
+      hasPathSnappingToggle={source === 'drawn'}
       label="Route line"
       readOnly={readOnly || source !== 'drawn'}
       geometry={{

@@ -123,7 +123,9 @@ modes and they are silent unless surfaced:
 ## Route snapping and direct point editing
 
 **Start new** is a geometry source for drawing a route from scratch. It opens
-a blank map with Draw active, using the same point editor as Trails. Blank
+a blank map with **Path snapping** active. Switch to **Point editing** to draw
+freely or adjust individual points with the same tools as Trails. Switching
+keeps the line and its undo history. Blank
 drafts can be saved; publishing requires a line. Distance, bounds, and a default
 route id are derived on save, without import provenance.
 

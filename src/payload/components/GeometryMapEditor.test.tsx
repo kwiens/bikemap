@@ -22,6 +22,7 @@ const ui = vi.hoisted(() => ({
   changed: () => {},
   finished: () => {},
   features: [] as GeoJSON.Feature[],
+  pendingParts: [] as [number, number][][],
   removeMap: vi.fn(),
 }));
 
@@ -120,12 +121,20 @@ vi.mock('terra-draw-mapbox-gl-adapter', () => ({
   TerraDrawMapboxGLAdapter: class {},
 }));
 vi.mock('./route-tool', () => ({
-  createRouteTool: () => ({
+  createRouteTool: (
+    _map: unknown,
+    host: { apply(parts: [number, number][][]): void },
+  ) => ({
     dispose() {},
     install() {},
     hasRoute: () => false,
     setTrails() {},
     activate() {},
+    finish() {
+      const next = ui.pendingParts;
+      ui.pendingParts = [];
+      if (next.length > 0) host.apply(next);
+    },
     deactivate() {},
   }),
 }));
@@ -164,6 +173,7 @@ beforeEach(() => {
   };
   ui.writes = {};
   ui.features = [];
+  ui.pendingParts = [];
   ui.removeMap.mockClear();
 });
 
@@ -229,11 +239,18 @@ describe('shared geometry editor', () => {
     expect(screen.getByText('Snapping route planner')).toBeInTheDocument();
   });
 
-  it('starts a new drawn route with a blank map and the Draw tool active', async () => {
+  it('starts a blank route in path snapping and switches to point editing without losing the line', async () => {
     ui.values.geom = null;
     ui.values.geometrySource = 'drawn';
     render(<RouteLineEditor path="geom" />);
     await act(async () => ui.loadStyle());
+    expect(
+      screen.getByRole('button', { name: 'Path snapping' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.queryByRole('button', { name: 'Draw line' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Point editing' }));
     expect(screen.getByRole('button', { name: 'Draw line' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -255,6 +272,42 @@ describe('shared geometry editor', () => {
     expect(ui.writes.geom).toEqual({ type: 'MultiLineString', coordinates });
     expect(ui.writes).not.toHaveProperty('plan');
     expect(ui.writes).not.toHaveProperty('geometrySource');
+    fireEvent.click(screen.getByRole('button', { name: 'Path snapping' }));
+    expect(
+      screen.getByRole('button', { name: 'Path snapping' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Point editing' }));
+    expect(screen.getByRole('button', { name: 'Adjust line' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(ui.writes.geom).toEqual({ type: 'MultiLineString', coordinates });
+    expect(ui.removeMap).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(ui.writes.geom).toBeNull();
+  });
+
+  it('finishes an in-progress snapped line before opening its point handles', async () => {
+    ui.values.geom = null;
+    ui.values.geometrySource = 'drawn';
+    render(<RouteLineEditor path="geom" />);
+    await act(async () => ui.loadStyle());
+    const coordinates: TrailGeometry['coordinates'] = [
+      [
+        [-85, 35],
+        [-85.01, 35.01],
+      ],
+    ];
+    ui.pendingParts = coordinates;
+    fireEvent.click(screen.getByRole('button', { name: 'Point editing' }));
+    expect(ui.writes.geom).toEqual({ type: 'MultiLineString', coordinates });
+    expect(screen.getByRole('button', { name: 'Adjust line' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(ui.removeMap).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(ui.writes.geom).toBeNull();
   });
 
   it('imports and undoes a route GPX without writing trail-only fields or remounting the map', async () => {
