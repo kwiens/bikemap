@@ -15,10 +15,19 @@
  * Client-safe, like `geometry.ts` — this runs in the admin bundle.
  */
 import { boundsOfCell, cellCoordinatesCovering } from '@/payload/routing/grid';
-import { MinHeap } from '@/payload/routing/min-heap';
-import { haversineDistance } from '@/utils/ride-stats';
-
-type Position = [number, number];
+import { shortestPath } from '@/payload/routing/shortest-path';
+import {
+  createSegmentIndex,
+  indexSegment,
+  type SegmentIndex,
+} from '@/payload/routing/segment-index';
+import {
+  distance,
+  isPosition,
+  type Position,
+} from '@/payload/routing/geometry';
+import { snapToSegments } from '@/payload/routing/segment-snap';
+import { dropRepeatedPoints } from './geometry';
 
 /** One OSM way as the network endpoint returns it. */
 export interface NetworkWay {
@@ -34,16 +43,8 @@ interface NetworkEdge {
   to: number;
 }
 
-export interface TrailNetwork {
+export interface TrailNetwork extends SegmentIndex {
   edges: Map<number, NetworkEdge[]>;
-  /**
-   * Segment indexes bucketed by {@link SNAP_GRID_DEG} cell, so snapping looks
-   * at the few segments near the pointer rather than all of them — it runs on
-   * every animation frame while Follow trails previews the next leg.
-   */
-  grid: Map<string, number[]>;
-  /** Long segments checked directly instead of expanding their bounding boxes. */
-  unindexedSegments: number[];
   nodes: Map<number, Position>;
   /** Every segment once, as node-id pairs — what snapping searches. */
   segments: [number, number][];
@@ -81,16 +82,11 @@ export const MAX_SNAP_METERS = 150;
 
 /** The snapping index's cell size: about 160 × 220 m at Bend's latitude. */
 const SNAP_GRID_DEG = 0.002;
-/** Bounds each index insertion and query, independent of geographic extent. */
-const MAX_SNAP_GRID_CELLS = 256;
-
-const METERS_PER_DEG_LAT = 111_320;
 
 export function createTrailNetwork(): TrailNetwork {
   return {
     edges: new Map(),
-    grid: new Map(),
-    unindexedSegments: [],
+    ...createSegmentIndex(SNAP_GRID_DEG),
     nodes: new Map(),
     segments: [],
     wayIds: new Set(),
@@ -136,10 +132,12 @@ export function addWays(network: TrailNetwork, ways: NetworkWay[]): void {
       );
       link(network, a, b, meters);
       link(network, b, a, meters);
-      indexSegment(network, network.segments.length, [
+      indexSegment(
+        network,
+        network.segments.length,
         way.coordinates[index - 1],
         way.coordinates[index],
-      ]);
+      );
       network.segments.push([a, b]);
     }
   }
@@ -159,70 +157,25 @@ export function snapToNetwork(
   point: Position,
   maxMeters = MAX_SNAP_METERS,
 ): NetworkSnap | null {
-  if (!isPosition(point) || !Number.isFinite(maxMeters) || maxMeters < 0) {
-    return null;
-  }
-  const project = flatProjection(point);
-  let best: NetworkSnap | null = null;
-
-  const latDeg = maxMeters / METERS_PER_DEG_LAT;
-  const lngDeg =
-    maxMeters /
-    (METERS_PER_DEG_LAT * Math.max(0.01, Math.cos((point[1] * Math.PI) / 180)));
-  const keys = gridCells(
-    [point[0] - lngDeg, point[1] - latDeg],
-    [point[0] + lngDeg, point[1] + latDeg],
+  const snap = snapToSegments(
+    network,
+    network.nodes,
+    (index) => {
+      const [a, b] = network.segments[index];
+      return { a, b };
+    },
+    point,
+    maxMeters,
   );
-  // A very large search radius scans the existing graph, never an enormous
-  // geographic rectangle. Long segments remain snappable at their midpoint.
-  const candidates = new Set<number>(network.unindexedSegments);
-  if (keys === null) {
-    for (let segment = 0; segment < network.segments.length; segment++) {
-      candidates.add(segment);
-    }
-  } else {
-    for (const key of keys) {
-      for (const segment of network.grid.get(key) ?? []) {
-        candidates.add(segment);
-      }
-    }
-  }
-
-  for (const segment of candidates) {
-    const [from, to] = network.segments[segment];
-    const a = network.nodes.get(from);
-    const b = network.nodes.get(to);
-    if (!a || !b) {
-      continue;
-    }
-    const [ax, ay] = project(a);
-    const [bx, by] = project(b);
-    const dx = bx - ax;
-    const dy = by - ay;
-    const lengthSquared = dx * dx + dy * dy;
-    const t =
-      lengthSquared === 0
-        ? 0
-        : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lengthSquared));
-    const distanceMeters = Math.hypot(ax + t * dx, ay + t * dy);
-
-    if (
-      distanceMeters <= maxMeters &&
-      (best === null || distanceMeters < best.distanceMeters)
-    ) {
-      const segmentMeters = Math.sqrt(lengthSquared);
-      best = {
-        distanceMeters,
-        from,
-        metersToFrom: t * segmentMeters,
-        metersToTo: (1 - t) * segmentMeters,
-        point: [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])],
-        to,
-      };
-    }
-  }
-
-  return best;
+  if (!snap) return null;
+  return {
+    distanceMeters: snap.distanceMeters,
+    from: snap.from,
+    to: snap.to,
+    point: snap.point,
+    metersToFrom: snap.metersToFrom,
+    metersToTo: snap.metersToTo,
+  };
 }
 
 /** Virtual node ids for the two snapped points; OSM node ids are positive. */
@@ -250,16 +203,10 @@ export function routeBetween(
     (a.from === b.from && a.to === b.to) ||
     (a.from === b.to && a.to === b.from)
   ) {
-    return dropRepeats([a.point, b.point]);
+    return dropRepeatedPoints([a.point, b.point]);
   }
 
   const goal = b.point;
-  const cost = new Map<number, number>([[START, 0]]);
-  const previous = new Map<number, number>();
-  const settled = new Set<number>();
-  const queue = new MinHeap();
-  queue.push(START, distance(a.point, goal));
-
   const neighbours = (node: number): NetworkEdge[] => {
     const out: NetworkEdge[] =
       node === START
@@ -277,46 +224,21 @@ export function routeBetween(
     return out;
   };
 
-  while (queue.size > 0) {
-    const node = queue.pop();
-    if (node === END) {
-      break;
-    }
-    if (settled.has(node)) {
-      continue;
-    }
-    settled.add(node);
-    const base = cost.get(node) ?? Infinity;
-
-    for (const edge of neighbours(node)) {
-      const next = base + edge.meters;
-      if (next < (cost.get(edge.to) ?? Infinity)) {
-        cost.set(edge.to, next);
-        previous.set(edge.to, node);
-        const position =
-          edge.to === END ? goal : (network.nodes.get(edge.to) ?? goal);
-        queue.push(edge.to, next + distance(position, goal));
-      }
-    }
-  }
-
-  if (!previous.has(END)) {
-    return null;
-  }
-
-  const path: Position[] = [goal];
-  for (
-    let node = previous.get(END) as number;
-    node !== START;
-    node = previous.get(node) as number
-  ) {
-    const position = network.nodes.get(node);
-    if (position) {
-      path.push(position);
-    }
-  }
-  path.push(a.point);
-  return dropRepeats(path.reverse());
+  const hops = shortestPath(
+    START,
+    END,
+    neighbours,
+    (node) =>
+      node === END ? 0 : distance(network.nodes.get(node) ?? a.point, goal),
+    (edge) => edge.meters,
+  );
+  if (!hops) return null;
+  return dropRepeatedPoints([
+    a.point,
+    ...hops.map(({ node }) =>
+      node === END ? goal : (network.nodes.get(node) ?? goal),
+    ),
+  ]);
 }
 
 /** Grid cell keys covering a [west, south, east, north] box. */
@@ -343,95 +265,8 @@ export function cellBounds(key: string): [number, number, number, number] {
   return boundsOfCell(x, y, NETWORK_CELL_DEG);
 }
 
-/** Indexes local segments; retains long ones without geographic amplification. */
-function indexSegment(
-  network: TrailNetwork,
-  segment: number,
-  [a, b]: [Position, Position],
-) {
-  const keys = gridCells(
-    [Math.min(a[0], b[0]), Math.min(a[1], b[1])],
-    [Math.max(a[0], b[0]), Math.max(a[1], b[1])],
-  );
-  if (keys === null) {
-    network.unindexedSegments.push(segment);
-    return;
-  }
-  for (const key of keys) {
-    const bucket = network.grid.get(key);
-    if (bucket) {
-      bucket.push(segment);
-    } else {
-      network.grid.set(key, [segment]);
-    }
-  }
-}
-
-/** Returns null when a box needs the bounded-by-graph-size fallback. */
-function gridCells(
-  [west, south]: Position,
-  [east, north]: Position,
-): string[] | null {
-  const minX = Math.floor(west / SNAP_GRID_DEG);
-  const maxX = Math.floor(east / SNAP_GRID_DEG);
-  const minY = Math.floor(south / SNAP_GRID_DEG);
-  const maxY = Math.floor(north / SNAP_GRID_DEG);
-  const count = (maxX - minX + 1) * (maxY - minY + 1);
-  if (!Number.isFinite(count) || count > MAX_SNAP_GRID_CELLS) {
-    return null;
-  }
-  const keys: string[] = [];
-  for (let x = minX; x <= maxX; x++) {
-    for (let y = minY; y <= maxY; y++) {
-      keys.push(`${x}:${y}`);
-    }
-  }
-  return keys;
-}
-
-function isPosition(value: unknown): value is Position {
-  return (
-    Array.isArray(value) &&
-    value.length === 2 &&
-    typeof value[0] === 'number' &&
-    typeof value[1] === 'number' &&
-    Number.isFinite(value[0]) &&
-    Number.isFinite(value[1]) &&
-    Math.abs(value[0]) <= 180 &&
-    Math.abs(value[1]) <= 90
-  );
-}
-
 function link(network: TrailNetwork, from: number, to: number, meters: number) {
-  const list = network.edges.get(from);
-  if (list) {
-    list.push({ meters, to });
-  } else {
-    network.edges.set(from, [{ meters, to }]);
-  }
+  const edges = network.edges.get(from);
+  if (edges) edges.push({ meters, to });
+  else network.edges.set(from, [{ meters, to }]);
 }
-
-function distance(a: Position, b: Position): number {
-  return haversineDistance(a[1], a[0], b[1], b[0]);
-}
-
-/** Meters east/north of `origin`. */
-function flatProjection([originLng, originLat]: Position) {
-  const metersPerDegLng =
-    METERS_PER_DEG_LAT * Math.cos((originLat * Math.PI) / 180);
-  return ([lng, lat]: Position): [number, number] => [
-    (lng - originLng) * metersPerDegLng,
-    (lat - originLat) * METERS_PER_DEG_LAT,
-  ];
-}
-
-function dropRepeats(points: Position[]): Position[] {
-  return points.filter(
-    (point, index) =>
-      index === 0 ||
-      point[0] !== points[index - 1][0] ||
-      point[1] !== points[index - 1][1],
-  );
-}
-
-/** A binary min-heap of node ids by priority. Duplicates are allowed; stale ones are skipped by the caller. */

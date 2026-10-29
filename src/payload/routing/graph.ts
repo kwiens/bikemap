@@ -24,11 +24,17 @@
  *
  * Client-safe: this runs in the admin bundle.
  */
-import { MinHeap } from './min-heap';
+import { shortestPath } from './shortest-path';
+import {
+  createSegmentIndex,
+  indexSegment as addToIndex,
+  segmentsNear,
+  type SegmentIndex,
+} from './segment-index';
+import { distance, type Position } from './geometry';
+export { distance, type Position } from './geometry';
+import { snapToSegments } from './segment-snap';
 import { dropRepeatedPoints } from '@/payload/osm/geometry';
-import { haversineDistance } from '@/utils/ride-stats';
-
-export type Position = [number, number];
 
 /** The kinds of line a route can ride on, cheapest first. */
 export type WayClass =
@@ -151,9 +157,8 @@ interface Segment {
   source: number;
 }
 
-export interface RouteGraph {
+export interface RouteGraph extends SegmentIndex {
   edges: Map<number, Edge[]>;
-  grid: Map<string, number[]>;
   nodes: Map<number, Position>;
   segments: Segment[];
   sources: StepSource[];
@@ -193,7 +198,7 @@ export function buildRouteGraph({
 }): RouteGraph {
   const graph: RouteGraph = {
     edges: new Map(),
-    grid: new Map(),
+    ...createSegmentIndex(GRID_DEG),
     nodes: new Map(),
     segments: [],
     sources: [],
@@ -419,72 +424,29 @@ export function snapToGraph(
     preferTrails?: boolean;
   } = {},
 ): GraphSnap | null {
-  const project = flatProjection(point);
-  const candidates = segmentsNear(graph, point, maxMeters);
-
-  let best: GraphSnap | null = null;
-  let bestTrail: GraphSnap | null = null;
-  for (const index of candidates) {
-    const segment = graph.segments[index];
-    if (
-      segment.a === exclude ||
-      segment.b === exclude ||
-      (accept && !accept(segment.source))
-    ) {
-      continue;
-    }
-    const a = graph.nodes.get(segment.a);
-    const b = graph.nodes.get(segment.b);
-    if (!a || !b) {
-      continue;
-    }
-    const [ax, ay] = project(a);
-    const [bx, by] = project(b);
-    const dx = bx - ax;
-    const dy = by - ay;
-    const lengthSquared = dx * dx + dy * dy;
-    const t =
-      lengthSquared === 0
-        ? 0
-        : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lengthSquared));
-    const distanceMeters = Math.hypot(ax + t * dx, ay + t * dy);
-    const isTrail =
-      preferTrails && graph.sources[segment.source]?.kind === 'trail';
-    if (
-      distanceMeters <= maxMeters &&
-      (best === null ||
-        distanceMeters < best.distanceMeters ||
-        (isTrail &&
-          (bestTrail === null || distanceMeters < bestTrail.distanceMeters)))
-    ) {
-      const segmentMeters = Math.sqrt(lengthSquared);
-      const snap: GraphSnap = {
-        distanceMeters,
-        from: segment.a,
-        metersToFrom: t * segmentMeters,
-        metersToTo: (1 - t) * segmentMeters,
-        point: [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])],
-        segment: index,
-        source: segment.source,
-        to: segment.b,
-      };
-      if (best === null || distanceMeters < best.distanceMeters) {
-        best = snap;
-      }
-      if (
-        isTrail &&
-        (bestTrail === null || distanceMeters < bestTrail.distanceMeters)
-      ) {
-        bestTrail = snap;
-      }
-    }
-  }
-  return bestTrail &&
-    best &&
-    bestTrail.distanceMeters <=
-      best.distanceMeters + TRAIL_SNAP_PREFERENCE_METERS
-    ? bestTrail
-    : best;
+  const snap = snapToSegments(
+    graph,
+    graph.nodes,
+    (index) => graph.segments[index],
+    point,
+    maxMeters,
+    {
+      accept: (index) => {
+        const segment = graph.segments[index];
+        return (
+          segment.a !== exclude &&
+          segment.b !== exclude &&
+          (!accept || accept(segment.source))
+        );
+      },
+      prefer: preferTrails
+        ? (index) =>
+            graph.sources[graph.segments[index].source]?.kind === 'trail'
+        : undefined,
+      preferenceMeters: TRAIL_SNAP_PREFERENCE_METERS,
+    },
+  );
+  return snap ? { ...snap, source: graph.segments[snap.segment].source } : null;
 }
 
 /** Virtual node ids for the two snapped ends. Real ids never get this large. */
@@ -576,46 +538,14 @@ export function routeBetween(
       ? 0
       : distance(graph.nodes.get(node) ?? a.point, b.point) * MIN_FACTOR;
 
-  const cost = new Map<number, number>([[START, 0]]);
-  const previous = new Map<number, { edge: Edge; from: number }>();
-  const settled = new Set<number>();
-  const queue = new MinHeap();
-  queue.push(START, heuristic(START));
-
-  while (queue.size > 0) {
-    const node = queue.pop();
-    if (settled.has(node)) {
-      continue;
-    }
-    if (node === END) {
-      break;
-    }
-    settled.add(node);
-    const base = cost.get(node) ?? Number.POSITIVE_INFINITY;
-    for (const edge of neighbours(node)) {
-      const next = base + edge.cost;
-      if (next < (cost.get(edge.to) ?? Number.POSITIVE_INFINITY)) {
-        cost.set(edge.to, next);
-        previous.set(edge.to, { edge, from: node });
-        queue.push(edge.to, next + heuristic(edge.to));
-      }
-    }
-  }
-
-  if (!previous.has(END)) {
-    return null;
-  }
-
-  const hops: { edge: Edge; node: number }[] = [];
-  for (let node = END; node !== START; ) {
-    const step = previous.get(node);
-    if (!step) {
-      return null;
-    }
-    hops.push({ edge: step.edge, node });
-    node = step.from;
-  }
-  hops.reverse();
+  const hops = shortestPath(
+    START,
+    END,
+    neighbours,
+    heuristic,
+    (edge) => edge.cost,
+  );
+  if (!hops) return null;
 
   const coordinates: Position[] = [a.point];
   const steps: RouteStep[] = [];
@@ -662,10 +592,6 @@ export function sameSource(a: StepSource, b: StepSource): boolean {
     return a.slug === b.slug;
   }
   return a.kind === b.kind;
-}
-
-export function distance(a: Position, b: Position): number {
-  return haversineDistance(a[1], a[0], b[1], b[0]);
 }
 
 function sourceOf(graph: RouteGraph, index: number): StepSource {
@@ -757,75 +683,5 @@ function indexSegment(graph: RouteGraph, index: number): void {
   if (!pa || !pb) {
     return;
   }
-  for (const key of cellsIn(
-    Math.min(pa[0], pb[0]),
-    Math.min(pa[1], pb[1]),
-    Math.max(pa[0], pb[0]),
-    Math.max(pa[1], pb[1]),
-  )) {
-    const list = graph.grid.get(key);
-    if (list) {
-      list.push(index);
-    } else {
-      graph.grid.set(key, [index]);
-    }
-  }
+  addToIndex(graph, index, pa, pb);
 }
-
-/** Indexes of every segment in the grid cells within `meters` of `point`. */
-function segmentsNear(
-  graph: RouteGraph,
-  [lng, lat]: Position,
-  meters: number,
-): Set<number> {
-  const latRadius = meters / 111_320;
-  const lngRadius = latRadius / Math.max(Math.cos((lat * Math.PI) / 180), 0.01);
-  const found = new Set<number>();
-  for (const key of cellsIn(
-    lng - lngRadius,
-    lat - latRadius,
-    lng + lngRadius,
-    lat + latRadius,
-  )) {
-    for (const index of graph.grid.get(key) ?? []) {
-      found.add(index);
-    }
-  }
-  return found;
-}
-
-function cellsIn(
-  west: number,
-  south: number,
-  east: number,
-  north: number,
-): string[] {
-  const keys: string[] = [];
-  for (
-    let x = Math.floor(west / GRID_DEG);
-    x <= Math.floor(east / GRID_DEG);
-    x++
-  ) {
-    for (
-      let y = Math.floor(south / GRID_DEG);
-      y <= Math.floor(north / GRID_DEG);
-      y++
-    ) {
-      keys.push(`${x}:${y}`);
-    }
-  }
-  return keys;
-}
-
-/** Meters east/north of `origin` — accurate to well under a meter nearby. */
-function flatProjection(origin: Position): (p: Position) => [number, number] {
-  const metersPerDegLat = 111_320;
-  const metersPerDegLng =
-    metersPerDegLat * Math.cos((origin[1] * Math.PI) / 180);
-  return ([lng, lat]) => [
-    (lng - origin[0]) * metersPerDegLng,
-    (lat - origin[1]) * metersPerDegLat,
-  ];
-}
-
-/** A binary min-heap of node ids keyed by priority. */

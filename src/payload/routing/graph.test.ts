@@ -265,3 +265,26 @@ describe('appendStep', () => {
     ]);
   });
 });
+
+describe('bounded route snapping', () => {
+  it('keeps long diagonal segments snappable without expanding their entire extent', () => {
+    const graph = buildRouteGraph({
+      trails: [],
+      ways: [
+        way(
+          1,
+          [1, 2],
+          [
+            [0, 0],
+            [60, 60],
+          ],
+        ),
+      ],
+    });
+    expect(graph.grid.size).toBeLessThanOrEqual(256);
+    expect(snapToGraph(graph, [30, 30])?.point).toEqual([30, 30]);
+    expect(snapToGraph(graph, [30, 30], Number.MAX_VALUE)?.point).toEqual([
+      30, 30,
+    ]);
+  });
+});
