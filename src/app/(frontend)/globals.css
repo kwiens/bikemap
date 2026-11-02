@@ -1,50 +1,201 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/*
+ * Tailwind 4 emits native cascade layers, and any unlayered rule beats every
+ * layered one. Third-party stylesheets therefore go in `vendor`, between
+ * Tailwind's base and utilities: they still override the preflight reset, but
+ * a utility on the same element wins, as it did under Tailwind 3. Unlayered,
+ * `.mapboxgl-map { position: relative }` beat the map container's `absolute`
+ * and Font Awesome's `.svg-inline--fa { height: 1em }` beat every `h-*` icon.
+ */
+@layer theme, base, vendor, components, utilities;
 
-/* Reset and base styles */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+@import 'tailwindcss' source('../..');
+@import 'mapbox-gl/dist/mapbox-gl.css' layer(vendor);
+@import '@fortawesome/fontawesome-svg-core/styles.css' layer(vendor);
+
+@theme {
+  --color-app-primary: #c3f44d;
+  --color-app-secondary: #1a434e;
+
+  /*
+   * Tailwind 3's absolute line heights. v4 switched to unitless ratios, which
+   * children inherit as ratios, so a `text-[10px]` icon inside `text-sm`
+   * text got a shorter line box and shifted every row it sat in.
+   */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+
+  --animate-recording-pulse: recording-pulse 3s ease-in-out infinite;
+  --animate-toast-slide-in: toast-slide-in 0.2s ease;
+  --animate-pulse-dot: pulse-dot 3s ease-in-out infinite;
+  --animate-toast-fade-in: toast-fade-in 0.3s ease-out;
+  --animate-toast-fade-out: toast-fade-out 0.3s ease-out forwards;
+  --animate-welcome-fade-in: welcome-fade-in 0.4s ease-out;
+  --animate-welcome-fade-out: welcome-fade-out 0.4s ease-in forwards;
+  --animate-welcome-slide-up: welcome-slide-up 0.45s ease-out;
+  --animate-welcome-slide-down: welcome-slide-down 0.35s ease-in forwards;
+
+  @keyframes recording-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 16px 6px rgba(239, 68, 68, 0.6);
+    }
+  }
+  @keyframes toast-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
+  }
+  /*
+   * The toast is centred with `-translate-x-1/2`, which in v4 sets the
+   * standalone `translate` property. Animating only the vertical offset in
+   * `transform` composes with it; repeating translateX(-50%) here would shift
+   * the toast a second half-width for the length of the animation.
+   */
+  @keyframes toast-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes toast-fade-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes welcome-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes welcome-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes welcome-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(40px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes welcome-slide-down {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(30px) scale(0.97);
+    }
+  }
 }
 
-html {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  overflow: hidden;
-  position: fixed;
-  inset: 0;
-  /* Prevent browser pinch-zoom (iOS Safari ignores user-scalable=no) */
-  touch-action: pan-x pan-y;
-  /* Prevent pull-to-refresh and elastic bounce */
-  overscroll-behavior: none;
-  /* Remove tap highlight on iOS/Android */
-  -webkit-tap-highlight-color: transparent;
-  /* Prevent text selection on UI elements */
-  user-select: none;
-  /* Prevent long-press context menu */
-  -webkit-touch-callout: none;
-}
+/*
+ * Base styles must sit in the base layer: Tailwind 4 puts utilities in
+ * `@layer utilities`, and an unlayered rule beats every layered one, so an
+ * unlayered `* { padding: 0 }` would override every `p-*` class.
+ */
+@layer base {
+  /* Tailwind 3 defaults that v4 dropped and this UI was built against. */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
 
-body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  position: fixed;
-  inset: 0;
-  overscroll-behavior: none;
-}
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
 
-/* Next.js app wrapper */
-body > div,
-#__next,
-#root {
-  overflow: hidden;
-  position: fixed;
-  inset: 0;
+  /* Reset and base styles */
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  }
+
+  html {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
+    /* Prevent browser pinch-zoom (iOS Safari ignores user-scalable=no) */
+    touch-action: pan-x pan-y;
+    /* Prevent pull-to-refresh and elastic bounce */
+    overscroll-behavior: none;
+    /* Remove tap highlight on iOS/Android */
+    -webkit-tap-highlight-color: transparent;
+    /* Prevent text selection on UI elements */
+    user-select: none;
+    /* Prevent long-press context menu */
+    -webkit-touch-callout: none;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
+    overscroll-behavior: none;
+  }
+
+  /* Next.js app wrapper */
+  body > div,
+  #__next,
+  #root {
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
+  }
 }
 
 /* Fix for Mapbox controls - ensure they're visible */
