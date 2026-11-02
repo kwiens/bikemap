@@ -909,7 +909,7 @@ export function TrailMapEditor({
       )}
 
       <div
-        className="h-[480px] w-full rounded-[var(--style-radius-s,4px)] border border-solid border-[color:var(--theme-elevation-150)]"
+        className="h-[480px] w-full rounded-(--style-radius-s,4px) border border-solid border-(--theme-elevation-150)"
         ref={containerRef}
       />
 
@@ -917,13 +917,11 @@ export function TrailMapEditor({
         <strong ref={statsRef}>No line yet</strong>
         <span className="flex-1" />
         {geometrySource === 'edited' && (
-          <span className="text-[color:var(--theme-elevation-600)]">
-            Drawn here
-          </span>
+          <span className="text-(--theme-elevation-600)">Drawn here</span>
         )}
         {picked.length > 0 && geometrySource === 'edited' && (
           <button
-            className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--theme-elevation-800)]"
+            className="border-0 bg-transparent p-0 text-[0.8rem] text-(--theme-error-500,#c00) underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--theme-elevation-800)"
             onClick={revertToOsm}
             type="button"
           >
@@ -932,7 +930,7 @@ export function TrailMapEditor({
         )}
       </div>
 
-      <p className="mb-2 mt-0 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.45]">
+      <p className="mb-2 mt-0 max-w-[75ch] text-[0.8rem] text-(--theme-elevation-600) leading-[1.45]">
         {hintFor(
           mode,
           geometrySource,
@@ -946,7 +944,7 @@ export function TrailMapEditor({
       {pointRemovalNote && (
         <p
           aria-live="polite"
-          className="mb-2 mt-0 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-error-500,#c00)]"
+          className="mb-2 mt-0 max-w-[75ch] text-[0.8rem] text-(--theme-error-500,#c00)"
         >
           {pointRemovalNote}
         </p>
@@ -955,7 +953,7 @@ export function TrailMapEditor({
       {mode === 'pick' && (
         <div className="mt-1">
           {picked.length === 0 ? (
-            <p className="m-0 text-[color:var(--theme-elevation-600)]">
+            <p className="m-0 text-(--theme-elevation-600)">
               No OpenStreetMap trail segments selected yet.
             </p>
           ) : (
@@ -972,7 +970,7 @@ export function TrailMapEditor({
                     #{way.id}
                   </a>{' '}
                   <button
-                    className="border-0 bg-transparent p-0 text-[0.8rem] text-[color:var(--theme-error-500,#c00)] underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-0 bg-transparent p-0 text-[0.8rem] text-(--theme-error-500,#c00) underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={!editable}
                     onClick={() => togglePick(way.id, way.name)}
                     type="button"
@@ -1114,10 +1112,10 @@ function ModeButton({
     <button
       aria-pressed={isToggle ? active : undefined}
       className={cn(
-        'rounded-[var(--style-radius-s,4px)] border border-solid border-[color:var(--theme-elevation-150)] px-2.5 py-1 text-[0.8rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--theme-elevation-800)] disabled:cursor-not-allowed disabled:opacity-50',
+        'rounded-(--style-radius-s,4px) border border-solid border-(--theme-elevation-150) px-2.5 py-1 text-[0.8rem] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--theme-elevation-800) disabled:cursor-not-allowed disabled:opacity-50',
         active
-          ? 'bg-[var(--theme-elevation-800)] text-[color:var(--theme-elevation-0)]'
-          : 'bg-[var(--theme-elevation-50)] text-[color:var(--theme-elevation-800)] hover:bg-[var(--theme-elevation-100)]',
+          ? 'bg-(--theme-elevation-800) text-(--theme-elevation-0)'
+          : 'bg-(--theme-elevation-50) text-(--theme-elevation-800) hover:bg-(--theme-elevation-100)',
       )}
       disabled={disabled}
       onClick={onClick}

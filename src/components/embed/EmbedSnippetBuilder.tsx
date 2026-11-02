@@ -313,10 +313,10 @@ export function EmbedSnippetBuilder({
               src={iframeSrc}
               title="Bike map preview"
               allow={IFRAME_ALLOW}
-              className="aspect-[4/3] w-full rounded-xl border-0"
+              className="aspect-4/3 w-full rounded-xl border-0"
             />
           ) : (
-            <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white text-center">
+            <div className="flex aspect-4/3 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white text-center">
               <p className="px-6 text-sm text-gray-600">
                 The preview loads the real map, exactly as your visitors will
                 see it.

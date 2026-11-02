@@ -403,7 +403,10 @@ The map can be framed on third-party sites via `<iframe src="https://bikechatt.c
 All component styling uses Tailwind utility classes. The only remaining custom CSS is in `map.css` for Mapbox DOM-API elements (markers, popups, location dots) that cannot be styled with Tailwind.
 
 - **Use `cn()` from `@/lib/utils`** (clsx + tailwind-merge) for conditional classes: `className={cn('base-classes', condition && 'conditional-classes')}`
-- **Custom animations** go in `tailwind.config.ts` under `theme.extend.keyframes` and `theme.extend.animation`, not in CSS `@keyframes`.
+- **Tailwind 4 is configured in CSS** — there is no `tailwind.config.ts`. Brand colors and custom animations live in the `@theme` block of `src/app/(frontend)/globals.css` (`--color-*`, `--animate-*` plus the `@keyframes` inside `@theme`).
+- **Global CSS goes in `@layer base`.** Utilities live in `@layer utilities`, and any unlayered rule beats every layered one regardless of specificity — an unlayered reset silently overrides `p-*`/`m-*` everywhere.
+- **Translate utilities set the `translate` property, not `transform`.** A keyframe that animates `transform` composes with `-translate-x-1/2` instead of replacing it, so don't repeat the centring offset inside the keyframe.
+- **The admin's Tailwind (`src/app/(payload)/tailwind.css`) is unlayered and inline-themed** so it beats Payload's `@layer payload-default` styles without colliding with Payload's own `--color-blue-*` variables. It scans only `src/payload/components`.
 - **Use standard Tailwind colors** (e.g., `text-gray-500`, `bg-red-500`). App brand colors are available as `app-primary` and `app-secondary`.
 - **Dynamic values** that can't be expressed as Tailwind classes (e.g., computed widths from JS) can use `style={{}}` for that single property. Everything else should be Tailwind.
 - **SidebarCard** (`src/components/sidebar/SidebarCard.tsx`) is a shared card component with a `colorTheme` prop (`blue | green | purple | gray`) used across AttractionsList, BikeResourcesList, BikeRentalList, and InformationSection.

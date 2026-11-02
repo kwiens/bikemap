@@ -32,7 +32,7 @@ export function EmbedAttribution() {
       // attribution control sits bottom-right, the location-tracker button at
       // `bottom-[60px] right-4`, and the elevation panel spans nearly the full
       // width along the bottom whenever a route is selected.
-      className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-[0_2px_4px_rgba(0,0,0,0.2)] hover:text-gray-900"
+      className="absolute top-3 right-3 z-1000 flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-[0_2px_4px_rgba(0,0,0,0.2)] hover:text-gray-900"
     >
       Open in {siteConfig.name}
       <FontAwesomeIcon

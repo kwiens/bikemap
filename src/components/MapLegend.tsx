@@ -434,7 +434,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       <div
         className={cn(
           'fixed left-4 top-[calc(1rem+env(safe-area-inset-top))]',
-          isOpen ? 'z-[960]' : 'z-[900]',
+          isOpen ? 'z-960' : 'z-900',
         )}
       >
         <button
@@ -454,7 +454,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       <div
         ref={sidebarRef}
         className={cn(
-          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-[950] overflow-hidden transition-transform duration-300 ease-in-out flex flex-col max-md:w-full max-md:max-w-[320px]',
+          'fixed top-0 left-0 h-full w-[280px] bg-white shadow-[2px_0_5px_rgba(0,0,0,0.1)] z-950 overflow-hidden transition-transform duration-300 ease-in-out flex flex-col max-md:w-full max-md:max-w-[320px]',
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -475,7 +475,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   className={cn(
                     'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                     activeSection === 'routes'
-                      ? 'bg-white text-gray-800 shadow-sm'
+                      ? 'bg-white text-gray-800 shadow-xs'
                       : 'text-gray-500 hover:text-gray-700',
                   )}
                   onClick={() => switchTab('routes')}
@@ -488,7 +488,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                 className={cn(
                   'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                   activeSection === 'trails'
-                    ? 'bg-white text-gray-800 shadow-sm'
+                    ? 'bg-white text-gray-800 shadow-xs'
                     : 'text-gray-500 hover:text-gray-700',
                 )}
                 onClick={() => switchTab('trails')}
