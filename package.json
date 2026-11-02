@@ -68,7 +68,7 @@
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@types/geojson": "7946.0.16",
-    "@types/node": "26.6.5",
+    "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vercel/config": "0.13.0",
@@ -84,9 +84,9 @@
     "lint-staged": "17.6.0",
     "postcss": "8.5.31",
     "sharp": "0.35.5",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "3.4.19",
     "tsx": "4.23.15",
-    "typescript": "7.0.2",
+    "typescript": "6.0.3",
     "typescript-eslint": "8.72.0",
     "vitest": "5.0.5"
   }
