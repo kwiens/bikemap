@@ -43,7 +43,7 @@ describe('upsertStudioRoute', () => {
     });
   });
 
-  it.each(['trail', 'composed'])(
+  it.each(['trail', 'composed', 'drawn'])(
     'does not restore Studio over a %s route',
     async (geometrySource) => {
       const update = vi.fn();
@@ -99,7 +99,7 @@ describe('upsertImportedRoute', () => {
     sourceSha256: 'abc123',
   };
 
-  it.each(['trail', 'composed'])(
+  it.each(['trail', 'composed', 'drawn'])(
     'does not restore imported geometry over a %s route',
     async (geometrySource) => {
       const update = vi.fn();

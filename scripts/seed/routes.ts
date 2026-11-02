@@ -135,7 +135,8 @@ export async function upsertStudioRoute(
 function isCuratorOwned(existing: Route): boolean {
   return (
     existing.geometrySource === 'trail' ||
-    existing.geometrySource === 'composed'
+    existing.geometrySource === 'composed' ||
+    existing.geometrySource === 'drawn'
   );
 }
 
