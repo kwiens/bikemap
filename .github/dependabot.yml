@@ -13,6 +13,17 @@ updates:
         dependency-type: production
       development-dependencies:
         dependency-type: development
+    # Majors that are blocked upstream. Remove an entry once its blocker clears.
+    ignore:
+      # Tracks the Node major in .nvmrc; bump the two together.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      # typescript-eslint still peers on typescript <6.1.0.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      # Payload 3 peers on graphql ^16.
+      - dependency-name: graphql
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
