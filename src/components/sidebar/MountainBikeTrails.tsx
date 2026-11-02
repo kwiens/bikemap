@@ -73,7 +73,7 @@ function toggleSet(
  */
 const TRAIL_SHAPE: Record<string, string> = {
   easy: 'shrink-0 w-3 h-3 rounded-full',
-  intermediate: 'shrink-0 w-3 h-3 rounded-sm',
+  intermediate: 'shrink-0 w-3 h-3 rounded-none',
   advanced: 'shrink-0 w-2.5 h-2.5 rotate-45 rounded-[1px]',
   expert: 'shrink-0 w-2.5 h-2.5 rotate-45 rounded-[1px]',
   unrated: 'shrink-0 w-3 h-3 rounded-full',
