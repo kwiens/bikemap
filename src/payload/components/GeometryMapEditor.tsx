@@ -99,6 +99,7 @@ import { createEditHistory } from '@/payload/osm/edit-history';
 import type { PreviewTrailGeometryResponse } from '@/payload/endpoints/preview-trail-geometry';
 import {
   cloneParts,
+  COORDINATE_DECIMALS,
   featuresToParts,
   parseTrailGeometry,
   partsToFeatures,
@@ -435,7 +436,9 @@ export function GeometryMapEditor({
       if (!draw) {
         return;
       }
-      const next = featuresToParts(draw.getSnapshot());
+      // Rounded for the same reason the adapter is: partsRef must stay at the
+      // precision the form-sync effect compares, whatever Terra Draw emits.
+      const next = roundParts(featuresToParts(draw.getSnapshot()));
       const changed = !samePartsAs(next, partsRef.current);
 
       partsRef.current = next;
@@ -781,7 +784,14 @@ export function GeometryMapEditor({
     });
 
     const draw = new TerraDraw({
-      adapter: new TerraDrawMapboxGLAdapter({ map }),
+      // Terra Draw defaults to 9 decimals. The line the editor stores, and the
+      // copy the form-sync effect compares against, are rounded to
+      // COORDINATE_DECIMALS — a dragged point at 9 decimals never matched its
+      // own echo, so every edit reloaded the line as a new document.
+      adapter: new TerraDrawMapboxGLAdapter({
+        coordinatePrecision: COORDINATE_DECIMALS,
+        map,
+      }),
       modes: [
         new TerraDrawSelectMode({
           flags: {

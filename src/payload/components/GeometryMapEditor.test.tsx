@@ -409,6 +409,43 @@ describe('shared geometry editor', () => {
     expect(ui.removeMap).not.toHaveBeenCalled();
   });
 
+  it('keeps a dragged point at Terra Draw precision as an undoable edit, not a reload', async () => {
+    render(<TrailMapEditor path="geom" />);
+    act(() => ui.loadStyle());
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust line' }));
+    // Loading the line holds edits back until a microtask clears it.
+    await act(async () => {});
+
+    // The real adapter would round to the precision it was given; a stray
+    // 9-decimal coordinate (its default) must still not read as a new document.
+    const [feature] = ui.features;
+    ui.features = [
+      {
+        ...feature,
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [-85, 35],
+            [-85.012345678, 35.012345678],
+          ],
+        },
+      },
+    ];
+    act(() => ui.changed());
+    act(() => ui.finished());
+
+    expect(ui.writes.geom).toEqual({
+      type: 'MultiLineString',
+      coordinates: [
+        [
+          [-85, 35],
+          [-85.0123457, 35.0123457],
+        ],
+      ],
+    });
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+  });
+
   it('leaves the saved line untouched when a GPX is invalid', async () => {
     const { container } = render(<RouteMapEditor path="plan" />);
     act(() => ui.loadStyle());
