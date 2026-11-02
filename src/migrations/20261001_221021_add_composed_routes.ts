@@ -13,12 +13,14 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
 export async function down({ db, payload, req }: MigrateDownArgs): Promise<void> {
   await db.execute(sql`
    ALTER TABLE "routes" ALTER COLUMN "geometry_source" SET DATA TYPE text;
+  UPDATE "routes" SET "geometry_source" = 'imported' WHERE "geometry_source" = 'composed';
   ALTER TABLE "routes" ALTER COLUMN "geometry_source" SET DEFAULT 'imported'::text;
   DROP TYPE "public"."enum_routes_geometry_source";
   CREATE TYPE "public"."enum_routes_geometry_source" AS ENUM('imported', 'trail', 'studio');
   ALTER TABLE "routes" ALTER COLUMN "geometry_source" SET DEFAULT 'imported'::"public"."enum_routes_geometry_source";
   ALTER TABLE "routes" ALTER COLUMN "geometry_source" SET DATA TYPE "public"."enum_routes_geometry_source" USING "geometry_source"::"public"."enum_routes_geometry_source";
   ALTER TABLE "_routes_v" ALTER COLUMN "version_geometry_source" SET DATA TYPE text;
+  UPDATE "_routes_v" SET "version_geometry_source" = 'imported' WHERE "version_geometry_source" = 'composed';
   ALTER TABLE "_routes_v" ALTER COLUMN "version_geometry_source" SET DEFAULT 'imported'::text;
   DROP TYPE "public"."enum__routes_v_version_geometry_source";
   CREATE TYPE "public"."enum__routes_v_version_geometry_source" AS ENUM('imported', 'trail', 'studio');
