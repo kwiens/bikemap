@@ -1,6 +1,9 @@
 import { ValidationError, type CollectionBeforeValidateHook } from 'payload';
 import { isCityId } from '@/config/map.config';
+import { boundsOf, lengthMeters } from '@/payload/osm/assemble';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
+import { METERS_TO_MILES } from '@/payload/osm/units';
+import { parseRoutePlan, planGeometry } from '@/payload/routing/plan';
 import { STYLE_OWNED_ROUTE_LAYER_IDS } from '@/data/mapbox-style';
 import { slugify } from '@/utils/string';
 
@@ -110,17 +113,26 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
       current.name = name;
     }
     if (!valueOf(current, stored, 'routeId')) {
-      current.routeId = trail.slug || slugify(name);
+      current.routeId = await availableRouteId(
+        req,
+        city,
+        trail.slug || slugify(name),
+        stored?.id,
+      );
     }
     current.kind = 'trail';
     return current;
+  }
+
+  if (source === 'composed' || source === 'drawn') {
+    return await resolveAuthoredRoute(current, stored, req, isPublishing);
   }
 
   if (source !== 'imported' && source !== 'studio') {
     error(
       req,
       'geometrySource',
-      'Choose imported geometry, an existing trail, or a Mapbox Studio layer.',
+      'Choose a route built on the map, imported geometry, an existing trail, or a Mapbox Studio layer.',
     );
   }
 
@@ -173,3 +185,112 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
 
   return current;
 };
+
+/**
+ * Authored routes derive their public geometry and measurements from the
+ * drawn line or snapping plan.
+ *
+ * The line, distance, and bounds are computed here on every save, never taken
+ * from the request, so a built route's numbers cannot disagree with the line
+ * it draws — the same rule a hand-edited trail follows.
+ */
+async function resolveAuthoredRoute(
+  current: RouteData,
+  stored: RouteData | undefined,
+  req: Parameters<CollectionBeforeValidateHook>[0]['req'],
+  isPublishing: boolean,
+): Promise<RouteData> {
+  current.sourceTrail = null;
+
+  const isDrawn = current.geometrySource === 'drawn';
+  let geom;
+  if (isDrawn) {
+    const parsed = parseTrailGeometry(valueOf(current, stored, 'geom'));
+    if (!parsed.ok) error(req, 'geom', parsed.error);
+    geom =
+      parsed.parts.length > 0
+        ? { type: 'MultiLineString' as const, coordinates: parsed.parts }
+        : null;
+    current.plan = null;
+    current.sourcePath = null;
+    current.sourceSha256 = null;
+    current.sourceFeatureCount = null;
+  } else {
+    const parsed = parseRoutePlan(valueOf(current, stored, 'plan'));
+    if (!parsed.ok) error(req, 'plan', parsed.error);
+    geom = planGeometry(parsed.plan);
+    current.plan = parsed.plan;
+  }
+  current.geom = geom;
+  current.distance = geom
+    ? Math.round(lengthMeters(geom.coordinates) * METERS_TO_MILES * 100) / 100
+    : null;
+  current.bounds = geom ? boundsOf(geom.coordinates) : null;
+
+  const name = valueOf(current, stored, 'name');
+  if (
+    !valueOf(current, stored, 'routeId') &&
+    typeof name === 'string' &&
+    name &&
+    isCityId(valueOf(current, stored, 'city'))
+  ) {
+    current.routeId = await availableRouteId(
+      req,
+      valueOf(current, stored, 'city'),
+      slugify(name),
+      stored?.id,
+    );
+  }
+
+  if (!isPublishing) {
+    return current;
+  }
+  if (!name) {
+    error(req, 'name', 'Give this route a name.');
+  }
+  if (!geom) {
+    error(
+      req,
+      isDrawn ? 'geom' : 'plan',
+      'Draw or import a line with at least two points to publish this route.',
+    );
+  }
+  return current;
+}
+
+/**
+ * `base`, or `base-2`, `base-3`… — the first id no other route in the city
+ * uses. Only consulted when the id is being filled in for the curator; an id
+ * they typed is theirs, and a clash is reported by the unique index.
+ *
+ * Bounded by the routes sharing the prefix, which is a handful.
+ */
+async function availableRouteId(
+  req: Parameters<CollectionBeforeValidateHook>[0]['req'],
+  city: unknown,
+  base: string,
+  selfId: unknown,
+): Promise<string> {
+  if (!isCityId(city)) {
+    return base;
+  }
+  const { docs } = await req.payload.find({
+    collection: 'routes',
+    depth: 0,
+    limit: 0,
+    pagination: false,
+    req,
+    select: { routeId: true },
+    where: {
+      and: [{ city: { equals: city } }, { routeId: { like: base } }],
+    },
+  });
+  const taken = new Set(
+    docs.filter((doc) => doc.id !== selfId).map((doc) => doc.routeId),
+  );
+  let candidate = base;
+  for (let suffix = 2; taken.has(candidate); suffix++) {
+    candidate = `${base}-${suffix}`;
+  }
+  return candidate;
+}

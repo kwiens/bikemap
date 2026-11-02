@@ -11,7 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { siteConfig } from '@/config/site.config';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { getSetting, setSetting, type RideStyle } from '@/utils/settings';
 
 const features: {
@@ -82,11 +82,7 @@ export function WelcomeModal() {
   const choose = (style: RideStyle) => {
     localStorage.setItem(STORAGE_KEY, '1');
     setSetting('rideStyle', style);
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.RIDE_STYLE_CHOSEN, {
-        detail: { style },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.RIDE_STYLE_CHOSEN, { style });
     setExiting(true);
     setTimeout(() => {
       setVisible(false);
@@ -154,7 +150,7 @@ export function WelcomeModal() {
             <button
               key={c.style}
               type="button"
-              className="flex-1 flex flex-col items-center gap-2 py-4 px-3 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-[#a5d730]"
+              className="flex-1 flex flex-col items-center gap-2 py-4 px-3 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-app-primary"
               onClick={() => choose(c.style)}
             >
               <span

@@ -7,6 +7,8 @@ export interface TrailSummary {
   missingGeometry: null | number;
   missingProfile: null | number;
   withWarnings: null | number;
+  /** Condition reports filed in the last seven days, hidden ones included. */
+  reportsThisWeek: null | number;
   recent: { id: number; name: string }[];
   unavailable: boolean;
 }
@@ -27,6 +29,7 @@ export function summarizeTrails(
   city: CityId,
   trails: SummaryTrail[],
   issues: TrailIssueCounts,
+  reportsThisWeek: number,
 ): TrailSummary {
   let drafts = 0;
   let published = 0;
@@ -56,6 +59,7 @@ export function summarizeTrails(
       id: trail.id,
       name: trail.displayName ?? 'Untitled',
     })),
+    reportsThisWeek,
     unavailable: false,
     withWarnings,
   };

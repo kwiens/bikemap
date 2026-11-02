@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ValidationError } from 'payload';
+import { appendWaypoint, EMPTY_PLAN } from '@/payload/routing/plan';
 import { resolveRouteSource } from './resolveRouteSource';
 
 type HookArgs = Parameters<typeof resolveRouteSource>[0];
@@ -35,16 +36,18 @@ function run(
     trailName: 'Deschutes River Trail',
     _status: 'published',
   },
+  existingRoutes: { id: number; routeId: string }[] = [],
 ) {
   const findByID = vi.fn().mockResolvedValue(trail);
+  const find = vi.fn().mockResolvedValue({ docs: existingRoutes });
   const result = resolveRouteSource({
     collection: { slug: 'routes' },
     context: {},
     data,
     operation: 'create',
-    req: { payload: { findByID } },
+    req: { payload: { find, findByID } },
   } as unknown as HookArgs);
-  return { findByID, result: Promise.resolve(result) };
+  return { find, findByID, result: Promise.resolve(result) };
 }
 
 describe('resolveRouteSource', () => {
@@ -173,5 +176,157 @@ describe('resolveRouteSource', () => {
     expect((failed as ValidationError).data.errors[0]).toEqual(
       expect.objectContaining({ path: 'geom' }),
     );
+  });
+
+  describe('built on the map', () => {
+    const plan = appendWaypoint(
+      appendWaypoint(EMPTY_PLAN, [-121.4, 44]).plan,
+      [-121.39, 44.01],
+    ).plan;
+
+    it('derives the line, distance, bounds, and id from the plan', async () => {
+      const { result } = run({
+        _status: 'published',
+        bounds: [0, 0, 1, 1],
+        city: 'bend',
+        distance: 99,
+        geom: null,
+        geometrySource: 'composed',
+        name: 'Old Mill Loop',
+        plan,
+        sourceTrail: 42,
+      });
+      const resolved = (await result) as Record<string, unknown>;
+
+      expect(resolved.geom).toEqual(GEOMETRY);
+      expect(resolved.distance).toBeCloseTo(0.85, 1);
+      expect(resolved.bounds).toEqual([-121.4, 44, -121.39, 44.01]);
+      expect(resolved.routeId).toBe('old-mill-loop');
+      expect(resolved.sourceTrail).toBeNull();
+    });
+
+    it('picks a free id when another route already uses the name', async () => {
+      const { result } = run(
+        {
+          _status: 'draft',
+          city: 'bend',
+          geometrySource: 'composed',
+          name: 'Old Mill Loop',
+          plan,
+        },
+        undefined,
+        [
+          { id: 1, routeId: 'old-mill-loop' },
+          { id: 2, routeId: 'old-mill-loop-2' },
+        ],
+      );
+      const resolved = (await result) as Record<string, unknown>;
+
+      expect(resolved.routeId).toBe('old-mill-loop-3');
+    });
+
+    it('lets a draft be saved before it has a line', async () => {
+      const { result } = run({
+        _status: 'draft',
+        city: 'bend',
+        geometrySource: 'composed',
+        plan: null,
+      });
+      const resolved = (await result) as Record<string, unknown>;
+
+      expect(resolved.geom).toBeNull();
+      expect(resolved.distance).toBeNull();
+    });
+
+    it.each([
+      [{ name: 'No line', plan: null }, 'plan'],
+      [{ plan }, 'name'],
+      [{ name: 'Bad', plan: { ...plan, legs: [] } }, 'plan'],
+    ])('refuses to publish %o', async (data, path) => {
+      const { result } = run({
+        _status: 'published',
+        city: 'bend',
+        geometrySource: 'composed',
+        ...data,
+      });
+      const failed = await result.catch(
+        (error: unknown) => error as ValidationError,
+      );
+      expect(failed).toBeInstanceOf(ValidationError);
+      expect((failed as ValidationError).data.errors[0]).toEqual(
+        expect.objectContaining({ path }),
+      );
+    });
+  });
+});
+
+it('saves direct point overrides as the authoritative route geometry and measurements', async () => {
+  const geometry = {
+    type: 'MultiLineString',
+    coordinates: [
+      [
+        [-85, 35],
+        [-85.01, 35.01],
+      ],
+      [
+        [-85.1, 35.1],
+        [-85.11, 35.11],
+      ],
+    ],
+  };
+  const { result } = run({
+    city: 'chattanooga',
+    name: 'Custom route',
+    routeId: 'custom-route',
+    geometrySource: 'composed',
+    _status: 'published',
+    plan: { version: 1, waypoints: [], legs: [], geometry },
+  });
+  await expect(result).resolves.toMatchObject({
+    geom: geometry,
+    bounds: [-85.11, 35, -85, 35.11],
+    distance: expect.any(Number),
+  });
+});
+
+describe('Start new drawn routes', () => {
+  it('allows a blank draft without import provenance', async () => {
+    const { result } = run({
+      city: 'chattanooga',
+      geometrySource: 'drawn',
+      _status: 'draft',
+    });
+    await expect(result).resolves.toMatchObject({
+      geom: null,
+      distance: null,
+      bounds: null,
+      plan: null,
+    });
+  });
+  it('measures a drawn route and generates its public id', async () => {
+    const { result } = run({
+      city: 'chattanooga',
+      name: 'New drawing',
+      geometrySource: 'drawn',
+      _status: 'published',
+      geom: GEOMETRY,
+      distance: 9999,
+    });
+    await expect(result).resolves.toMatchObject({
+      geom: GEOMETRY,
+      routeId: 'new-drawing',
+      distance: expect.any(Number),
+      plan: null,
+    });
+    expect((await result)?.distance).not.toBe(9999);
+  });
+  it('rejects publishing a blank drawing', async () => {
+    const { result } = run({
+      city: 'chattanooga',
+      name: 'Empty route',
+      geometrySource: 'drawn',
+      _status: 'published',
+    });
+    await expect(result).rejects.toThrow(/invalid/);
   });
 });

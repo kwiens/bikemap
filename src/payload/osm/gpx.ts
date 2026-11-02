@@ -9,7 +9,7 @@
  * Client-safe on purpose: it runs in the admin bundle, against the browser's
  * `DOMParser`, and has no Node-only imports.
  */
-import { MIN_POINTS_PER_PART } from './geometry';
+import { dropRepeatedPoints, MIN_POINTS_PER_PART } from './geometry';
 
 /**
  * How far, in meters, a simplified line may stray from the recording.
@@ -92,7 +92,7 @@ export function parseGpx(
   let pointsRead = 0;
   const parts: [number, number][][] = [];
   for (const run of runs) {
-    const points = dropRepeats(run.flatMap(positionOf));
+    const points = dropRepeatedPoints(run.flatMap(positionOf));
     pointsRead += points.length;
     if (points.length >= MIN_POINTS_PER_PART) {
       parts.push(simplifyLine(points, toleranceMeters));
@@ -215,16 +215,6 @@ function positionOf(point: Element): [number, number][] {
 function coordinateOf(point: Element, name: 'lat' | 'lon'): number {
   const raw = point.getAttribute(name)?.trim();
   return raw ? Number(raw) : Number.NaN;
-}
-
-/** A stopped recorder logs the same fix over and over; one copy is enough. */
-function dropRepeats(points: [number, number][]): [number, number][] {
-  return points.filter(
-    (point, index) =>
-      index === 0 ||
-      point[0] !== points[index - 1][0] ||
-      point[1] !== points[index - 1][1],
-  );
 }
 
 /**

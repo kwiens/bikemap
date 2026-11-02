@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { RidesPanel } from './RidesPanel';
 import { MAP_EVENTS } from '@/events';
+import { initLayout, setSidebarOpen } from '@/hooks/useLayout';
 
 // Mock useRideRecording hook — rebuilt each test via beforeEach
 function createMockHook() {
@@ -28,11 +29,6 @@ let mockHook = createMockHook();
 
 vi.mock('@/hooks', () => ({
   useRideRecording: () => mockHook,
-  useToast: () => ({
-    message: null,
-    isFadingOut: false,
-    showToast: vi.fn(),
-  }),
 }));
 
 vi.mock('./sidebar/RideHistory', () => ({
@@ -51,6 +47,7 @@ function openPanel() {
 describe('RidesPanel', () => {
   beforeEach(() => {
     mockHook = createMockHook();
+    initLayout({ sidebarOpen: true });
   });
 
   it('renders toggle button', () => {
@@ -142,6 +139,138 @@ describe('RidesPanel', () => {
     expect(mockHook.dismissRecovery).toHaveBeenCalled();
   });
 
+  it('sends recovery feedback to the global toast host', async () => {
+    mockHook.hasRecovery = true;
+    mockHook.recoverRide = vi.fn().mockResolvedValue({ id: 'ride-1' });
+    const toasts: string[] = [];
+    const handler = (e: Event) =>
+      toasts.push((e as CustomEvent).detail.message);
+    window.addEventListener(MAP_EVENTS.TOAST, handler);
+
+    try {
+      render(<RidesPanel />);
+      openPanel();
+      await act(async () => {
+        fireEvent.click(screen.getByText('Save it'));
+      });
+      expect(toasts).toEqual(['Ride recovered!']);
+      // No in-panel copy: the panel can be closed while recording.
+      expect(screen.queryByText('Ride recovered!')).toBeNull();
+    } finally {
+      window.removeEventListener(MAP_EVENTS.TOAST, handler);
+    }
+  });
+
+  it('selects the saved ride after Finish and leaves the message to the recorder', async () => {
+    mockHook.isRecording = true;
+    mockHook.stopRecording = vi.fn().mockResolvedValue({ id: 'ride-2' });
+    const selected: string[] = [];
+    const toasts: string[] = [];
+    const onSelect = (e: Event) =>
+      selected.push((e as CustomEvent).detail.rideId);
+    const onToast = (e: Event) =>
+      toasts.push((e as CustomEvent).detail.message);
+    window.addEventListener(MAP_EVENTS.RIDE_SELECT, onSelect);
+    window.addEventListener(MAP_EVENTS.TOAST, onToast);
+
+    try {
+      render(<RidesPanel />);
+      openPanel();
+      await act(async () => {
+        fireEvent.click(screen.getByText('Finish'));
+      });
+      expect(selected).toEqual(['ride-2']);
+      expect(toasts).toEqual([]);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, onSelect);
+      window.removeEventListener(MAP_EVENTS.TOAST, onToast);
+    }
+  });
+
+  it('saves a pending unfinished ride before starting a new recording', async () => {
+    mockHook.hasRecovery = true;
+    const order: string[] = [];
+    mockHook.recoverRide = vi.fn(async () => {
+      order.push('recover');
+      return { id: 'old-ride' };
+    });
+    mockHook.startRecording = vi.fn(() => {
+      order.push('start');
+    });
+    render(<RidesPanel />);
+    openPanel();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Record a Ride'));
+    });
+    expect(order).toEqual(['recover', 'start']);
+  });
+
+  it('does not start recording when the unfinished ride cannot be saved', async () => {
+    mockHook.hasRecovery = true;
+    mockHook.recoverRide = vi.fn().mockRejectedValue(new Error('quota'));
+    const toasts: string[] = [];
+    const onToast = (e: Event) =>
+      toasts.push((e as CustomEvent).detail.message);
+    window.addEventListener(MAP_EVENTS.TOAST, onToast);
+    try {
+      render(<RidesPanel />);
+      openPanel();
+      await act(async () => {
+        fireEvent.click(screen.getByText('Record a Ride'));
+      });
+      expect(mockHook.startRecording).not.toHaveBeenCalled();
+      expect(toasts).toEqual([
+        'Save or discard the unfinished ride before recording',
+      ]);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.TOAST, onToast);
+    }
+  });
+
+  it('starts only once after repeated record taps during recovery', async () => {
+    mockHook.hasRecovery = true;
+    let finishRecovery!: (ride: { id: string }) => void;
+    mockHook.recoverRide = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finishRecovery = resolve;
+        }),
+    );
+    render(<RidesPanel />);
+    openPanel();
+    const record = screen.getByText('Record a Ride').closest('button')!;
+    fireEvent.click(record);
+    fireEvent.click(record);
+    expect(record).toBeDisabled();
+    expect(screen.getByText('Save it')).toBeDisabled();
+    expect(screen.getByText('Continue')).toBeDisabled();
+    expect(screen.getByText('Discard')).toBeDisabled();
+    expect(mockHook.recoverRide).toHaveBeenCalledTimes(1);
+    expect(mockHook.startRecording).not.toHaveBeenCalled();
+    await act(async () => finishRecovery({ id: 'old-ride' }));
+    expect(mockHook.startRecording).toHaveBeenCalledTimes(1);
+    expect(record).toBeEnabled();
+  });
+
+  it('does not start a recording while Save it is recovering the old ride', async () => {
+    mockHook.hasRecovery = true;
+    let finishRecovery!: (ride: { id: string }) => void;
+    mockHook.recoverRide = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finishRecovery = resolve;
+        }),
+    );
+    render(<RidesPanel />);
+    openPanel();
+    fireEvent.click(screen.getByText('Save it'));
+    fireEvent.click(screen.getByText('Record a Ride'));
+    expect(mockHook.recoverRide).toHaveBeenCalledTimes(1);
+    expect(mockHook.startRecording).not.toHaveBeenCalled();
+    await act(async () => finishRecovery({ id: 'old-ride' }));
+    expect(mockHook.startRecording).not.toHaveBeenCalled();
+  });
+
   it('dispatches RIDES_PANEL_TOGGLE on toggle', () => {
     const events: CustomEvent[] = [];
     const handler = (e: Event) => events.push(e as CustomEvent);
@@ -157,7 +286,7 @@ describe('RidesPanel', () => {
     }
   });
 
-  it('dispatches panel-close when sidebar opens', () => {
+  it('closes (and says so) when the sidebar opens', () => {
     const events: CustomEvent[] = [];
     const handler = (e: Event) => events.push(e as CustomEvent);
     window.addEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
@@ -165,20 +294,29 @@ describe('RidesPanel', () => {
     try {
       render(<RidesPanel />);
       openPanel(); // opens panel, dispatches isOpen: true
+      expect(screen.getByLabelText('Close rides panel')).toBeInTheDocument();
 
       act(() => {
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.SIDEBAR_TOGGLE, {
-            detail: { isOpen: true },
-          }),
-        );
+        setSidebarOpen(true);
       });
 
-      // Should have dispatched isOpen: false after the sidebar opened
+      expect(screen.getByLabelText('Open rides panel')).toBeInTheDocument();
       const closeEvent = events.find((e) => e.detail.isOpen === false);
       expect(closeEvent).toBeDefined();
     } finally {
       window.removeEventListener(MAP_EVENTS.RIDES_PANEL_TOGGLE, handler);
     }
+  });
+
+  it('opens itself when a ride is selected with openPanel', () => {
+    render(<RidesPanel />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
+          detail: { rideId: 'ride-1', openPanel: true },
+        }),
+      );
+    });
+    expect(screen.getByLabelText('Close rides panel')).toBeInTheDocument();
   });
 });

@@ -98,21 +98,11 @@ export async function buildTrailFromOsm(
 
   const { gaps, orderedIds, parts } = assembleWays(ordered);
 
-  const warnings: string[] = [];
-  if (missingIds.length > 0) {
-    warnings.push(
-      `${missingIds.length} of ${requested.length} ways no longer exist in OSM (${missingIds.join(', ')}). The trail was built from the rest.`,
-    );
-  }
-  const notable = gaps.filter((gap) => gap.distanceMeters > NOTABLE_GAP_M);
-  if (notable.length > 0) {
-    warnings.push(
-      `The picked ways form ${parts.length} disconnected pieces; the largest break is ${notable[0].distanceMeters} m. A connecting way is probably missing.`,
-    );
-  }
-
   const measured = await measureParts(parts, name, options);
-  warnings.push(...measured.warnings);
+  const warnings = [
+    ...osmWayWarnings(requested.length, missingIds, parts.length, gaps),
+    ...measured.warnings,
+  ];
 
   return {
     bounds: measured.bounds,
@@ -126,4 +116,30 @@ export async function buildTrailFromOsm(
     profile: measured.profile,
     report: { gaps, missingIds, resolvedIds: orderedIds, warnings },
   };
+}
+
+/**
+ * What is wrong with the picked ways themselves, apart from measuring them.
+ * The save hook re-derives these for a reviewed preview instead of trusting the
+ * preview's warnings, which also carry that preview's terrain sampling.
+ */
+export function osmWayWarnings(
+  requestedCount: number,
+  missingIds: number[],
+  partCount: number,
+  gaps: { distanceMeters: number }[],
+): string[] {
+  const warnings: string[] = [];
+  if (missingIds.length > 0) {
+    warnings.push(
+      `${missingIds.length} of ${requestedCount} ways no longer exist in OSM (${missingIds.join(', ')}). The trail was built from the rest.`,
+    );
+  }
+  const notable = gaps.filter((gap) => gap.distanceMeters > NOTABLE_GAP_M);
+  if (notable.length > 0) {
+    warnings.push(
+      `The picked ways form ${partCount} disconnected pieces; the largest break is ${notable[0].distanceMeters} m. A connecting way is probably missing.`,
+    );
+  }
+  return warnings;
 }

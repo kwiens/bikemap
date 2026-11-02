@@ -7,6 +7,7 @@ import './map.css';
 import Script from 'next/script';
 import { siteConfigForHostname } from '@/config/site.config';
 import { getRequestHostname } from '@/utils/request-hostname';
+import { getFrontendThemeCss } from '@/payload/read/theme';
 
 // Self-hosted to keep production builds reproducible and offline-capable
 // (next/font/google would fetch from Google Fonts at build time).
@@ -63,10 +64,16 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const config = siteConfigForHostname(await getRequestHostname());
+  const themeCss = await getFrontendThemeCss();
 
   return (
     <html lang="en">
       <head>
+        {themeCss && (
+          // buildFrontendThemeCss emits only validated numeric colour channels.
+          // eslint-disable-next-line @eslint-react/dom-no-dangerously-set-innerhtml -- the builder cannot emit markup or arbitrary CSS.
+          <style dangerouslySetInnerHTML={{ __html: themeCss }} />
+        )}
         <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

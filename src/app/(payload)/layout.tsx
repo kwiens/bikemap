@@ -72,9 +72,9 @@ export default async function Layout({ children }: Args) {
         // with a CSS `@import`, which has to come first in a file and would
         // therefore lose to custom.css rather than override it.
         //
-        // Content is custom properties only; see sanitizeCss in read/theme.ts
-        // for why it cannot close its own <style> element.
-        // eslint-disable-next-line @eslint-react/dom-no-dangerously-set-innerhtml -- sanitizeCss restricts this to safe custom properties.
+        // Content is custom properties from validated hex colors only;
+        // buildThemeCss cannot emit markup or arbitrary CSS.
+        // eslint-disable-next-line @eslint-react/dom-no-dangerously-set-innerhtml -- buildThemeCss emits only validated color properties.
         <style dangerouslySetInnerHTML={{ __html: themeCss }} />
       )}
       {children}

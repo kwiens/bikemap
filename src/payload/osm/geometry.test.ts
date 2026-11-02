@@ -3,6 +3,7 @@ import {
   featuresToParts,
   parseTrailGeometry,
   partsToFeatures,
+  roundParts,
   samePartsAs,
   toTrailGeometry,
 } from './geometry';
@@ -192,5 +193,23 @@ describe('parts <-> Terra Draw features', () => {
         {},
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('roundParts', () => {
+  it('rounds to the precision Terra Draw accepts, without touching its input', () => {
+    const parts: [number, number][][] = [
+      [
+        [-121.39671298408157, 44.032515251951345],
+        [-121.3, 44.1],
+      ],
+    ];
+    expect(roundParts(parts)).toEqual([
+      [
+        [-121.396713, 44.0325153],
+        [-121.3, 44.1],
+      ],
+    ]);
+    expect(parts[0][0][0]).toBe(-121.39671298408157);
   });
 });

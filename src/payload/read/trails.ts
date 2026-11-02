@@ -23,6 +23,7 @@ import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 import {
+  PUBLIC_TRAIL_CACHE_DATA_VERSION,
   PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
   PUBLIC_TRAIL_GEOJSON_CACHE_TAG,
   PUBLIC_TRAIL_SUMMARIES_CACHE_TAG,
@@ -206,7 +207,7 @@ async function readCityTrailSummaries(
 
 const readCachedCityTrailSummaries = unstable_cache(
   readCityTrailSummaries,
-  ['public-city-trail-summaries'],
+  ['public-city-trail-summaries', PUBLIC_TRAIL_CACHE_DATA_VERSION],
   {
     revalidate: PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
     tags: [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG],
@@ -292,7 +293,7 @@ function decompressCityTrailGeojson(value: string): CityTrailGeojsonData {
 
 const readCachedCityTrailGeojson = unstable_cache(
   readCompressedCityTrailGeojson,
-  ['public-city-trail-geojson'],
+  ['public-city-trail-geojson', PUBLIC_TRAIL_CACHE_DATA_VERSION],
   {
     revalidate: PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
     tags: [PUBLIC_TRAIL_GEOJSON_CACHE_TAG],

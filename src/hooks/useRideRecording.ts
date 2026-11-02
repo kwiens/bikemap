@@ -4,12 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RecordedRide, RidePoint, StoredRidePoint } from '../data/ride';
 import { generateRideName, splitRideSegments } from '../data/ride';
-
-type NotifyCallback = (message: string) => void;
-
-// If no GPS point arrives for this long, the app was likely backgrounded
-const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
-import { MAP_EVENTS } from '../events';
+import { MAP_EVENTS, dispatchMapEvent } from '../events';
+import { usePlatform } from '@/platform/context';
+import type { PositionError, Unsubscribe } from '@/platform/types';
 import {
   computeBounds,
   computeDistance,
@@ -17,19 +14,22 @@ import {
   computeRideStats,
   haversineDistance,
   MAX_ACCURACY_M,
-  ELEVATION_EMA_ALPHA as ALT_EMA_ALPHA,
-  ELEVATION_DEAD_BAND as ALT_DEADBAND_M,
-  ELEVATION_SPIKE_THRESHOLD as ALT_SPIKE_M,
-  ELEVATION_SPIKE_MAX_RUN as ALT_SPIKE_MAX_RUN,
-  ELEVATION_MIN_DISTANCE as ALT_MIN_DIST_M,
-  ELEVATION_MAX_ALT_ACCURACY as ALT_MAX_ACCURACY,
 } from '../utils/ride-stats';
+import {
+  createLiveElevationAccumulator,
+  ELEVATION_MAX_ALT_ACCURACY,
+} from '@/utils/elevation';
 import {
   saveRide,
   saveInProgress,
   clearInProgress,
   loadInProgress,
 } from '../utils/ride-storage';
+
+type NotifyCallback = (message: string) => void;
+
+// If no GPS point arrives for this long, the app was likely backgrounded
+const BACKGROUND_GAP_THRESHOLD_MS = 15_000;
 
 async function tryDemCorrection(points: StoredRidePoint[]) {
   try {
@@ -60,6 +60,9 @@ interface UseRideRecordingReturn {
 export function useRideRecording(
   onNotify?: NotifyCallback,
 ): UseRideRecordingReturn {
+  // Fixes come from the platform's shared watch (the location marker uses the
+  // same one), so recording never starts a second GPS watch.
+  const { positions } = usePlatform();
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [hasRecovery, setHasRecovery] = useState(false);
@@ -68,26 +71,23 @@ export function useRideRecording(
   const [liveDistance, setLiveDistance] = useState(0);
   const [liveElevationGain, setLiveElevationGain] = useState(0);
   const distanceRef = useRef(0);
-  const elevGainRef = useRef(0);
-  const emaAltRef = useRef<number | null>(null); // EMA-smoothed altitude
-  const lastAltRef = useRef<number | null>(null); // last accepted raw altitude (spike-filter reference)
-  const altRejectRunRef = useRef(0); // consecutive spike rejections
-  const altAnchorRef = useRef<number | null>(null); // last committed altitude for deadband
-  const distSinceAnchorRef = useRef(0); // horizontal meters since last anchor update
+  const elevationRef = useRef(createLiveElevationAccumulator());
   const pausedRef = useRef(false);
   const manualPauseRef = useRef(false); // true when user explicitly paused
   const pausedTimeRef = useRef(0); // accumulated paused ms
   const pauseStartRef = useRef(0);
   const lowSpeedCountRef = useRef(0); // consecutive low-speed GPS readings
   const preserveProgressRef = useRef(false); // keep in-progress data if GPS fails during continue
+  const gpsSessionRef = useRef(0); // invalidate callbacks already queued by a cleared watch
   const stoppingRef = useRef(false); // synchronous re-entry guard for stopRecording
+  const isRecoveringRef = useRef(false); // synchronous re-entry guard for recoverRide
   const segmentBreakRef = useRef(false); // next GPS point follows a manual pause — don't bridge it
 
   const saveIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(
     undefined,
   );
   const pointsRef = useRef<RidePoint[]>([]);
-  const watchIdRef = useRef<number | null>(null);
+  const stopPositionsRef = useRef<Unsubscribe | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(
     undefined,
   );
@@ -108,17 +108,14 @@ export function useRideRecording(
         }
       }
 
-      // Request an immediate position fix to minimize the gap
-      navigator.geolocation.getCurrentPosition(
-        () => {}, // watchPosition will pick up the next point
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 },
-      );
+      // Nudge the hardware for an immediate fix to shorten the gap; the
+      // watch delivers the next point.
+      positions.requestFix().catch(() => {});
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility);
-  }, [isRecording, onNotify]);
+  }, [isRecording, onNotify, positions]);
 
   // Warn before closing tab while recording
   useEffect(() => {
@@ -130,11 +127,10 @@ export function useRideRecording(
     return () => window.removeEventListener('beforeunload', handler);
   }, [isRecording]);
 
-  const cleanup = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
+  const releaseGpsWatchAndTimers = useCallback(() => {
+    gpsSessionRef.current += 1;
+    stopPositionsRef.current?.();
+    stopPositionsRef.current = null;
     if (timerRef.current !== undefined) {
       clearInterval(timerRef.current);
       timerRef.current = undefined;
@@ -143,27 +139,48 @@ export function useRideRecording(
       clearInterval(saveIntervalRef.current);
       saveIntervalRef.current = undefined;
     }
-    if (preserveProgressRef.current) {
-      preserveProgressRef.current = false;
-      setHasRecovery(true); // re-show recovery banner so user can retry or save
-      // Clear the map's live ride layer so a retry doesn't double-append points
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
-    } else {
-      void clearInProgress();
-    }
-    setIsRecording(false);
-    setIsPaused(false);
-    setElapsedTime(0);
-    setLiveDistance(0);
-    setLiveElevationGain(0);
-    segmentBreakRef.current = false;
   }, []);
+
+  // The single exit from a recording session. Every path out — Finish, a too
+  // short ride, a failed save, a fatal GPS error — ends here, and this is the
+  // only place RIDE_RECORDING_STOP is dispatched: the map relies on that event
+  // to drop the live track, release the wake lock, stop trail auto-detect and
+  // restore its controls. A path that skipped it left the map stuck in
+  // recording mode with no recorder behind it.
+  const cleanup = useCallback(
+    (stopDetail: { rideId?: string } = {}) => {
+      releaseGpsWatchAndTimers();
+      if (preserveProgressRef.current) {
+        preserveProgressRef.current = false;
+        setHasRecovery(true); // re-show recovery banner so user can retry or save
+      } else {
+        void clearInProgress();
+        setHasRecovery(false);
+      }
+      setIsRecording(false);
+      setIsPaused(false);
+      setElapsedTime(0);
+      setLiveDistance(0);
+      setLiveElevationGain(0);
+      segmentBreakRef.current = false;
+      dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, stopDetail);
+    },
+    [releaseGpsWatchAndTimers],
+  );
 
   // Shared: start GPS watch, elapsed timer, and periodic save
   const startGpsWatchAndTimers = useCallback(() => {
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const speed = position.coords.speed ?? 0;
+    const session = ++gpsSessionRef.current;
+    // Set if the provider fails inside subscribe(), before we hold its stop
+    // function: cleanup() has already run, so the rest of startup must not.
+    let hasFailedDuringSubscribe = false;
+    // Warn once per loss of signal, not on every error while it lasts.
+    let isSignalLost = false;
+    const stopPositions = positions.subscribe(
+      (fix) => {
+        if (session !== gpsSessionRef.current) return;
+        isSignalLost = false;
+        const speed = fix.speed ?? 0;
         const AUTO_PAUSE_SPEED = 0.5; // m/s (~1.1 mph)
         const AUTO_PAUSE_COUNT = 3; // consecutive low-speed readings
 
@@ -198,12 +215,12 @@ export function useRideRecording(
         segmentBreakRef.current = false;
 
         const point: RidePoint = {
-          lng: position.coords.longitude,
-          lat: position.coords.latitude,
-          altitude: position.coords.altitude,
-          accuracy: position.coords.accuracy,
-          speed: position.coords.speed,
-          timestamp: position.timestamp,
+          lng: fix.lng,
+          lat: fix.lat,
+          altitude: fix.altitude,
+          accuracy: fix.accuracy,
+          speed: fix.speed,
+          timestamp: fix.timestamp,
           ...(startsNewSegment && { segmentStart: true }),
         };
         pointsRef.current.push(point);
@@ -211,119 +228,70 @@ export function useRideRecording(
         // GPS is confirmed working — safe to clear progress on future cleanup
         preserveProgressRef.current = false;
 
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-            detail: {
-              point: [point.lng, point.lat] as [number, number],
-              segmentStart: startsNewSegment,
-            },
-          }),
-        );
+        dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
+          point: [point.lng, point.lat] as [number, number],
+          segmentStart: startsNewSegment,
+        });
 
-        // Compute horizontal distance once and reuse for both
-        // distance tracking and elevation min-distance filter. The first
-        // segment after a manual pause is skipped entirely: points were
-        // dropped while paused, so this segment may teleport across whatever
-        // ground was covered in the meantime.
-        if (prev && !startsNewSegment) {
-          const segDist = haversineDistance(
-            prev.lat,
-            prev.lng,
-            point.lat,
-            point.lng,
-          );
-          distSinceAnchorRef.current += segDist;
-          if (
-            point.accuracy < MAX_ACCURACY_M &&
-            prev.accuracy < MAX_ACCURACY_M
-          ) {
-            distanceRef.current += segDist;
-            setLiveDistance(distanceRef.current);
-          }
-        }
-
-        // Filter 1: skip readings with poor altitude accuracy
-        const altAccuracy = position.coords.altitudeAccuracy;
-        const altValue = point.altitude;
-
-        if (startsNewSegment) {
-          emaAltRef.current = null;
-          altAnchorRef.current = null;
-          distSinceAnchorRef.current = 0;
-        }
-
+        // The first segment after a pause may cross unrecorded ground.
+        const distanceMeters =
+          prev && !startsNewSegment
+            ? haversineDistance(prev.lat, prev.lng, point.lat, point.lng)
+            : 0;
         if (
-          altValue !== null &&
-          (altAccuracy === null || altAccuracy <= ALT_MAX_ACCURACY)
+          prev &&
+          point.accuracy < MAX_ACCURACY_M &&
+          prev.accuracy < MAX_ACCURACY_M
         ) {
-          let alt = altValue;
-
-          // Filter 2: spike rejection — replace outlier jumps with the last
-          // accepted reading.  The reference must be a raw reading, not the
-          // EMA: the EMA lags sustained climbs until every reading rejects,
-          // and substituting it into its own update freezes it permanently
-          // (see smoothAltitudes in ride-stats.ts).  Bursts longer than
-          // ALT_SPIKE_MAX_RUN are accepted as real ground.
-          const lastAccepted = lastAltRef.current;
-          if (
-            lastAccepted !== null &&
-            Math.abs(alt - lastAccepted) > ALT_SPIKE_M &&
-            altRejectRunRef.current < ALT_SPIKE_MAX_RUN
-          ) {
-            alt = lastAccepted;
-            altRejectRunRef.current += 1;
-          } else {
-            lastAltRef.current = alt;
-            altRejectRunRef.current = 0;
-          }
-
-          // EMA smoothing
-          if (emaAltRef.current === null) {
-            emaAltRef.current = alt;
-            altAnchorRef.current = alt;
-          } else {
-            emaAltRef.current =
-              ALT_EMA_ALPHA * alt + (1 - ALT_EMA_ALPHA) * emaAltRef.current;
-
-            // Filter 3: require minimum horizontal distance before anchor update
-            const anchor = altAnchorRef.current;
-            if (
-              distSinceAnchorRef.current >= ALT_MIN_DIST_M &&
-              anchor !== null
-            ) {
-              const delta = emaAltRef.current - anchor;
-              if (delta > ALT_DEADBAND_M) {
-                elevGainRef.current += delta;
-                setLiveElevationGain(elevGainRef.current);
-                altAnchorRef.current = emaAltRef.current;
-                distSinceAnchorRef.current = 0;
-              } else if (delta < -ALT_DEADBAND_M) {
-                altAnchorRef.current = emaAltRef.current;
-                distSinceAnchorRef.current = 0;
-              }
-            }
-          }
+          distanceRef.current += distanceMeters;
+          setLiveDistance(distanceRef.current);
         }
+
+        const altitude =
+          fix.altitudeAccuracy === null ||
+          fix.altitudeAccuracy <= ELEVATION_MAX_ALT_ACCURACY
+            ? point.altitude
+            : null;
+        setLiveElevationGain(
+          elevationRef.current.add(altitude, distanceMeters, startsNewSegment),
+        );
       },
-      (error) => {
-        const messages: Record<number, string> = {
-          1: 'Location permission denied — cannot record ride',
-          2: 'GPS unavailable — check your device settings',
-          3: 'GPS timed out — trying again...',
-        };
-        const msg = messages[error.code] ?? 'GPS error';
-        if (error.code !== 3) {
-          // Timeout is transient; permission/unavailable are fatal
-          cleanup();
-          onNotify?.(msg);
+      (error: PositionError, isFatal: boolean) => {
+        if (session !== gpsSessionRef.current) return;
+        // A timeout is transient; the watch keeps going.
+        if (error.code === 'timeout') return;
+        if (!isFatal) {
+          // Signal lost mid-ride: the stream keeps the watch running and the
+          // next fix resumes the track, so the ride carries on.
+          if (!isSignalLost) onNotify?.('GPS signal lost — still recording');
+          isSignalLost = true;
+          return;
         }
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 5000,
+        // Permission denied or no provider: the ride cannot continue.
+        hasFailedDuringSubscribe = true;
+        // Keep what was recorded so far: the periodic save may be up to ten
+        // seconds behind, and cleanup() would otherwise clear the in-progress
+        // record and lose the ride. The recovery banner offers "Save it".
+        if (pointsRef.current.length >= 2) {
+          saveInProgress({
+            startTime: startTimeRef.current,
+            points: pointsRef.current,
+          }).catch(() => {});
+          preserveProgressRef.current = true;
+        }
+        cleanup();
+        onNotify?.(
+          error.code === 'permission-denied'
+            ? 'Location permission denied — cannot record ride'
+            : 'GPS unavailable — check your device settings',
+        );
       },
     );
+    if (hasFailedDuringSubscribe) {
+      stopPositions();
+      return;
+    }
+    stopPositionsRef.current = stopPositions;
 
     // Start elapsed time counter
     timerRef.current = setInterval(() => {
@@ -346,21 +314,16 @@ export function useRideRecording(
       }
     }, 10_000);
 
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_START));
-  }, [cleanup, onNotify]);
+    dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_START);
+  }, [cleanup, onNotify, positions]);
 
   const startRecording = useCallback(() => {
-    if (isRecording) return;
+    if (isRecording || stoppingRef.current) return;
 
     pointsRef.current = [];
     startTimeRef.current = Date.now();
     distanceRef.current = 0;
-    elevGainRef.current = 0;
-    emaAltRef.current = null;
-    lastAltRef.current = null;
-    altRejectRunRef.current = 0;
-    altAnchorRef.current = null;
-    distSinceAnchorRef.current = 0;
+    elevationRef.current = createLiveElevationAccumulator();
     pausedRef.current = false;
     manualPauseRef.current = false;
     pausedTimeRef.current = 0;
@@ -471,20 +434,30 @@ export function useRideRecording(
     // duplicate ride. The ref guards synchronously.
     if (!isRecording || stoppingRef.current) return null;
     stoppingRef.current = true;
+    const endTime = Date.now();
+    // Freeze the session before any asynchronous work. Queued GPS callbacks
+    // must not append points or dispatch a second stop while Finish is saving.
+    releaseGpsWatchAndTimers();
 
     try {
       if (pointsRef.current.length < 2) {
         cleanup();
-        window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP));
+        onNotify?.('Ride too short to save — keep recording longer');
         return null;
       }
 
       const points = [...pointsRef.current];
+      // Finish can happen before the periodic checkpoint. Persist the final
+      // snapshot so a failed save can recover even a ride under ten seconds.
+      await saveInProgress({
+        startTime: startTimeRef.current,
+        points,
+      }).catch(() => {});
       const { corrected, deduplicated } = await tryDemCorrection(points);
       const ride = buildRide(
         points,
         startTimeRef.current,
-        Date.now(),
+        endTime,
         corrected,
         deduplicated,
       );
@@ -494,27 +467,26 @@ export function useRideRecording(
       } catch (error) {
         // Save failed (quota, private browsing, ...) — still tear down the
         // watch/timers/UI, but keep the in-progress record so the recovery
-        // banner offers a retry. cleanup() dispatches RIDE_RECORDING_STOP on
-        // this path.
+        // banner offers a retry.
         console.error('Failed to save ride:', error);
         preserveProgressRef.current = true;
         cleanup();
-        onNotify?.('Could not save your ride — it can be recovered below.');
+        onNotify?.('Could not save your ride — open Rides to recover it.');
         return null;
       }
-      cleanup();
-
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.RIDE_RECORDING_STOP, {
-          detail: { rideId: ride.id },
-        }),
-      );
+      // The ride is safely stored, so the in-progress record must go even if
+      // a continued ride never got its first fix (which is what normally
+      // clears this flag). Otherwise the banner would offer the saved ride
+      // for recovery again and "Save it" would store a duplicate.
+      preserveProgressRef.current = false;
+      cleanup({ rideId: ride.id });
+      onNotify?.('Ride saved!');
 
       return ride;
     } finally {
       stoppingRef.current = false;
     }
-  }, [isRecording, cleanup, onNotify]);
+  }, [isRecording, cleanup, onNotify, releaseGpsWatchAndTimers]);
 
   useEffect(() => {
     void loadInProgress()
@@ -529,31 +501,39 @@ export function useRideRecording(
   }, []);
 
   const recoverRide = useCallback(async (): Promise<RecordedRide | null> => {
-    const data = await loadInProgress();
-    if (!data || data.points.length < 2) {
+    // Building the ride awaits IndexedDB and DEM tiles; a second tap on
+    // "Save it" in that window would store the same ride twice.
+    if (isRecoveringRef.current) return null;
+    isRecoveringRef.current = true;
+    try {
+      const data = await loadInProgress();
+      if (!data || data.points.length < 2) {
+        await clearInProgress();
+        setHasRecovery(false);
+        return null;
+      }
+
+      const points = data.points;
+      const { corrected, deduplicated } = await tryDemCorrection(points);
+      const ride = buildRide(
+        points,
+        data.startTime,
+        points[points.length - 1].timestamp,
+        corrected,
+        deduplicated,
+      );
+
+      await saveRide(ride);
       await clearInProgress();
       setHasRecovery(false);
-      return null;
+      return ride;
+    } finally {
+      isRecoveringRef.current = false;
     }
-
-    const points = data.points;
-    const { corrected, deduplicated } = await tryDemCorrection(points);
-    const ride = buildRide(
-      points,
-      data.startTime,
-      points[points.length - 1].timestamp,
-      corrected,
-      deduplicated,
-    );
-
-    await saveRide(ride);
-    await clearInProgress();
-    setHasRecovery(false);
-    return ride;
   }, []);
 
   const continueRide = useCallback(async () => {
-    if (isRecording) return;
+    if (isRecording || stoppingRef.current) return;
     const data = await loadInProgress();
     if (!data || data.points.length < 2) {
       await clearInProgress();
@@ -580,17 +560,7 @@ export function useRideRecording(
 
     // Use smoothed elevation computation (matches saved ride stats)
     const elev = computeElevation(data.points);
-    elevGainRef.current = elev.gain;
-
-    // Seed EMA from the last altitude in saved points for live smoothing
-    const lastAlt =
-      [...data.points].reverse().find((p) => p.altitude !== null)?.altitude ??
-      null;
-    emaAltRef.current = lastAlt;
-    lastAltRef.current = lastAlt;
-    altRejectRunRef.current = 0;
-    altAnchorRef.current = lastAlt;
-    distSinceAnchorRef.current = 0;
+    elevationRef.current = createLiveElevationAccumulator(elev);
 
     setLiveDistance(dist);
     setLiveElevationGain(elev.gain);
@@ -607,11 +577,7 @@ export function useRideRecording(
     const segments = splitRideSegments(data.points).map((segment) =>
       segment.map((pt) => [pt.lng, pt.lat] as [number, number]),
     );
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, {
-        detail: { segments },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, { segments });
 
     startGpsWatchAndTimers();
   }, [isRecording, startGpsWatchAndTimers]);
@@ -621,16 +587,10 @@ export function useRideRecording(
     setHasRecovery(false);
   }, []);
 
-  // Cleanup on unmount — use refs directly to avoid stale closure from cleanup()
+  // Keep the checkpoint on unmount, but invalidate queued GPS callbacks.
   useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null)
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      if (timerRef.current !== undefined) clearInterval(timerRef.current);
-      if (saveIntervalRef.current !== undefined)
-        clearInterval(saveIntervalRef.current);
-    };
-  }, []);
+    return releaseGpsWatchAndTimers;
+  }, [releaseGpsWatchAndTimers]);
 
   return {
     isRecording,

@@ -1,0 +1,246 @@
+import { describe, it, expect, vi } from 'vitest';
+import { createPositionWatch, LIVE_FIX_OPTIONS } from './position-watch';
+import type { GeolocationService, PositionError, PositionFix } from './types';
+
+const FIX: PositionFix = {
+  lng: -85.3,
+  lat: 35.0,
+  accuracy: 5,
+  altitude: 200,
+  altitudeAccuracy: 5,
+  speed: 3,
+  heading: 90,
+  timestamp: 1_000,
+};
+
+function fakeGeolocation() {
+  let onFix: ((fix: PositionFix) => void) | null = null;
+  let onError: ((error: PositionError) => void) | null = null;
+  const stop = vi.fn();
+  const service: GeolocationService = {
+    isSupported: () => true,
+    watchPosition: vi.fn((fix, error) => {
+      onFix = fix;
+      onError = error;
+      return stop;
+    }),
+    getCurrentPosition: vi.fn().mockResolvedValue(FIX),
+  };
+  return {
+    service,
+    stop,
+    emit: (fix: PositionFix) => onFix?.(fix),
+    fail: (error: PositionError) => onError?.(error),
+  };
+}
+
+describe('createPositionWatch', () => {
+  it('starts the underlying watch on the first subscriber and stops on the last', () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+
+    const offA = watch.subscribe(() => {});
+    const offB = watch.subscribe(() => {});
+    expect(geo.service.watchPosition).toHaveBeenCalledTimes(1);
+    expect(geo.service.watchPosition).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      LIVE_FIX_OPTIONS,
+    );
+
+    offA();
+    expect(geo.stop).not.toHaveBeenCalled();
+    offB();
+    expect(geo.stop).toHaveBeenCalledTimes(1);
+    // Unsubscribing twice is harmless.
+    offB();
+    expect(geo.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('fans fixes and errors out to every subscriber', () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+    const fixesA: PositionFix[] = [];
+    const fixesB: PositionFix[] = [];
+    const errors: Array<[PositionError, boolean]> = [];
+    watch.subscribe((fix) => fixesA.push(fix));
+    watch.subscribe(
+      (fix) => fixesB.push(fix),
+      (error, isFatal) => errors.push([error, isFatal]),
+    );
+
+    geo.emit(FIX);
+    geo.fail({ code: 'timeout', message: 'slow' });
+
+    expect(fixesA).toEqual([FIX]);
+    expect(fixesB).toEqual([FIX]);
+    expect(errors).toEqual([[{ code: 'timeout', message: 'slow' }, false]]);
+  });
+
+  it('restarts cleanly after the last subscriber leaves', () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+    watch.subscribe(() => {})();
+    watch.subscribe(() => {});
+    expect(geo.service.watchPosition).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops the hardware after a fatal error so the next subscriber restarts it', () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+    const errors: string[] = [];
+    watch.subscribe(
+      () => {},
+      (error) => errors.push(error.code),
+    );
+    geo.emit(FIX);
+    geo.fail({ code: 'timeout', message: '' });
+    expect(geo.stop).not.toHaveBeenCalled();
+
+    geo.fail({ code: 'permission-denied', message: '' });
+    expect(errors).toEqual(['timeout', 'permission-denied']);
+    expect(geo.stop).toHaveBeenCalledTimes(1);
+
+    // The first subscriber is still attached; a second one brings the
+    // hardware back for both.
+    watch.subscribe(() => {});
+    expect(geo.service.watchPosition).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the watch through a loss of signal after a fix', () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+    const errors: Array<[string, boolean]> = [];
+    const fixes: PositionFix[] = [];
+    watch.subscribe(
+      (fix) => fixes.push(fix),
+      (error, isFatal) => errors.push([error.code, isFatal]),
+    );
+    geo.emit(FIX);
+    // iOS reports a tunnel or a bridge as POSITION_UNAVAILABLE and keeps
+    // the watch running.
+    geo.fail({ code: 'unavailable', message: 'location unknown' });
+    expect(errors).toEqual([['unavailable', false]]);
+    expect(geo.stop).not.toHaveBeenCalled();
+    geo.emit(FIX);
+    expect(fixes).toHaveLength(2);
+  });
+
+  it('ends the watch when no provider ever produced a fix', () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+    const errors: Array<[string, boolean]> = [];
+    watch.subscribe(
+      () => {},
+      (error, isFatal) => errors.push([error.code, isFatal]),
+    );
+    geo.fail({ code: 'unavailable', message: 'no provider' });
+    expect(errors).toEqual([['unavailable', true]]);
+    expect(geo.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('survives a provider that fails synchronously inside watchPosition', () => {
+    const stop = vi.fn();
+    const service: GeolocationService = {
+      isSupported: () => false,
+      watchPosition: vi.fn((_fix, onError) => {
+        onError({ code: 'unavailable', message: 'no api' });
+        return stop;
+      }),
+      getCurrentPosition: vi.fn(),
+    };
+    const watch = createPositionWatch(service);
+    const errors: string[] = [];
+    const off = watch.subscribe(
+      () => {},
+      (error) => errors.push(error.code),
+    );
+    expect(errors).toEqual(['unavailable']);
+    // The dead handle was discarded, and unsubscribing does not call it again.
+    expect(stop).toHaveBeenCalledTimes(1);
+    off();
+    expect(stop).toHaveBeenCalledTimes(1);
+    // A later subscriber tries the hardware afresh.
+    watch.subscribe(() => {});
+    expect(service.watchPosition).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores late callbacks from a watch it has already stopped', () => {
+    const calls: Array<{
+      fix: (fix: PositionFix) => void;
+      fail: (error: PositionError) => void;
+      stop: ReturnType<typeof vi.fn>;
+    }> = [];
+    const service: GeolocationService = {
+      isSupported: () => true,
+      watchPosition: vi.fn((fix, fail) => {
+        const stop = vi.fn();
+        calls.push({ fix, fail, stop });
+        return stop;
+      }),
+      getCurrentPosition: vi.fn(),
+    };
+    const watch = createPositionWatch(service);
+    const fixes: PositionFix[] = [];
+    const errors: string[] = [];
+    watch.subscribe(
+      (fix) => fixes.push(fix),
+      (error) => errors.push(error.code),
+    );
+    calls[0].fail({ code: 'unavailable', message: '' });
+    // The next subscriber restarts the hardware.
+    watch.subscribe(() => {});
+    expect(calls).toHaveLength(2);
+
+    // The browser delivers stragglers for the first, cleared watch.
+    calls[0].fix(FIX);
+    calls[0].fail({ code: 'permission-denied', message: '' });
+    expect(fixes).toEqual([]);
+    expect(errors).toEqual(['unavailable']);
+    expect(calls[1].stop).not.toHaveBeenCalled();
+
+    calls[1].fix(FIX);
+    expect(fixes).toEqual([FIX]);
+  });
+
+  it('keeps a watch that a subscriber restarted from inside the error fan-out', () => {
+    const calls: Array<{
+      fail: (error: PositionError) => void;
+      stop: ReturnType<typeof vi.fn>;
+    }> = [];
+    const service: GeolocationService = {
+      isSupported: () => true,
+      watchPosition: vi.fn((_fix, fail) => {
+        const stop = vi.fn();
+        calls.push({ fail, stop });
+        return stop;
+      }),
+      getCurrentPosition: vi.fn(),
+    };
+    const watch = createPositionWatch(service);
+    let off: () => void = () => {};
+    off = watch.subscribe(
+      () => {},
+      () => {
+        // A subscriber that gives up and immediately tries again.
+        off();
+        off = watch.subscribe(() => {});
+      },
+    );
+    calls[0].fail({ code: 'unavailable', message: '' });
+    expect(calls).toHaveLength(2);
+    expect(calls[1].stop).not.toHaveBeenCalled();
+  });
+
+  it('returns a requested fix without broadcasting it', async () => {
+    const geo = fakeGeolocation();
+    const watch = createPositionWatch(geo.service);
+    const seen: PositionFix[] = [];
+    watch.subscribe((fix) => seen.push(fix));
+
+    const options = { highAccuracy: false, maximumAgeMs: 60_000 };
+    await expect(watch.requestFix(options)).resolves.toEqual(FIX);
+    expect(geo.service.getCurrentPosition).toHaveBeenCalledWith(options);
+    expect(seen).toEqual([]);
+  });
+});

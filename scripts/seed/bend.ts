@@ -166,7 +166,7 @@ run(async () => {
   );
   if (!dryRun) {
     payload.logger.info(
-      `bend routes: created ${routesCreated}, updated ${routesUpdated}, unchanged ${routesUnchanged}, kept ${routesPreserved} trail-linked.`,
+      `bend routes: created ${routesCreated}, updated ${routesUpdated}, unchanged ${routesUnchanged}, kept ${routesPreserved} migrated.`,
     );
   }
 
