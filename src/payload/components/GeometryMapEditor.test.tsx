@@ -28,6 +28,7 @@ const ui = vi.hoisted(() => ({
   features: [] as GeoJSON.Feature[],
   pendingParts: [] as [number, number][][],
   removeMap: vi.fn(),
+  selectFeature: vi.fn(),
 }));
 
 vi.mock('@payloadcms/ui', () => ({
@@ -103,10 +104,16 @@ vi.mock('terra-draw', () => ({
     }
     clearUndoRedoHistory() {}
     addFeatures(features: GeoJSON.Feature[]) {
-      ui.features = features;
+      // Terra Draw gives every stored feature an id; selecting needs one.
+      ui.features = features.map((feature, index) => ({
+        ...feature,
+        id: feature.id ?? `feature-${index}`,
+      }));
       return [];
     }
-    selectFeature() {}
+    selectFeature(id: unknown, mode: unknown) {
+      ui.selectFeature(id, mode);
+    }
     getSnapshot() {
       return ui.features;
     }
@@ -179,7 +186,21 @@ beforeEach(() => {
   ui.features = [];
   ui.pendingParts = [];
   ui.removeMap.mockClear();
+  ui.selectFeature.mockClear();
 });
+
+/** Moves the line's last point the way a Terra Draw drag would. */
+function dragLastPoint(to: [number, number]) {
+  const [feature] = ui.features;
+  ui.features = [
+    {
+      ...feature,
+      geometry: { type: 'LineString', coordinates: [[-85, 35], to] },
+    },
+  ];
+  act(() => ui.changed());
+  act(() => ui.finished());
+}
 
 async function upload(container: HTMLElement, text = GPX) {
   const input = container.querySelector('input[type="file"]')!;
@@ -444,6 +465,108 @@ describe('shared geometry editor', () => {
       ],
     });
     expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+  });
+
+  it('hands an OSM trail back to OSM when its GPX import is undone', async () => {
+    const report = { gaps: [], isPreview: false, source: 'osm' };
+    ui.values.osmReport = report;
+    ui.values.rebuildGeometry = false;
+    const { container } = render(<TrailMapEditor path="geom" />);
+    act(() => ui.loadStyle());
+    await upload(container);
+    expect(ui.writes.geometrySource).toBe('edited');
+    expect(ui.writes.osmReport).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(ui.writes.geom).toEqual(ORIGINAL);
+    expect(ui.writes.geometrySource).toBe('osm');
+    expect(ui.writes.osmReport).toBe(report);
+    expect(ui.writes.rebuildGeometry).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
+    expect(ui.writes.geometrySource).toBe('edited');
+    expect(ui.writes.osmReport).toBeNull();
+  });
+
+  it('keeps unsaved hand edits undoable after refreshing from OSM', async () => {
+    const preview: TrailGeometry = {
+      type: 'MultiLineString',
+      coordinates: [
+        [
+          [-85, 35],
+          [-85.03, 35.03],
+        ],
+      ],
+    };
+    ui.values.osmIds = [101];
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        geometry: preview,
+        measurements: {
+          bounds: [-85.03, 35, -85, 35.03],
+          distance: 4000,
+          elevationGain: null,
+          elevationLoss: null,
+          elevationMax: null,
+          elevationMin: null,
+        },
+        message: 'Refreshed.',
+        report: { gaps: [], missingIds: [], resolvedIds: [101], warnings: [] },
+      }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      render(<TrailMapEditor path="geom" />);
+      act(() => ui.loadStyle());
+      fireEvent.click(screen.getByRole('button', { name: 'Adjust line' }));
+      await act(async () => {});
+      dragLastPoint([-85.02, 35.02]);
+      expect(ui.writes.geometrySource).toBe('edited');
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Choose from OpenStreetMap' }),
+      );
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: 'Refresh line from OpenStreetMap',
+          }),
+        );
+      });
+      await waitFor(() => expect(ui.writes.geom).toEqual(preview));
+      expect(ui.writes.geometrySource).toBe('osm');
+      expect(screen.getByText(/only a preview/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Adjust line' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+      expect(ui.writes.geom).toEqual({
+        type: 'MultiLineString',
+        coordinates: [
+          [
+            [-85, 35],
+            [-85.02, 35.02],
+          ],
+        ],
+      });
+      expect(ui.writes.geometrySource).toBe('edited');
+      expect(screen.queryByText(/only a preview/)).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('never selects a read-only line, which would give it drag handles', () => {
+    render(<RouteLineEditor path="geom" readOnly />);
+    act(() => ui.loadStyle());
+    expect(ui.selectFeature).not.toHaveBeenCalled();
+  });
+
+  it('selects an editable line on load so its points can be grabbed', () => {
+    render(<TrailMapEditor path="geom" />);
+    act(() => ui.loadStyle());
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust line' }));
+    expect(ui.selectFeature).toHaveBeenCalledWith('feature-0', 'select');
   });
 
   it('leaves the saved line untouched when a GPX is invalid', async () => {

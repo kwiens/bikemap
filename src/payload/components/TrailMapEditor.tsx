@@ -22,7 +22,7 @@ export function TrailMapEditor({
   >({ path: 'osmIds' });
   const { setValue: setGeometrySource, value: geometrySource } =
     useField<string>({ path: 'geometrySource' });
-  const { setValue: setRebuild } = useField<boolean>({
+  const { setValue: setRebuild, value: rebuild } = useField<boolean>({
     path: 'rebuildGeometry',
   });
   const { setValue: setBounds } = useField({ path: 'bounds' });
@@ -34,7 +34,9 @@ export function TrailMapEditor({
   const { setValue: setElevationProfile } = useField({
     path: 'elevationProfile',
   });
-  const { setValue: setOsmReport } = useField({ path: 'osmReport' });
+  const { setValue: setOsmReport, value: osmReport } = useField({
+    path: 'osmReport',
+  });
   const { value: displayName } = useField<string>({ path: 'displayName' });
   const { setValue: setTrailName, value: trailName } = useField<string>({
     path: 'trailName',
@@ -53,6 +55,8 @@ export function TrailMapEditor({
       osm={{
         ids: osmIdsValue,
         source: geometrySource,
+        rebuild: Boolean(rebuild),
+        report: osmReport,
         setIds: setOsmIds,
         setSource: setGeometrySource,
         setRebuild,

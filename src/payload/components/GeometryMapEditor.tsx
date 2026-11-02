@@ -47,7 +47,9 @@
  * **Undo is the editor's, not Terra Draw's** (`edit-history.ts`). Every settled
  * edit — a finished drag, a finished piece, one bulk operation — pushes a
  * snapshot of the line before it. Terra Draw keeps only its mode-level history,
- * for taking back points of a piece still being drawn.
+ * for taking back points of a piece still being drawn. A snapshot also records
+ * who owned the line (`LineOwner`), so undoing past the first hand edit, or past
+ * an OSM refresh, puts the trail's source and OSM report back as they were.
  *
  * ## Two rules this component lives by
  *
@@ -168,6 +170,31 @@ const SNAPPING = { toCoordinate: true, toLine: true } as const;
 /** Simplify tolerances offered, in meters. 3 m matches the GPX import's. */
 const SIMPLIFY_TOLERANCES_M = [1, 3, 5, 10, 20] as const;
 
+/**
+ * Who a line belongs to, as the form records it. An undo step restores this
+ * along with the points, because the points alone don't say whether saving
+ * should keep them or rebuild from OSM.
+ */
+interface LineOwner {
+  hasUnsavedPreview: boolean;
+  rebuild: boolean;
+  report: unknown;
+  source: string;
+}
+
+interface LineSnapshot {
+  owner: LineOwner;
+  parts: Parts;
+}
+
+/** What `commit` leaves behind after any edit made in the editor. */
+const EDITED_OWNER: LineOwner = {
+  hasUnsavedPreview: false,
+  rebuild: false,
+  report: null,
+  source: 'edited',
+};
+
 const IDLE_ROUTE: RouteStatus = {
   network: 'idle',
   networkMessage: null,
@@ -190,6 +217,8 @@ export interface GeometryEditorProps {
     source: string;
     setIds(value: number[]): void;
     setSource(value: string): void;
+    rebuild: boolean;
+    report: unknown;
     setRebuild(value: boolean): void;
     setReport(value: unknown): void;
     displayName: string;
@@ -220,6 +249,8 @@ export function GeometryMapEditor({
   const setGeometrySource = osm?.setSource ?? ignoreChange;
   const setRebuild = osm?.setRebuild ?? ignoreChange;
   const setOsmReport = osm?.setReport ?? ignoreChange;
+  const rebuildValue = Boolean(osm?.rebuild);
+  const osmReportValue = osm?.report ?? null;
   const displayName = osm?.displayName;
   const {
     config: {
@@ -246,12 +277,14 @@ export function GeometryMapEditor({
    * `partsRef` runs ahead of it during a drag or a piece being drawn.
    */
   const settledRef = useRef<Parts>([]);
+  /** Who owned `settledRef`'s line — undo has to hand that back too. */
+  const settledOwnerRef = useRef<LineOwner>(EDITED_OWNER);
   /** True while *we* are writing into Terra Draw's store. See the change handler. */
   const loadingRef = useRef(false);
   /** Terra Draw throws if started twice or stopped before starting. */
   const startedRef = useRef(false);
   /** Undo and redo for every edit. See `edit-history.ts`. */
-  const historyRef = useRef(createEditHistory(cloneParts));
+  const historyRef = useRef(createEditHistory(cloneSnapshot));
   const refreshRequestRef = useRef<AbortController | null>(null);
 
   const [ready, setReady] = useState(false);
@@ -303,6 +336,8 @@ export function GeometryMapEditor({
   const readOnlyRef = useRef(Boolean(readOnly));
   const isRemovingPointRef = useRef(false);
   const sourceRef = useRef(geometrySource);
+  const rebuildRef = useRef(rebuildValue);
+  const osmReportRef = useRef(osmReportValue);
   const setGeomRef = useRef(setGeom);
   const setOsmIdsRef = useRef(setOsmIds);
   const setOsmReportRef = useRef(setOsmReport);
@@ -315,6 +350,8 @@ export function GeometryMapEditor({
   readOnlyRef.current = Boolean(readOnly);
   isRemovingPointRef.current = isRemovingPoint;
   sourceRef.current = geometrySource;
+  rebuildRef.current = rebuildValue;
+  osmReportRef.current = osmReportValue;
   setGeomRef.current = setGeom;
   setOsmIdsRef.current = setOsmIds;
   setOsmReportRef.current = setOsmReport;
@@ -367,19 +404,25 @@ export function GeometryMapEditor({
    *
    * Flipping the source is what makes the edit survive: an 'osm' trail restores
    * its last reviewed geometry unless a new OSM preview accompanies the save.
+   * Undo passes the owner the restored line had instead, so taking back a GPX
+   * import hands an OSM trail back to OSM rather than leaving it hand-edited.
    */
-  const commit = useCallback(() => {
-    // A late OSM response must never overwrite a point edit made while the
-    // network request was running.
-    cancelRefresh();
-    setHasUnsavedPreview(false);
-    setOsmReportRef.current(null);
-    setRebuildRef.current(false);
-    setGeomRef.current(toTrailGeometry(partsRef.current));
-    if (sourceRef.current !== 'edited') {
-      setSourceRef.current('edited');
-    }
-  }, [cancelRefresh]);
+  const commit = useCallback(
+    (owner: LineOwner = EDITED_OWNER) => {
+      // A late OSM response must never overwrite a point edit made while the
+      // network request was running.
+      cancelRefresh();
+      setHasUnsavedPreview(owner.hasUnsavedPreview);
+      setOsmReportRef.current(owner.report);
+      setRebuildRef.current(owner.rebuild);
+      setGeomRef.current(toTrailGeometry(partsRef.current));
+      if (sourceRef.current !== owner.source) {
+        sourceRef.current = owner.source;
+        setSourceRef.current(owner.source);
+      }
+    },
+    [cancelRefresh],
+  );
 
   /**
    * Lights the toolbar buttons from what can actually be undone.
@@ -416,8 +459,13 @@ export function GeometryMapEditor({
     if (samePartsAs(settledRef.current, partsRef.current)) {
       return;
     }
-    historyRef.current.push(settledRef.current);
+    historyRef.current.push({
+      owner: settledOwnerRef.current,
+      parts: settledRef.current,
+    });
     settledRef.current = cloneParts(partsRef.current);
+    // Every Terra Draw edit went through `commit`, which took ownership.
+    settledOwnerRef.current = EDITED_OWNER;
     syncHistory();
   }, [syncHistory]);
 
@@ -533,6 +581,12 @@ export function GeometryMapEditor({
       draw.clearUndoRedoHistory();
       historyRef.current.clear();
       settledRef.current = cloneParts(parts);
+      settledOwnerRef.current = {
+        hasUnsavedPreview: false,
+        rebuild: rebuildRef.current,
+        report: osmReportRef.current,
+        source: sourceRef.current,
+      };
       setHistory({ canRedo: false, canUndo: false });
     }
   }, []);
@@ -547,7 +601,9 @@ export function GeometryMapEditor({
    */
   const autoSelect = useCallback(() => {
     const draw = drawRef.current;
-    if (!draw || !startedRef.current) {
+    // Selecting switches Terra Draw out of static mode, which would put drag
+    // handles on a line whose edits are never written back.
+    if (!draw || !startedRef.current || readOnlyRef.current) {
       return;
     }
     const lines = draw
@@ -566,12 +622,13 @@ export function GeometryMapEditor({
    * Terra Draw silently refuses any with more than 9 decimal places.
    */
   const setLine = useCallback(
-    (next: Parts) => {
+    (next: Parts, owner: LineOwner = EDITED_OWNER) => {
       partsRef.current = roundParts(next);
       settledRef.current = cloneParts(partsRef.current);
+      settledOwnerRef.current = owner;
       loadDraw(partsRef.current, false);
       paintStats();
-      commit();
+      commit(owner);
       selectionToolRef.current?.refresh();
       // A route in progress was built against the old line — it may be set to
       // extend a piece that no longer exists, or is now a different one.
@@ -607,7 +664,8 @@ export function GeometryMapEditor({
         }
         return;
       }
-      historyRef.current.push(base);
+      // A gesture previews without committing, so ownership is still as settled.
+      historyRef.current.push({ owner: settledOwnerRef.current, parts: base });
       setLine(next);
     },
     [setLine, settle],
@@ -991,6 +1049,36 @@ export function GeometryMapEditor({
   // does not survive a `setStyle` on its own.
   useEditorBasemap(mapRef, basemap);
 
+  /**
+   * Shows a line that came from outside the editor — a document load, a save
+   * coming back, or an OSM preview — and frames it. Writes nothing to the form.
+   */
+  const receiveLine = useCallback(
+    (incoming: Parts, baseline: boolean) => {
+      partsRef.current = incoming;
+      loadDraw(incoming, baseline);
+      settledRef.current = cloneParts(incoming);
+      paintStats();
+      // Same as `setLine`: a selection or a route in progress names points and
+      // pieces of the line just replaced — a refresh from OSM can land mid-edit.
+      selectionToolRef.current?.setSelection([]);
+      setEditNote(null);
+      if (routeToolRef.current?.hasRoute()) {
+        routeToolRef.current.cancel();
+      }
+      if (modeRef.current === 'move') {
+        autoSelect();
+      }
+
+      const map = mapRef.current;
+      const bounds = boundsOf(incoming);
+      if (map && bounds) {
+        map.fitBounds(bounds, { animate: false, padding: 60 });
+      }
+    },
+    [autoSelect, loadDraw, paintStats],
+  );
+
   // Pull the stored line in — on first load, and after a save replaces it with
   // the server's rebuilt version.
   useEffect(() => {
@@ -1005,29 +1093,23 @@ export function GeometryMapEditor({
       return;
     }
 
-    partsRef.current = incoming;
-    loadDraw(incoming);
-    paintStats();
-    // Same as `setLine`: a selection or a route in progress names points and
-    // pieces of the line just replaced — a refresh from OSM can land mid-edit.
-    selectionToolRef.current?.setSelection([]);
-    setEditNote(null);
-    if (routeToolRef.current?.hasRoute()) {
-      routeToolRef.current.cancel();
-    }
-    if (modeRef.current === 'move') {
-      autoSelect();
-    }
+    receiveLine(incoming, true);
     // Whatever ways are on the record right now are the ones this line came
     // from — the server rebuilt it from them on the save that produced it.
     setLineWays(idsRef.current);
+  }, [geomValue, ready, receiveLine]);
 
-    const map = mapRef.current;
-    const bounds = boundsOf(incoming);
-    if (map && bounds) {
-      map.fitBounds(bounds, { animate: false, padding: 60 });
-    }
-  }, [autoSelect, geomValue, loadDraw, paintStats, ready]);
+  /** The line now, for the history to keep as the step redo or undo returns to. */
+  const currentSnapshot = useCallback(
+    (): LineSnapshot => ({
+      // Anything past the settled line went through `commit`.
+      owner: samePartsAs(settledRef.current, partsRef.current)
+        ? settledOwnerRef.current
+        : EDITED_OWNER,
+      parts: partsRef.current,
+    }),
+    [],
+  );
 
   /**
    * Undo, taking back the smallest thing first: a click of the route being
@@ -1045,13 +1127,13 @@ export function GeometryMapEditor({
       return;
     }
     settle();
-    const previous = historyRef.current.undo(partsRef.current);
+    const previous = historyRef.current.undo(currentSnapshot());
     if (previous) {
-      setLine(previous);
+      setLine(previous.parts, previous.owner);
       selectionToolRef.current?.clear();
       setEditNote(null);
     }
-  }, [setLine, settle, syncHistory]);
+  }, [currentSnapshot, setLine, settle, syncHistory]);
 
   const redo = useCallback(() => {
     // Applying a redo replaces the line, which cancels the route being built
@@ -1065,13 +1147,13 @@ export function GeometryMapEditor({
       syncHistory();
       return;
     }
-    const next = historyRef.current.redo(partsRef.current);
+    const next = historyRef.current.redo(currentSnapshot());
     if (next) {
-      setLine(next);
+      setLine(next.parts, next.owner);
       selectionToolRef.current?.clear();
       setEditNote(null);
     }
-  }, [setLine, syncHistory]);
+  }, [currentSnapshot, setLine, syncHistory]);
 
   // --- Select points operations -------------------------------------------
   //
@@ -1250,16 +1332,35 @@ export function GeometryMapEditor({
         throw new Error(messageFrom(body));
       }
 
-      setGeom(body.geometry);
-      setGeometrySource('osm');
-      osm?.onPreview(body);
-      setOsmReport({
+      const report = {
         ...body.report,
         builtAt: new Date().toISOString(),
         isPreview: true,
         requestedIds,
         source: 'osm',
-      });
+      };
+      // One undo step, not a new document: a refresh to compare against OSM
+      // must not cost the unsaved hand edits it replaced. Shown here rather
+      // than by the form-sync effect, which would treat it as a load.
+      settle();
+      historyRef.current.push(currentSnapshot());
+      receiveLine(
+        roundParts(parseTrailGeometry(body.geometry).parts ?? []),
+        false,
+      );
+      settledOwnerRef.current = {
+        hasUnsavedPreview: true,
+        rebuild: true,
+        report,
+        source: 'osm',
+      };
+      sourceRef.current = 'osm';
+      syncHistory();
+
+      setGeom(body.geometry);
+      setGeometrySource('osm');
+      osm?.onPreview(body);
+      setOsmReport(report);
       setRebuild(true);
       // The builder may reorder connected ways while joining them. The preview
       // still corresponds to the ordered selection we sent, so track that
@@ -2135,3 +2236,8 @@ function plural(count: number, noun: string): string {
 }
 
 function ignoreChange() {}
+
+function cloneSnapshot(snapshot: LineSnapshot): LineSnapshot {
+  // The owner is replaced whole, never mutated, so it can be shared.
+  return { owner: snapshot.owner, parts: cloneParts(snapshot.parts) };
+}
