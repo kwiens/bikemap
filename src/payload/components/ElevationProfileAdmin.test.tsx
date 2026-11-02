@@ -29,6 +29,7 @@ const ui = vi.hoisted(() => ({
   isBackgroundProcessing: false,
   isModified: false,
   isProcessing: false,
+  setModified: vi.fn(),
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
@@ -54,6 +55,7 @@ vi.mock('@payloadcms/ui', () => ({
   }),
   useDocumentInfo: () => ui.documentInfo,
   useFormBackgroundProcessing: () => ui.isBackgroundProcessing,
+  useForm: () => ({ setModified: ui.setModified }),
   useFormFields: (selector: (form: unknown) => unknown) =>
     selector([ui.fields, ui.dispatch]),
   useFormModified: () => ui.isModified,
@@ -195,6 +197,8 @@ describe('ElevationProfileAdmin', () => {
       ),
     );
     expect(ui.dispatch).toHaveBeenCalledTimes(8);
+    // Without the form-level flag, Save draft and Publish stay disabled.
+    expect(ui.setModified).toHaveBeenCalledWith(true);
     expect(ui.dispatch).toHaveBeenCalledWith({
       initialValue: 180,
       modified: true,
@@ -315,6 +319,7 @@ describe('ElevationProfileAdmin', () => {
 
     await waitFor(() => expect(ui.toast.error).toHaveBeenCalledOnce());
     expect(ui.dispatch).not.toHaveBeenCalled();
+    expect(ui.setModified).not.toHaveBeenCalled();
     expect(ui.documentInfo.setData).not.toHaveBeenCalled();
   });
 
@@ -364,6 +369,7 @@ describe('ElevationProfileAdmin', () => {
 
     await waitFor(() => expect(signal?.aborted).toBe(true));
     expect(ui.dispatch).not.toHaveBeenCalled();
+    expect(ui.setModified).not.toHaveBeenCalled();
     expect(ui.toast.error).not.toHaveBeenCalled();
   });
 });

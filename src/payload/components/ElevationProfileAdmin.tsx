@@ -6,6 +6,7 @@ import {
   toast,
   useConfig,
   useDocumentInfo,
+  useForm,
   useFormBackgroundProcessing,
   useFormFields,
   useFormProcessing,
@@ -99,6 +100,7 @@ export function ElevationProfileAdmin() {
   // Payload records them in form state but has no input here to show them on.
   const saveError = useAdminFormField('elevationProfileAdmin');
   const dispatchFields = useFormFields(([, dispatch]) => dispatch);
+  const { setModified } = useForm();
   const [result, setResult] = useState<MeasurementSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -240,6 +242,9 @@ export function ElevationProfileAdmin() {
       const next = snapshotFromResponse(body);
       setResult(next);
       updateFormFields(dispatchFields, next, formFields, data);
+      // A field UPDATE never touches the form-level modified flag, and Save
+      // draft / Publish stay disabled on an unedited document until it is set.
+      setModified(true);
       toast.success(body.message);
     } catch (caught) {
       if (isAbortError(caught)) {
