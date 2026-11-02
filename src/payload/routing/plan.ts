@@ -229,22 +229,34 @@ export function straightLeg(
   };
 }
 
-/** Keeps an older routing response from replacing a leg changed by a later edit. */
+/**
+ * Keeps an older routing response from replacing a leg changed by a later edit.
+ *
+ * The leg is found by identity rather than by `index`: inserting or removing a
+ * waypoint elsewhere while it routes shifts it, and only undo, redo, and
+ * reverse ever route a leg again — a result dropped for moving would leave it a
+ * straight placeholder for good.
+ */
 export function replacePendingLeg(
   current: RoutePlan,
   pending: RoutePlan,
   index: number,
   routed: RouteLeg,
 ): RoutePlan {
-  if (
-    current.legs[index] !== pending.legs[index] ||
-    !samePosition(current.waypoints[index], pending.waypoints[index]) ||
-    !samePosition(current.waypoints[index + 1], pending.waypoints[index + 1])
-  ) {
+  const placeholder = pending.legs[index];
+  const from = pending.waypoints[index];
+  const to = pending.waypoints[index + 1];
+  const at = current.legs.findIndex(
+    (leg, i) =>
+      leg === placeholder &&
+      samePosition(current.waypoints[i], from) &&
+      samePosition(current.waypoints[i + 1], to),
+  );
+  if (!placeholder || at < 0) {
     return current;
   }
   const legs = [...current.legs];
-  legs[index] = routed;
+  legs[at] = routed;
   return { ...current, legs };
 }
 

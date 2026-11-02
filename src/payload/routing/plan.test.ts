@@ -146,6 +146,16 @@ describe('edits', () => {
     expect(replacePendingLeg(pending, pending, 0, routed).legs[0]).toBe(routed);
   });
 
+  it('finds a pending leg that an edit elsewhere has moved', () => {
+    const pending = planThrough(at(0, 0), at(2, 0), at(2, 2));
+    const shifted = insertWaypoint(pending, 0, at(1, 0)).plan;
+    const routed = { ...pending.legs[1], isUnrouted: false };
+
+    const next = replacePendingLeg(shifted, pending, 1, routed);
+    expect(next.legs[2]).toBe(routed);
+    expect(next.legs[1]).toBe(shifted.legs[1]);
+  });
+
   it('appends a waypoint and asks for its leg to be routed', () => {
     const edit = appendWaypoint(planThrough(at(0, 0)), at(1, 0));
 

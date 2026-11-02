@@ -178,6 +178,41 @@ describe('route editor controller', () => {
     expect(controller.getSnapshot().plan.waypoints).toEqual([C]);
   });
 
+  it('routes a pending leg that an insert elsewhere shifted along', async () => {
+    const { controller, network } = setup(planThrough(A, B));
+    network.graphFor.mockReturnValue(
+      buildRouteGraph({
+        trails: [],
+        ways: [
+          {
+            id: 1,
+            name: 'Path',
+            class: 'cycleway',
+            hasBikeLane: false,
+            nodes: [1, 2, 3],
+            coordinates: [A, B, C],
+          },
+        ],
+      }),
+    );
+    const pending = deferred();
+    network.ensure
+      .mockResolvedValueOnce(undefined)
+      .mockReturnValueOnce(pending.promise);
+    await controller.addWaypoint(C);
+    await vi.waitFor(() => expect(controller.getSnapshot().routing).toBe(1));
+
+    // Leg B–C moves from index 1 to 2 while it is still routing.
+    await controller.addWaypoint(A, 0);
+    expect(controller.getSnapshot().plan.legs).toHaveLength(3);
+    pending.resolve();
+    await settled(controller);
+
+    const leg = controller.getSnapshot().plan.legs[2];
+    expect(leg.coordinates).toEqual([B, C]);
+    expect(leg.isUnrouted).toBeUndefined();
+  });
+
   it('leaves a pending leg unchanged when switched to a deliberate straight line', async () => {
     const { controller, network } = setup();
     await controller.addWaypoint(A);
