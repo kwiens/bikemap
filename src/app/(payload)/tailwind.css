@@ -1,1 +1,11 @@
-@tailwind utilities;
+/*
+ * Utilities stay unlayered on purpose. Payload's own styles live in
+ * `@layer payload-default`, and unlayered rules beat layered ones, so these
+ * keep winning as they did under Tailwind 3. `theme(inline)` compiles values
+ * into the utilities rather than referencing `--color-*` variables, because
+ * Payload defines its own `--color-blue-*` scale on `:root`.
+ */
+@import 'tailwindcss/theme.css' layer(theme) theme(inline);
+@import 'tailwindcss/utilities.css' source(none);
+
+@source '../../payload/components';

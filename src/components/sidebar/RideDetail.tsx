@@ -93,7 +93,7 @@ export function RideDetail({ ride, onClose, onDeleted }: RideDetailProps) {
                 if (e.key === 'Escape') setEditing(false);
               }}
               autoFocus
-              className="flex-1 text-sm font-semibold px-1.5 py-0.5 border border-gray-200 rounded outline-none min-w-0 focus:border-blue-500"
+              className="flex-1 text-sm font-semibold px-1.5 py-0.5 border border-gray-200 rounded outline-hidden min-w-0 focus:border-blue-500"
             />
             <IconButton onClick={handleRename} icon={faCheck} />
           </div>

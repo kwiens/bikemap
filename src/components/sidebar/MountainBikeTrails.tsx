@@ -73,7 +73,7 @@ function toggleSet(
  */
 const TRAIL_SHAPE: Record<string, string> = {
   easy: 'shrink-0 w-3 h-3 rounded-full',
-  intermediate: 'shrink-0 w-3 h-3 rounded-sm',
+  intermediate: 'shrink-0 w-3 h-3 rounded-none',
   advanced: 'shrink-0 w-2.5 h-2.5 rotate-45 rounded-[1px]',
   expert: 'shrink-0 w-2.5 h-2.5 rotate-45 rounded-[1px]',
   unrated: 'shrink-0 w-3 h-3 rounded-full',
@@ -149,7 +149,7 @@ function TrailRow({
                     <span
                       className={cn(
                         'inline-flex max-w-0 items-center overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-200',
-                        isShowingElevationDetail && 'max-w-[6rem] opacity-100',
+                        isShowingElevationDetail && 'max-w-24 opacity-100',
                       )}
                     >
                       {' \u00B7 '}
@@ -247,7 +247,7 @@ export function MountainBikeTrails({
           <input
             ref={searchRef}
             type="text"
-            className="w-full py-2 pr-8 pl-3 border border-gray-300 rounded-lg text-sm text-app-secondary bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30 placeholder:text-gray-400"
+            className="w-full py-2 pr-8 pl-3 border border-gray-300 rounded-lg text-sm text-app-secondary bg-white outline-hidden focus:border-app-primary focus:ring-2 focus:ring-app-primary/30 placeholder:text-gray-400"
             placeholder="Search trails..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

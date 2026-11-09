@@ -54,7 +54,7 @@ export function Banner({
 
   return (
     <p
-      className="mb-2 rounded-[var(--style-radius-s)] border border-solid px-3 py-2"
+      className="mb-2 rounded-(--style-radius-s) border border-solid px-3 py-2"
       style={{
         background,
         borderColor: line,

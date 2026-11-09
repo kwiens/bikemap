@@ -151,17 +151,17 @@ describe('MountainBikeTrails', () => {
     expect(descentDetail).toHaveClass('max-w-0', 'opacity-0');
 
     fireEvent.mouseEnter(trail);
-    expect(descentDetail).toHaveClass('max-w-[6rem]', 'opacity-100');
+    expect(descentDetail).toHaveClass('max-w-24', 'opacity-100');
 
     fireEvent.mouseLeave(trail);
-    expect(descentDetail).not.toHaveClass('max-w-[6rem]', 'opacity-100');
+    expect(descentDetail).not.toHaveClass('max-w-24', 'opacity-100');
 
     fireEvent.focus(trail);
-    expect(descentDetail).toHaveClass('max-w-[6rem]', 'opacity-100');
+    expect(descentDetail).toHaveClass('max-w-24', 'opacity-100');
 
     fireEvent.mouseEnter(trail);
     fireEvent.mouseLeave(trail);
-    expect(descentDetail).toHaveClass('max-w-[6rem]', 'opacity-100');
+    expect(descentDetail).toHaveClass('max-w-24', 'opacity-100');
   });
 
   it('shows descent when climbing is zero', () => {

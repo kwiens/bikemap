@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import { bikeRoutesUrl, inlineBikeRouteIds } from '@/data/geo_data';
 import { mapConfig } from '@/config/map.config';
 import { buildSvg } from '@/utils/svg';
