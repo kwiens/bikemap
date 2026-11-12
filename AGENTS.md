@@ -115,7 +115,7 @@ src/
 - **`src/data/cities/types.ts`** defines `CityData` — the contract for what a city provides (routes, features, resources, MTB trail config, regionFor, optional `bikeNetworkUrl`/`bikeRoutesUrl`).
 - **`src/data/cities/index.ts`** registers cities in `cityDataById` and exposes `activeCityData`.
 - **City resolution** happens in `map.config.ts`: `resolveActiveCityId()` checks the hostname against `NEXT_PUBLIC_CITY_HOST_MAP`, falling back to `NEXT_PUBLIC_CITY_ID`, then Chattanooga. `parseCityId` derives valid ids from `cityConfigs` keys — adding a city to the registry is sufficient. Server components (`layout.tsx`, `manifest.ts`, `about/page.tsx`) resolve per-request via `getRequestHostname()`; client code binds `activeCityData` at module load (works because the map is client-only).
-- **Style ownership** (`src/data/mapbox-style.ts`): the shared Mapbox Studio style is Chattanooga's. `hiddenStyleLayerIdsFor(city)` computes which style-baked route layers a city must hide (everything it doesn't own) — a new city never imports another city's data.
+- **Style ownership** (`src/data/mapbox-style.ts`): the shared Mapbox Studio style is Chattanooga's. `hiddenStyleLayerIdsFor(city)` computes which style-baked route layers a city must hide (everything it doesn't own) — a new city never imports another city's data. `loadOptimizedMapStyle` removes the orphan TPL layer and its dedicated tileset before map creation, and also removes Studio route data for cities with their own runtime route source; `hideStrayStyleLayers` is the visual fallback when that style fetch fails.
 - **Per-city static data** lives under `public/data/<city>/` (GeoJSON) and `public/data/elevation/<city>/` (per-trail elevation JSONs — city-scoped so same-named trails can't collide).
 - Adding a city: extend `CityId`, add a `MapConfig` + `SiteConfig`, create `src/data/cities/<city>/`, register it in `cityDataById`, add the hostname to `NEXT_PUBLIC_CITY_HOST_MAP`, and provide `public/data/<city>/` assets.
 
@@ -470,7 +470,10 @@ The map can be framed on third-party sites via `<iframe src="https://bikechatt.c
 All component styling uses Tailwind utility classes. The only remaining custom CSS is in `map.css` for Mapbox DOM-API elements (markers, popups, location dots) that cannot be styled with Tailwind.
 
 - **Use `cn()` from `@/lib/utils`** (clsx + tailwind-merge) for conditional classes: `className={cn('base-classes', condition && 'conditional-classes')}`
-- **Custom animations** go in `tailwind.config.ts` under `theme.extend.keyframes` and `theme.extend.animation`, not in CSS `@keyframes`.
+- **Tailwind 4 is configured in CSS** — there is no `tailwind.config.ts`. Brand colors and custom animations live in the `@theme` block of `src/app/(frontend)/globals.css` (`--color-*`, `--animate-*` plus the `@keyframes` inside `@theme`).
+- **Global CSS goes in `@layer base`.** Utilities live in `@layer utilities`, and any unlayered rule beats every layered one regardless of specificity — an unlayered reset silently overrides `p-*`/`m-*` everywhere.
+- **Translate utilities set the `translate` property, not `transform`.** A keyframe that animates `transform` composes with `-translate-x-1/2` instead of replacing it, so don't repeat the centring offset inside the keyframe.
+- **The admin's Tailwind (`src/app/(payload)/tailwind.css`) is unlayered and inline-themed** so it beats Payload's `@layer payload-default` styles without colliding with Payload's own `--color-blue-*` variables. It scans only `src/payload/components`.
 - **Use standard Tailwind colors** (e.g., `text-gray-500`, `bg-red-500`). App brand colors are available as `app-primary` and `app-secondary`.
 - **Dynamic values** that can't be expressed as Tailwind classes (e.g., computed widths from JS) can use `style={{}}` for that single property. Everything else should be Tailwind.
 - **SidebarCard** (`src/components/sidebar/SidebarCard.tsx`) is a shared card component with a `colorTheme` prop (`blue | green | purple | gray`) used across AttractionsList, BikeResourcesList, BikeRentalList, and InformationSection.

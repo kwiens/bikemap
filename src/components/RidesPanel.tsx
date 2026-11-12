@@ -171,7 +171,7 @@ export function RidesPanel() {
       <div
         className={cn(
           'fixed right-4 top-[calc(1.25rem+env(safe-area-inset-top))]',
-          isOpen ? 'z-[960]' : 'z-[900]',
+          isOpen ? 'z-960' : 'z-900',
           isRecording && !isOpen && 'animate-recording-pulse rounded-full',
         )}
       >
@@ -194,7 +194,7 @@ export function RidesPanel() {
 
       {/* Floating recording HUD — visible when recording with panel closed */}
       {isRecording && !isOpen && (
-        <div className="fixed top-[calc(22px+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[800] bg-white rounded-xl shadow-lg h-10 px-3 flex items-center gap-2.5 text-sm max-md:top-[calc(76px+env(safe-area-inset-top))] max-md:left-2 max-md:right-2 max-md:translate-x-0">
+        <div className="fixed top-[calc(22px+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-800 bg-white rounded-xl shadow-lg h-10 px-3 flex items-center gap-2.5 text-sm max-md:top-[calc(76px+env(safe-area-inset-top))] max-md:left-2 max-md:right-2 max-md:translate-x-0">
           <PulseDot />
           <span className="font-bold tabular-nums text-gray-700">
             {formatElapsed(elapsedTime)}
@@ -231,7 +231,7 @@ export function RidesPanel() {
       <div
         ref={panelRef}
         className={cn(
-          'fixed top-0 right-0 h-full w-[280px] bg-white shadow-[-2px_0_5px_rgba(0,0,0,0.1)] z-[950] overflow-hidden transition-transform duration-300 ease-in-out flex flex-col',
+          'fixed top-0 right-0 h-full w-[280px] bg-white shadow-[-2px_0_5px_rgba(0,0,0,0.1)] z-950 overflow-hidden transition-transform duration-300 ease-in-out flex flex-col',
           'max-md:w-full max-md:max-w-[320px]',
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
         )}

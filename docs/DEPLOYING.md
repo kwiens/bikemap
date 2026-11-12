@@ -65,7 +65,7 @@ One file controls app identity. Edit every field:
 | `themeColor` / `backgroundColor` | PWA theme + splash (match your brand) |
 | `storageKeyPrefix` | Cookie / localStorage key prefix — **pick your own** so it's distinct per deployment |
 
-Brand colors also live in `tailwind.config.ts` as `app-primary` / `app-secondary`.
+Brand colors also live in the `@theme` block of `src/app/(frontend)/globals.css` as `--color-app-primary` / `--color-app-secondary` (the `app-primary` / `app-secondary` classes).
 
 ## 4. Geography — `src/config/map.config.ts`
 

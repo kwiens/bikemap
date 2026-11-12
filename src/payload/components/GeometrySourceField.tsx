@@ -26,9 +26,9 @@ export function GeometrySourceField({ path }: { path: string }) {
   return (
     <div className="field-type">
       <div className="field-label">Trail line source</div>
-      <div className="rounded-[var(--style-radius-s)] bg-[var(--theme-elevation-50)] p-3">
+      <div className="rounded-(--style-radius-s) bg-(--theme-elevation-50) p-3">
         <strong className="block text-sm leading-tight">{copy.label}</strong>
-        <p className="mb-0 mt-1 text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.45]">
+        <p className="mb-0 mt-1 text-[0.8rem] text-(--theme-elevation-600) leading-[1.45]">
           {copy.description}
         </p>
       </div>

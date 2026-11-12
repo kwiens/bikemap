@@ -110,9 +110,9 @@ export default async function AboutPage({
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 fixed inset-0 overflow-y-auto z-[9999]">
+    <div className="min-h-screen bg-gray-50 fixed inset-0 overflow-y-auto z-9999">
       {/* Header bar */}
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-200">
+      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b border-gray-200">
         <div className="max-w-2xl mx-auto px-5 h-14 flex items-center">
           <Link
             href={`/${citySearch}`}
@@ -177,7 +177,7 @@ export default async function AboutPage({
 
           <Link
             href={`/export${citySearch}`}
-            className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-sm transition-all group mb-3"
+            className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-xs transition-all group mb-3"
           >
             <div className="w-10 h-10 rounded-lg bg-app-secondary flex items-center justify-center shrink-0">
               <Printer className="w-5 h-5 text-app-primary" />
@@ -346,7 +346,7 @@ function ExtLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-sm transition-all group"
+      className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-app-primary hover:shadow-xs transition-all group"
     >
       <div className="w-10 h-10 rounded-lg bg-app-secondary flex items-center justify-center shrink-0">
         <span className="text-app-primary">{icon}</span>
@@ -380,7 +380,7 @@ function LogoCard({
         href={file}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${bg} rounded-lg border border-gray-200 flex items-center justify-center p-4 mb-2 aspect-[4/3] ${square ? 'aspect-square' : ''}`}
+        className={`${bg} rounded-lg border border-gray-200 flex items-center justify-center p-4 mb-2 aspect-4/3 ${square ? 'aspect-square' : ''}`}
       >
         <Image
           src={file}

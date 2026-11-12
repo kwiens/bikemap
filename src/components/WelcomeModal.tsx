@@ -94,7 +94,7 @@ export function WelcomeModal() {
   return (
     <div
       className={cn(
-        'fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-[4px] px-5 py-10',
+        'fixed inset-0 z-3000 flex items-center justify-center bg-black/60 backdrop-blur-xs px-5 py-10',
         exiting ? 'animate-welcome-fade-out' : 'animate-welcome-fade-in',
       )}
     >

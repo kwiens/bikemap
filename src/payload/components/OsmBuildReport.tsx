@@ -59,7 +59,7 @@ export function OsmBuildReport({ path }: { path: string }) {
   return (
     <section
       aria-labelledby={headingId}
-      className="field-type mt-6 border-0 border-t border-solid border-[color:var(--theme-elevation-150)] pt-4"
+      className="field-type mt-6 border-0 border-t border-solid border-(--theme-elevation-150) pt-4"
     >
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div>
@@ -69,12 +69,12 @@ export function OsmBuildReport({ path }: { path: string }) {
           >
             Trail line status
           </h3>
-          <p className="mb-0 mt-1 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.45]">
+          <p className="mb-0 mt-1 max-w-[75ch] text-[0.8rem] text-(--theme-elevation-600) leading-[1.45]">
             {status.description}
             {report?.builtAt && healthy ? ' No problems found.' : ''}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-[var(--theme-elevation-100)] px-[0.55rem] py-1 text-xs text-[color:var(--theme-elevation-650,var(--theme-elevation-600))]">
+        <span className="shrink-0 rounded-full bg-(--theme-elevation-100) px-[0.55rem] py-1 text-xs text-(--theme-elevation-650,var(--theme-elevation-600))">
           {status.label}
         </span>
       </div>

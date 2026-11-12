@@ -174,7 +174,7 @@ export function EmbedSnippetBuilder({
             src={initialSrcRef.current}
             title="Bike map preview"
             allow={IFRAME_ALLOW}
-            className="aspect-[4/3] w-full rounded-xl border-0"
+            className="aspect-4/3 w-full rounded-xl border-0"
           />
         </div>
 

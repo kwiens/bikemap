@@ -322,7 +322,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       <div
         className={cn(
           'fixed left-4 top-[calc(1rem+env(safe-area-inset-top))]',
-          ridesPanelOpen ? 'z-[900]' : 'z-[960]',
+          ridesPanelOpen ? 'z-900' : 'z-960',
         )}
       >
         <button
@@ -364,7 +364,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                   className={cn(
                     'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                     activeSection === 'routes'
-                      ? 'bg-app-primary text-app-secondary shadow-sm'
+                      ? 'bg-app-primary text-app-secondary shadow-xs'
                       : 'text-app-surface/70 hover:text-app-surface',
                   )}
                   onClick={() => switchTab('routes')}
@@ -377,7 +377,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                 className={cn(
                   'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                   activeSection === 'trails'
-                    ? 'bg-app-primary text-app-secondary shadow-sm'
+                    ? 'bg-app-primary text-app-secondary shadow-xs'
                     : 'text-app-surface/70 hover:text-app-surface',
                 )}
                 onClick={() => switchTab('trails')}

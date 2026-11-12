@@ -280,7 +280,7 @@ export function ElevationProfileAdmin() {
   return (
     <section
       aria-labelledby="elevation-profile-heading"
-      className="mt-6 overflow-hidden rounded-[var(--style-radius-m)] border border-solid border-[color:var(--theme-elevation-150)] p-4"
+      className="mt-6 overflow-hidden rounded-(--style-radius-m) border border-solid border-(--theme-elevation-150) p-4"
     >
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
@@ -290,13 +290,13 @@ export function ElevationProfileAdmin() {
           >
             Elevation profile
           </h3>
-          <p className="mb-0 mt-1 text-[color:var(--theme-elevation-600)] leading-[1.45]">
+          <p className="mb-0 mt-1 text-(--theme-elevation-600) leading-[1.45]">
             Terrain samples riders see on the map. Recalculate from topo
             elevations along the track.
           </p>
         </div>
         {snapshot.profile && (
-          <span className="shrink-0 rounded-full bg-[var(--theme-elevation-100)] px-[0.55rem] py-1 text-xs text-[color:var(--theme-elevation-650,var(--theme-elevation-600))]">
+          <span className="shrink-0 rounded-full bg-(--theme-elevation-100) px-[0.55rem] py-1 text-xs text-(--theme-elevation-650,var(--theme-elevation-600))">
             {isPreview ? 'Unsaved preview' : 'Stored with trail'} ·{' '}
             {snapshot.profile.profile.length.toLocaleString()} samples
           </span>
@@ -341,7 +341,7 @@ export function ElevationProfileAdmin() {
               ? 'Preview bundled profile'
               : 'Calculate elevation'}
         </Button>
-        <span className="text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.4]">
+        <span className="text-[0.8rem] text-(--theme-elevation-600) leading-[1.4]">
           {canImportBundledProfile
             ? 'This loads the bundled profile into the form without saving it. Review it, then use Save draft or Publish to keep it.'
             : 'This replaces the distance, climb, descent, range, bounds, and chart points in the form without saving. Review the result, then use Save draft or Publish to keep it.'}
@@ -366,7 +366,7 @@ function ProfileChart({ profile }: { profile: ElevationProfile }) {
   const range = `${formatFeet(profile.min)}–${formatFeet(profile.max)}`;
 
   return (
-    <figure className="m-0 overflow-hidden rounded-[var(--style-radius-s)] border border-solid border-[color:var(--theme-elevation-150)] bg-[var(--theme-elevation-50)] px-2 pb-[0.35rem] pt-2">
+    <figure className="m-0 overflow-hidden rounded-(--style-radius-s) border border-solid border-(--theme-elevation-150) bg-(--theme-elevation-50) px-2 pb-[0.35rem] pt-2">
       <svg
         aria-label={`Elevation profile for ${profile.trail}: ${range}`}
         aria-describedby={paths.breaks.length > 0 ? descriptionId : undefined}
@@ -431,7 +431,7 @@ function ProfileChart({ profile }: { profile: ElevationProfile }) {
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <figcaption className="flex justify-between pt-1 text-xs text-[color:var(--theme-elevation-600)]">
+      <figcaption className="flex justify-between pt-1 text-xs text-(--theme-elevation-600)">
         <span>0 mi</span>
         <span>{formatMiles(profile.distance / FEET_PER_MILE)}</span>
       </figcaption>
@@ -468,8 +468,8 @@ function MeasurementSummary({ snapshot }: { snapshot: MeasurementSnapshot }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 bg-[var(--theme-elevation-50)] px-3 py-[0.65rem]">
-      <dt className="mb-[0.2rem] text-xs text-[color:var(--theme-elevation-600)] leading-[1.2]">
+    <div className="min-w-0 bg-(--theme-elevation-50) px-3 py-[0.65rem]">
+      <dt className="mb-[0.2rem] text-xs text-(--theme-elevation-600) leading-[1.2]">
         {label}
       </dt>
       <dd className="m-0 text-base font-semibold leading-tight tabular-nums">
