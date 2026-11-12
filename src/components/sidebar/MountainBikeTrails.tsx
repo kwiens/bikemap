@@ -254,7 +254,7 @@ export function MountainBikeTrails({
           <input
             ref={searchRef}
             type="text"
-            className="w-full py-2 pr-8 pl-3 border border-gray-300 rounded-lg text-sm text-app-surface bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30 placeholder:text-gray-400"
+            className="w-full py-2 pr-8 pl-3 border border-gray-300 rounded-lg text-sm text-inherit bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30 placeholder:text-gray-400"
             placeholder="Search trails..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

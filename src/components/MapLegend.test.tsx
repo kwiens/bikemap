@@ -85,8 +85,8 @@ vi.mock('./sidebar', () => ({
   ),
 }));
 
-vi.mock('./styles', () => ({
-  SIDEBAR_THEME_CLASS: 'sidebar-theme',
+vi.mock('./styles', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./styles')>()),
   TOGGLE_BTN_CLASS: 'toggle-btn',
   TOGGLE_ICON_CLASS: 'toggle-icon',
 }));

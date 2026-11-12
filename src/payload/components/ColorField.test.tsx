@@ -60,6 +60,24 @@ describe('ColorField', () => {
     expect(fieldState.setValue).toHaveBeenNthCalledWith(2, '#654321');
   });
 
+  it('shows the configured default in both inputs when the field is cleared', () => {
+    fieldState.value = '';
+    render(
+      <ColorField
+        {...props}
+        field={{
+          ...props.field,
+          admin: { ...props.field.admin, placeholder: '#ffffff' },
+        }}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText('#ffffff')).toHaveValue('');
+    expect(
+      screen.getByLabelText('Selected items & highlights colour picker'),
+    ).toHaveValue('#ffffff');
+  });
+
   it('marks the text input when Payload reports a validation error', () => {
     fieldState.showError = true;
 
