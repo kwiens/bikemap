@@ -5,17 +5,12 @@ import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
 import type { MapFeature } from '@/data/map-features';
 import initialAttractions from '@/migrations/data/initial-attractions.json';
+import { schoolTrafficGardens } from '@/migrations/data/school-traffic-gardens';
 
 /** The map and its embed share the same published, city-scoped listings. */
 export async function getCityAttractions(city: CityId): Promise<MapFeature[]> {
   if (!process.env.DATABASE_URL) {
-    // Keep the standalone map usable when running without Payload.
-    return initialAttractions
-      .filter((row) => row.city === city)
-      .map(({ city: _city, ...row }, index) => ({
-        ...row,
-        id: -(index + 1),
-      }));
+    return bundledAttractions(city);
   }
 
   try {
@@ -42,6 +37,15 @@ export async function getCityAttractions(city: CityId): Promise<MapFeature[]> {
       `Could not read attractions for "${city}" from Payload.`,
       error,
     );
-    return [];
+    return bundledAttractions(city);
   }
+}
+
+function bundledAttractions(city: CityId): MapFeature[] {
+  return [...initialAttractions, ...schoolTrafficGardens]
+    .filter((row) => row.city === city)
+    .map(({ city: _city, ...row }, index) => ({
+      ...row,
+      id: -(index + 1),
+    }));
 }

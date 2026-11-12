@@ -83,7 +83,8 @@ src/
 │   │   └── bend/          # Bend CityData + data files
 │   ├── geo_data.ts        # Barrel over activeCityData — components import from here
 │   ├── mapbox-style.ts    # What the shared Studio style bakes in (style-owned layers)
-│   ├── bike-routes|map-features|bike-resources|local-resources.ts  # Types + Chattanooga data
+│   ├── bike-routes|bike-resources|local-resources.ts  # Types + Chattanooga data
+│   ├── map-features.ts    # Attraction display type and icon choices
 │   ├── mountain-bike-trails(.data).ts  # MTB types/constants + Chattanooga trail array
 │   ├── trail-metadata.ts  # Rating→color palette (trailColor) + GIS name metadata
 │   ├── osm-trails.ts      # Nationwide OSM trails layer constants
@@ -105,7 +106,7 @@ src/
 
 ### Multi-City Architecture
 
-- **`src/data/cities/types.ts`** defines `CityData` — the contract for what a city provides (routes, features, resources, MTB trail config, regionFor, optional `bikeNetworkUrl`/`bikeRoutesUrl`).
+- **`src/data/cities/types.ts`** defines `CityData` — the contract for what a city provides (routes, resources, MTB trail config, regionFor, optional `bikeNetworkUrl`/`bikeRoutesUrl`).
 - **`src/data/cities/index.ts`** registers cities in `cityDataById` and exposes `activeCityData`.
 - **City resolution** happens in `map.config.ts`: `resolveActiveCityId()` checks the hostname against `NEXT_PUBLIC_CITY_HOST_MAP`, falling back to `NEXT_PUBLIC_CITY_ID`, then Chattanooga. `parseCityId` derives valid ids from `cityConfigs` keys — adding a city to the registry is sufficient. Server components (`layout.tsx`, `manifest.ts`, `about/page.tsx`) resolve per-request via `getRequestHostname()`; client code binds `activeCityData` at module load (works because the map is client-only).
 - **Style ownership** (`src/data/mapbox-style.ts`): the shared Mapbox Studio style is Chattanooga's. `hiddenStyleLayerIdsFor(city)` computes which style-baked route layers a city must hide (everything it doesn't own) — a new city never imports another city's data. `loadOptimizedMapStyle` removes the orphan TPL layer and its dedicated tileset before map creation, and also removes Studio route data for cities with their own runtime route source; `hideStrayStyleLayers` is the visual fallback when that style fetch fails.
@@ -114,10 +115,10 @@ src/
 
 ### Core Data Flow
 
-1. **Page Entry** (`src/app/(frontend)/page.tsx`): Reads CMS trails and routes on the server, then renders `HomeClient.tsx`, which dynamically imports Map with SSR disabled
+1. **Page Entry** (`src/app/(frontend)/page.tsx`): Reads CMS trails, routes, and attractions on the server, then renders `HomeClient.tsx`, which dynamically imports Map with SSR disabled
 2. **Map Component** (`src/components/Map.tsx`): Main orchestrator that initializes Mapbox, manages markers, and handles custom events
 3. **Data Sources** (`src/data/`):
-   - `geo_data.ts`: barrel re-exporting the **active city's** static config (`mapFeatures`, `bikeResources`, route/network URLs, and trail-layer config). Published lists come from `route-source.ts` and `trail-source.ts`.
+   - `geo_data.ts`: barrel re-exporting the **active city's** static config (`bikeResources`, route/network URLs, and trail-layer config). Published routes and trails reach the map through `route-source.ts` and `trail-source.ts`. Published attractions are read by `src/payload/read/attractions.ts` and passed to the map and sidebar as props.
    - `gbfs.ts`: live bike share data (station-based for Chattanooga, free-bike/Veo for Bend — a discriminated `GBFSConfig` union)
 
 ### Event-Driven Communication
@@ -478,6 +479,9 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   `pnpm db:import:chattanooga-routes` rather than committing generated route
   GeoJSON. Bend's seed derives its eight imported routes directly from the
   committed bike-network source.
+- `src/payload/collections/Attractions.ts` + `src/payload/read/attractions.ts` —
+  editable point listings for the public map and embeds. Migrations seed the
+  original listings once. Make subsequent changes in Payload admin.
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
 - `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind

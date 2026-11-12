@@ -75,8 +75,10 @@ Choose its city, fill in its name, description, and address, set its latitude
 and longitude, then choose an icon and publish. The public map and embeds read
 the published attractions for their city.
 
-The migration seeds both cities' existing listings once. Installations with no
-database configured use the original migration snapshot.
+The migrations seed both cities' existing listings and the three Chattanooga
+school traffic gardens once. Make subsequent changes in Payload. The map
+uses the migration snapshots when Payload is unavailable. An empty list from
+Payload means the city has no published attractions.
 
 ## BikeResource (`bike-resources.ts`)
 

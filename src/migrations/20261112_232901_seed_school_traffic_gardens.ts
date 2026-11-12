@@ -1,34 +1,5 @@
 import type { MigrateUpArgs } from '@payloadcms/db-postgres';
-
-// Campus points are from NCES EDGE Public School Locations 2024–25.
-// White Oak Bicycle Co-op lists Calvin Donaldson as open and the other two
-// gardens as upcoming projects: https://www.whiteoakbicycle.org/our-impact
-const schoolGardens = [
-  {
-    name: 'Soddy Elementary School Traffic Garden (Planned)',
-    description:
-      'White Oak Bicycle Co-op lists this school traffic garden as an upcoming project.',
-    address: '260 School St, Soddy-Daisy, TN 37379',
-    latitude: 35.2917,
-    longitude: -85.1627,
-  },
-  {
-    name: 'Lookout Valley Elementary School Traffic Garden (Planned)',
-    description:
-      'White Oak Bicycle Co-op lists this school traffic garden as an upcoming project.',
-    address: '701 Browns Ferry Rd, Chattanooga, TN 37419',
-    latitude: 35.0445,
-    longitude: -85.357,
-  },
-  {
-    name: 'Calvin Donaldson Elementary School Traffic Garden',
-    description:
-      'A school traffic garden where students practice biking and road safety. Check with the school about visitor access.',
-    address: '927 W. 37th Street, Chattanooga, TN 37410',
-    latitude: 35.0109,
-    longitude: -85.3182,
-  },
-];
+import { schoolTrafficGardens } from './data/school-traffic-gardens';
 
 export async function up({ payload, req }: MigrateUpArgs): Promise<void> {
   const { docs } = await payload.find({
@@ -41,15 +12,15 @@ export async function up({ payload, req }: MigrateUpArgs): Promise<void> {
     where: {
       city: { equals: 'chattanooga' },
       or: [
-        { address: { in: schoolGardens.map(({ address }) => address) } },
-        { name: { in: schoolGardens.map(({ name }) => name) } },
+        { address: { in: schoolTrafficGardens.map(({ address }) => address) } },
+        { name: { in: schoolTrafficGardens.map(({ name }) => name) } },
       ],
     },
   });
 
   // These three writes share the migration transaction. Payload records the
   // first published revision for each new attraction.
-  for (const garden of schoolGardens) {
+  for (const garden of schoolTrafficGardens) {
     if (
       docs.some(
         ({ address, name }) => address === garden.address || name === garden.name,
@@ -62,8 +33,6 @@ export async function up({ payload, req }: MigrateUpArgs): Promise<void> {
       req,
       data: {
         ...garden,
-        city: 'chattanooga',
-        icon: 'bicycle',
         _status: 'published',
       },
     });
