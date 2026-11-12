@@ -215,6 +215,21 @@ export async function loadBikeRouteOptimizedStyle(
 // Route utilities
 export const ROUTE_DIRECTION_ARROW_IMAGE_ID = 'route-direction-arrow';
 
+/** The Studio style interleaves road geometry with symbols such as tunnel arrows. */
+export function routeLabelLayerId(
+  layers: readonly mapboxgl.LayerSpecification[],
+): string | undefined {
+  const lastRoadIndex = layers.findLastIndex(
+    (layer) =>
+      layer.type !== 'symbol' &&
+      'source-layer' in layer &&
+      layer['source-layer'] === 'road',
+  );
+  return layers.find(
+    (layer, index) => index > lastRoadIndex && layer.type === 'symbol',
+  )?.id;
+}
+
 export function createArrowSdfImage(size: number = 20): ImageData {
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -1337,6 +1352,7 @@ export function ensureInlineRoutes(
   map: mapboxgl.Map,
   collection: GeoJSON.FeatureCollection | null,
   routes: BikeRoute[],
+  beforeId: string | undefined,
 ): void {
   try {
     const routeIds = new Set(routes.map((route) => route.id));
@@ -1370,7 +1386,6 @@ export function ensureInlineRoutes(
       tolerance: 0.5,
       promoteId: 'id',
     });
-    const beforeId = firstSymbolLayerId(map);
     const color = routePropertyExpression(routes, 'color');
     const width = routePropertyExpression(routes, 'defaultWidth');
 

@@ -27,6 +27,7 @@ import {
   queryNearbyLineFeatures,
   ensureOsmTrailsSource,
   ensureInlineRoutes,
+  routeLabelLayerId,
   setOsmTrailsVisible,
   OSM_BIKE_TRAIL_FILTER,
   OSM_POI_FILTER,
@@ -940,7 +941,7 @@ describe('Mapbox Geo Integration', () => {
   });
 
   describe('ensureInlineRoutes', () => {
-    it('replaces a style-backed route with the configured GeoJSON source', () => {
+    it('replaces a style-backed route and inserts its GeoJSON above roads and bridges', () => {
       const layers = new Map<string, mapboxgl.AnyLayer>([
         [
           'route1',
@@ -955,7 +956,13 @@ describe('Mapbox Geo Integration', () => {
         getSource: vi.fn().mockReturnValue(undefined),
         addSource: vi.fn(),
         getStyle: vi.fn().mockReturnValue({
-          layers: [{ id: 'labels', type: 'symbol' }],
+          layers: [
+            { id: 'tunnel-arrow', type: 'symbol', 'source-layer': 'road' },
+            { id: 'street', type: 'line', 'source-layer': 'road' },
+            { id: 'street-arrow', type: 'symbol', 'source-layer': 'road' },
+            { id: 'bridge', type: 'line', 'source-layer': 'road' },
+            { id: 'road-label', type: 'symbol', 'source-layer': 'road' },
+          ],
         }),
         getLayer: vi.fn((id: string) => layers.get(id)),
         removeLayer: vi.fn((id: string) => layers.delete(id)),
@@ -991,7 +998,8 @@ describe('Mapbox Geo Integration', () => {
         ],
       };
 
-      ensureInlineRoutes(mockMap, collection, [route]);
+      const beforeId = routeLabelLayerId(mockMap.getStyle().layers);
+      ensureInlineRoutes(mockMap, collection, [route], beforeId);
 
       expect(mockMap.removeLayer).toHaveBeenCalledWith('route1');
       expect(mockMap.addSource).toHaveBeenCalledWith('bike-routes-source', {
@@ -1002,6 +1010,16 @@ describe('Mapbox Geo Integration', () => {
         tolerance: 0.5,
       });
       expect(mockMap.addLayer).toHaveBeenCalledTimes(2);
+      expect(mockMap.addLayer).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ id: BIKE_ROUTE_CASING_LAYER_ID }),
+        'road-label',
+      );
+      expect(mockMap.addLayer).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ id: BIKE_ROUTE_LAYER_ID }),
+        'road-label',
+      );
       expect(layers.get(BIKE_ROUTE_LAYER_ID)).toMatchObject({
         id: BIKE_ROUTE_LAYER_ID,
         source: 'bike-routes-source',
@@ -1036,7 +1054,7 @@ describe('Mapbox Geo Integration', () => {
         distance: 5,
       };
 
-      ensureInlineRoutes(mockMap, null, [route]);
+      ensureInlineRoutes(mockMap, null, [route], undefined);
 
       expect(mockMap.removeLayer).toHaveBeenCalledWith('route1');
       expect(mockMap.addSource).not.toHaveBeenCalled();

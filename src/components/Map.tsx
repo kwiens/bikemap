@@ -56,6 +56,7 @@ import {
   ensureBikeNetworkSource,
   setBikeNetworkVisible,
   ensureInlineRoutes,
+  routeLabelLayerId,
   loadBikeRouteOptimizedStyle,
   queryNearbyLineFeatures,
   registerPointerCursor,
@@ -881,9 +882,7 @@ const MapboxMap = memo(function MapboxMap() {
           });
           if (cancelled || map.current !== newMap) return;
 
-          // Find the road-label layer — route lines will be inserted
-          // just below it so street names remain visible on top of routes.
-          const style = newMap.getStyle();
+          const routeBeforeId = routeLabelLayerId(newMap.getStyle().layers);
 
           // Register SDF arrow image for route direction indicators
           if (!newMap.hasImage(ROUTE_DIRECTION_ARROW_IMAGE_ID)) {
@@ -891,16 +890,6 @@ const MapboxMap = memo(function MapboxMap() {
             newMap.addImage(ROUTE_DIRECTION_ARROW_IMAGE_ID, arrowImage, {
               sdf: true,
             });
-          }
-
-          let firstLabelId: string | undefined;
-          if (style?.layers) {
-            for (const l of style.layers) {
-              if (l.id === 'road-label') {
-                firstLabelId = l.id;
-                break;
-              }
-            }
           }
 
           hideStyleLayers(newMap, [
@@ -915,7 +904,12 @@ const MapboxMap = memo(function MapboxMap() {
             configuredInlineIds.has(route.id),
           );
           if (bikeRoutesUrl) {
-            ensureInlineRoutes(newMap, routeCollection, configuredInlineRoutes);
+            ensureInlineRoutes(
+              newMap,
+              routeCollection,
+              configuredInlineRoutes,
+              routeBeforeId,
+            );
           }
           const inlineRouteIds = configuredInlineIds;
 
@@ -941,7 +935,7 @@ const MapboxMap = memo(function MapboxMap() {
             newMap.setLayoutProperty(layer.id, 'line-join', 'round');
             newMap.setLayoutProperty(layer.id, 'visibility', 'visible');
 
-            if (firstLabelId) newMap.moveLayer(layer.id, firstLabelId);
+            newMap.moveLayer(layer.id, routeBeforeId);
 
             const casingId = `${layer.id}-casing`;
             if (!newMap.getLayer(casingId)) {
@@ -986,7 +980,7 @@ const MapboxMap = memo(function MapboxMap() {
                 ? sharedLayer
                 : currentLayers?.find((candidate) => candidate.id === route.id);
               if (layer?.type === 'line') {
-                syncRouteArrowLayer(newMap, route, layer, firstLabelId);
+                syncRouteArrowLayer(newMap, route, layer, routeBeforeId);
               }
             }
           };
