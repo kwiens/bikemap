@@ -68,12 +68,21 @@ export async function renderSiteIcon(
 
 async function readLogo(url: string): Promise<Buffer> {
   if (url.startsWith('/')) {
-    // Local Payload uploads are served from /api/media/file/<filename>.
-    // Resolve only a filename so an unexpected stored URL cannot read outside media.
+    // Payload uses the same media proxy URL for disk and Blob uploads.
     const filename = path.basename(
       decodeURIComponent(new URL(url, 'http://local').pathname),
     );
-    return readFile(path.join(process.cwd(), 'public/media', filename));
+    const storeId = process.env.BLOB_READ_WRITE_TOKEN?.match(
+      /^vercel_blob_rw_([a-z\d]+)_[a-z\d]+$/i,
+    )?.[1];
+    if (!storeId) {
+      return readFile(path.join(process.cwd(), 'public/media', filename));
+    }
+
+    const blobOrigin =
+      process.env.STORAGE_VERCEL_BLOB_BASE_URL ||
+      `https://${storeId.toLowerCase()}.public.blob.vercel-storage.com`;
+    url = `${blobOrigin.replace(/\/$/, '')}/${encodeURIComponent(filename)}`;
   }
   const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
   if (!response.ok) throw new Error(`Logo fetch returned ${response.status}`);

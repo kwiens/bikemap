@@ -107,6 +107,33 @@ describe('city icon rendering', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 
+  it('renders Blob uploads from Payload’s same-origin media URLs', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_QAStore_test');
+    vi.stubEnv('STORAGE_VERCEL_BLOB_BASE_URL', undefined);
+    try {
+      vi.mocked(getFrontendTheme).mockResolvedValue({
+        branding: {
+          bend: { logoUrl: '/api/media/file/bend%20logo.png', logoAlt: null },
+        },
+        css: '',
+      });
+      const input = await sharp({
+        create: { width: 100, height: 200, channels: 3, background: 'red' },
+      })
+        .png()
+        .toBuffer();
+      vi.mocked(fetch).mockResolvedValue(new Response(new Uint8Array(input)));
+      const response = await renderSiteIcon('bend', 180);
+      expect(fetch).toHaveBeenCalledWith(
+        'https://qastore.public.blob.vercel-storage.com/bend%20logo.png',
+        { signal: expect.any(AbortSignal) },
+      );
+      expect(response.headers.get('Cache-Control')).toContain('max-age=3600');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('reads local Payload uploads without requiring an HTTP server', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'city-icon-test-'));
     try {
