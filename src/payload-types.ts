@@ -926,7 +926,7 @@ export interface ConditionReporting {
   createdAt?: string | null;
 }
 /**
- * Customize the public map and admin palette. Each field explains which parts of the interface it changes. Changes apply on the next page load.
+ * Choose colors for the public map. Save and reload the map to see your changes. Clear a color to use its default.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "theme".
@@ -934,23 +934,23 @@ export interface ConditionReporting {
 export interface Theme {
   id: number;
   /**
-   * Changes selected tabs, highlighted cards, icons, borders, and keyboard focus rings.
+   * Colors selected routes, trails, rides, and keyboard focus rings. Also colors selected tabs on Ride Bend.
    */
   primaryColor?: string | null;
   /**
-   * Changes the sidebar background, floating map buttons, and other dark brand areas.
+   * Colors headings and icon backgrounds on the About page, plus the menu and floating buttons on Ride Bend.
    */
   sidebarColor?: string | null;
   /**
-   * Changes cards, panels, form controls, and the light end of the neutral color scale.
+   * Colors page backgrounds, cards, and forms, plus the menu and floating buttons on Bike Chatt.
    */
   surfaceColor?: string | null;
   /**
-   * Changes primary text and tints the gray shades used for secondary text, borders, and dividers.
+   * Colors text and Bike Chatt’s floating button icons. Also tints gray text, borders, and dividers.
    */
   textColor?: string | null;
   /**
-   * Changes enabled toggle switches, hover states, and supporting emphasis.
+   * Colors layer switches when they are on and floating buttons when hovered on Ride Bend.
    */
   accentColor?: string | null;
   updatedAt?: string | null;

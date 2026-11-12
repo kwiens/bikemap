@@ -12,7 +12,7 @@ function textFields(fields: Field[]): TextField[] {
 }
 
 describe('Theme global', () => {
-  it('keeps the Ride Bend fallback palette and editor-facing labels together', () => {
+  it('keeps palette defaults and editor-facing labels together', () => {
     const fields = textFields(Theme.fields);
 
     expect(
@@ -29,22 +29,22 @@ describe('Theme global', () => {
       },
       {
         defaultValue: '#1a434e',
-        label: 'Sidebar & map controls',
+        label: 'About page accents & Ride Bend controls',
         name: 'sidebarColor',
       },
       {
         defaultValue: '#ffffff',
-        label: 'Panels & backgrounds',
+        label: 'Menu, buttons & page backgrounds',
         name: 'surfaceColor',
       },
       {
         defaultValue: '#1a434e',
-        label: 'Text & neutral shades',
+        label: 'Text & icons',
         name: 'textColor',
       },
       {
         defaultValue: '#a5d730',
-        label: 'Enabled controls',
+        label: 'Enabled switches',
         name: 'accentColor',
       },
     ]);

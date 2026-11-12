@@ -28,6 +28,7 @@ function colorField(
         Field: '@/payload/components/ColorField#ColorField',
       },
       description,
+      placeholder: defaultValue,
       width,
     },
     validate: validateHex,
@@ -38,7 +39,7 @@ export const Theme: GlobalConfig = {
   slug: 'theme',
   admin: {
     description:
-      'Customize the public map and admin palette. Each field explains which parts of the interface it changes. Changes apply on the next page load.',
+      'Choose colors for the public map. Save and reload the map to see your changes. Clear a color to use its default.',
     group: 'Settings',
   },
   access: {
@@ -48,7 +49,7 @@ export const Theme: GlobalConfig = {
   fields: [
     {
       type: 'collapsible',
-      label: 'Frontend color palette',
+      label: 'Public map colors',
       fields: [
         {
           type: 'row',
@@ -57,14 +58,14 @@ export const Theme: GlobalConfig = {
               'primaryColor',
               'Selected items & highlights',
               '#c3f44d',
-              'Changes selected tabs, highlighted cards, icons, borders, and keyboard focus rings.',
+              'Colors selected routes, trails, rides, and keyboard focus rings. Also colors selected tabs on Ride Bend.',
               '50%',
             ),
             colorField(
               'sidebarColor',
-              'Sidebar & map controls',
+              'About page accents & Ride Bend controls',
               '#1a434e',
-              'Changes the sidebar background, floating map buttons, and other dark brand areas.',
+              'Colors headings and icon backgrounds on the About page, plus the menu and floating buttons on Ride Bend.',
               '50%',
             ),
           ],
@@ -74,23 +75,23 @@ export const Theme: GlobalConfig = {
           fields: [
             colorField(
               'surfaceColor',
-              'Panels & backgrounds',
+              'Menu, buttons & page backgrounds',
               '#ffffff',
-              'Changes cards, panels, form controls, and the light end of the neutral color scale.',
+              'Colors page backgrounds, cards, and forms, plus the menu and floating buttons on Bike Chatt.',
               '33%',
             ),
             colorField(
               'textColor',
-              'Text & neutral shades',
+              'Text & icons',
               '#1a434e',
-              'Changes primary text and tints the gray shades used for secondary text, borders, and dividers.',
+              'Colors text and Bike Chatt’s floating button icons. Also tints gray text, borders, and dividers.',
               '33%',
             ),
             colorField(
               'accentColor',
-              'Enabled controls',
+              'Enabled switches',
               '#a5d730',
-              'Changes enabled toggle switches, hover states, and supporting emphasis.',
+              'Colors layer switches when they are on and floating buttons when hovered on Ride Bend.',
               '33%',
             ),
           ],

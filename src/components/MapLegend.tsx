@@ -36,6 +36,7 @@ import {
 import { getRideStyle } from './WelcomeModal';
 import { getSetting, setSetting } from '@/utils/settings';
 import {
+  SIDEBAR_COLORS,
   SIDEBAR_THEME_CLASS,
   TOGGLE_BTN_CLASS,
   TOGGLE_ICON_CLASS,
@@ -348,24 +349,29 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       >
         {isEmbed ? (
           /* The host fixes the embed mode, so a compact label replaces tabs. */
-          <div className="flex items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-app-primary/40 bg-app-secondary pt-[calc(17px+env(safe-area-inset-top))]">
-            <span className="text-sm font-medium text-app-surface">
+          <div className={sidebarHeaderClass}>
+            <span className={cn('text-sm font-medium', SIDEBAR_COLORS.label)}>
               {siteConfig.name} ·{' '}
               {embedOptions.mode === 'mtb' ? 'MTB routes' : 'Casual routes'}
             </span>
           </div>
         ) : (
           /* Casual / MTB toggle in header */
-          <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-app-primary/40 bg-app-secondary pt-[calc(17px+env(safe-area-inset-top))]">
-            <div className="flex bg-app-surface/10 rounded-full p-1 w-full border border-app-surface/20">
+          <div className={cn(sidebarHeaderClass, 'justify-center')}>
+            <div
+              className={cn(
+                'flex rounded-full p-1 w-full border',
+                SIDEBAR_COLORS.tabList,
+              )}
+            >
               {hasRoutesSection && (
                 <button
                   type="button"
                   className={cn(
                     'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                     activeSection === 'routes'
-                      ? 'bg-app-primary text-app-secondary shadow-xs'
-                      : 'text-app-surface/70 hover:text-app-surface',
+                      ? SIDEBAR_COLORS.selectedTab
+                      : SIDEBAR_COLORS.unselectedTab,
                   )}
                   onClick={() => switchTab('routes')}
                 >
@@ -377,8 +383,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                 className={cn(
                   'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                   activeSection === 'trails'
-                    ? 'bg-app-primary text-app-secondary shadow-xs'
-                    : 'text-app-surface/70 hover:text-app-surface',
+                    ? SIDEBAR_COLORS.selectedTab
+                    : SIDEBAR_COLORS.unselectedTab,
                 )}
                 onClick={() => switchTab('trails')}
               >
@@ -388,7 +394,12 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <div className="overflow-y-auto flex-1 min-h-0 border-t border-app-surface/10">
+        <div
+          className={cn(
+            'overflow-y-auto flex-1 min-h-0',
+            SIDEBAR_COLORS.contentBorder,
+          )}
+        >
           <div className="px-4 pb-4 pt-2">
             {visibleSection === 'routes' && (
               <>
@@ -459,3 +470,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     </>
   );
 }
+
+const sidebarHeaderClass = cn(
+  'flex items-center py-[17px] px-4 pl-[68px] pb-3 border-b pt-[calc(17px+env(safe-area-inset-top))]',
+  SIDEBAR_COLORS.header,
+);

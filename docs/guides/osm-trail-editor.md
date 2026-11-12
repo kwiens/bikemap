@@ -524,38 +524,21 @@ before the API responds. `/api/map/trails` also sends `Cache-Control: public,
 max-age=60, stale-while-revalidate=3600`; existing clients may serve one stale
 response while they refresh after an edit.
 
-## Admin appearance
+## Public map colors
 
-Two layers, so the common case needs no code:
+Admins can edit the palette in **Settings → Theme** (`/admin/globals/theme`).
+Save and reload the map to see the new colors. Clear a field to use its default.
 
-1. **`src/app/(payload)/custom.css`** — the defaults. Sets CSS custom properties
-   only, never Payload's own selectors, because variables are a supported
-   surface and class names like `.btn__content` are internals that move between
-   releases. It's unlayered while Payload's styles live in
-   `@layer payload-default, payload`, so unlayered rules win and nothing needs
-   `!important`.
-2. **Settings → Theme** (`/admin/globals/theme`) — editable in the UI, stored in
-   the database, injected by the admin layout as variables that override the
-   stylesheet. Colour swatches, corner style, font, neutral tint, plus a custom
-   CSS escape hatch.
+- **Menu, buttons & page backgrounds** and **Text & icons** control Bike Chatt’s
+  menu and floating map controls. The defaults are white and dark teal.
+- **About page accents & Ride Bend controls** sets the brand color used on the
+  About page and for Ride Bend’s menu and floating controls.
+- **Selected items & highlights** and **Enabled switches** control selection
+  highlights and active layer switches.
 
-Every theme field is optional: an unset field falls through to the stylesheet
-default, so clearing a field is how you reset it.
-
-**The one trick worth knowing:** `--theme-elevation-*` — the greys the whole UI
-is built from — all resolve to a `--color-base-*` scale, and Payload derives
-dark mode by *inverting* that scale. So retinting the base ramp once themes both
-modes coherently, which is why "neutral tint" is a single setting rather than
-two.
-
-`customCss` is injected verbatim, so `sanitizeCss` strips `<` and `>` — a stray
-`</style>` would otherwise turn styling into markup. It's admin-only, but
-"trusted input" is exactly how injection bugs get written.
-
-Like the trail reader, `getThemeCss` **never throws**: no database, an
-unreachable one, or an unset global all return an empty string and the
-stylesheet defaults stand. Nobody should be locked out of the admin by a theme
-row.
+The public layout reads the saved palette and applies it through CSS variables.
+The admin uses the saved highlight color for its focus outlines. Both layouts
+use their stylesheet defaults when the theme is unavailable.
 
 ## How the admin is laid out
 
