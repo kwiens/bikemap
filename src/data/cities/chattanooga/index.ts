@@ -1,7 +1,6 @@
 import { bikeResources } from '@/data/bike-resources';
 import { bikeRoutes } from '@/data/bike-routes';
 import { localResources } from '@/data/local-resources';
-import { mapFeatures } from '@/data/map-features';
 import {
   MTN_BIKE_LAYER_ID,
   MTN_BIKE_SOURCE_ID,
@@ -23,7 +22,6 @@ const mountainBikeTrails = applyChattanoogaMeasurements(baseMountainBikeTrails);
 export const chattanoogaData: CityData = {
   cityId: 'chattanooga',
   bikeRoutes,
-  mapFeatures,
   bikeResources,
   localResources,
   mountainBikeTrails,

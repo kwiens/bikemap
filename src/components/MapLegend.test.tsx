@@ -3,6 +3,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import type { MapFeature } from '@/data/map-features';
 import { MapLegendProvider } from './MapLegend';
 import { EmbedProvider } from './EmbedContext';
 import { DEFAULT_EMBED_OPTIONS, type EmbedOptions } from '@/utils/embed';
@@ -124,7 +125,7 @@ describe('MapLegendProvider', () => {
 
   it('defaults to routes section when no cookie', () => {
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -137,7 +138,7 @@ describe('MapLegendProvider', () => {
   it('defaults to trails section when cookie is mountain', () => {
     mockRideStyle = 'mountain';
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -147,7 +148,7 @@ describe('MapLegendProvider', () => {
 
   it('RIDE_STYLE_CHOSEN event switches to trails', () => {
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -162,7 +163,7 @@ describe('MapLegendProvider', () => {
   it('ROUTE_SELECT event sets selectedRoute and clears selectedTrail', () => {
     mockRideStyle = 'mountain';
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -184,7 +185,7 @@ describe('MapLegendProvider', () => {
 
   it('TRAIL_SELECT event sets selectedTrail and switches to trails section', () => {
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -200,7 +201,7 @@ describe('MapLegendProvider', () => {
 
   it('ROUTE_DESELECT clears selectedRoute', () => {
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -221,7 +222,7 @@ describe('MapLegendProvider', () => {
   it('TRAIL_DESELECT clears selectedTrail', () => {
     mockRideStyle = 'mountain';
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -236,7 +237,7 @@ describe('MapLegendProvider', () => {
 
   it('clicking empty map area clears both route and trail selection', () => {
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -261,7 +262,7 @@ describe('MapLegendProvider', () => {
   it('area select dispatches deselect events before area-select', () => {
     mockRideStyle = 'mountain';
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -282,7 +283,7 @@ describe('MapLegendProvider', () => {
 
   it('renders map layers in routes section', () => {
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -292,7 +293,7 @@ describe('MapLegendProvider', () => {
 
   it('hides map layers when switched to trails section', () => {
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -304,7 +305,7 @@ describe('MapLegendProvider', () => {
 
   it('Nationwide trails toggle lives in the trails tab and dispatches osmTrails', () => {
     render(
-      <MapLegendProvider>
+      <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
@@ -330,11 +331,14 @@ describe('embed mode', () => {
   const events: Array<{ type: string; detail: unknown }> = [];
   let handler: (e: Event) => void;
 
-  function renderEmbed(options: Partial<EmbedOptions> = {}) {
+  function renderEmbed(
+    options: Partial<EmbedOptions> = {},
+    attractions: MapFeature[] = [],
+  ) {
     const merged: EmbedOptions = { ...DEFAULT_EMBED_OPTIONS, ...options };
     return render(
       <EmbedProvider options={merged}>
-        <MapLegendProvider>
+        <MapLegendProvider attractions={attractions}>
           <div />
         </MapLegendProvider>
       </EmbedProvider>,
@@ -409,7 +413,17 @@ describe('embed mode', () => {
   it('dispatches LAYER_TOGGLE for preset layers on mount when the map is ready', () => {
     (window as unknown as { __mapReady?: boolean }).__mapReady = true;
 
-    renderEmbed({ layers: ['attractions'] });
+    renderEmbed({ layers: ['attractions'] }, [
+      {
+        id: 1,
+        name: 'Traffic garden',
+        description: 'Practice cycling.',
+        address: 'Chattanooga, TN',
+        latitude: 35,
+        longitude: -85,
+        icon: 'bicycle',
+      },
+    ]);
 
     const toggleEvents = events.filter(
       (e) => e.type === MAP_EVENTS.LAYER_TOGGLE,
@@ -418,6 +432,14 @@ describe('embed mode', () => {
       type: MAP_EVENTS.LAYER_TOGGLE,
       detail: { layer: 'attractions', visible: true },
     });
+  });
+
+  it('skips the Attractions preset when there are no published attractions', () => {
+    (window as unknown as { __mapReady?: boolean }).__mapReady = true;
+
+    renderEmbed({ layers: ['attractions'] });
+
+    expect(events.some((e) => e.type === MAP_EVENTS.LAYER_TOGGLE)).toBe(false);
   });
 
   it('waits for MAP_READY before dispatching preset layers when the map is not ready yet', () => {

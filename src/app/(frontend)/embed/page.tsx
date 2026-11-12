@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import React from 'react';
 import { resolveActiveCityId } from '@/config/map.config';
+import { getCityAttractions } from '@/payload/read/attractions';
 import { getCityRoutes } from '@/payload/read/routes';
 import { getRequestHostname } from '@/utils/request-hostname';
 import EmbedClient from './EmbedClient';
@@ -15,6 +16,11 @@ export default async function EmbedPage({
     searchParams,
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
-  const { routes } = await getCityRoutes(cityId);
-  return <EmbedClient cityId={cityId} routes={routes} />;
+  const [{ routes }, attractions] = await Promise.all([
+    getCityRoutes(cityId),
+    getCityAttractions(cityId),
+  ]);
+  return (
+    <EmbedClient cityId={cityId} routes={routes} attractions={attractions} />
+  );
 }

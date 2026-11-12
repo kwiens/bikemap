@@ -31,15 +31,23 @@ import { mapConfig } from '@/config/map.config';
 import { siteConfig } from '@/config/site.config';
 import { useEmbed } from '@/components/EmbedContext';
 import type { EmbedLayer } from '@/utils/embed';
-import { bikeNetworkUrl, bikeResources, mapFeatures } from '@/data/geo_data';
+import type { MapFeature } from '@/data/map-features';
+import { bikeNetworkUrl, bikeResources } from '@/data/geo_data';
 import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
 
 // Main provider component
-export function MapLegendProvider({ children }: { children: React.ReactNode }) {
+export function MapLegendProvider({
+  attractions,
+  children,
+}: {
+  attractions: MapFeature[];
+  children: React.ReactNode;
+}) {
+  const hasAttractions = attractions.length > 0;
   const hasRoutesSection =
     getBikeRoutes().length > 0 ||
-    mapFeatures.length > 0 ||
+    hasAttractions ||
     bikeResources.length > 0 ||
     Boolean(mapConfig.gbfs);
   const { isEmbed, options: embedOptions } = useEmbed();
@@ -262,6 +270,10 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     [toggleLayer],
   );
 
+  useEffect(() => {
+    if (!hasAttractions && showAttractions) toggleAttractionLayer();
+  }, [hasAttractions, showAttractions, toggleAttractionLayer]);
+
   const toggleBikeResourcesLayer = useCallback(
     () => toggleLayer('bikeResources'),
     [toggleLayer],
@@ -313,14 +325,18 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     bikeNetwork: false,
   });
   presetLayersRef.current = {
-    attractions: showAttractions,
+    attractions: hasAttractions && showAttractions,
     bikeResources: showBikeResources,
     bikeRentals: showBikeRentals,
     bikeNetwork: showBikeNetwork,
   };
 
   useEffect(() => {
-    if (!isEmbed || embedOptions.layers.length === 0) return;
+    if (!isEmbed) return;
+    const layers = embedOptions.layers.filter(
+      (layer) => layer !== 'attractions' || hasAttractions,
+    );
+    if (layers.length === 0) return;
 
     const setterMap: Record<EmbedLayer, () => void> = {
       attractions: () => setShowAttractions(true),
@@ -328,7 +344,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       bikeRentals: () => setShowBikeRentals(true),
       bikeNetwork: () => setShowBikeNetwork(true),
     };
-    for (const layer of embedOptions.layers) {
+    for (const layer of layers) {
       setterMap[layer]();
       // Seed the ref too: when the map is already ready, onMapReady dispatches
       // synchronously below — before React has re-rendered with the state we
@@ -337,7 +353,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     }
 
     const dispatchLayers = () => {
-      for (const layer of embedOptions.layers) {
+      for (const layer of layers) {
         const visible = presetLayersRef.current[layer];
         window.dispatchEvent(
           new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
@@ -516,6 +532,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                 )}
 
                 <MapLayers
+                  hasAttractions={hasAttractions}
                   showAttractions={showAttractions}
                   showBikeResources={showBikeResources}
                   showBikeRentals={showBikeRentals}
@@ -525,6 +542,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                 />
 
                 <AttractionsList
+                  attractions={attractions}
                   show={showAttractions}
                   onCenterLocation={centerOnLocation}
                 />

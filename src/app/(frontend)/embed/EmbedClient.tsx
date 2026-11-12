@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import dynamic from 'next/dynamic';
 import React from 'react';
 import { activeCityId } from '@/config/map.config';
+import type { MapFeature } from '@/data/map-features';
 import type { BikeRoute } from '@/data/bike-routes';
 import type { CityId } from '@/data/cities/types';
 import { setBikeRoutes } from '@/data/route-source';
@@ -20,17 +21,20 @@ const EmbedMap = dynamic(() => import('@/components/embed/EmbedMap'), {
 export default function EmbedClient({
   cityId,
   routes,
+  attractions,
 }: {
   cityId: CityId;
   routes: BikeRoute[];
+  attractions: MapFeature[];
 }): ReactElement {
-  if (cityId === activeCityId) {
+  const isActiveCity = cityId === activeCityId;
+  if (isActiveCity) {
     setBikeRoutes(routes);
   }
 
   return (
     <main className="overflow-hidden fixed inset-0 m-0 p-0">
-      <EmbedMap />
+      <EmbedMap attractions={isActiveCity ? attractions : []} />
     </main>
   );
 }

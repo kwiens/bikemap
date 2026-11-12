@@ -119,9 +119,8 @@ Riverwalk Loop while leaving its 556-point main path unchanged.
 
 ## Other PR #67 datasets
 
-The app has dedicated database collections for curated mountain-bike trails
-and routes, not for every GIS layer in the archive. Do not coerce unrelated
-data into either collection:
+The app has dedicated database collections for curated mountain-bike trails,
+routes, and attractions. Other GIS layers in the archive are tracked below:
 
 | Source group | Intended treatment |
 |---|---|
@@ -129,7 +128,7 @@ data into either collection:
 | Riverwalk Loop route file | Normalize and import into Payload's `routes` collection; display metadata remains in `BikeRoute`. |
 | Zoo, Riverwalk Greenway, Cherokee, Moccasin Bend, and South Chickamauga route files | Keep their newer Studio geometry until each current source is archived and verified. |
 | Bike Chattanooga station snapshot | Do not seed as current availability; the app already reads live GBFS. Keep only as a dated reference snapshot. |
-| Traffic garden points | Candidate geometry for a future map-features collection. |
+| Traffic garden points | The three existing gardens are seeded in Payload’s Attractions collection with their checked-in coordinates. |
 | Godsey–Waldens connection | Preserve as an unmapped route candidate until its product/route identity is decided. |
 
 This division is intentional: “ready to import” means the data matches a real
