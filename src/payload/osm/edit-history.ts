@@ -3,7 +3,7 @@
  * deep copy; immutable route plans can retain their references so pending-leg
  * identity checks still work. Unfinished drawing gestures keep their own history.
  */
-const MAX_HISTORY = 100;
+export const MAX_EDIT_HISTORY = 100;
 
 export interface EditHistory<T> {
   canRedo(): boolean;
@@ -20,7 +20,7 @@ export interface EditHistory<T> {
 
 export function createEditHistory<T>(
   copy: (value: T) => T,
-  limit = MAX_HISTORY,
+  limit = MAX_EDIT_HISTORY,
 ): EditHistory<T> {
   const past: T[] = [];
   const future: T[] = [];

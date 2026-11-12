@@ -44,10 +44,9 @@
  * store, and Terra Draw has no notion of selecting points across features. In
  * those modes Terra Draw is inert and only draws the line.
  *
- * **Undo is the editor's, not Terra Draw's** (`edit-history.ts`). Every settled
- * edit — a finished drag, a finished piece, one bulk operation — pushes a
- * snapshot of the line before it. Terra Draw keeps only its mode-level history,
- * for taking back points of a piece still being drawn. A snapshot also records
+ * The editor's history (`edit-history.ts`) records settled changes, including
+ * one step per click when adding a line. Terra Draw keeps the mode-level
+ * history for a piece still being drawn. An editor snapshot also records
  * who owned the line (`LineOwner`), so undoing past the first hand edit, or past
  * an OSM refresh, puts the trail's source and OSM report back as they were.
  *
@@ -97,7 +96,10 @@ import {
 } from '@/data/osm-trails';
 import type { TrailNetworkResponse } from '@/payload/endpoints/trail-network';
 import { boundsOf, lengthMeters } from '@/payload/osm/assemble';
-import { createEditHistory } from '@/payload/osm/edit-history';
+import {
+  createEditHistory,
+  MAX_EDIT_HISTORY,
+} from '@/payload/osm/edit-history';
 import type { PreviewTrailGeometryResponse } from '@/payload/endpoints/preview-trail-geometry';
 import {
   cloneParts,
@@ -132,6 +134,7 @@ import {
 } from './point-selection-tool';
 import {
   createRouteTool,
+  type LineAddition,
   type RouteStatus,
   type RouteTool,
 } from './route-tool';
@@ -142,6 +145,7 @@ type Mode = 'draw' | 'move' | 'pick' | 'route' | 'select';
 
 const WAYS_LAYER = 'osm-ways';
 const WAYS_HIT_LAYER = 'osm-ways-hit';
+const HISTORY_POINT_LAYER = 'editor-history-point';
 
 const PICKED_COLOR = '#2563EB';
 const UNPICKED_COLOR = '#9CA3AF';
@@ -183,6 +187,7 @@ interface LineOwner {
 }
 
 interface LineSnapshot {
+  point?: [number, number];
   owner: LineOwner;
   parts: Parts;
 }
@@ -285,6 +290,7 @@ export function GeometryMapEditor({
   const startedRef = useRef(false);
   /** Undo and redo for every edit. See `edit-history.ts`. */
   const historyRef = useRef(createEditHistory(cloneSnapshot));
+  const historyPointRef = useRef<LineSnapshot['point']>(undefined);
   const refreshRequestRef = useRef<AbortController | null>(null);
 
   const [ready, setReady] = useState(false);
@@ -424,50 +430,69 @@ export function GeometryMapEditor({
     [cancelRefresh],
   );
 
-  /**
-   * Lights the toolbar buttons from what can actually be undone.
-   *
-   * Three sources count: the editor's history, Terra Draw's points of a piece
-   * still being drawn, and the clicks of a route still being built. Redo is off
-   * while a route is being built — see `redo`.
-   */
   const syncHistory = useCallback(() => {
-    const draw = drawRef.current;
-    const isDrawing = modeRef.current === 'draw';
-    const isRouting = Boolean(routeToolRef.current?.hasRoute());
+    const draw = startedRef.current ? drawRef.current : null;
+    const route = modeRef.current === 'route' ? routeToolRef.current : null;
+    const isDrawing = modeRef.current === 'draw' && Boolean(draw?.canUndo());
     setHistory({
       canRedo:
-        !isRouting &&
-        (historyRef.current.canRedo() ||
-          (isDrawing && Boolean(draw?.canRedo()))),
+        Boolean(route?.canRedoLeg()) ||
+        (modeRef.current === 'draw' && Boolean(draw?.canRedo())) ||
+        (!route?.hasRoute() && !isDrawing && historyRef.current.canRedo()),
       canUndo:
-        historyRef.current.canUndo() ||
-        (isDrawing && Boolean(draw?.canUndo())) ||
-        (modeRef.current === 'route' &&
-          Boolean(routeToolRef.current?.hasRoute())),
+        Boolean(route?.hasRoute()) || isDrawing || historyRef.current.canUndo(),
     });
   }, []);
 
-  /**
-   * Closes the edit in progress into one undo step.
-   *
-   * Called when Terra Draw finishes an action — the end of a drag, a finished
-   * piece, a deleted point — so a drag that rewrote the line on every frame is
-   * still a single Undo. A no-op when nothing has changed since the last one.
-   */
-  const settle = useCallback(() => {
-    if (samePartsAs(settledRef.current, partsRef.current)) {
-      return;
-    }
-    historyRef.current.push({
-      owner: settledOwnerRef.current,
-      parts: settledRef.current,
-    });
-    settledRef.current = cloneParts(partsRef.current);
-    // Every Terra Draw edit went through `commit`, which took ownership.
-    settledOwnerRef.current = EDITED_OWNER;
-    syncHistory();
-  }, [syncHistory]);
+  const setHistoryPoint = useCallback((point?: LineSnapshot['point']) => {
+    historyPointRef.current = point;
+    const source =
+      mapRef.current?.getSource<mapboxgl.GeoJSONSource>(HISTORY_POINT_LAYER);
+    source?.setData(historyPointData(point));
+  }, []);
+
+  const recordEdit = useCallback(
+    (base: Parts, next: Parts, addition?: LineAddition) => {
+      const owner = settledOwnerRef.current;
+      const history = historyRef.current;
+      history.push({ owner, parts: base, point: historyPointRef.current });
+      if (!addition) {
+        return;
+      }
+      const { atStart, partIndex, pointCounts } = addition;
+      const part = next[partIndex];
+      // The last count is the current line. Older prefixes past the history
+      // limit would be discarded as soon as we push the newer ones.
+      for (const count of pointCounts.slice(-MAX_EDIT_HISTORY - 1, -1)) {
+        if (count === 1) {
+          // A single click is visible, but cannot be saved as a LineString.
+          history.push({ owner, parts: base, point: part[0] });
+        } else {
+          const prefix = [...next];
+          prefix[partIndex] = atStart
+            ? part.slice(-count)
+            : part.slice(0, count);
+          history.push({ owner: EDITED_OWNER, parts: prefix });
+        }
+      }
+    },
+    [],
+  );
+
+  /** A drag can preview many updates before settling as one edit. */
+  const settle = useCallback(
+    (addition?: LineAddition) => {
+      if (samePartsAs(settledRef.current, partsRef.current)) {
+        return;
+      }
+      recordEdit(settledRef.current, partsRef.current, addition);
+      setHistoryPoint();
+      settledRef.current = cloneParts(partsRef.current);
+      settledOwnerRef.current = EDITED_OWNER;
+      syncHistory();
+    },
+    [recordEdit, setHistoryPoint, syncHistory],
+  );
 
   /**
    * Pulls Terra Draw's store back into `parts` and, optionally, the form.
@@ -485,8 +510,15 @@ export function GeometryMapEditor({
         return;
       }
       // Rounded for the same reason the adapter is: partsRef must stay at the
-      // precision the form-sync effect compares, whatever Terra Draw emits.
-      const next = roundParts(featuresToParts(draw.getSnapshot()));
+      // precision the form-sync effect compares. An unfinished stroke includes
+      // the live cursor, so it stays in Terra Draw until the user finishes it.
+      const next = roundParts(
+        featuresToParts(
+          draw
+            .getSnapshot()
+            .filter((feature) => !feature.properties.currentlyDrawing),
+        ),
+      );
       const changed = !samePartsAs(next, partsRef.current);
 
       partsRef.current = next;
@@ -617,13 +649,16 @@ export function GeometryMapEditor({
   /**
    * Puts a whole new line on screen and into the form, without touching the
    * history — the callers decide what that step means for undo.
-   *
-   * Rounded on the way in: the bulk edits and routes compute coordinates, and
-   * Terra Draw silently refuses any with more than 9 decimal places.
+   * Callers pass rounded coordinates so Terra Draw can load them.
    */
   const setLine = useCallback(
-    (next: Parts, owner: LineOwner = EDITED_OWNER) => {
-      partsRef.current = roundParts(next);
+    (
+      next: Parts,
+      owner: LineOwner = EDITED_OWNER,
+      point?: LineSnapshot['point'],
+    ) => {
+      partsRef.current = next;
+      setHistoryPoint(point);
       settledRef.current = cloneParts(partsRef.current);
       settledOwnerRef.current = owner;
       loadDraw(partsRef.current, false);
@@ -632,8 +667,9 @@ export function GeometryMapEditor({
       selectionToolRef.current?.refresh();
       // A route in progress was built against the old line — it may be set to
       // extend a piece that no longer exists, or is now a different one.
-      if (routeToolRef.current?.hasRoute()) {
-        routeToolRef.current.cancel();
+      const route = routeToolRef.current;
+      if (route?.hasRoute() || route?.canRedoLeg()) {
+        route.cancel();
       }
       // Loading cleared Terra Draw's selection, which is what shows the handles.
       if (modeRef.current === 'move') {
@@ -641,7 +677,7 @@ export function GeometryMapEditor({
       }
       syncHistory();
     },
-    [autoSelect, commit, loadDraw, paintStats, syncHistory],
+    [autoSelect, commit, loadDraw, paintStats, setHistoryPoint, syncHistory],
   );
 
   /**
@@ -652,23 +688,24 @@ export function GeometryMapEditor({
    * has to be recorded from where the gesture started.
    */
   const applyEdit = useCallback(
-    (next: Parts, before?: Parts) => {
+    (next: Parts, before?: Parts, addition?: LineAddition) => {
       if (!before) {
         // Any Terra Draw edit not yet closed off becomes its own step first.
         settle();
       }
       const base = before ?? settledRef.current;
-      if (samePartsAs(next, base)) {
+      const rounded = roundParts(next);
+      if (samePartsAs(rounded, base)) {
         if (before) {
           setLine(base);
         }
         return;
       }
       // A gesture previews without committing, so ownership is still as settled.
-      historyRef.current.push({ owner: settledOwnerRef.current, parts: base });
-      setLine(next);
+      recordEdit(base, rounded, addition);
+      setLine(rounded);
     },
-    [setLine, settle],
+    [recordEdit, setLine, settle],
   );
 
   /** Shows a line mid-gesture. Neither committed nor recorded. */
@@ -912,15 +949,27 @@ export function GeometryMapEditor({
       }
     });
 
-    // The end of a drag, an inserted or deleted point, a finished piece.
-    draw.on('finish', settle);
+    draw.on('finish', (id, { mode, action }) => {
+      if (mode === LINESTRING && action === 'draw') {
+        const lines = draw
+          .getSnapshot()
+          .filter((feature) => feature.geometry.type === 'LineString');
+        const partIndex = lines.findIndex((feature) => feature.id === id);
+        const part = partsRef.current[partIndex];
+        if (part) {
+          settle({ partIndex, pointCounts: part.map((_, index) => index + 1) });
+          return;
+        }
+      }
+      settle();
+    });
 
     // Fires for every push, undo, and redo of a piece still being drawn, so the
     // toolbar reflects what is actually on the stacks.
     draw.on('history', syncHistory);
 
     const routeTool = createRouteTool(map, {
-      apply: (next) => applyEdit(next),
+      apply: (next, addition) => applyEdit(next, undefined, addition),
       fetchNetwork,
       getParts: () => partsRef.current,
       isActive: () => !readOnlyRef.current && modeRef.current === 'route',
@@ -949,6 +998,21 @@ export function GeometryMapEditor({
       installWayLayers(map);
       applyWayStyle(map, idsRef.current, modeRef.current);
       mountDraw();
+      map.addSource(HISTORY_POINT_LAYER, {
+        type: 'geojson',
+        data: historyPointData(historyPointRef.current),
+      });
+      map.addLayer({
+        id: HISTORY_POINT_LAYER,
+        type: 'circle',
+        source: HISTORY_POINT_LAYER,
+        paint: {
+          'circle-color': LINE_COLOR,
+          'circle-radius': 5,
+          'circle-stroke-color': '#fff',
+          'circle-stroke-width': 2,
+        },
+      });
       routeTool.install();
       selectionTool.install();
       setReady(true);
@@ -983,22 +1047,26 @@ export function GeometryMapEditor({
     togglePick,
   ]);
 
-  // Mode governs what Terra Draw is doing and how the ways layer looks.
   useEffect(() => {
     const draw = drawRef.current;
-    const map = mapRef.current;
-    if (!draw || !map || !ready) {
+    if (!draw || !ready || !startedRef.current) {
       return;
     }
-
-    if (startedRef.current) {
-      draw.setMode(terraModeFor(mode, editable));
-      if (mode === 'move' && editable) {
-        autoSelect();
-      }
+    // Setting a mode cleans up Terra Draw's unfinished stroke and its history.
+    const terraMode = terraModeFor(mode, editable);
+    if (draw.getMode() !== terraMode) {
+      draw.setMode(terraMode);
     }
-    applyWayStyle(map, ids, mode);
-  }, [autoSelect, editable, ids, mode, ready]);
+    if (mode === 'move' && editable) {
+      autoSelect();
+    }
+  }, [autoSelect, editable, mode, ready]);
+
+  useEffect(() => {
+    if (mapRef.current && ready) {
+      applyWayStyle(mapRef.current, ids, mode);
+    }
+  }, [ids, mode, ready]);
 
   // Entering and leaving the custom modes. Leaving Follow trails keeps any
   // route in progress, and a double-click there finishes the route instead of
@@ -1056,6 +1124,7 @@ export function GeometryMapEditor({
   const receiveLine = useCallback(
     (incoming: Parts, baseline: boolean) => {
       partsRef.current = incoming;
+      setHistoryPoint();
       loadDraw(incoming, baseline);
       settledRef.current = cloneParts(incoming);
       paintStats();
@@ -1063,8 +1132,9 @@ export function GeometryMapEditor({
       // pieces of the line just replaced — a refresh from OSM can land mid-edit.
       selectionToolRef.current?.setSelection([]);
       setEditNote(null);
-      if (routeToolRef.current?.hasRoute()) {
-        routeToolRef.current.cancel();
+      const route = routeToolRef.current;
+      if (route?.hasRoute() || route?.canRedoLeg()) {
+        route.cancel();
       }
       if (modeRef.current === 'move') {
         autoSelect();
@@ -1076,7 +1146,7 @@ export function GeometryMapEditor({
         map.fitBounds(bounds, { animate: false, padding: 60 });
       }
     },
-    [autoSelect, loadDraw, paintStats],
+    [autoSelect, loadDraw, paintStats, setHistoryPoint],
   );
 
   // Pull the stored line in — on first load, and after a save replaces it with
@@ -1107,6 +1177,7 @@ export function GeometryMapEditor({
         ? settledOwnerRef.current
         : EDITED_OWNER,
       parts: partsRef.current,
+      point: historyPointRef.current,
     }),
     [],
   );
@@ -1118,7 +1189,6 @@ export function GeometryMapEditor({
   const undo = useCallback(() => {
     const draw = drawRef.current;
     if (modeRef.current === 'route' && routeToolRef.current?.undoLeg()) {
-      syncHistory();
       return;
     }
     if (modeRef.current === 'draw' && draw?.canUndo()) {
@@ -1129,27 +1199,33 @@ export function GeometryMapEditor({
     settle();
     const previous = historyRef.current.undo(currentSnapshot());
     if (previous) {
-      setLine(previous.parts, previous.owner);
+      setLine(previous.parts, previous.owner, previous.point);
       selectionToolRef.current?.clear();
       setEditNote(null);
     }
   }, [currentSnapshot, setLine, settle, syncHistory]);
 
   const redo = useCallback(() => {
-    // Applying a redo replaces the line, which cancels the route being built
-    // against it and throws its clicks away. Finish or cancel the route first.
-    if (routeToolRef.current?.hasRoute()) {
-      return;
+    if (modeRef.current === 'route') {
+      const route = routeToolRef.current;
+      if (route?.redoLeg() || route?.hasRoute()) {
+        return;
+      }
     }
     const draw = drawRef.current;
-    if (modeRef.current === 'draw' && draw?.canRedo()) {
-      draw.redo();
-      syncHistory();
-      return;
+    if (modeRef.current === 'draw') {
+      if (draw?.canRedo()) {
+        draw.redo();
+        syncHistory();
+        return;
+      }
+      if (draw?.canUndo()) {
+        return;
+      }
     }
     const next = historyRef.current.redo(currentSnapshot());
     if (next) {
-      setLine(next.parts, next.owner);
+      setLine(next.parts, next.owner, next.point);
       selectionToolRef.current?.clear();
       setEditNote(null);
     }
@@ -1268,7 +1344,6 @@ export function GeometryMapEditor({
         routeToolRef.current?.cancel();
       } else if (current === 'route' && event.key === 'Backspace') {
         routeToolRef.current?.undoLeg();
-        syncHistory();
       } else if (
         current === 'select' &&
         (event.key === 'Delete' || event.key === 'Backspace')
@@ -1287,7 +1362,7 @@ export function GeometryMapEditor({
         event.stopPropagation();
       }
     },
-    [deleteSelected, redo, syncHistory, undo],
+    [deleteSelected, redo, undo],
   );
 
   async function refreshFromOsm(): Promise<void> {
@@ -2239,5 +2314,22 @@ function ignoreChange() {}
 
 function cloneSnapshot(snapshot: LineSnapshot): LineSnapshot {
   // The owner is replaced whole, never mutated, so it can be shared.
-  return { owner: snapshot.owner, parts: cloneParts(snapshot.parts) };
+  return { ...snapshot, parts: cloneParts(snapshot.parts) };
+}
+
+function historyPointData(
+  point: LineSnapshot['point'],
+): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: point
+      ? [
+          {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: point },
+            properties: {},
+          },
+        ]
+      : [],
+  };
 }

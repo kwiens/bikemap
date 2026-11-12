@@ -24,9 +24,10 @@ const ui = vi.hoisted(() => ({
   writes: {} as Record<string, unknown>,
   loadStyle: () => {},
   changed: () => {},
-  finished: () => {},
+  finished: (_id?: string, _context?: { mode: string; action: string }) => {},
   features: [] as GeoJSON.Feature[],
-  pendingParts: [] as [number, number][][],
+  clickMap: (_point: [number, number], _altKey: boolean) => {},
+  sourceData: new Map<string, unknown>(),
   removeMap: vi.fn(),
   selectFeature: vi.fn(),
 }));
@@ -61,23 +62,64 @@ vi.mock('@/utils/map', () => ({ OSM_BIKE_TRAIL_FILTER: [] }));
 vi.mock('mapbox-gl', () => ({
   default: {
     Map: class {
+      private handlers = new Map<string, Set<(event?: unknown) => void>>();
+
+      constructor() {
+        ui.clickMap = ([lng, lat], altKey) => {
+          const lngLat = { lng, lat };
+          for (const handle of this.handlers.get('click') ?? []) {
+            handle({
+              lngLat,
+              point: this.project(lngLat),
+              originalEvent: { altKey },
+            });
+          }
+        };
+      }
       addControl() {}
       setFilter() {}
       setLayoutProperty() {}
       doubleClickZoom = { disable() {}, enable() {} };
-      on(event: string, callback: () => void) {
+      on(event: string, callback: string | ((event?: unknown) => void)) {
+        if (typeof callback !== 'function') return;
         if (event === 'style.load') ui.loadStyle = callback;
+        const handlers = this.handlers.get(event) ?? new Set();
+        handlers.add(callback);
+        this.handlers.set(event, handlers);
       }
-      getSource() {
-        return null;
+      off(event: string, callback: (event?: unknown) => void) {
+        this.handlers.get(event)?.delete(callback);
+      }
+      getSource(id: string) {
+        return ui.sourceData.has(id)
+          ? { setData: (data: unknown) => ui.sourceData.set(id, data) }
+          : undefined;
       }
       getLayer() {
         return null;
       }
-      addSource() {}
+      addSource(id: string, source: { data?: unknown }) {
+        ui.sourceData.set(id, source.data);
+      }
       addLayer() {}
       getCanvas() {
         return { style: {} };
+      }
+      getZoom() {
+        return 10;
+      }
+      project(location: { lng: number; lat: number } | [number, number]) {
+        const [lng, lat] = Array.isArray(location)
+          ? location
+          : [location.lng, location.lat];
+        const x = lng * 10000;
+        const y = lat * 10000;
+        return {
+          x,
+          y,
+          dist: (other: { x: number; y: number }) =>
+            Math.hypot(x - other.x, y - other.y),
+        };
       }
       fitBounds() {}
       remove() {
@@ -92,13 +134,23 @@ vi.mock('./RoutePlanner', () => ({
 }));
 vi.mock('terra-draw', () => ({
   TerraDraw: class {
-    on(event: string, callback: () => void) {
+    private mode = 'static';
+
+    on(event: string, callback: typeof ui.finished) {
       if (event === 'change') ui.changed = callback;
-      if (event === 'finish') ui.finished = callback;
+      if (event === 'finish') {
+        ui.finished = (id, context = { mode: this.mode, action: 'edit' }) =>
+          callback(id, context);
+      }
     }
     start() {}
     stop() {}
-    setMode() {}
+    getMode() {
+      return this.mode;
+    }
+    setMode(mode: string) {
+      this.mode = mode;
+    }
     clear() {
       ui.features = [];
     }
@@ -130,24 +182,6 @@ vi.mock('terra-draw', () => ({
 }));
 vi.mock('terra-draw-mapbox-gl-adapter', () => ({
   TerraDrawMapboxGLAdapter: class {},
-}));
-vi.mock('./route-tool', () => ({
-  createRouteTool: (
-    _map: unknown,
-    host: { apply(parts: [number, number][][]): void },
-  ) => ({
-    dispose() {},
-    install() {},
-    hasRoute: () => false,
-    setTrails() {},
-    activate() {},
-    finish() {
-      const next = ui.pendingParts;
-      ui.pendingParts = [];
-      if (next.length > 0) host.apply(next);
-    },
-    deactivate() {},
-  }),
 }));
 vi.mock('./point-selection-tool', () => ({
   createPointSelectionTool: () => ({
@@ -184,7 +218,7 @@ beforeEach(() => {
   };
   ui.writes = {};
   ui.features = [];
-  ui.pendingParts = [];
+  ui.sourceData.clear();
   ui.removeMap.mockClear();
   ui.selectFeature.mockClear();
 });
@@ -360,7 +394,7 @@ describe('shared geometry editor', () => {
         [-85.01, 35.01],
       ],
     ];
-    ui.pendingParts = coordinates;
+    act(() => coordinates[0].forEach((point) => ui.clickMap(point, true)));
     fireEvent.click(screen.getByRole('button', { name: 'Point editing' }));
     expect(ui.writes.geom).toEqual({ type: 'MultiLineString', coordinates });
     expect(screen.getByRole('button', { name: 'Adjust line' })).toHaveAttribute(
@@ -370,6 +404,127 @@ describe('shared geometry editor', () => {
     expect(ui.removeMap).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(ui.writes.geom).toBeNull();
+  });
+
+  it('undoes and redoes each snapped waypoint before and after finishing', async () => {
+    ui.values.geom = null;
+    ui.values.geometrySource = 'drawn';
+    render(<RouteLineEditor path="geom" />);
+    await act(async () => ui.loadStyle());
+
+    const points: [number, number][] = [
+      [-85, 35],
+      [-85.01, 35.01],
+      [-85.02, 35.02],
+    ];
+    const undo = screen.getByRole('button', { name: 'Undo' });
+    const redo = screen.getByRole('button', { name: 'Redo' });
+    const map = screen.getByRole('application', { name: 'Route line map' });
+    act(() => points.forEach((point) => ui.clickMap(point, true)));
+    fireEvent.keyDown(map, { key: 'z', ctrlKey: true });
+    expect(ui.sourceData.get('route-tool-path')).toMatchObject({
+      features: [{ geometry: { coordinates: points.slice(0, 2) } }],
+    });
+    expect(redo).toBeEnabled();
+    fireEvent.keyDown(map, { key: 'z', ctrlKey: true, shiftKey: true });
+    expect(ui.sourceData.get('route-tool-path')).toMatchObject({
+      features: [{ geometry: { coordinates: points } }],
+    });
+    expect(ui.writes).toEqual({});
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finish route' }));
+    expect(ui.writes.geom).toMatchObject({ coordinates: [points] });
+    fireEvent.click(undo);
+    expect(ui.writes.geom).toMatchObject({ coordinates: [points.slice(0, 2)] });
+    fireEvent.click(undo);
+    expect(ui.writes.geom).toBeNull();
+    expect(ui.sourceData.get('editor-history-point')).toMatchObject({
+      features: [{ geometry: { coordinates: points[0] } }],
+    });
+    fireEvent.click(undo);
+    expect(ui.sourceData.get('editor-history-point')).toMatchObject({
+      features: [],
+    });
+    expect(undo).toBeDisabled();
+
+    fireEvent.click(redo);
+    expect(ui.sourceData.get('editor-history-point')).toMatchObject({
+      features: [{ geometry: { coordinates: points[0] } }],
+    });
+    fireEvent.click(redo);
+    expect(ui.writes.geom).toMatchObject({ coordinates: [points.slice(0, 2)] });
+    fireEvent.click(redo);
+    expect(ui.writes.geom).toMatchObject({ coordinates: [points] });
+    expect(redo).toBeDisabled();
+  });
+
+  it('undoes an extension at the start of a line without changing its existing points', async () => {
+    ui.values.geometrySource = 'drawn';
+    render(<RouteLineEditor path="geom" />);
+    await act(async () => ui.loadStyle());
+    fireEvent.click(screen.getByRole('button', { name: 'Path snapping' }));
+
+    const [line] = ORIGINAL.coordinates;
+    const first: [number, number] = [-84.99, 35];
+    const second: [number, number] = [-84.98, 35];
+    act(() => {
+      ui.clickMap(line[0], false);
+      ui.clickMap(first, true);
+      ui.clickMap(second, true);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Finish route' }));
+    expect(ui.writes.geom).toMatchObject({
+      coordinates: [[second, first, ...line]],
+    });
+    const undo = screen.getByRole('button', { name: 'Undo' });
+    fireEvent.click(undo);
+    expect(ui.writes.geom).toMatchObject({ coordinates: [[first, ...line]] });
+    fireEvent.click(undo);
+    expect(ui.writes.geom).toEqual(ORIGINAL);
+    expect(undo).toBeDisabled();
+  });
+
+  it('records the clicked vertices of a finished freehand line', async () => {
+    ui.values.geom = null;
+    render(<TrailMapEditor path="geom" />);
+    await act(async () => ui.loadStyle());
+    fireEvent.click(screen.getByRole('button', { name: 'Draw line' }));
+
+    const points: [number, number][] = [
+      [-85, 35],
+      [-85.01, 35.01],
+      [-85.02, 35.02],
+    ];
+    const feature: GeoJSON.Feature = {
+      id: 'freehand',
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: points },
+      properties: { mode: 'linestring' },
+    };
+    act(() => {
+      ui.features = [
+        {
+          ...feature,
+          geometry: {
+            type: 'LineString',
+            coordinates: [...points, [-85.03, 35.03]],
+          },
+          properties: { ...feature.properties, currentlyDrawing: true },
+        },
+      ];
+      ui.changed();
+    });
+    expect(ui.writes).toEqual({});
+    act(() => {
+      ui.features = [feature];
+      ui.changed();
+      ui.finished('freehand', { mode: 'linestring', action: 'draw' });
+    });
+    expect(ui.writes.geom).toMatchObject({ coordinates: [points] });
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(ui.writes.geom).toMatchObject({ coordinates: [points.slice(0, 2)] });
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
+    expect(ui.writes.geom).toMatchObject({ coordinates: [points] });
   });
 
   it('imports and undoes a route GPX without writing trail-only fields or remounting the map', async () => {

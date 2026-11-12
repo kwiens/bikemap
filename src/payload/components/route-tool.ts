@@ -39,9 +39,15 @@ export interface RouteStatus {
   waypoints: number;
 }
 
+export interface LineAddition {
+  atStart?: boolean;
+  partIndex: number;
+  /** Length of the edited part after each click that adds to it. */
+  pointCounts: number[];
+}
+
 export interface RouteToolHost {
-  /** Commits a finished route as one undoable edit. */
-  apply(next: Parts): void;
+  apply(next: Parts, addition: LineAddition): void;
   fetchNetwork(bbox: [number, number, number, number]): Promise<NetworkWay[]>;
   getParts(): Parts;
   isActive(): boolean;
@@ -51,6 +57,7 @@ export interface RouteToolHost {
 export interface RouteTool {
   /** Starts loading the network for the view. Call on entering the mode. */
   activate(): void;
+  canRedoLeg(): boolean;
   /** Throws away the route being built. */
   cancel(): void;
   /** Keeps whatever route is in progress and clears the preview. Call on leaving the mode. */
@@ -65,6 +72,8 @@ export interface RouteTool {
   hasRoute(): boolean;
   /** (Re)adds the tool's layers. Call after every `style.load`. */
   install(): void;
+  /** Restores the last click that was undone. */
+  redoLeg(): boolean;
   /** Takes back the last click. Returns false when there was nothing to take back. */
   undoLeg(): boolean;
 }
@@ -79,6 +88,12 @@ interface Waypoint {
   position: Position;
   /** The network point nearest the click; null when there is none in range. */
   snap: NetworkSnap | null;
+}
+
+interface RouteClick {
+  waypoint: Waypoint;
+  coordinates: Position[];
+  note: string | null;
 }
 
 const PATH_SOURCE = 'route-tool-path';
@@ -115,10 +130,8 @@ export function createRouteTool(
   let queue: string[] = [];
   let isFetching = false;
 
-  let waypoints: Waypoint[] = [];
-  /** The route so far, and its length after each leg — what Backspace pops. */
-  let path: Position[] = [];
-  let legEnds: number[] = [];
+  const clicks: RouteClick[] = [];
+  const undoneClicks: RouteClick[] = [];
   /** Set when the route started on the end of an existing piece. */
   let extend: { atStart: boolean; part: number } | null = null;
 
@@ -138,7 +151,7 @@ export function createRouteTool(
   let isDisposed = false;
 
   function report(patch: Partial<RouteStatus>) {
-    status = { ...status, ...patch, waypoints: waypoints.length };
+    status = { ...status, ...patch, waypoints: clicks.length };
     host.onStatus(status);
   }
 
@@ -304,40 +317,34 @@ export function createRouteTool(
       lastClick !== null && event.point.dist(lastClick) < DOUBLE_CLICK_PIXELS;
     lastClick = event.point;
 
-    if (waypoints.length === 0) {
+    const previous = clicks.at(-1)?.waypoint;
+    let next = waypointAt(event.lngLat, isFree);
+
+    if (!previous) {
       const end = isFree ? null : nearbyEnd(event.lngLat);
+      extend = end ? { atStart: end.atStart, part: end.part } : null;
       if (end) {
         const part = host.getParts()[end.part];
         const position = end.atStart ? part[0] : part[part.length - 1];
-        extend = { atStart: end.atStart, part: end.part };
         const snap = snapToNetwork(network, position, snapMeters(event.lngLat));
-        waypoints = [{ isFree: false, position, snap }];
-      } else {
-        extend = null;
-        waypoints = [waypointAt(event.lngLat, isFree)];
+        next = { isFree: false, position, snap };
       }
-      path = [waypoints[0].position];
-      legEnds = [1];
-      render();
-      report({ note: null });
-      return;
+      clicks.push({ waypoint: next, coordinates: [next.position], note: null });
+    } else {
+      if (isRepeat || same(next.position, previous.position)) {
+        return;
+      }
+      const leg = legBetween(previous, next);
+      clicks.push({
+        waypoint: next,
+        coordinates: leg.coordinates.slice(1),
+        note: leg.isStraight
+          ? 'No loaded trail connects those two points, so they are joined with a straight line. Undo takes it back.'
+          : null,
+      });
     }
-
-    const previous = waypoints[waypoints.length - 1];
-    const next = waypointAt(event.lngLat, isFree);
-    if (isRepeat || same(next.position, previous.position)) {
-      return;
-    }
-    const leg = legBetween(previous, next);
-    waypoints.push(next);
-    path = [...path, ...leg.coordinates.slice(1)];
-    legEnds.push(path.length);
-    render();
-    report({
-      note: leg.isStraight
-        ? 'No loaded trail connects those two points, so they are joined with a straight line. Undo takes it back.'
-        : null,
-    });
+    undoneClicks.length = 0;
+    updateRoute();
   }
 
   function onDoubleClick(event: mapboxgl.MapMouseEvent) {
@@ -365,13 +372,13 @@ export function createRouteTool(
       return;
     }
     const target = waypointAt(cursor, isAltDown);
-    const key = `${waypoints.length}:${target.position.join(',')}`;
+    const key = `${clicks.length}:${target.position.join(',')}`;
     if (key === previewKey) {
       return;
     }
     previewKey = key;
     const features: GeoJSON.Feature[] = [point(target.position, 'cursor')];
-    const previous = waypoints[waypoints.length - 1];
+    const previous = clicks.at(-1)?.waypoint;
     if (previous && !same(previous.position, target.position)) {
       features.push(line(legBetween(previous, target).coordinates));
     }
@@ -379,6 +386,7 @@ export function createRouteTool(
   }
 
   function render() {
+    const path = clicks.flatMap((click) => click.coordinates);
     setData(
       PATH_SOURCE,
       path.length > 1
@@ -386,7 +394,7 @@ export function createRouteTool(
         : EMPTY,
     );
     setData(POINTS_SOURCE, {
-      features: waypoints.map((waypoint) =>
+      features: clicks.map(({ waypoint }) =>
         point(waypoint.position, 'waypoint'),
       ),
       type: 'FeatureCollection',
@@ -399,34 +407,47 @@ export function createRouteTool(
     }
   }
 
-  function reset() {
-    waypoints = [];
-    path = [];
-    legEnds = [];
-    extend = null;
+  function updateRoute() {
     render();
+    report({ note: clicks.at(-1)?.note ?? null });
+  }
+
+  function reset() {
+    clicks.length = 0;
+    undoneClicks.length = 0;
+    extend = null;
+    lastClick = null;
     setData(PREVIEW_SOURCE, EMPTY);
+    updateRoute();
   }
 
   function finish() {
-    if (path.length < 2) {
+    if (clicks.length < 2) {
       reset();
-      report({ note: null });
       return;
     }
-    const parts = host.getParts().map((part) => [...part]);
+    const path = clicks.flatMap((click) => click.coordinates);
+    const parts = [...host.getParts()];
     const target = extend ? parts[extend.part] : undefined;
-    if (extend && target) {
-      // The route starts at the piece's end, so that point is already there.
-      parts[extend.part] = extend.atStart
-        ? [...[...path].reverse().slice(0, -1), ...target]
+    const partIndex = extend && target ? extend.part : parts.length;
+    const atStart = Boolean(extend?.atStart && target);
+    let points = target ? target.length - 1 : 0;
+    const pointCounts = clicks.map(({ coordinates }) => {
+      points += coordinates.length;
+      return points;
+    });
+
+    if (target) {
+      // The first click anchors the extension at a point already on the line.
+      pointCounts.shift();
+      parts[partIndex] = atStart
+        ? [...path.slice(1).reverse(), ...target]
         : [...target, ...path.slice(1)];
     } else {
       parts.push(path);
     }
     reset();
-    host.apply(parts);
-    report({ note: null });
+    host.apply(parts, { atStart, partIndex, pointCounts });
   }
 
   // --- wiring -------------------------------------------------------------
@@ -459,21 +480,18 @@ export function createRouteTool(
       map.getCanvas().style.cursor = 'crosshair';
       loadView();
     },
-    cancel() {
-      reset();
-      report({ note: null });
-    },
+    canRedoLeg: () => undoneClicks.length > 0,
+    cancel: reset,
     deactivate() {
       // Switching modes mid-route keeps the work rather than discarding it.
       finish();
       cursor = null;
-      lastClick = null;
       previewKey = '';
       setData(PREVIEW_SOURCE, EMPTY);
     },
     dispose,
     finish,
-    hasRoute: () => waypoints.length > 0,
+    hasRoute: () => clicks.length > 0,
     install() {
       for (const id of [PATH_SOURCE, PREVIEW_SOURCE, POINTS_SOURCE]) {
         if (!map.getSource(id)) {
@@ -525,19 +543,23 @@ export function createRouteTool(
       });
       render();
     },
-    undoLeg() {
-      if (waypoints.length === 0) {
+    redoLeg() {
+      const click = undoneClicks.pop();
+      if (!click) {
         return false;
       }
-      waypoints.pop();
-      legEnds.pop();
-      if (waypoints.length === 0) {
-        reset();
-      } else {
-        path = path.slice(0, legEnds[legEnds.length - 1]);
-        render();
+      clicks.push(click);
+      updateRoute();
+      return true;
+    },
+    undoLeg() {
+      const click = clicks.pop();
+      if (!click) {
+        return false;
       }
-      report({ note: null });
+      undoneClicks.push(click);
+      lastClick = null;
+      updateRoute();
       return true;
     },
   };

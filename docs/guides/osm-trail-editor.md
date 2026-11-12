@@ -246,9 +246,9 @@ plan edits, undo/redo, ordered clicks, and stale asynchronous results. Its React
 component handles Mapbox rendering and Payload field synchronization. The
 controller can be tested without a map or a form.
 
-A finished route is one undo step. A route still in progress lives in the tool,
-not the line: Undo and Backspace take back its last click, and switching modes
-keeps it rather than discarding it.
+Undo and Redo step through one waypoint click at a time, during route building
+and after finishing. Backspace also takes back the last click while building.
+Switching modes finishes the route in progress.
 
 Terra Draw's `change` event fires for its own edits *and* for our writes into its
 store, and carries nothing to tell them apart — hence the `loadingRef` guard. Without it,
@@ -280,9 +280,10 @@ Everything else undoes through the editor's own snapshot history
 (`osm/edit-history.ts`). Terra Draw's `sessionLevel` couldn't undo a deleted
 piece (below), and it knows nothing of the bulk edits, which replace the store
 wholesale and would leave every entry it held pointing at features that no
-longer exist. An entry is the line as it was before an edit *settled*:
-`settledRef` holds that line and `partsRef` runs ahead of it mid-gesture, so a
-drag is one step however many frames it took. Terra Draw's keyboard shortcuts
+longer exist. `settledRef` holds the line before an edit and `partsRef` runs
+ahead of it mid-gesture, so a drag is one step however many frames it took.
+Finishing a freehand line or snapped route records one step per click. Terra
+Draw's keyboard shortcuts
 are off too; the map's own key handler sends `Ctrl`+`Z` to the right stack —
 the route in progress, then the piece being drawn, then the history.
 

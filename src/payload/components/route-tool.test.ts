@@ -38,12 +38,15 @@ describe('Follow trails straight fallback', () => {
       if (isAlt) expect(statuses.at(-1)?.note).toBeNull();
       else expect(statuses.at(-1)?.note).toContain('straight line');
       tool.finish();
-      expect(apply).toHaveBeenCalledWith([
+      expect(apply).toHaveBeenCalledWith(
         [
-          [-85.3, 35],
-          [-85.31, 35],
+          [
+            [-85.3, 35],
+            [-85.31, 35],
+          ],
         ],
-      ]);
+        { atStart: false, partIndex: 0, pointCounts: [1, 2] },
+      );
     },
   );
 });
@@ -236,6 +239,38 @@ describe('Follow trails legs', () => {
     expect(path).toContainEqual([0.04, 0.07]);
     expect(path.at(-1)?.[0]).toBeCloseTo(0.05, 9);
     expect(path.at(-1)?.[1]).toBeCloseTo(0.07, 9);
+  });
+
+  it('restores the exact snapped leg and records its waypoint boundary', async () => {
+    const { apply, statuses, tool, view } = await routeOnElbow();
+    view.click(0.02, 0.05);
+    view.click(0.04, 0.05);
+    view.click(0.06, 0.07);
+
+    expect(tool.undoLeg()).toBe(true);
+    expect(statuses.at(-1)?.waypoints).toBe(2);
+    expect(tool.redoLeg()).toBe(true);
+    expect(statuses.at(-1)?.waypoints).toBe(3);
+    tool.finish();
+
+    expect(apply).toHaveBeenCalledWith([ELBOW.coordinates], {
+      atStart: false,
+      partIndex: 0,
+      pointCounts: [1, 2, 4],
+    });
+  });
+
+  it('discards undone waypoints when a new click starts a branch', async () => {
+    const { statuses, tool, view } = await routeOnElbow();
+    view.click(0.02, 0.05);
+    view.click(0.04, 0.05);
+    expect(tool.undoLeg()).toBe(true);
+    expect(tool.undoLeg()).toBe(true);
+    expect(statuses.at(-1)?.waypoints).toBe(0);
+    expect(tool.redoLeg()).toBe(true);
+    expect(statuses.at(-1)?.waypoints).toBe(1);
+    view.click(0.06, 0.07);
+    expect(tool.canRedoLeg()).toBe(false);
   });
 
   it('explains a straight leg to a click away from every trail', async () => {
