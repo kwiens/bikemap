@@ -1,10 +1,9 @@
 /** Shared Tailwind class strings for components that appear in multiple files */
 
-// `[&_svg]:hover:`, not `hover:[&_svg]:`: Tailwind 3 applies stacked variants
-// right to left, so the latter compiles to `svg:hover` and the icon only
-// recolours when the pointer is on its paths.
+// Touch browsers can retain :hover after a tap. Limit hover colors to fine
+// pointers and apply the icon color while the whole button is hovered.
 export const TOGGLE_BTN_CLASS =
-  'bg-app-secondary rounded-full p-3 shadow-md cursor-pointer flex items-center justify-center border border-app-primary/40 transition-colors duration-150 hover:bg-app-accent [&_svg]:hover:text-app-secondary active:bg-app-secondary [&_svg]:active:text-app-primary';
+  'bg-app-secondary rounded-full p-3 shadow-md cursor-pointer flex items-center justify-center border border-app-primary/40 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-app-accent [@media(hover:hover)_and_(pointer:fine)]:[&_svg]:hover:text-app-secondary';
 
 export const TOGGLE_ICON_CLASS = 'w-5 h-5 text-app-primary';
 

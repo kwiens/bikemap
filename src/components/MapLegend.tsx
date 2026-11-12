@@ -64,7 +64,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       ? embedOptions.sidebarOpen
       : (getSetting('sidebarOpen') ?? true),
   }));
-  const { sidebarOpen: isOpen } = useLayout();
+  const { sidebarOpen: isOpen, ridesPanelOpen } = useLayout();
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
@@ -318,11 +318,11 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
     <>
       {children}
 
-      {/* Toggle button */}
+      {/* Keep the toggle above the sidebar as it slides closed. */}
       <div
         className={cn(
           'fixed left-4 top-[calc(1rem+env(safe-area-inset-top))]',
-          isOpen ? 'z-[960]' : 'z-[900]',
+          ridesPanelOpen ? 'z-[900]' : 'z-[960]',
         )}
       >
         <button

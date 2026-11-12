@@ -107,8 +107,8 @@ export function PwaInstallPrompt(): React.ReactElement | null {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-[2000] sm:hidden">
-      <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-white/95 p-4 shadow-lg backdrop-blur">
-        <div className="flex-1">
+      <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+        <div>
           <p className="text-sm font-semibold text-emerald-900">
             Add {siteConfig.name} to your home screen
           </p>
@@ -118,10 +118,10 @@ export function PwaInstallPrompt(): React.ReactElement | null {
               : 'Install for quick access.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           {!isIos && (
             <button
-              className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white"
+              className="min-h-12 min-w-12 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
               onClick={handleInstallClick}
               type="button"
             >
@@ -129,7 +129,7 @@ export function PwaInstallPrompt(): React.ReactElement | null {
             </button>
           )}
           <button
-            className="rounded-full border border-emerald-200 px-2 py-1 text-xs text-emerald-700"
+            className="min-h-12 min-w-12 rounded-full border border-emerald-200 px-4 py-2 text-sm text-emerald-700"
             onClick={handleDismiss}
             type="button"
           >
