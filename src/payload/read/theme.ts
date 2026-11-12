@@ -7,6 +7,7 @@ import type { CityBranding } from '@/components/SiteBrandingContext';
 
 import { siteConfigs } from '@/config/site.config';
 import type { CityId } from '@/data/cities/types';
+import { SVG_MIME_TYPE } from '@/utils/logo-svg';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -23,6 +24,7 @@ export interface ThemeDoc {
       | number
       | {
           alt?: null | string;
+          mimeType?: null | string;
           url?: null | string;
         }
     >
@@ -97,7 +99,7 @@ export async function getFrontendTheme(): Promise<{
   const branding: CityBranding = {};
   for (const { cityId } of Object.values(siteConfigs)) {
     const logo = theme?.logos?.[cityId];
-    if (logo && typeof logo === 'object') {
+    if (logo && typeof logo === 'object' && logo.mimeType === SVG_MIME_TYPE) {
       branding[cityId] = {
         logoAlt: logo.alt ?? null,
         logoUrl: logo.url ?? null,

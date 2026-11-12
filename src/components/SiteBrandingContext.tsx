@@ -41,8 +41,7 @@ export function SiteLogo({
 
   if (!branding?.logoUrl) return children ?? null;
 
-  // Payload accepts only raster images. Uploaded dimensions vary, so the
-  // caller controls the bounding box while the natural aspect ratio is kept.
+  // The caller controls the bounding box while the SVG keeps its aspect ratio.
   return (
     // eslint-disable-next-line @next/next/no-img-element -- uploaded logos do not have fixed dimensions.
     <img

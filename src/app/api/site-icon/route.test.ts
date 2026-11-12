@@ -4,7 +4,7 @@ import { renderSiteIcon } from '@/utils/site-icon';
 
 vi.mock('@/utils/site-icon', () => ({
   SITE_ICON_SIZES: [32, 180, 192, 512],
-  renderSiteIcon: vi.fn(async () => new Response('png')),
+  renderSiteIcon: vi.fn(async () => new Response('<svg/>')),
 }));
 
 it.each([

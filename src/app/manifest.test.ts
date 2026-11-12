@@ -23,6 +23,6 @@ describe('manifest', () => {
     const icons = (await manifest()).icons ?? [];
     expect(icons.length).toBeGreaterThan(0);
     expect(icons.some((i) => i.purpose === 'maskable')).toBe(true);
-    expect(icons.every((i) => i.src.startsWith('/icon-'))).toBe(true);
+    expect(icons.every((icon) => icon.type === 'image/svg+xml')).toBe(true);
   });
 });

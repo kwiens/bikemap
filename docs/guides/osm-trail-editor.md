@@ -886,7 +886,10 @@ Theme logo uploads use Payload's Vercel Blob adapter when
 `BLOB_READ_WRITE_TOKEN` is set. Connect a **public** Blob store to the Vercel
 project for production and preview; logos are public map assets. The adapter
 stores files outside the function filesystem, so they survive restarts and
-redeploys. PNG, JPEG, and WebP logos are limited to 3 MB.
+redeploys. Upload a self-contained SVG up to 3 MB with a `viewBox` or explicit
+pixel dimensions. Use vector artwork and outline text if it needs a custom font.
+A previously selected raster logo falls back to the city's default until you
+replace it with an SVG in Theme.
 
 Local development without a Blob token keeps files in the gitignored
 `public/media` directory. On Vercel, uploads fail explicitly if the token is
@@ -895,9 +898,8 @@ copying the database alone does not copy their files.
 
 Theme → City logos has a separate upload for each city. The selected upload
 appears on its welcome screen, sidebar, and About page, and generates its
-favicon, Apple touch icon, and PWA icons. Images keep their proportions;
+SVG favicon, Apple touch icon, and PWA icons. Logos keep their proportions;
 maskable icons include safe padding. Replacing an upload changes the icon URLs
 so browsers can refresh them. Already installed apps refresh icons on the
 browser or operating system's schedule. An unset or unavailable logo keeps the
-existing branding; the old deployment-wide upload remains in Media for explicit
-selection rather than being assigned to a city automatically.
+existing city branding.

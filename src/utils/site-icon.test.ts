@@ -1,163 +1,105 @@
-import { readFile, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import sharp from 'sharp';
-import { describe, expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { getFrontendTheme } from '@/payload/read/theme';
 import { renderSiteIcon, SITE_ICON_SIZES } from './site-icon';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/payload/read/theme', () => ({ getFrontendTheme: vi.fn() }));
 
-describe('city icon rendering', () => {
-  it.each(SITE_ICON_SIZES)(
-    'renders an uploaded rectangular logo as a %i-pixel PNG',
-    async (size) => {
-      vi.mocked(getFrontendTheme).mockResolvedValue({
-        branding: {
-          bend: { logoUrl: 'https://example.com/bend.webp', logoAlt: 'Bend' },
-        },
-        css: '',
-      });
-      const input = await sharp({
-        create: { width: 200, height: 100, channels: 4, background: 'red' },
-      })
-        .webp()
-        .toBuffer();
-      vi.mocked(fetch).mockResolvedValue(new Response(new Uint8Array(input)));
-      const response = await renderSiteIcon('bend', size);
-      const output = Buffer.from(await response.arrayBuffer());
-      expect(await sharp(output).metadata()).toMatchObject({
-        width: size,
-        height: size,
-        format: 'png',
-      });
-      expect(response.headers.get('Content-Type')).toBe('image/png');
-      const { data, info } = await sharp(output)
-        .removeAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-      const center =
-        (Math.floor(size / 2) * info.width + Math.floor(size / 2)) *
-        info.channels;
-      expect(data[center]).toBeGreaterThan(240);
-      expect(data[center + 1]).toBeLessThan(10);
-      expect([...data.subarray(0, 3)]).toEqual([195, 244, 77]);
-    },
+const logo =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><path fill="red" d="M0 0h200v100H0z"/></svg>';
+
+function setBendLogo(logoUrl: string) {
+  vi.mocked(getFrontendTheme).mockResolvedValue({
+    branding: { bend: { logoUrl, logoAlt: 'Bend' } },
+    css: '',
+  });
+}
+
+function embeddedArtwork(svg: string): string {
+  const data = svg.match(/href="data:image\/svg\+xml;base64,([^"]+)"/);
+  expect(data).not.toBeNull();
+  return Buffer.from(data![1], 'base64').toString();
+}
+
+it.each(SITE_ICON_SIZES)(
+  'preserves the vector in a %i-pixel SVG viewport',
+  async (size) => {
+    setBendLogo('https://example.com/bend.svg');
+    vi.mocked(fetch).mockResolvedValue(new Response(logo));
+    const response = await renderSiteIcon('bend', size);
+    expect(response.headers.get('Content-Type')).toBe('image/svg+xml');
+    expect(response.headers.get('Content-Security-Policy')).toContain(
+      'sandbox',
+    );
+    const svg = await response.text();
+    expect(svg).toContain(
+      `width="${size}" height="${size}" viewBox="0 0 100 100"`,
+    );
+    expect(embeddedArtwork(svg)).toBe(logo);
+  },
+);
+
+it('fits maskable artwork inside the safe circle', async () => {
+  setBendLogo('https://example.com/bend.svg');
+  vi.mocked(fetch).mockResolvedValue(new Response(logo));
+  const svg = await (await renderSiteIcon('bend', 512, true)).text();
+  expect(svg).toContain('<image x="22" y="22" width="56" height="56"');
+  expect(Math.hypot(28, 28)).toBeLessThan(40);
+});
+
+it('uses different default vectors for the two cities', async () => {
+  vi.mocked(getFrontendTheme).mockResolvedValue({ branding: {}, css: '' });
+  const [bend, chatt] = await Promise.all([
+    renderSiteIcon('bend', 192),
+    renderSiteIcon('chattanooga', 192),
+  ]);
+  expect(embeddedArtwork(await bend.text())).not.toEqual(
+    embeddedArtwork(await chatt.text()),
   );
+  expect(bend.headers.get('Cache-Control')).toBe('no-store');
+});
 
-  it('keeps maskable artwork inside the safe circle', async () => {
-    vi.mocked(getFrontendTheme).mockResolvedValue({
-      branding: {
-        bend: { logoUrl: 'https://example.com/bend.png', logoAlt: null },
-      },
-      css: '',
-    });
-    const input = await sharp({
-      create: { width: 100, height: 100, channels: 3, background: 'red' },
-    })
-      .png()
-      .toBuffer();
-    vi.mocked(fetch).mockResolvedValue(new Response(new Uint8Array(input)));
-    const response = await renderSiteIcon('bend', 512, true);
-    const { data, info } = await sharp(
-      Buffer.from(await response.arrayBuffer()),
-    )
-      .removeAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    for (let y = 0; y < info.height; y++) {
-      for (let x = 0; x < info.width; x++) {
-        const offset = (y * info.width + x) * info.channels;
-        if (data[offset + 1] < 10)
-          expect(Math.hypot(x - 256, y - 256)).toBeLessThan(512 * 0.4);
-      }
-    }
-  });
+it('falls back without caching invalid uploads', async () => {
+  setBendLogo('https://example.com/invalid.svg');
+  vi.mocked(fetch).mockResolvedValue(new Response('Not SVG'));
+  const response = await renderSiteIcon('bend', 32);
+  expect(embeddedArtwork(await response.text())).toContain('<svg');
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
+});
 
-  it('uses the existing icon when a city has no upload, even if another does', async () => {
-    vi.mocked(getFrontendTheme).mockResolvedValue({
-      branding: {
-        chattanooga: {
-          logoUrl: 'https://example.com/chatt.png',
-          logoAlt: null,
-        },
-      },
-      css: '',
-    });
-    const response = await renderSiteIcon('bend', 192);
-    expect(Buffer.from(await response.arrayBuffer())).toEqual(
-      await readFile('public/icon-192.png'),
+it('loads uploaded vectors from Blob for same-origin Payload URLs', async () => {
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_QAStore_test');
+  vi.stubEnv('STORAGE_VERCEL_BLOB_BASE_URL', undefined);
+  try {
+    setBendLogo('/api/media/file/bend%20logo.svg');
+    vi.mocked(fetch).mockResolvedValue(new Response(logo));
+    const response = await renderSiteIcon('bend', 180);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://qastore.public.blob.vercel-storage.com/bend%20logo.svg',
+      { signal: expect.any(AbortSignal) },
     );
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-  });
+    expect(response.headers.get('Cache-Control')).toContain('max-age=3600');
+    expect(embeddedArtwork(await response.text())).toBe(logo);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
 
-  it('falls back without caching an unavailable upload', async () => {
-    vi.mocked(getFrontendTheme).mockResolvedValue({
-      branding: {
-        bend: { logoUrl: 'https://example.com/missing.png', logoAlt: null },
-      },
-      css: '',
-    });
-    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 404 }));
-    const response = await renderSiteIcon('bend', 32);
-    expect(Buffer.from(await response.arrayBuffer())).toEqual(
-      await readFile('public/favicon.png'),
-    );
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-  });
-
-  it('renders Blob uploads from Payload’s same-origin media URLs', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_QAStore_test');
-    vi.stubEnv('STORAGE_VERCEL_BLOB_BASE_URL', undefined);
-    try {
-      vi.mocked(getFrontendTheme).mockResolvedValue({
-        branding: {
-          bend: { logoUrl: '/api/media/file/bend%20logo.png', logoAlt: null },
-        },
-        css: '',
-      });
-      const input = await sharp({
-        create: { width: 100, height: 200, channels: 3, background: 'red' },
-      })
-        .png()
-        .toBuffer();
-      vi.mocked(fetch).mockResolvedValue(new Response(new Uint8Array(input)));
-      const response = await renderSiteIcon('bend', 180);
-      expect(fetch).toHaveBeenCalledWith(
-        'https://qastore.public.blob.vercel-storage.com/bend%20logo.png',
-        { signal: expect.any(AbortSignal) },
-      );
-      expect(response.headers.get('Cache-Control')).toContain('max-age=3600');
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
-  it('reads local Payload uploads without requiring an HTTP server', async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), 'city-icon-test-'));
-    try {
-      await mkdir(path.join(directory, 'public/media'), { recursive: true });
-      const input = await sharp({
-        create: { width: 100, height: 200, channels: 3, background: 'red' },
-      })
-        .png()
-        .toBuffer();
-      await writeFile(path.join(directory, 'public/media/local.png'), input);
-      vi.spyOn(process, 'cwd').mockReturnValue(directory);
-      vi.mocked(getFrontendTheme).mockResolvedValue({
-        branding: {
-          bend: { logoUrl: '/api/media/file/local.png', logoAlt: null },
-        },
-        css: '',
-      });
-      const response = await renderSiteIcon('bend', 180);
-      expect(
-        await sharp(Buffer.from(await response.arrayBuffer())).metadata(),
-      ).toMatchObject({ width: 180, height: 180, format: 'png' });
-      expect(response.headers.get('Cache-Control')).toContain('max-age=3600');
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
-  });
+it('loads local Payload uploads from disk', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'city-icon-test-'));
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', undefined);
+  try {
+    await mkdir(path.join(directory, 'public/media'), { recursive: true });
+    await writeFile(path.join(directory, 'public/media/local.svg'), logo);
+    vi.spyOn(process, 'cwd').mockReturnValue(directory);
+    setBendLogo('/api/media/file/local.svg');
+    const response = await renderSiteIcon('bend', 180);
+    expect(embeddedArtwork(await response.text())).toBe(logo);
+  } finally {
+    vi.unstubAllEnvs();
+    await rm(directory, { recursive: true, force: true });
+  }
 });

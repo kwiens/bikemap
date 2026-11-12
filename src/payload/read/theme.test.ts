@@ -64,8 +64,16 @@ describe('getFrontendTheme city logos', () => {
     vi.stubEnv('DATABASE_URL', 'postgres://test');
     const findGlobal = vi.fn().mockResolvedValue({
       logos: {
-        chattanooga: { url: '/media/chatt.png', alt: 'Bike Chatt' },
-        bend: { url: '/media/bend.png', alt: 'Ride Bend' },
+        chattanooga: {
+          url: '/media/chatt.svg',
+          mimeType: 'image/svg+xml',
+          alt: 'Bike Chatt',
+        },
+        bend: {
+          url: '/media/bend.svg',
+          mimeType: 'image/svg+xml',
+          alt: 'Ride Bend',
+        },
       },
     });
     vi.mocked(getPayload).mockResolvedValue({
@@ -73,8 +81,8 @@ describe('getFrontendTheme city logos', () => {
     } as unknown as Awaited<ReturnType<typeof getPayload>>);
     const { branding } = await getFrontendTheme();
     expect(branding).toEqual({
-      chattanooga: { logoUrl: '/media/chatt.png', logoAlt: 'Bike Chatt' },
-      bend: { logoUrl: '/media/bend.png', logoAlt: 'Ride Bend' },
+      chattanooga: { logoUrl: '/media/chatt.svg', logoAlt: 'Bike Chatt' },
+      bend: { logoUrl: '/media/bend.svg', logoAlt: 'Ride Bend' },
     });
     expect(findGlobal).toHaveBeenCalledExactlyOnceWith({
       slug: 'theme',
@@ -86,14 +94,27 @@ describe('getFrontendTheme city logos', () => {
     vi.stubEnv('DATABASE_URL', 'postgres://test');
     const findGlobal = vi.fn().mockResolvedValue({
       logo: { url: '/media/legacy.png' },
-      logos: { chattanooga: { url: '/media/chatt.png' }, bend: 42 },
+      logos: {
+        chattanooga: { url: '/media/chatt.svg', mimeType: 'image/svg+xml' },
+        bend: 42,
+      },
     });
     vi.mocked(getPayload).mockResolvedValue({
       findGlobal,
     } as unknown as Awaited<ReturnType<typeof getPayload>>);
     expect((await getFrontendTheme()).branding).toEqual({
-      chattanooga: { logoUrl: '/media/chatt.png', logoAlt: null },
+      chattanooga: { logoUrl: '/media/chatt.svg', logoAlt: null },
     });
+  });
+
+  it('ignores a previously selected raster logo without modifying the record', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    vi.mocked(getPayload).mockResolvedValue({
+      findGlobal: vi.fn().mockResolvedValue({
+        logos: { bend: { url: '/media/bend.png', mimeType: 'image/png' } },
+      }),
+    } as unknown as Awaited<ReturnType<typeof getPayload>>);
+    expect((await getFrontendTheme()).branding).toEqual({});
   });
 
   it('uses existing branding when the database is unavailable or unconfigured', async () => {

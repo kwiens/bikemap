@@ -6,21 +6,28 @@ vi.mock('server-only', () => ({}));
 vi.mock('./theme', () => ({ getFrontendTheme: vi.fn() }));
 
 describe('city icon metadata', () => {
-  it('uses existing icons for an unset city', async () => {
+  it('uses default SVG icons for an unset city', async () => {
     vi.mocked(getFrontendTheme).mockResolvedValue({
-      branding: { chattanooga: { logoUrl: '/media/chatt.png', logoAlt: null } },
+      branding: { chattanooga: { logoUrl: '/media/chatt.svg', logoAlt: null } },
       css: '',
     });
+    const icons = (await getSiteIcons('bend')).manifestIcons ?? [];
+    expect(icons).toHaveLength(3);
     expect(
-      (await getSiteIcons('bend')).manifestIcons?.map((icon) => icon.src),
-    ).toEqual(['/icon-192.png', '/icon-512.png', '/icon-512.png']);
+      icons.every(
+        ({ src, type }) =>
+          src.startsWith('/api/site-icon?city=bend&') &&
+          !src.includes('&v=') &&
+          type === 'image/svg+xml',
+      ),
+    ).toBe(true);
   });
 
   it('uses distinct city, size, and maskable URLs across metadata and manifest', async () => {
     vi.mocked(getFrontendTheme).mockResolvedValue({
       branding: {
-        chattanooga: { logoUrl: '/media/chatt.png', logoAlt: null },
-        bend: { logoUrl: '/media/bend.png', logoAlt: null },
+        chattanooga: { logoUrl: '/media/chatt.svg', logoAlt: null },
+        bend: { logoUrl: '/media/bend.svg', logoAlt: null },
       },
       css: '',
     });
@@ -37,17 +44,17 @@ describe('city icon metadata', () => {
     expect(chatt.manifestIcons![0].src).not.toBe(bend.manifestIcons![0].src);
     expect(JSON.stringify(bend.icons)).toContain('size=32');
     expect(JSON.stringify(bend.icons)).toContain('size=180');
-    expect(JSON.stringify(bend.icons)).toContain(bend.manifestIcons![0].src);
+    expect(JSON.stringify(bend.icons)).toContain('image/svg+xml');
   });
 
   it('changes icon URLs after replacing the logo and restores defaults after removing it', async () => {
     vi.mocked(getFrontendTheme).mockResolvedValue({
-      branding: { bend: { logoUrl: '/media/first.png', logoAlt: null } },
+      branding: { bend: { logoUrl: '/media/first.svg', logoAlt: null } },
       css: '',
     });
     const first = await getSiteIcons('bend');
     vi.mocked(getFrontendTheme).mockResolvedValue({
-      branding: { bend: { logoUrl: '/media/replacement.png', logoAlt: null } },
+      branding: { bend: { logoUrl: '/media/replacement.svg', logoAlt: null } },
       css: '',
     });
     expect((await getSiteIcons('bend')).manifestIcons![0].src).not.toBe(
@@ -55,7 +62,7 @@ describe('city icon metadata', () => {
     );
     vi.mocked(getFrontendTheme).mockResolvedValue({ branding: {}, css: '' });
     expect((await getSiteIcons('bend')).manifestIcons![0].src).toBe(
-      '/icon-192.png',
+      '/api/site-icon?city=bend&size=192',
     );
   });
 });

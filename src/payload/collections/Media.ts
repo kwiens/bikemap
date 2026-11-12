@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { APIError, type CollectionConfig } from 'payload';
+import { readLogoSvg, SVG_MIME_TYPE } from '@/utils/logo-svg';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,7 +23,7 @@ export const Media: CollectionConfig = {
   },
   hooks: {
     beforeOperation: [
-      function prepareUpload({ operation, req }) {
+      async function prepareUpload({ operation, req }) {
         if (
           (operation === 'create' || operation === 'update') &&
           process.env.VERCEL === '1' &&
@@ -35,8 +37,23 @@ export const Media: CollectionConfig = {
           );
         }
         if ((operation === 'create' || operation === 'update') && req.file) {
-          // Replacements get a new URL so CDN caches cannot serve the old logo.
-          req.file.name = `${randomUUID()}${path.extname(req.file.name)}`;
+          const file = req.file;
+          try {
+            if (file.mimetype !== SVG_MIME_TYPE)
+              throw new Error('Invalid type');
+            readLogoSvg(
+              file.tempFilePath ? await readFile(file.tempFilePath) : file.data,
+            );
+          } catch {
+            throw new APIError(
+              'Upload a static, self-contained SVG with a viewBox or pixel dimensions.',
+              400,
+              undefined,
+              true,
+            );
+          }
+          // A fresh filename lets replacements use immutable Blob URLs.
+          file.name = `${randomUUID()}.svg`;
         }
       },
     ],
@@ -45,7 +62,17 @@ export const Media: CollectionConfig = {
     // The adapter also disables disk writes locally when a Blob token is set.
     disableLocalStorage: process.env.VERCEL === '1',
     staticDir: path.resolve(dirname, '../../../public/media'),
-    mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    mimeTypes: [SVG_MIME_TYPE],
+    modifyResponseHeaders({ headers }) {
+      if (headers.get('Content-Type')?.startsWith(SVG_MIME_TYPE)) {
+        headers.set(
+          'Content-Security-Policy',
+          "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        );
+        headers.set('X-Content-Type-Options', 'nosniff');
+      }
+      return headers;
+    },
   },
   fields: [
     {
