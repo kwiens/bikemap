@@ -77,7 +77,10 @@ export async function upsertImportedRoute(
     return 'updated';
   }
 
-  await payload.create({ collection: 'routes', data });
+  await payload.create({
+    collection: 'routes',
+    data: { ...data, featured: route.featured ?? true },
+  });
   return 'created';
 }
 
@@ -127,7 +130,10 @@ export async function upsertStudioRoute(
     return 'updated';
   }
 
-  await payload.create({ collection: 'routes', data });
+  await payload.create({
+    collection: 'routes',
+    data: { ...data, featured: route.featured ?? true },
+  });
   return 'created';
 }
 

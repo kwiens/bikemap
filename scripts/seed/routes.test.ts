@@ -36,6 +36,7 @@ describe('upsertStudioRoute', () => {
       collection: 'routes',
       data: expect.objectContaining({
         _status: 'published',
+        featured: true,
         geom: null,
         geometrySource: 'studio',
         routeId: route.id,
@@ -65,7 +66,9 @@ describe('upsertStudioRoute', () => {
     const update = vi.fn().mockResolvedValue({});
     const payload = {
       find: vi.fn().mockResolvedValue({
-        docs: [{ id: 7, geom: null, geometrySource: 'imported' }],
+        docs: [
+          { id: 7, geom: null, geometrySource: 'imported', featured: false },
+        ],
       }),
       update,
     } as unknown as Payload;
@@ -78,6 +81,7 @@ describe('upsertStudioRoute', () => {
       id: 7,
       data: expect.objectContaining({ geometrySource: 'studio' }),
     });
+    expect(update.mock.calls[0][0].data).not.toHaveProperty('featured');
   });
 });
 
@@ -121,7 +125,9 @@ describe('upsertImportedRoute', () => {
     const update = vi.fn().mockResolvedValue({});
     const payload = {
       find: vi.fn().mockResolvedValue({
-        docs: [{ id: 7, geom: null, geometrySource: 'imported' }],
+        docs: [
+          { id: 7, geom: null, geometrySource: 'imported', featured: false },
+        ],
       }),
       update,
     } as unknown as Payload;
@@ -132,5 +138,6 @@ describe('upsertImportedRoute', () => {
       id: 7,
       data: expect.objectContaining({ geometrySource: 'imported' }),
     });
+    expect(update.mock.calls[0][0].data).not.toHaveProperty('featured');
   });
 });

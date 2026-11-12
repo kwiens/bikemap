@@ -37,6 +37,34 @@ describe('routeFeatureCollection', () => {
     });
   });
 
+  it('preserves both routes on the map and carries the featured flag to the menu', () => {
+    const geom = {
+      type: 'MultiLineString',
+      coordinates: [
+        [
+          [-85.3, 35],
+          [-85.31, 35.01],
+        ],
+      ],
+    };
+    const routes = [
+      { routeId: 'featured', name: 'Featured', geom, featured: true },
+      { routeId: 'unfeatured', name: 'Unfeatured', geom, featured: false },
+    ];
+
+    expect(
+      publicBikeRoutes(routes).map(({ id, featured }) => [id, featured]),
+    ).toEqual([
+      ['featured', true],
+      ['unfeatured', false],
+    ]);
+    expect(
+      routeFeatureCollection(routes).features.map(
+        ({ properties }) => properties.id,
+      ),
+    ).toEqual(['featured', 'unfeatured']);
+  });
+
   it('uses a linked trail as the route geometry and measurement source', () => {
     const geom = {
       type: 'MultiLineString',

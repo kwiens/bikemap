@@ -4,15 +4,24 @@ import { getBikeRoutes } from '@/data/route-source';
 import { pressableProps } from './a11y';
 import type { BikeRoutesProps } from './types';
 
-export function BikeRoutes({ selectedRoute, onRouteSelect }: BikeRoutesProps) {
+export function BikeRoutes({
+  selectedRoute,
+  onRouteSelect,
+  showAllRoutes = false,
+}: BikeRoutesProps) {
   const bikeRoutes = getBikeRoutes();
-  if (bikeRoutes.length === 0) {
+  const visibleRoutes = showAllRoutes
+    ? bikeRoutes
+    : bikeRoutes.filter(
+        (route) => route.featured || route.id === selectedRoute,
+      );
+  if (visibleRoutes.length === 0) {
     return null;
   }
 
   return (
     <div className="flex flex-col gap-2">
-      {bikeRoutes.map((route) => (
+      {visibleRoutes.map((route) => (
         <div
           key={route.id}
           {...pressableProps(() => onRouteSelect(route.id))}

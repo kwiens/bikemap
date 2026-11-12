@@ -12,6 +12,7 @@ export interface BikeRoute {
   defaultWidth: number; // Default line width
   opacity: number; // Line opacity (0-1)
   distance: number; // Route distance in miles
+  featured?: boolean; // List in the home map's Casual menu
   reverseDirection?: boolean; // Flip arrow direction on this route
   reverseArrowBounds?: [number, number, number, number][]; // Flip arrow geometry within [swLng, swLat, neLng, neLat]
   hideArrows?: boolean; // Don't show directional arrows on this route

@@ -16,6 +16,8 @@ import * as migration_20261029_220844_add_drawn_routes from './20261029_220844_a
 
 import * as refreshChattanoogaElevation from './20261112_233931_refresh_chattanooga_elevation';
 
+import * as addRouteFeatured from './20261112_235419_add_route_featured';
+
 export const migrations = [
   {
     up: migration_20260807_044718_initial_schema.up,
@@ -96,5 +98,10 @@ export const migrations = [
     up: refreshChattanoogaElevation.up,
     down: refreshChattanoogaElevation.down,
     name: '20261112_233931_refresh_chattanooga_elevation',
+  },
+  {
+    up: addRouteFeatured.up,
+    down: addRouteFeatured.down,
+    name: '20261112_235419_add_route_featured',
   },
 ];

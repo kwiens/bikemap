@@ -395,6 +395,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
                 <BikeRoutes
                   selectedRoute={selectedRoute}
                   onRouteSelect={handleRouteSelect}
+                  showAllRoutes={isEmbed}
                 />
 
                 {bikeNetworkUrl && (

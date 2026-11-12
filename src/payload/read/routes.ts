@@ -39,6 +39,7 @@ export async function getCityRoutes(city: CityId): Promise<CityRouteData> {
         defaultWidth: true,
         description: true,
         distance: true,
+        featured: true,
         geom: true,
         geometrySource: true,
         hideArrows: true,

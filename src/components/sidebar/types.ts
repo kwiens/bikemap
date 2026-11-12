@@ -20,6 +20,7 @@ export interface ToggleSwitchProps {
 export interface BikeRoutesProps {
   selectedRoute: string | null;
   onRouteSelect: (routeId: string) => void;
+  showAllRoutes?: boolean;
 }
 
 export interface MapLayersProps {

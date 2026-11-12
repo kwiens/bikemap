@@ -138,7 +138,7 @@ export interface UserAuthOperations {
   };
 }
 /**
- * Every published Route appears in Casual mode. Build one on the map from trails and roads, or reuse an import, an existing Trail, or a current Mapbox Studio layer.
+ * Published routes appear on the map. Feature a route to list it in the home menu. Build a route from trails and roads or reuse an import, an existing Trail, or a Mapbox Studio layer.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "routes".
@@ -167,6 +167,10 @@ export interface Route {
    * Short description shown under the route in Casual mode.
    */
   description?: string | null;
+  /**
+   * Show this route in the home map’s Casual menu.
+   */
+  featured?: boolean | null;
   color: string;
   defaultWidth: number;
   opacity: number;
@@ -703,6 +707,7 @@ export interface RoutesSelect<T extends boolean = true> {
   geometrySource?: T;
   sourceTrail?: T;
   description?: T;
+  featured?: T;
   color?: T;
   defaultWidth?: T;
   opacity?: T;

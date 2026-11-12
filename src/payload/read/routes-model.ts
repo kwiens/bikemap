@@ -11,6 +11,7 @@ export interface StoredRoute {
   defaultWidth?: null | number;
   description?: null | string;
   distance?: null | number;
+  featured?: null | boolean;
   geom?: null | unknown;
   geometrySource?: null | RouteGeometrySource;
   hideArrows?: null | boolean;
@@ -90,6 +91,7 @@ export function publicBikeRoutes(
         defaultWidth: route.defaultWidth ?? 8,
         opacity: route.opacity ?? 1,
         distance: trail?.distance ?? route.distance ?? 0,
+        featured: route.featured === true,
         geometrySource: route.geometrySource ?? 'imported',
         ...(route.kind ? { kind: route.kind } : {}),
         ...(route.hideArrows ? { hideArrows: true } : {}),

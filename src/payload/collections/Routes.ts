@@ -28,9 +28,16 @@ export const Routes: CollectionConfig = {
   indexes: [{ fields: ['city', 'routeId'], unique: true }],
   admin: {
     useAsTitle: 'name',
-    defaultColumns: ['name', 'city', 'kind', 'geometrySource', 'updatedAt'],
+    defaultColumns: [
+      'name',
+      'city',
+      'kind',
+      'featured',
+      'geometrySource',
+      'updatedAt',
+    ],
     description:
-      'Every published Route appears in Casual mode. Build one on the map from trails and roads, or reuse an import, an existing Trail, or a current Mapbox Studio layer.',
+      'Published routes appear on the map. Feature a route to list it in the home menu. Build a route from trails and roads or reuse an import, an existing Trail, or a Mapbox Studio layer.',
     group: 'Map content',
     listSearchableFields: ['name', 'routeId'],
   },
@@ -154,6 +161,14 @@ export const Routes: CollectionConfig = {
       type: 'textarea',
       admin: {
         description: 'Short description shown under the route in Casual mode.',
+      },
+    },
+    {
+      name: 'featured',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: {
+        description: 'Show this route in the home map’s Casual menu.',
       },
     },
     {
