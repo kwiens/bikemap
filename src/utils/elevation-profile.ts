@@ -73,6 +73,85 @@ export function measurementsFromElevationProfile(
   };
 }
 
+/** Finds section boundaries in both stored profiles and legacy ride charts. */
+export function elevationProfileBreaks(
+  points: ElevationProfile['profile'],
+  gaps: ElevationProfile['geometryGapDetails'] = [],
+): Map<number, ElevationProfileGapDetail | undefined> {
+  const byEdge = new Map(
+    gaps.map((gap) => [
+      `${gap.from[0]},${gap.from[1]}:${gap.to[0]},${gap.to[1]}`,
+      gap,
+    ]),
+  );
+  const breaks = new Map<number, ElevationProfileGapDetail | undefined>();
+  for (let index = 1; index < points.length; index++) {
+    const [distance, , lng, lat] = points[index];
+    const [previousDistance, , previousLng, previousLat] = points[index - 1];
+    const gap = byEdge.get(`${previousLng},${previousLat}:${lng},${lat}`);
+    const hasJumpAtSameDistance =
+      distance === previousDistance &&
+      (lng !== previousLng || lat !== previousLat);
+    if (gap || distance < previousDistance || hasJumpAtSameDistance) {
+      breaks.set(index, gap);
+    }
+  }
+  return breaks;
+}
+
+export interface ElevationChartLayout {
+  pointX: number[];
+  ranges: [number, number][];
+  breaks: { left: number; right: number; label: string }[];
+}
+
+/** Gives breaks display space without adding distance to the profile. */
+export function layoutElevationChart(
+  points: ElevationProfile['profile'],
+  width: number,
+  gapDetails: ElevationProfile['geometryGapDetails'],
+): ElevationChartLayout {
+  const boundaries = elevationProfileBreaks(points, gapDetails);
+  // Keep at least 80% of a narrow chart for the measured terrain.
+  const gapWidth = Math.min(14, (width * 0.2) / Math.max(boundaries.size, 1));
+  const plotWidth = width - gapWidth * boundaries.size;
+  let distance = 0;
+  const distances = points.map(([position], index) => {
+    if (index > 0 && !boundaries.has(index)) {
+      distance += position - points[index - 1][0];
+    }
+    return distance;
+  });
+  const breaks: ElevationChartLayout['breaks'] = [];
+  const starts = points.length ? [0] : [];
+  const pointX = distances.map((position, index) => {
+    const left =
+      (position / (distance || 1)) * plotWidth + breaks.length * gapWidth;
+    if (!boundaries.has(index)) return left;
+
+    const feet = boundaries.get(index)?.feet ?? 0;
+    const right = left + gapWidth;
+    starts.push(index);
+    breaks.push({
+      left,
+      right,
+      label:
+        feet > 0
+          ? `${feet.toLocaleString()} ft between sections`
+          : 'Section break',
+    });
+    return right;
+  });
+  return {
+    breaks,
+    pointX,
+    ranges: starts.map((start, index) => [
+      start,
+      starts[index + 1] ?? points.length,
+    ]),
+  };
+}
+
 function isProfilePoint(value: unknown): boolean {
   return (
     Array.isArray(value) &&

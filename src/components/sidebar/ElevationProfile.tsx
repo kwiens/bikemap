@@ -3,6 +3,7 @@
 import React, {
   useState,
   useEffect,
+  useId,
   useCallback,
   useMemo,
   useRef,
@@ -12,6 +13,11 @@ import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
+import {
+  elevationProfileBreaks,
+  layoutElevationChart,
+  type ElevationChartLayout,
+} from '@/utils/elevation-profile';
 import { buildProfileGpx } from '@/utils/gpx';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
@@ -169,26 +175,13 @@ export function computeGrades(
 ): number[] {
   if (points.length < 2) return points.map(() => 0);
 
-  const gapEdges = new Set(
-    gapDetails.map(({ from, to }) =>
-      profileEdgeKey(from[0], from[1], to[0], to[1]),
-    ),
-  );
-  const segmentStarts = new Set<number>();
+  const segmentStarts = elevationProfileBreaks(points, gapDetails);
   const rises: number[] = [0];
   const runs: number[] = [0];
   for (let i = 1; i < points.length; i++) {
     const previous = points[i - 1];
     const current = points[i];
     const run = current[0] - previous[0];
-    if (
-      run <= 0 ||
-      gapEdges.has(
-        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
-      )
-    ) {
-      segmentStarts.add(i);
-    }
     const rise = current[1] - previous[1];
     runs.push(run > 0 ? run : 0);
     rises.push(run > 0 ? rise : 0);
@@ -220,42 +213,6 @@ export function computeGrades(
   return smoothed;
 }
 
-function profileEdgeKey(
-  fromLng: number,
-  fromLat: number,
-  toLng: number,
-  toLat: number,
-): string {
-  return `${fromLng},${fromLat}:${toLng},${toLat}`;
-}
-
-function profileSegmentRanges(
-  points: [number, number, number, number][],
-  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
-): [number, number][] {
-  if (points.length === 0) return [];
-  const gapEdges = new Set(
-    gapDetails.map(({ from, to }) =>
-      profileEdgeKey(from[0], from[1], to[0], to[1]),
-    ),
-  );
-  const starts = [0];
-  for (let index = 1; index < points.length; index++) {
-    const previous = points[index - 1];
-    const current = points[index];
-    if (
-      current[0] <= previous[0] ||
-      gapEdges.has(
-        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
-      )
-    ) {
-      starts.push(index);
-    }
-  }
-  starts.push(points.length);
-  return starts.slice(0, -1).map((start, index) => [start, starts[index + 1]]);
-}
-
 // Force strictly increasing offsets. Consecutive profile points can share a
 // distance (multi-segment trails repeat distance at a seam), which would yield
 // duplicate gradient offsets — invalid as React keys and pointless zero-width
@@ -273,24 +230,24 @@ function uniqueOffsets(
 }
 
 export function downsampleStops(
-  points: [number, number, number, number][],
+  pointX: number[],
   colors: string[],
-  maxDist: number,
+  width: number,
 ): { offset: number; color: string }[] {
-  if (points.length <= MAX_GRADIENT_STOPS) {
+  if (pointX.length <= MAX_GRADIENT_STOPS) {
     return uniqueOffsets(
       colors.map((color, i) => ({
-        offset: maxDist > 0 ? points[i][0] / maxDist : 0,
+        offset: width > 0 ? pointX[i] / width : 0,
         color,
       })),
     );
   }
-  const step = (points.length - 1) / (MAX_GRADIENT_STOPS - 1);
+  const step = (pointX.length - 1) / (MAX_GRADIENT_STOPS - 1);
   const stops: { offset: number; color: string }[] = [];
   for (let i = 0; i < MAX_GRADIENT_STOPS; i++) {
     const idx = Math.round(i * step);
     stops.push({
-      offset: maxDist > 0 ? points[idx][0] / maxDist : 0,
+      offset: width > 0 ? pointX[idx] / width : 0,
       color: colors[idx],
     });
   }
@@ -371,7 +328,8 @@ export function ElevationProfile() {
   // a name there and neither has conditions.
   const [conditionSlug, setConditionSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [hover, setHover] = useState<number | string | null>(null);
+  const hoverIndex = typeof hover === 'number' ? hover : null;
   const [locationIndex, setLocationIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -429,7 +387,7 @@ export function ElevationProfile() {
     setTrailName(osmProfile.trail);
     setProfile(osmProfile);
     profileRef.current = osmProfile;
-    setHoverIndex(null);
+    setHover(null);
     setLocationIndex(null);
     setLoading(false);
   });
@@ -475,7 +433,7 @@ export function ElevationProfile() {
       profileCache.set(`ride:${ride.name}`, elevProfile);
       setProfile(elevProfile);
       profileRef.current = elevProfile;
-      setHoverIndex(null);
+      setHover(null);
       setLocationIndex(null);
       setLoading(false);
     } else {
@@ -526,7 +484,7 @@ export function ElevationProfile() {
     if (cached) {
       setProfile(cached);
       profileRef.current = cached;
-      setHoverIndex(null);
+      setHover(null);
       setLocationIndex(null);
       return;
     }
@@ -538,7 +496,7 @@ export function ElevationProfile() {
     setLoading(true);
     setProfile(null);
     profileRef.current = null;
-    setHoverIndex(null);
+    setHover(null);
     setLocationIndex(null);
 
     const controller = new AbortController();
@@ -574,28 +532,44 @@ export function ElevationProfile() {
     return () => observer.disconnect();
   }, [profile]);
 
+  const chart = useMemo(
+    () =>
+      layoutElevationChart(
+        profile?.profile ?? [],
+        chartWidth,
+        profile?.geometryGapDetails,
+      ),
+    [profile, chartWidth],
+  );
+
   const updateHoverFromX = useCallback(
     (clientX: number, rect: DOMRect) => {
-      if (!profile || profile.profile.length === 0) return;
-      const x = clientX - rect.left;
-      const fraction = Math.max(0, Math.min(1, x / rect.width));
-      const maxDist = profile.profile[profile.profile.length - 1][0];
-      const targetDist = fraction * maxDist;
+      if (!profile || !chart.pointX.length || rect.width <= 0) return;
+      const fraction = Math.max(
+        0,
+        Math.min(1, (clientX - rect.left) / rect.width),
+      );
+      const x = fraction * chartWidth;
+      const gap = chart.breaks.find(({ left, right }) => x > left && x < right);
+      if (gap) {
+        setHover(gap.label);
+        dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: null, lat: null });
+        return;
+      }
 
       let lo = 0;
-      let hi = profile.profile.length - 1;
+      let hi = chart.pointX.length - 1;
       while (lo < hi) {
         const mid = (lo + hi) >> 1;
-        if (profile.profile[mid][0] < targetDist) lo = mid + 1;
+        if (chart.pointX[mid] < x) lo = mid + 1;
         else hi = mid;
       }
-      const idx = Math.max(0, Math.min(lo, profile.profile.length - 1));
-      setHoverIndex(idx);
+      setHover(lo);
 
-      const pt = profile.profile[idx];
+      const pt = profile.profile[lo];
       dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: pt[2], lat: pt[3] });
     },
-    [profile],
+    [profile, chart, chartWidth],
   );
 
   const handleMouseMove = useCallback(
@@ -615,7 +589,7 @@ export function ElevationProfile() {
   );
 
   const clearHover = useCallback(() => {
-    setHoverIndex(null);
+    setHover(null);
     dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: null, lat: null });
   }, []);
 
@@ -810,6 +784,7 @@ export function ElevationProfile() {
               points={points}
               gradeColors={gradeColors}
               profile={profile}
+              chart={chart}
               chartWidth={chartWidth}
               svgRef={svgRef}
               onMouseMove={handleMouseMove}
@@ -822,6 +797,7 @@ export function ElevationProfile() {
               <LocationIndicator
                 points={points}
                 profile={profile}
+                chart={chart}
                 chartWidth={chartWidth}
                 locationIndex={locationIndex}
               />
@@ -831,6 +807,7 @@ export function ElevationProfile() {
                 points={points}
                 gradeColors={gradeColors}
                 profile={profile}
+                chart={chart}
                 chartWidth={chartWidth}
                 hoverIndex={hoverIndex}
               />
@@ -854,7 +831,7 @@ export function ElevationProfile() {
               </span>
             </>
           ) : (
-            '\u00A0'
+            (hover ?? '\u00A0')
           )}
         </div>
       )}
@@ -867,6 +844,7 @@ const ElevationSvg = React.memo(function ElevationSvg({
   points,
   gradeColors,
   profile,
+  chart,
   chartWidth,
   svgRef,
   onMouseMove,
@@ -878,6 +856,7 @@ const ElevationSvg = React.memo(function ElevationSvg({
   points: [number, number, number, number][];
   gradeColors: string[];
   profile: ElevationProfileData;
+  chart: ElevationChartLayout;
   chartWidth: number;
   svgRef: React.RefObject<SVGSVGElement | null>;
   onMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -886,42 +865,34 @@ const ElevationSvg = React.memo(function ElevationSvg({
   onTouchMove: (e: React.TouchEvent<SVGSVGElement>) => void;
   onTouchEnd: () => void;
 }) {
-  const maxDist = points[points.length - 1][0];
+  const descriptionId = useId();
   const yRange = profile.max - profile.min || 1;
 
-  const xScale = (d: number) => (d / maxDist) * chartWidth;
   const yScale = (e: number) =>
     CHART_PADDING_TOP +
     PLOT_HEIGHT -
     ((e - profile.min) / yRange) * PLOT_HEIGHT;
 
   const baseline = CHART_HEIGHT - CHART_PADDING_BOTTOM;
-  const ranges = profileSegmentRanges(points, profile.geometryGapDetails);
-  const linePath = ranges
-    .map(([start, end]) =>
-      points
-        .slice(start, end)
-        .map(
-          (point, index) =>
-            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
-        )
-        .join(' '),
+  const segments = chart.ranges.map(([start, end]) => ({
+    start,
+    end,
+    path: points
+      .slice(start, end)
+      .map(
+        (point, index) =>
+          `${index === 0 ? 'M' : 'L'}${chart.pointX[start + index].toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+      )
+      .join(' '),
+  }));
+  const linePath = segments.map(({ path }) => path).join(' ');
+  const areaPath = segments
+    .map(
+      ({ start, end, path }) =>
+        `${path} L${chart.pointX[end - 1].toFixed(1)} ${baseline} L${chart.pointX[start].toFixed(1)} ${baseline} Z`,
     )
     .join(' ');
-  const areaPath = ranges
-    .map(([start, end]) => {
-      const segmentLine = points
-        .slice(start, end)
-        .map(
-          (point, index) =>
-            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
-        )
-        .join(' ');
-      return `${segmentLine} L${xScale(points[end - 1][0]).toFixed(1)} ${baseline} L${xScale(points[start][0]).toFixed(1)} ${baseline} Z`;
-    })
-    .join(' ');
-
-  const gradientStops = downsampleStops(points, gradeColors, maxDist);
+  const gradientStops = downsampleStops(chart.pointX, gradeColors, chartWidth);
 
   return (
     <svg
@@ -936,7 +907,13 @@ const ElevationSvg = React.memo(function ElevationSvg({
       ref={svgRef}
       role="img"
       aria-label={`Elevation profile for ${profile.trail}`}
+      aria-describedby={chart.breaks.length > 0 ? descriptionId : undefined}
     >
+      {chart.breaks.length > 0 && (
+        <desc id={descriptionId}>
+          {chart.breaks.map(({ label }) => label).join('. ')}
+        </desc>
+      )}
       <defs>
         <linearGradient
           id="grade-stroke"
@@ -984,6 +961,21 @@ const ElevationSvg = React.memo(function ElevationSvg({
         vectorEffect="non-scaling-stroke"
       />
 
+      {chart.breaks.map(({ left, right, label }) => (
+        <line
+          key={left}
+          x1={(left + right) / 2}
+          x2={(left + right) / 2}
+          y1={CHART_PADDING_TOP}
+          y2={baseline}
+          stroke="#9ca3af"
+          strokeDasharray="2 3"
+          vectorEffect="non-scaling-stroke"
+        >
+          <title>{label}</title>
+        </line>
+      ))}
+
       <path d={areaPath} fill="url(#grade-fill)" />
       <path
         d={linePath}
@@ -1003,11 +995,11 @@ export function profilePointToXY(
   index: number,
   profile: ElevationProfileData,
   chartWidth: number,
+  chart = layoutElevationChart(points, chartWidth, profile.geometryGapDetails),
 ): { x: number; y: number } {
-  const maxDist = points[points.length - 1][0];
   const yRange = profile.max - profile.min || 1;
   return {
-    x: (points[index][0] / maxDist) * chartWidth,
+    x: chart.pointX[index],
     y:
       CHART_PADDING_TOP +
       PLOT_HEIGHT -
@@ -1020,16 +1012,24 @@ function HoverIndicator({
   points,
   gradeColors,
   profile,
+  chart,
   chartWidth,
   hoverIndex,
 }: {
   points: [number, number, number, number][];
   gradeColors: string[];
   profile: ElevationProfileData;
+  chart: ElevationChartLayout;
   chartWidth: number;
   hoverIndex: number;
 }) {
-  const { x, y } = profilePointToXY(points, hoverIndex, profile, chartWidth);
+  const { x, y } = profilePointToXY(
+    points,
+    hoverIndex,
+    profile,
+    chartWidth,
+    chart,
+  );
 
   return (
     <svg
@@ -1064,15 +1064,23 @@ function HoverIndicator({
 function LocationIndicator({
   points,
   profile,
+  chart,
   chartWidth,
   locationIndex,
 }: {
   points: [number, number, number, number][];
   profile: ElevationProfileData;
+  chart: ElevationChartLayout;
   chartWidth: number;
   locationIndex: number;
 }) {
-  const { x, y } = profilePointToXY(points, locationIndex, profile, chartWidth);
+  const { x, y } = profilePointToXY(
+    points,
+    locationIndex,
+    profile,
+    chartWidth,
+    chart,
+  );
   const leftPct = (x / chartWidth) * 100;
   const topPct = (y / CHART_HEIGHT) * 100;
 

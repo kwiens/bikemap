@@ -391,5 +391,9 @@ describe('buildChartPaths', () => {
 
     expect(paths.line.match(/M/g)).toHaveLength(2);
     expect(paths.area.match(/Z/g)).toHaveLength(2);
+    expect(paths.breaks).toHaveLength(1);
+    const [{ left, right, label }] = paths.breaks;
+    expect(right - left).toBeGreaterThan(0);
+    expect(label).toBe('1,000 ft between sections');
   });
 });

@@ -54,8 +54,8 @@ export interface ElevationProfile {
   min: number;
   max: number;
   profile: [number, number, number, number][]; // [distance_ft, elevation_ft, lng, lat]
-  // Boundaries where the source geometry is disconnected. The distance and
-  // elevation jump between these coordinates must not be treated as trail.
+  // Boundaries between separately measured sections. Distance and elevation
+  // across the boundary are excluded from the trail totals.
   geometryGapDetails?: ElevationProfileGapDetail[];
   // OSM trails only: a tiny tag summary shown beneath the pane header. Curated
   // trails and recorded rides leave this undefined.

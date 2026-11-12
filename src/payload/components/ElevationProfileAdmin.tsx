@@ -16,7 +16,11 @@ import { formatAdminURL } from 'payload/shared';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
 import type { RecalculateTrailElevationResponse } from '@/payload/endpoints/recalculate-trail-elevation';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
-import { parseElevationProfile } from '@/utils/elevation-profile';
+import {
+  layoutElevationChart,
+  parseElevationProfile,
+  type ElevationChartLayout,
+} from '@/utils/elevation-profile';
 import { Banner } from './admin-ui';
 
 interface MeasurementSnapshot {
@@ -31,6 +35,7 @@ interface MeasurementSnapshot {
 
 interface ChartPaths {
   area: string;
+  breaks: ElevationChartLayout['breaks'];
   line: string;
 }
 
@@ -357,17 +362,24 @@ export function DerivedMeasurementField() {
 function ProfileChart({ profile }: { profile: ElevationProfile }) {
   const gradientId = `elevation-fill-${useId().replaceAll(':', '')}`;
   const paths = useMemo(() => buildChartPaths(profile), [profile]);
+  const descriptionId = `${gradientId}-breaks`;
   const range = `${formatFeet(profile.min)}–${formatFeet(profile.max)}`;
 
   return (
     <figure className="m-0 overflow-hidden rounded-[var(--style-radius-s)] border border-solid border-[color:var(--theme-elevation-150)] bg-[var(--theme-elevation-50)] px-2 pb-[0.35rem] pt-2">
       <svg
         aria-label={`Elevation profile for ${profile.trail}: ${range}`}
+        aria-describedby={paths.breaks.length > 0 ? descriptionId : undefined}
         className="block h-[clamp(9rem,22vw,13.75rem)] w-full"
         preserveAspectRatio="none"
         role="img"
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
       >
+        {paths.breaks.length > 0 && (
+          <desc id={descriptionId}>
+            {paths.breaks.map(({ label }) => label).join('. ')}
+          </desc>
+        )}
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop
@@ -393,6 +405,20 @@ function ProfileChart({ profile }: { profile: ElevationProfile }) {
             y1={fraction * CHART_HEIGHT}
             y2={fraction * CHART_HEIGHT}
           />
+        ))}
+        {paths.breaks.map(({ left, right, label }) => (
+          <line
+            key={left}
+            stroke="var(--theme-elevation-500)"
+            strokeDasharray="2 3"
+            vectorEffect="non-scaling-stroke"
+            x1={(left + right) / 2}
+            x2={(left + right) / 2}
+            y1={CHART_PADDING}
+            y2={CHART_HEIGHT - CHART_PADDING}
+          >
+            <title>{label}</title>
+          </line>
         ))}
         <path d={paths.area} fill={`url(#${gradientId})`} />
         <path
@@ -470,67 +496,49 @@ export function buildChartPaths(profile: ElevationProfile): ChartPaths {
     max = Math.max(max, point[1]);
   }
   if (points.length === 0) {
-    return { area: '', line: '' };
+    return { area: '', breaks: [], line: '' };
   }
 
-  const maxDistance = Math.max(points[points.length - 1][0], 1);
   const elevationRange = max - min || 1;
-  const x = (distance: number) => (distance / maxDistance) * CHART_WIDTH;
   const y = (elevation: number) =>
     CHART_PADDING +
     (1 - (elevation - min) / elevationRange) *
       (CHART_HEIGHT - CHART_PADDING * 2);
-  const ranges = segmentRanges(points, profile.geometryGapDetails);
+  const { breaks, pointX, ranges } = layoutElevationChart(
+    points,
+    CHART_WIDTH,
+    profile.geometryGapDetails,
+  );
 
   const segments = ranges.map(([start, end]) => ({
     end,
-    path: pathThrough(points, start, end, x, y),
+    path: pathThrough(points, start, end, pointX, y),
     start,
   }));
   const line = segments.map(({ path }) => path).join(' ');
   const area = segments
     .map(({ end, path, start }) => {
-      return `${path} L${coordinate(x(points[end - 1][0]))} ${CHART_HEIGHT} L${coordinate(x(points[start][0]))} ${CHART_HEIGHT} Z`;
+      return `${path} L${coordinate(pointX[end - 1])} ${CHART_HEIGHT} L${coordinate(pointX[start])} ${CHART_HEIGHT} Z`;
     })
     .join(' ');
 
-  return { area, line };
+  return { area, breaks, line };
 }
 
 function pathThrough(
   points: ElevationProfile['profile'],
   start: number,
   end: number,
-  x: (distance: number) => number,
+  pointX: number[],
   y: (elevation: number) => number,
 ): string {
   return points
     .slice(start, end)
     .map(
-      ([distance, elevation], index) =>
-        `${index === 0 ? 'M' : 'L'}${coordinate(x(distance))} ${coordinate(y(elevation))}`,
+      ([, elevation], index) =>
+        `${index === 0 ? 'M' : 'L'}${coordinate(pointX[start + index])} ${coordinate(y(elevation))}`,
     )
     .join(' ');
-}
-
-function segmentRanges(
-  points: ElevationProfile['profile'],
-  gaps: ElevationProfile['geometryGapDetails'] = [],
-): [number, number][] {
-  const gapEdges = new Set(
-    gaps.map(({ from, to }) => `${from[0]},${from[1]}:${to[0]},${to[1]}`),
-  );
-  const starts = [0];
-  for (let index = 1; index < points.length; index++) {
-    const previous = points[index - 1];
-    const current = points[index];
-    const edge = `${previous[2]},${previous[3]}:${current[2]},${current[3]}`;
-    if (current[0] <= previous[0] || gapEdges.has(edge)) {
-      starts.push(index);
-    }
-  }
-  starts.push(points.length);
-  return starts.slice(0, -1).map((start, index) => [start, starts[index + 1]]);
 }
 
 function snapshotFromValues(

@@ -107,7 +107,7 @@ describe('edited geometry', () => {
       warnings: string[];
     };
     expect(report.gaps[0].distanceMeters).toBeGreaterThan(1000);
-    expect(report.warnings.join(' ')).toMatch(/disconnected pieces/);
+    expect(report.warnings.join(' ')).toMatch(/break between sections/);
   });
 
   it('skips re-measuring when the line has not moved', async () => {

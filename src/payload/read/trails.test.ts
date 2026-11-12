@@ -46,11 +46,11 @@ afterAll(() => {
 });
 
 describe('getCityTrailSummaries', () => {
-  it('versions both public caches for the Cherokee geometry migration', async () => {
+  it('versions both public caches for the Chattanooga elevation refresh', async () => {
     vi.resetModules();
     await import('./trails');
     expect(PUBLIC_TRAIL_CACHE_DATA_VERSION).toBe(
-      '20260921_152202_repair_cherokee_trail_geometry',
+      '20261112_233931_refresh_chattanooga_elevation',
     );
     expect(mocks.unstableCache.mock.calls.map(([, keys]) => keys)).toEqual([
       ['public-city-trail-summaries', PUBLIC_TRAIL_CACHE_DATA_VERSION],

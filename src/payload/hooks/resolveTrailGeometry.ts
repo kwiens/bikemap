@@ -214,14 +214,14 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
       );
     }
 
-    // In walking order, as the profile walks them: stored order would report
-    // a break between two pieces that were merely listed apart.
+    // Report transitions in the measured profile, even when several source
+    // pieces form one continuous section.
     const gaps = measured.gaps;
     const warnings = [...measured.warnings];
     const notable = gaps.filter((gap) => gap.distanceMeters > NOTABLE_GAP_M);
     if (notable.length > 0) {
       warnings.push(
-        `This line is in ${parts.length} disconnected pieces; the largest break is ${notable[0].distanceMeters} m. Drag an endpoint onto its neighbour to close it.`,
+        `The elevation profile has a ${notable[0].distanceMeters} m break between sections. Verify the connection before joining the pieces.`,
       );
     }
 

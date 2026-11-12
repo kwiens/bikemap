@@ -5,6 +5,11 @@ import {
   type ElevationProfile,
   slugForTrail,
 } from '@/data/mountain-bike-trails';
+import { lengthMeters } from '@/payload/osm/assemble';
+import {
+  elevationSections,
+  MIN_ELEVATION_PART_METERS,
+} from '@/payload/osm/elevation-sections';
 import { parseElevationProfile } from '@/utils/elevation-profile';
 import { chattanoogaData } from './index';
 import { getChattanoogaMeasurement } from './measurements';
@@ -228,7 +233,7 @@ describe('Chattanooga trail import geometry', () => {
       }
       expect(profile.profile.length).toBeGreaterThan(1);
       expect(profile.geometryGapDetails ?? []).toHaveLength(
-        Math.max(0, (feature?.geometry.coordinates.length ?? 0) - 1),
+        elevationSections(feature?.geometry.coordinates ?? []).length - 1,
       );
       expect(Number((profile.distance / 5280).toFixed(2))).toBe(
         measurement?.distance,
@@ -244,6 +249,7 @@ describe('Chattanooga trail import geometry', () => {
         ),
       );
       for (const part of feature?.geometry.coordinates ?? []) {
+        if (lengthMeters([part]) < MIN_ELEVATION_PART_METERS) continue;
         const first = part[0];
         const last = part[part.length - 1];
         expect(profileCoordinates.has(`${first[0]},${first[1]}`)).toBe(true);

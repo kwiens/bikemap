@@ -14,6 +14,8 @@ import * as migration_20261002_043000_expand_theme_palette from './20261002_0430
 import * as migration_20261002_050000_simplify_theme_palette from './20261002_050000_simplify_theme_palette';
 import * as migration_20261029_220844_add_drawn_routes from './20261029_220844_add_drawn_routes';
 
+import * as refreshChattanoogaElevation from './20261112_233931_refresh_chattanooga_elevation';
+
 export const migrations = [
   {
     up: migration_20260807_044718_initial_schema.up,
@@ -89,5 +91,10 @@ export const migrations = [
     up: migration_20261029_220844_add_drawn_routes.up,
     down: migration_20261029_220844_add_drawn_routes.down,
     name: '20261029_220844_add_drawn_routes'
+  },
+  {
+    up: refreshChattanoogaElevation.up,
+    down: refreshChattanoogaElevation.down,
+    name: '20261112_233931_refresh_chattanooga_elevation',
   },
 ];

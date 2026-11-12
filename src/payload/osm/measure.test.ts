@@ -1,4 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import {
+  afterEach,
+  assert,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+import {
+  elevationProfileBreaks,
+  layoutElevationChart,
+} from '@/utils/elevation-profile';
+import { buildProfileGpx } from '@/utils/gpx';
 import { measureParts } from './measure';
 import { clearTileCache } from './terrain';
 import { M_TO_FT } from './units';
@@ -165,13 +179,9 @@ describe('measureParts', () => {
 
     expect(profile[0].slice(2)).toEqual(WEST[0]);
     expect(profile[profile.length - 1].slice(2)).toEqual(westTail[1]);
-    expect(measured.profile?.geometryGapDetails).toEqual([
-      { feet: 0, from: WEST[1], to: westTail[0] },
-    ]);
-    // Reported against the stored line, which lists westTail first.
-    expect(measured.gaps).toEqual([
-      { distanceMeters: 0, fromPart: 1, toPart: 0 },
-    ]);
+    expect(measured.profile?.geometryGapDetails).toBeUndefined();
+    expect(measured.gaps).toEqual([]);
+    expect(profile.filter((point) => point[2] === WEST[1][0])).toHaveLength(1);
   });
 
   it('warns rather than storing a flat line when no terrain can be read', async () => {
@@ -188,4 +198,80 @@ describe('measureParts', () => {
     expect(measured.distance).toBeGreaterThan(0);
     expect(measured.warnings.join(' ')).toMatch(/no elevation data/i);
   });
+});
+
+describe('Chattanooga elevation regressions', () => {
+  const collection = JSON.parse(
+    readFileSync('public/data/chattanooga/trails.geojson', 'utf8'),
+  ) as {
+    features: {
+      geometry: { coordinates: [number, number][][] };
+      properties: { Trail: string };
+    }[];
+  };
+
+  it.each([
+    { name: 'BLUE Trail', gaps: [3165, 4588, 4828, 10846], sections: 5 },
+    { name: 'ADA Accessible Trail', gaps: [243], sections: 2 },
+    {
+      name: 'Crabtree Farm Trail Connection',
+      gaps: [0, 285, 620],
+      sections: 4,
+    },
+  ])(
+    'measures $name as $sections continuous sections',
+    async ({ name, gaps, sections }) => {
+      const feature = collection.features.find(
+        ({ properties }) => properties.Trail === name,
+      );
+      assert(feature);
+      const parts = feature.geometry.coordinates;
+      const measured = await measureParts(parts, name, { mapboxToken: TOKEN });
+      const profile = measured.profile;
+      assert(profile);
+      const { profile: points, geometryGapDetails } = profile;
+
+      const breaks = elevationProfileBreaks(points, geometryGapDetails);
+      expect(
+        geometryGapDetails?.map(({ feet }) => feet).sort((a, b) => a - b),
+      ).toEqual(gaps);
+      expect(breaks.size).toBe(sections - 1);
+      for (const index of breaks.keys()) {
+        expect(points[index][0]).toBe(points[index - 1][0]);
+      }
+      expect(points.at(-1)?.[0]).toBeCloseTo(profile.distance, 4);
+      expect(measured.elevationGain).toBe(0);
+      expect(measured.elevationLoss).toBe(0);
+
+      const chart = layoutElevationChart(points, 320, geometryGapDetails);
+      expect(chart.ranges).toHaveLength(sections);
+      expect(chart.breaks.every(({ left, right }) => right > left)).toBe(true);
+      expect(
+        buildProfileGpx(name, points, geometryGapDetails).match(/<trkseg>/g),
+      ).toHaveLength(sections);
+
+      if (name === 'ADA Accessible Trail') {
+        const [start, end] = chart.ranges.reduce((longest, range) =>
+          range[1] - range[0] > longest[1] - longest[0] ? range : longest,
+        );
+        expect(points[start].slice(2)).toEqual(points[end - 1].slice(2));
+        expect(
+          points
+            .slice(start, end)
+            .filter(
+              (point) =>
+                point[2] === parts[0][0][0] && point[3] === parts[0][0][1],
+            ),
+        ).toHaveLength(1);
+      }
+      if (name === 'Crabtree Farm Trail Connection') {
+        const stubEnd = [-85.3071117, 35.0101208];
+        expect(
+          points.some(
+            ([, , lng, lat]) => lng === stubEnd[0] && lat === stubEnd[1],
+          ),
+        ).toBe(false);
+      }
+    },
+  );
 });

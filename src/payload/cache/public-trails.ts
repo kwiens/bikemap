@@ -17,7 +17,7 @@ export const PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS = 24 * 60 * 60;
  * until the daily TTL.
  */
 export const PUBLIC_TRAIL_CACHE_DATA_VERSION =
-  '20260921_152202_repair_cherokee_trail_geometry';
+  '20261112_233931_refresh_chattanooga_elevation';
 
 function expireTags(tags: string[], req: PayloadRequest): void {
   try {

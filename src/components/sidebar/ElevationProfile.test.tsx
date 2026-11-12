@@ -189,7 +189,11 @@ describe('downsampleStops', () => {
     const points = makePoints(50);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
-    const stops = downsampleStops(points, colors, maxDist);
+    const stops = downsampleStops(
+      points.map(([distance]) => distance),
+      colors,
+      maxDist,
+    );
     expect(stops).toHaveLength(50);
   });
 
@@ -197,7 +201,11 @@ describe('downsampleStops', () => {
     const points = makePoints(700);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
-    const stops = downsampleStops(points, colors, maxDist);
+    const stops = downsampleStops(
+      points.map(([distance]) => distance),
+      colors,
+      maxDist,
+    );
     expect(stops).toHaveLength(600);
   });
 
@@ -205,7 +213,11 @@ describe('downsampleStops', () => {
     const points = makePoints(500);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
-    const stops = downsampleStops(points, colors, maxDist);
+    const stops = downsampleStops(
+      points.map(([distance]) => distance),
+      colors,
+      maxDist,
+    );
     expect(stops[0].offset).toBe(0);
     expect(stops[stops.length - 1].offset).toBeCloseTo(1, 2);
   });
@@ -419,6 +431,62 @@ describe('ElevationProfile selection source', () => {
     expect(grade.querySelector('[aria-hidden="true"]')).toHaveStyle({
       backgroundColor: gradeToColor(computeGrades(profile.profile)[2]),
     });
+  });
+
+  it('shows a gap label and clears the map hover between chart sections', () => {
+    const profile: ElevationProfileData = {
+      trail: 'Disconnected trail',
+      distance: 400,
+      gain: 0,
+      loss: 0,
+      min: 100,
+      max: 200,
+      profile: [
+        [0, 100, -85.3, 35],
+        [200, 100, -85.301, 35.001],
+        [200, 200, -85.305, 35.005],
+        [400, 200, -85.306, 35.006],
+      ],
+      geometryGapDetails: [
+        { feet: 620, from: [-85.301, 35.001], to: [-85.305, 35.005] },
+      ],
+    };
+    const hover = vi.fn();
+    window.addEventListener(MAP_EVENTS.ELEVATION_HOVER, hover);
+    try {
+      render(<ElevationProfile />);
+      act(() => {
+        window.dispatchEvent(
+          new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, { detail: { profile } }),
+        );
+      });
+      const chart = screen.getByRole('img', {
+        name: 'Elevation profile for Disconnected trail',
+      });
+      vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
+        left: 0,
+        width: 400,
+      } as DOMRect);
+      fireEvent.mouseMove(chart, { clientX: 200 });
+      expect(chart).toHaveAccessibleDescription('620 ft between sections');
+      expect(
+        screen.getByText('620 ft between sections', { selector: 'div' }),
+      ).toBeVisible();
+      expect(hover).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          detail: { lng: null, lat: null },
+        }),
+      );
+
+      fireEvent.mouseMove(chart, { clientX: 205 });
+      expect(hover).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          detail: { lng: -85.306, lat: 35.006 },
+        }),
+      );
+    } finally {
+      window.removeEventListener(MAP_EVENTS.ELEVATION_HOVER, hover);
+    }
   });
 
   it('loads a curated profile when an OSM trail with the same name was selected', async () => {
