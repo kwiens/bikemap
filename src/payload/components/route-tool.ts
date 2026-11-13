@@ -8,22 +8,24 @@
  * straight to Mapbox sources. React hears about it only through `onStatus`, at
  * click and fetch rate.
  *
- * The network arrives one fixed grid cell at a time from the trails network
- * endpoint (see `trail-network.ts`), fetched one request at a time so panning
- * across an area never bursts the public Overpass instance.
+ * The trail and route editors load their respective OSM networks one fixed
+ * grid cell at a time so panning never bursts the public Overpass instance.
  */
 import type mapboxgl from 'mapbox-gl';
 import {
   addWays,
-  cellBounds,
-  cellsCovering,
+  cellsCovering as trailCellsCovering,
   createTrailNetwork,
-  MIN_NETWORK_ZOOM,
+  MIN_NETWORK_ZOOM as MIN_TRAIL_ZOOM,
   type NetworkSnap,
   type NetworkWay,
   routeBetween,
   snapToNetwork,
 } from '@/payload/osm/trail-network';
+import {
+  cellsCovering as routeCellsCovering,
+  MIN_VIEW_LOAD_ZOOM,
+} from '@/payload/routing/cells';
 
 type Position = [number, number];
 type Parts = Position[][];
@@ -48,7 +50,8 @@ export interface LineAddition {
 
 export interface RouteToolHost {
   apply(next: Parts, addition: LineAddition): void;
-  fetchNetwork(bbox: [number, number, number, number]): Promise<NetworkWay[]>;
+  fetchNetwork(cell: string): Promise<NetworkWay[]>;
+  networkKind?: 'route' | 'trail';
   getParts(): Parts;
   isActive(): boolean;
   onStatus(status: RouteStatus): void;
@@ -74,6 +77,7 @@ export interface RouteTool {
   install(): void;
   /** Restores the last click that was undone. */
   redoLeg(): boolean;
+  setManualPoints(isManual: boolean): void;
   /** Takes back the last click. Returns false when there was nothing to take back. */
   undoLeg(): boolean;
 }
@@ -107,6 +111,9 @@ const SNAP_PIXELS = 30;
 /** Clicks closer than this to the last one are the second half of a double-click. */
 const DOUBLE_CLICK_PIXELS = 4;
 
+/** Lets a snapped leg rejoin the network from the end of a manual segment. */
+const MANUAL_APPROACH_METERS = 250;
+
 /**
  * How long a cell that failed to load waits before it is asked for again —
  * long enough that a struggling Overpass isn't hammered, short enough that a
@@ -123,6 +130,12 @@ export function createRouteTool(
   map: mapboxgl.Map,
   host: RouteToolHost,
 ): RouteTool {
+  const isRouteNetwork = host.networkKind === 'route';
+  const minZoom = isRouteNetwork ? MIN_VIEW_LOAD_ZOOM : MIN_TRAIL_ZOOM;
+  const cellsCovering = isRouteNetwork
+    ? routeCellsCovering
+    : trailCellsCovering;
+  const networkLabel = isRouteNetwork ? 'paths and roads' : 'trails';
   const network = createTrailNetwork();
   const loaded = new Set<string>();
   /** Cells that failed to load, and when — see `RETRY_AFTER_MS`. */
@@ -144,6 +157,7 @@ export function createRouteTool(
   let frame = 0;
   let cursor: mapboxgl.LngLat | null = null;
   let isAltDown = false;
+  let isManual = false;
   let lastClick: mapboxgl.Point | null = null;
   /** What the preview last drew, so an unmoved target skips the route search. */
   let previewKey = '';
@@ -161,10 +175,10 @@ export function createRouteTool(
     if (isDisposed || !host.isActive()) {
       return;
     }
-    if (map.getZoom() < MIN_NETWORK_ZOOM) {
+    if (map.getZoom() < minZoom) {
       report({
         network: 'zoom',
-        networkMessage: 'Zoom in to load trails to follow.',
+        networkMessage: `Zoom in to load ${networkLabel} to follow.`,
       });
       return;
     }
@@ -191,8 +205,7 @@ export function createRouteTool(
         cooling.length > 0
           ? {
               network: 'error',
-              networkMessage:
-                'Some trails could not be loaded. Retrying shortly…',
+              networkMessage: `Some ${networkLabel} could not be loaded. Retrying shortly…`,
             }
           : { network: 'ready', networkMessage: null },
       );
@@ -215,9 +228,12 @@ export function createRouteTool(
         if (loaded.has(key)) {
           continue;
         }
-        report({ network: 'loading', networkMessage: 'Loading trails…' });
+        report({
+          network: 'loading',
+          networkMessage: `Loading ${networkLabel}…`,
+        });
         try {
-          const ways = await host.fetchNetwork(cellBounds(key));
+          const ways = await host.fetchNetwork(key);
           if (isDisposed) {
             return;
           }
@@ -239,7 +255,7 @@ export function createRouteTool(
             networkMessage:
               error instanceof Error
                 ? error.message
-                : 'Trails could not be loaded.',
+                : `Could not load ${networkLabel}.`,
           });
         }
       }
@@ -294,8 +310,13 @@ export function createRouteTool(
     if (to.isFree) {
       return { coordinates: [from.position, to.position], isStraight: false };
     }
+    const fromSnap =
+      from.snap ??
+      (isRouteNetwork && from.isFree
+        ? snapToNetwork(network, from.position, MANUAL_APPROACH_METERS)
+        : null);
     const routed =
-      from.snap && to.snap ? routeBetween(network, from.snap, to.snap) : null;
+      fromSnap && to.snap ? routeBetween(network, fromSnap, to.snap) : null;
     if (!routed) {
       return { coordinates: [from.position, to.position], isStraight: true };
     }
@@ -309,12 +330,14 @@ export function createRouteTool(
     if (!host.isActive()) {
       return;
     }
-    const isFree = event.originalEvent.altKey;
+    const isFree = isManual || event.originalEvent.altKey;
     // The second click of a double-click lands where the first did; it finishes
     // the route (see `onDoubleClick`) and must not add a leg of its own. Judged
     // by the pointer, not the snapped position, which can differ by a hair.
     const isRepeat =
-      lastClick !== null && event.point.dist(lastClick) < DOUBLE_CLICK_PIXELS;
+      event.originalEvent.detail === 2 &&
+      lastClick !== null &&
+      event.point.dist(lastClick) < DOUBLE_CLICK_PIXELS;
     lastClick = event.point;
 
     const previous = clicks.at(-1)?.waypoint;
@@ -339,7 +362,7 @@ export function createRouteTool(
         waypoint: next,
         coordinates: leg.coordinates.slice(1),
         note: leg.isStraight
-          ? 'No loaded trail connects those two points, so they are joined with a straight line. Undo takes it back.'
+          ? `No connection through the loaded ${networkLabel}, so the points are joined with a straight line. Undo takes it back.`
           : null,
       });
     }
@@ -371,8 +394,8 @@ export function createRouteTool(
     if (!cursor || !host.isActive()) {
       return;
     }
-    const target = waypointAt(cursor, isAltDown);
-    const key = `${clicks.length}:${target.position.join(',')}`;
+    const target = waypointAt(cursor, isManual || isAltDown);
+    const key = `${clicks.length}:${target.isFree}:${target.position.join(',')}`;
     if (key === previewKey) {
       return;
     }
@@ -551,6 +574,11 @@ export function createRouteTool(
       clicks.push(click);
       updateRoute();
       return true;
+    },
+    setManualPoints(value) {
+      isManual = value;
+      previewKey = '';
+      if (!frame) frame = requestAnimationFrame(renderPreview);
     },
     undoLeg() {
       const click = clicks.pop();

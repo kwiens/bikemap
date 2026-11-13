@@ -121,12 +121,14 @@ export function RoutePlanner({
 
   const [ready, setReady] = useState(false);
   const [basemap, setBasemap] = useState<EditorBasemap>('streets');
+  const [isManual, setIsManual] = useState(false);
   const [pending, setPending] = useState(0);
   const [zoom, setZoom] = useState(mapConfig.defaultView.zoom);
   const [trailCount, setTrailCount] = useState<number | null>(null);
 
   const controllerRef = useRef<RouteEditorController | null>(null);
   const readOnlyRef = useRef(Boolean(readOnly));
+  const isManualRef = useRef(false);
   const colorRef = useRef(colorValue || DEFAULT_ROUTE_COLOR);
   const trailsRef = useRef<GeoJSON.FeatureCollection>(EMPTY_COLLECTION);
   /** The last plan this editor wrote, so its own write isn't read back as external. */
@@ -287,13 +289,21 @@ export function RoutePlanner({
         (target instanceof Element && target.closest('.mapboxgl-marker'))
       )
         return;
-      const hit = map.queryRenderedFeatures(event.point, {
-        layers: [ROUTE_HIT_LAYER],
-      })[0];
+      const point: Position = [event.lngLat.lng, event.lngLat.lat];
+      if (isManualRef.current || event.originalEvent.altKey) {
+        void controller.addWaypoint(point, undefined, 'straight');
+        return;
+      }
+      const hit = event.originalEvent.shiftKey
+        ? map.queryRenderedFeatures(event.point, {
+            layers: [ROUTE_HIT_LAYER],
+          })[0]
+        : undefined;
       const legIndex = Number(hit?.properties?.leg);
       void controller.addWaypoint(
-        [event.lngLat.lng, event.lngLat.lat],
+        point,
         Number.isInteger(legIndex) ? legIndex : undefined,
+        'network',
       );
     },
     [controller],
@@ -335,14 +345,6 @@ export function RoutePlanner({
     });
     map.on('click', (event) => {
       void handleMapClick(event);
-    });
-    map.on('mouseenter', ROUTE_HIT_LAYER, () => {
-      if (!readOnlyRef.current) {
-        map.getCanvas().style.cursor = 'copy';
-      }
-    });
-    map.on('mouseleave', ROUTE_HIT_LAYER, () => {
-      map.getCanvas().style.cursor = '';
     });
     map.on('moveend', () => {
       setZoom(map.getZoom());
@@ -471,6 +473,15 @@ export function RoutePlanner({
         role="group"
       >
         <ToolButton
+          active={isManual}
+          disabled={!editable}
+          label="Manual points"
+          onClick={() => {
+            isManualRef.current = !isManual;
+            setIsManual(!isManual);
+          }}
+        />
+        <ToolButton
           disabled={!editable || !canUndo}
           label="Undo"
           onClick={() => controller.undo()}
@@ -563,11 +574,13 @@ export function RoutePlanner({
       </div>
 
       <p className="mb-3 mt-0 max-w-[75ch] text-[0.8rem] text-[color:var(--theme-elevation-600)] leading-[1.45]">
-        Click the map to add waypoints; the route follows trails and roads
-        between them, preferring published trails and bike paths. To use part of
-        a trail, put waypoints where you join and leave it. Drag a waypoint to
-        move it, click the route to add one in between, or right-click a
-        waypoint to remove it. Distance is measured when you save.
+        Click the map to add waypoints. The route can follow roads, sidewalks,
+        and trails between them, preferring published trails and bike paths.
+        Toggle Manual points to place waypoints exactly where you click. Turn it
+        off to resume snapping. To use part of a trail, put waypoints where you
+        join and leave it. Drag a waypoint to move it, Shift-click an existing
+        leg to insert one, or right-click a waypoint to remove it. Distance is
+        measured when you save.
       </p>
 
       {steps.length > 0 && (

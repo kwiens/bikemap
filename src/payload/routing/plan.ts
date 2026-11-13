@@ -272,20 +272,23 @@ export interface PlanEdit {
   reroute: number[];
 }
 
-export function appendWaypoint(plan: RoutePlan, point: Position): PlanEdit {
+export function appendWaypoint(
+  plan: RoutePlan,
+  point: Position,
+  mode: LegMode = plan.legs.at(-1)?.mode ?? 'network',
+): PlanEdit {
   if (plan.waypoints.length >= MAX_WAYPOINTS) return { plan, reroute: [] };
   const last = plan.waypoints.at(-1);
   if (!last) {
     return { plan: { ...plan, waypoints: [point] }, reroute: [] };
   }
-  const mode = plan.legs.at(-1)?.mode ?? 'network';
   return {
     plan: {
       ...plan,
       legs: [...plan.legs, straightLeg(last, point, mode)],
       waypoints: [...plan.waypoints, point],
     },
-    reroute: [plan.legs.length],
+    reroute: mode === 'network' ? [plan.legs.length] : [],
   };
 }
 

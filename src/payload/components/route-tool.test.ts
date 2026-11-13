@@ -130,7 +130,7 @@ describe('Follow trails network loading', () => {
       finishFirst = resolve;
     });
     const fetchNetwork = vi
-      .fn<(bbox: [number, number, number, number]) => Promise<NetworkWay[]>>()
+      .fn<(cell: string) => Promise<NetworkWay[]>>()
       .mockReturnValueOnce(first)
       .mockResolvedValue([]);
     const tool = createRouteTool(view.map, {
@@ -146,14 +146,14 @@ describe('Follow trails network loading', () => {
     finishFirst?.([]);
 
     await vi.waitFor(() => expect(fetchNetwork).toHaveBeenCalledTimes(2));
-    expect(fetchNetwork.mock.calls.map(([bbox]) => bbox[0])).toEqual([0, 0.2]);
+    expect(fetchNetwork.mock.calls).toEqual([['0:0'], ['2:0']]);
   });
 
   it('keeps an error visible when another cell succeeds', async () => {
     const view = mapForView();
     const statuses: RouteStatus[] = [];
     const fetchNetwork = vi
-      .fn<(bbox: [number, number, number, number]) => Promise<NetworkWay[]>>()
+      .fn<(cell: string) => Promise<NetworkWay[]>>()
       .mockRejectedValueOnce(new Error('Overpass is busy'))
       .mockResolvedValue([]);
     const tool = createRouteTool(view.map, {
@@ -177,7 +177,7 @@ describe('Follow trails teardown', () => {
     vi.useFakeTimers();
     const view = mapForView();
     const fetchNetwork = vi
-      .fn<(bbox: [number, number, number, number]) => Promise<NetworkWay[]>>()
+      .fn<(cell: string) => Promise<NetworkWay[]>>()
       .mockRejectedValue(new Error('Overpass is busy'));
     const tool = createRouteTool(view.map, {
       apply: vi.fn(),
@@ -239,6 +239,20 @@ describe('Follow trails legs', () => {
     expect(path).toContainEqual([0.04, 0.07]);
     expect(path.at(-1)?.[0]).toBeCloseTo(0.05, 9);
     expect(path.at(-1)?.[1]).toBeCloseTo(0.07, 9);
+  });
+
+  it('adds a new leg when the route doubles back over its own line', async () => {
+    const { apply, tool, view } = await routeOnElbow();
+    const start = ELBOW.coordinates[0];
+    const turn = ELBOW.coordinates[3];
+    view.click(...start);
+    view.click(...turn);
+    view.click(...start);
+    tool.finish();
+    expect(apply).toHaveBeenCalledWith(
+      [[...ELBOW.coordinates, ...ELBOW.coordinates.slice(0, -1).reverse()]],
+      { atStart: false, partIndex: 0, pointCounts: [1, 4, 7] },
+    );
   });
 
   it('restores the exact snapped leg and records its waypoint boundary', async () => {

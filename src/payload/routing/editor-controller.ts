@@ -49,7 +49,11 @@ export interface RouteEditorController {
   setReadOnly(readOnly: boolean): void;
   replacePlan(plan: RoutePlan): void;
   ensureCells(keys: CellKey[]): Promise<boolean>;
-  addWaypoint(point: Position, legIndex?: number): Promise<void>;
+  addWaypoint(
+    point: Position,
+    legIndex?: number,
+    mode?: LegMode,
+  ): Promise<void>;
   moveWaypoint(index: number, from: Position, to: Position): Promise<void>;
   removeWaypoint(index: number, point?: Position): Promise<void>;
   setLegMode(index: number, mode: LegMode): Promise<void>;
@@ -222,14 +226,16 @@ export function createRouteEditorController(
       update({ plan, canUndo: false, canRedo: false, routing: 0, note: null });
     },
     ensureCells,
-    addWaypoint(point, legIndex = -1) {
+    addWaypoint(point, legIndex = -1, mode) {
       if (isDisposed || isReadOnly) return Promise.resolve();
       const from = state.plan.waypoints[legIndex];
       const to = state.plan.waypoints[legIndex + 1];
       const generation = editGeneration;
       // Start snaps together, but commit in click order. Observe rejection now,
       // even if an earlier click is still waiting on its own network cell.
-      const snapped = snapPoint(point).then(
+      const placement =
+        mode === 'straight' ? Promise.resolve(point) : snapPoint(point);
+      const snapped = placement.then(
         (position) => ({ position, error: null }),
         (error: unknown) => ({ position: null, error }),
       );
@@ -267,7 +273,7 @@ export function createRouteEditorController(
           (current) =>
             index >= 0
               ? insertWaypoint(current, index, position)
-              : appendWaypoint(current, position),
+              : appendWaypoint(current, position, mode),
           true,
         );
       });

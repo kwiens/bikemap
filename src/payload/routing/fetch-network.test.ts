@@ -2,6 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OverpassError } from '@/payload/osm/overpass';
 import { cellBounds, cellsCovering } from './cells';
 import {
+  buildRouteGraph,
+  routeBetween,
+  snapToGraph,
+  type Position,
+} from './graph';
+import {
   fetchRouteNetwork,
   networkWaysFrom,
   routeNetworkQuery,
@@ -12,6 +18,39 @@ afterEach(() => {
 });
 
 describe('networkWaysFrom', () => {
+  it('routes from a road along a paved sidewalk, crossing, and gravel trail', () => {
+    const points: Position[] = [
+      [-121.3, 44],
+      [-121.299, 44],
+      [-121.299, 44.001],
+      [-121.298, 44.001],
+      [-121.298, 44.002],
+    ];
+    const tags: Record<string, string>[] = [
+      { highway: 'residential' },
+      { highway: 'footway', footway: 'sidewalk', surface: 'paved' },
+      { highway: 'footway', footway: 'crossing' },
+      { highway: 'path', surface: 'gravel' },
+    ];
+    const ways = networkWaysFrom(
+      tags.map((tags, index) => ({
+        geometry: points
+          .slice(index, index + 2)
+          .map(([lon, lat]) => ({ lat, lon })),
+        id: index + 1,
+        nodes: [index + 1, index + 2],
+        tags,
+        type: 'way',
+      })),
+    );
+    const graph = buildRouteGraph({ trails: [], ways });
+    const from = snapToGraph(graph, points[0]);
+    const to = snapToGraph(graph, points[4]);
+    expect(from && to && routeBetween(graph, from, to)?.coordinates).toEqual(
+      points,
+    );
+  });
+
   it('keeps rideable ways with matching nodes and geometry', () => {
     const ways = networkWaysFrom([
       {
@@ -105,6 +144,15 @@ describe('fetchRouteNetwork', () => {
 });
 
 describe('routeNetworkQuery', () => {
+  it('requests footways regardless of whether bicycle or surface tags are set', () => {
+    const query = routeNetworkQuery([-121.32, 44.04, -121.3, 44.06]);
+    const highwayFilter = query.match(/\["highway"~"\^\(([^)]+)\)/)?.[1];
+    expect(highwayFilter?.split('|')).toEqual(
+      expect.arrayContaining(['footway', 'path', 'cycleway', 'residential']),
+    );
+    expect(query).not.toMatch(/\["(?:bicycle|surface)"/);
+  });
+
   it('asks Overpass for south,west,north,east', () => {
     expect(routeNetworkQuery([-121.32, 44.04, -121.3, 44.06])).toContain(
       '(44.04,-121.32,44.06,-121.3)',

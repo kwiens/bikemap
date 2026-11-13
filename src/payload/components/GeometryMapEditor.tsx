@@ -124,7 +124,9 @@ import {
   simplifyParts,
   splitAtPoints,
 } from '@/payload/osm/line-edits';
+import { cellBounds as trailCellBounds } from '@/payload/osm/trail-network';
 import { METERS_TO_MILES } from '@/payload/osm/units';
+import { cellBounds as routeCellBounds } from '@/payload/routing/cells';
 import { OSM_BIKE_TRAIL_FILTER } from '@/utils/map';
 import { cn } from '@/lib/utils';
 import { Banner, type Tone } from './admin-ui';
@@ -316,6 +318,7 @@ export function GeometryMapEditor({
     text: string;
     tone: Tone;
   } | null>(null);
+  const [isManualRoute, setIsManualRoute] = useState(false);
   const [routeStatus, setRouteStatus] = useState<RouteStatus>(IDLE_ROUTE);
   const [selection, setSelection] = useState<PointRef[]>([]);
   const [editNote, setEditNote] = useState<string | null>(null);
@@ -350,6 +353,8 @@ export function GeometryMapEditor({
   const setRebuildRef = useRef(setRebuild);
   const setSourceRef = useRef(setGeometrySource);
   const apiRef = useRef({ apiRoute, serverURL });
+  // RouteLineEditor remounts when the source changes.
+  const usesRouteNetworkRef = useRef(hasPathSnappingToggle);
   apiRef.current = { apiRoute, serverURL };
   idsRef.current = ids;
   modeRef.current = mode;
@@ -775,31 +780,34 @@ export function GeometryMapEditor({
     loadDraw(partsRef.current, false);
   }, [loadDraw]);
 
-  /** Loads the OSM trail network in one grid cell, for Follow trails. */
-  const fetchNetwork = useCallback(
-    async (bbox: [number, number, number, number]) => {
-      const { apiRoute: api, serverURL: server } = apiRef.current;
-      const endpoint = formatAdminURL({
-        apiRoute: api,
-        path: '/trails/network',
-        serverURL: server,
-      });
-      const response = await fetch(`${endpoint}?bbox=${bbox.join(',')}`, {
-        credentials: 'same-origin',
-      });
-      const body = (await response.json().catch(() => ({}))) as Partial<
-        TrailNetworkResponse & { message: string }
-      >;
-      if (!response.ok || !Array.isArray(body.ways)) {
-        throw new Error(
-          body.message ??
-            `Trails could not be loaded (HTTP ${response.status}).`,
-        );
-      }
-      return body.ways;
-    },
-    [],
-  );
+  const fetchNetwork = useCallback(async (cell: string) => {
+    const { apiRoute: api, serverURL: server } = apiRef.current;
+    const isRoute = usesRouteNetworkRef.current;
+    if (isRoute && !routeCellBounds(cell)) {
+      return [];
+    }
+    const endpoint = formatAdminURL({
+      apiRoute: api,
+      path: isRoute ? '/routes/network' : '/trails/network',
+      serverURL: server,
+    });
+    const query = isRoute
+      ? `cell=${cell}`
+      : `bbox=${trailCellBounds(cell).join(',')}`;
+    const response = await fetch(`${endpoint}?${query}`, {
+      credentials: 'same-origin',
+    });
+    const body = (await response.json().catch(() => ({}))) as Partial<
+      TrailNetworkResponse & { message: string }
+    >;
+    if (!response.ok || !Array.isArray(body.ways)) {
+      throw new Error(
+        body.message ??
+          `The network could not be loaded (HTTP ${response.status}).`,
+      );
+    }
+    return body.ways;
+  }, []);
 
   // --- the map -----------------------------------------------------------
 
@@ -973,6 +981,7 @@ export function GeometryMapEditor({
       fetchNetwork,
       getParts: () => partsRef.current,
       isActive: () => !readOnlyRef.current && modeRef.current === 'route',
+      networkKind: usesRouteNetworkRef.current ? 'route' : 'trail',
       onStatus: (status) => {
         setRouteStatus(status);
         syncHistory();
@@ -1709,6 +1718,15 @@ export function GeometryMapEditor({
         <RouteBar
           onCancel={() => routeToolRef.current?.cancel()}
           onFinish={() => routeToolRef.current?.finish()}
+          onToggleManual={
+            hasPathSnappingToggle
+              ? () => {
+                  routeToolRef.current?.setManualPoints(!isManualRoute);
+                  setIsManualRoute(!isManualRoute);
+                }
+              : undefined
+          }
+          isManual={isManualRoute}
           status={routeStatus}
         />
       )}
@@ -1765,6 +1783,7 @@ export function GeometryMapEditor({
           parts.length,
           isRemovingPoint,
           hasOsmSource,
+          hasPathSnappingToggle,
         )}
       </p>
 
@@ -1898,6 +1917,7 @@ function hintFor(
   pieces: number,
   isRemovingPoint: boolean,
   hasOsmSource: boolean,
+  hasPathSnappingToggle: boolean,
 ): string {
   if (mode === 'pick') {
     if (source === 'edited') {
@@ -1915,7 +1935,13 @@ function hintFor(
       : ' Your first change makes this a custom line, so future saves keep your version instead of replacing it from OpenStreetMap.';
 
   if (mode === 'route') {
-    return `Click where the trail starts, then click further along it — the line follows the trails between clicks. Start on the end of an existing piece to extend it. Hold Alt (Option) while clicking to go straight across a gap. Double-click or press Enter to finish, Backspace to take back a click, Escape to cancel.${takesOwnership}`;
+    const network = hasPathSnappingToggle
+      ? 'roads, sidewalks, and trails'
+      : 'trails';
+    const manualHint = hasPathSnappingToggle
+      ? ' Toggle Manual points to click through gaps, then turn it off to resume snapping.'
+      : '';
+    return `Click where the line starts, then click farther along. The line follows mapped ${network} between clicks.${manualHint} Start on the end of an existing piece to extend it. Hold Alt (Option) while clicking to go straight across a gap. Double-click or press Enter to finish, Backspace to take back a click, Escape to cancel.${takesOwnership}`;
   }
 
   if (mode === 'draw') {
@@ -2021,23 +2047,35 @@ function messageFrom(value: unknown): string {
 
 /** Follow trails' controls, and what the network is doing. */
 function RouteBar({
+  isManual,
   onCancel,
   onFinish,
+  onToggleManual,
   status,
 }: {
+  isManual: boolean;
   onCancel: () => void;
   onFinish: () => void;
+  onToggleManual?: () => void;
   status: RouteStatus;
 }) {
   const networkText =
     status.networkMessage ??
-    (status.network === 'ready' ? 'Trails loaded for this area.' : null);
+    (status.network === 'ready' ? 'Network loaded for this area.' : null);
   return (
     <div
-      aria-label="Follow trails"
+      aria-label={onToggleManual ? 'Route construction' : 'Follow trails'}
       className="mb-2 flex flex-wrap items-center gap-1.5"
       role="group"
     >
+      {onToggleManual && (
+        <ModeButton
+          active={isManual}
+          disabled={false}
+          label="Manual points"
+          onClick={onToggleManual}
+        />
+      )}
       <ModeButton
         active={false}
         disabled={status.waypoints < 2}

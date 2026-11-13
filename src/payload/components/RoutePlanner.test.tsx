@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   plan: { legs: [], version: 1, waypoints: [] } as RoutePlan,
   write: vi.fn(),
   ensure: vi.fn(),
+  queryRenderedFeatures: vi.fn(),
 }));
 vi.mock('@payloadcms/ui', () => ({
   useField: ({ path }: { path: string }) => ({
@@ -35,7 +36,7 @@ vi.mock('./editor-map', () => ({
     on: (name: string, ...args: unknown[]) =>
       mocks.handlers.set(name, args.at(-1) as (event: unknown) => void),
     doubleClickZoom: { disable: vi.fn() },
-    queryRenderedFeatures: () => [],
+    queryRenderedFeatures: mocks.queryRenderedFeatures,
     getSource: () => undefined,
     remove: vi.fn(),
   })),
@@ -69,10 +70,10 @@ vi.mock('@/payload/routing/network-store', () => ({
   },
 }));
 
-function click(point: Position) {
+function click(point: Position, shiftKey = false) {
   mocks.handlers.get('click')?.({
     lngLat: { lng: point[0], lat: point[1] },
-    originalEvent: { target: document.createElement('canvas') },
+    originalEvent: { target: document.createElement('canvas'), shiftKey },
   });
 }
 
@@ -90,6 +91,7 @@ beforeEach(() => {
   mocks.plan = EMPTY_PLAN;
   mocks.write.mockReset();
   mocks.ensure.mockReset().mockResolvedValue(undefined);
+  mocks.queryRenderedFeatures.mockReset().mockReturnValue([]);
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
 });
 afterEach(() => {
@@ -98,6 +100,68 @@ afterEach(() => {
 });
 
 describe('route waypoint network races', () => {
+  it('appends clicks over an existing route and uses Shift-click to insert a waypoint', async () => {
+    const start: Position = [-121.4, 44];
+    const end: Position = [-121.39, 44];
+    const doubledBack: Position = [-121.395, 44];
+    const inserted: Position = [-121.398, 44];
+    render(<RoutePlanner path="plan" />);
+    await act(async () => {
+      click(start);
+      click(end);
+    });
+    mocks.queryRenderedFeatures.mockReturnValue([{ properties: { leg: 0 } }]);
+    await act(async () => click(doubledBack));
+    expect(mocks.queryRenderedFeatures).not.toHaveBeenCalled();
+    expect(mocks.write.mock.lastCall?.[0].waypoints).toEqual([
+      start,
+      end,
+      doubledBack,
+    ]);
+
+    await act(async () => click(inserted, true));
+    expect(mocks.write.mock.lastCall?.[0].waypoints).toEqual([
+      start,
+      inserted,
+      end,
+      doubledBack,
+    ]);
+  });
+
+  it('adds several exact manual points and resumes network routing on the next click', async () => {
+    const start: Position = [-121.4, 44];
+    const manualA: Position = [-121.395, 44.003];
+    const manualB: Position = [-121.392, 44.002];
+    const finish: Position = [-121.39, 44];
+    render(<RoutePlanner path="plan" />);
+    await act(async () => click(start));
+    mocks.ensure.mockClear();
+    const toggle = screen.getByRole('button', { name: 'Manual points' });
+    fireEvent.click(toggle);
+    await act(async () => {
+      click(manualA);
+      click(manualB);
+    });
+    expect(mocks.ensure).not.toHaveBeenCalled();
+    const manualPlan: RoutePlan = mocks.write.mock.lastCall?.[0];
+    expect(manualPlan.waypoints).toEqual([start, manualA, manualB]);
+    expect(manualPlan.legs.map(({ mode }) => mode)).toEqual([
+      'straight',
+      'straight',
+    ]);
+
+    fireEvent.click(toggle);
+    await act(async () => click(finish));
+    const finalPlan: RoutePlan = mocks.write.mock.lastCall?.[0];
+    expect(finalPlan.waypoints).toEqual([start, manualA, manualB, finish]);
+    expect(finalPlan.legs.map(({ mode }) => mode)).toEqual([
+      'straight',
+      'straight',
+      'network',
+    ]);
+    expect(mocks.ensure).toHaveBeenCalled();
+  });
+
   it('keeps click order when the second snap finishes first', async () => {
     const first = deferred();
     const second = deferred();

@@ -6,6 +6,7 @@
 import type { WayClass } from './graph';
 
 const NO_BIKES = /^(no|private|dismount)$/;
+const NO_ACCESS = /^(no|private)$/;
 const BIKES_ALLOWED = /^(yes|designated|permissive)$/;
 
 /** `cycleway*` values that mean the road itself carries a bike lane. */
@@ -37,36 +38,43 @@ const HIGHWAY_CLASSES: Record<string, WayClass> = {
   unclassified: 'street',
 };
 
+export const ROUTABLE_HIGHWAYS = Object.keys(HIGHWAY_CLASSES).join('|');
+
 /**
- * The class a way routes as, or null when a bike can't use it.
- *
- * Motorways and trunks are absent from the table, so they never route. A
- * footway counts only where bikes are explicitly allowed — most are
- * sidewalks — and a path or footway designated for bikes is a cycleway in all
- * but name.
+ * Public footways, including sidewalks and crossings, can be traced when
+ * bicycle access is unspecified. A path designated for bikes is a cycleway.
  */
 export function classifyWay(
   tags: Record<string, string>,
 ): { class: WayClass; hasBikeLane: boolean } | null {
   const bicycle = tags.bicycle ?? '';
-  if (NO_BIKES.test(bicycle)) {
-    return null;
-  }
+  const isBikeAccessExplicit = BIKES_ALLOWED.test(bicycle);
   if (
-    /^(no|private)$/.test(tags.access ?? '') &&
-    !BIKES_ALLOWED.test(bicycle)
+    tags.area === 'yes' ||
+    NO_BIKES.test(bicycle) ||
+    (NO_ACCESS.test(tags.access ?? '') && !isBikeAccessExplicit)
   ) {
     return null;
   }
 
-  let wayClass: WayClass | undefined = HIGHWAY_CLASSES[tags.highway ?? ''];
-  if (!wayClass && (tags['mtb:scale'] || BIKES_ALLOWED.test(bicycle))) {
-    wayClass = 'path';
-  }
-  if (!wayClass) {
+  const highway = tags.highway ?? '';
+  let wayClass: WayClass | undefined = HIGHWAY_CLASSES[highway];
+  if (
+    /^(motorway|trunk)(_link)?$/.test(highway) ||
+    (highway === 'service' &&
+      /^(driveway|parking_aisle|drive-through)$/.test(tags.service ?? ''))
+  ) {
     return null;
   }
-  if (wayClass === 'footway' && !BIKES_ALLOWED.test(bicycle)) {
+  if (!wayClass && (tags['mtb:scale'] || isBikeAccessExplicit)) {
+    wayClass = 'path';
+  }
+  if (
+    !wayClass ||
+    (wayClass === 'footway' &&
+      NO_ACCESS.test(tags.foot ?? '') &&
+      !isBikeAccessExplicit)
+  ) {
     return null;
   }
   if (

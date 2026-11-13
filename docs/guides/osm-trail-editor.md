@@ -123,15 +123,19 @@ modes and they are silent unless surfaced:
 ## Route snapping and direct point editing
 
 **Start new** is a geometry source for drawing a route from scratch. It opens
-a blank map with **Path snapping** active. Switch to **Point editing** to draw
-freely or adjust individual points with the same tools as Trails. Switching
+a blank map with **Path snapping** active. Click along mapped roads, sidewalks,
+crossings, and trails. Turn on **Manual points** to click through a gap, then
+turn it off to resume snapping on the same line. Switch to **Point editing** to
+draw freely or adjust individual points with the same tools as Trails. Switching
 keeps the line and its undo history. Blank
 drafts can be saved; publishing requires a line. Distance, bounds, and a default
 route id are derived on save, without import provenance.
 
 Routes built on the map offer two tools. **Snap route to trails and roads**
-keeps the numbered waypoint planner and its road/trail routing, leg options,
-and route breakdown. **Edit points directly** opens the same `GeometryMapEditor`
+keeps the numbered waypoint planner, leg options, and route breakdown. It uses
+the same OpenStreetMap route network. Click the map to add the next waypoint,
+including on top of a previous leg when doubling back. Shift-click an existing
+leg to insert a waypoint into it. **Edit points directly** opens the same `GeometryMapEditor`
 used by Trails: drag vertices, insert midpoints, remove points, select or move
 several points, split/join/reverse/simplify pieces, draw, import GPX, and undo/redo.
 Switching tools before changing points does not modify the route.

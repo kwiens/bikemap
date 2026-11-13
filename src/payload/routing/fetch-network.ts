@@ -1,5 +1,5 @@
 /**
- * Fetches the rideable network in one grid cell from Overpass.
+ * Fetches the route-tracing network in one grid cell from Overpass.
  *
  * Server-only in practice (it is called from the admin endpoint), though it
  * imports nothing Node-specific.
@@ -12,16 +12,7 @@ import {
   requestWithRetry,
 } from '@/payload/osm/overpass';
 import type { NetworkWay } from './graph';
-import { classifyWay } from './osm-classes';
-
-/**
- * Highways fetched for routing. Footways are fetched only where bikes are
- * allowed — the rest are sidewalks, and in a city they would be most of the
- * response. Driveways and parking aisles are left out for the same reason.
- * `classifyWay` makes the final call on everything that comes back.
- */
-const ROUTABLE_HIGHWAYS =
-  'cycleway|path|track|bridleway|pedestrian|living_street|residential|unclassified|road|service|tertiary|tertiary_link|secondary|secondary_link|primary|primary_link';
+import { classifyWay, ROUTABLE_HIGHWAYS } from './osm-classes';
 
 export function routeNetworkQuery(
   [west, south, east, north]: [number, number, number, number],
@@ -30,8 +21,7 @@ export function routeNetworkQuery(
   const box = `${south},${west},${north},${east}`;
   return (
     `[out:json][timeout:${timeoutSeconds}];(` +
-    `way["highway"~"^(${ROUTABLE_HIGHWAYS})$"]["service"!~"^(driveway|parking_aisle|drive-through)$"](${box});` +
-    `way["highway"="footway"]["bicycle"~"^(yes|designated|permissive)$"](${box});` +
+    `way["highway"~"^(${ROUTABLE_HIGHWAYS})$"]["service"!~"^(driveway|parking_aisle|drive-through)$"]["area"!="yes"](${box});` +
     `way["mtb:scale"](${box});` +
     ');out geom;'
   );

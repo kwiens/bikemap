@@ -28,6 +28,7 @@ const ui = vi.hoisted(() => ({
   features: [] as GeoJSON.Feature[],
   clickMap: (_point: [number, number], _altKey: boolean) => {},
   sourceData: new Map<string, unknown>(),
+  zoom: 10,
   removeMap: vi.fn(),
   selectFeature: vi.fn(),
 }));
@@ -106,14 +107,23 @@ vi.mock('mapbox-gl', () => ({
         return { style: {} };
       }
       getZoom() {
-        return 10;
+        return ui.zoom;
+      }
+      getBounds() {
+        return {
+          getEast: () => -85.286,
+          getNorth: () => 35.051,
+          getSouth: () => 35.049,
+          getWest: () => -85.294,
+        };
       }
       project(location: { lng: number; lat: number } | [number, number]) {
         const [lng, lat] = Array.isArray(location)
           ? location
           : [location.lng, location.lat];
-        const x = lng * 10000;
-        const y = lat * 10000;
+        const scale = ui.zoom === 10 ? 10000 : 100000;
+        const x = lng * scale;
+        const y = lat * scale;
         return {
           x,
           y,
@@ -219,6 +229,7 @@ beforeEach(() => {
   ui.writes = {};
   ui.features = [];
   ui.sourceData.clear();
+  ui.zoom = 10;
   ui.removeMap.mockClear();
   ui.selectFeature.mockClear();
 });
@@ -456,6 +467,81 @@ describe('shared geometry editor', () => {
     fireEvent.click(redo);
     expect(ui.writes.geom).toMatchObject({ coordinates: [points] });
     expect(redo).toBeDisabled();
+  });
+
+  it('uses the route network and switches between snapped and manual clicks mid-route', async () => {
+    ui.values.geom = null;
+    ui.values.geometrySource = 'drawn';
+    ui.zoom = 15;
+    const street = [
+      [-85.293, 35.05],
+      [-85.291, 35.05],
+    ];
+    const sidewalk = [
+      [-85.291, 35.05],
+      [-85.29, 35.05],
+      [-85.29, 35.0505],
+      [-85.288, 35.0505],
+    ];
+    const fetchNetwork = vi.fn(async () =>
+      Response.json({
+        ways: [
+          { id: 1, class: 'street', coordinates: street, nodes: [1, 2] },
+          {
+            id: 2,
+            class: 'footway',
+            coordinates: sidewalk,
+            nodes: [2, 3, 4, 5],
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal('fetch', fetchNetwork);
+    try {
+      render(<RouteLineEditor path="geom" />);
+      await act(async () => ui.loadStyle());
+      await screen.findByText('Network loaded for this area.');
+      expect(fetchNetwork).toHaveBeenCalledExactlyOnceWith(
+        '/api/routes/network?cell=-2133,876',
+        { credentials: 'same-origin' },
+      );
+
+      const start: [number, number] = [-85.293, 35.05];
+      const junction: [number, number] = [-85.291, 35.05];
+      const firstManual: [number, number] = [-85.2905, 35.05025];
+      const secondManual: [number, number] = [-85.29, 35.049];
+      const finish: [number, number] = [-85.288, 35.0505];
+      act(() => {
+        ui.clickMap(start, false);
+        ui.clickMap(junction, false);
+      });
+      const manual = screen.getByRole('button', { name: 'Manual points' });
+      fireEvent.click(manual);
+      expect(manual).toHaveAttribute('aria-pressed', 'true');
+      act(() => {
+        ui.clickMap(firstManual, false);
+        ui.clickMap(secondManual, false);
+      });
+      fireEvent.click(manual);
+      expect(manual).toHaveAttribute('aria-pressed', 'false');
+      act(() => ui.clickMap(finish, false));
+      fireEvent.click(screen.getByRole('button', { name: 'Finish route' }));
+      expect(ui.writes.geom).toMatchObject({
+        coordinates: [
+          [
+            start,
+            junction,
+            firstManual,
+            secondManual,
+            [-85.29, 35.05],
+            [-85.29, 35.0505],
+            finish,
+          ],
+        ],
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('undoes an extension at the start of a line without changing its existing points', async () => {
