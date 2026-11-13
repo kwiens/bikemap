@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import EmbedPage from './page';
+import EmbedPage, { generateMetadata } from './page';
+import { getSiteIcons } from '@/payload/read/site-icons';
 
 const { routes, settings, trails } = vi.hoisted(() => ({
   routes: vi.fn(async () => ({ routes: [] })),
@@ -13,6 +14,9 @@ vi.mock('@/payload/read/routes', () => ({ getCityRoutes: routes }));
 vi.mock('@/payload/read/trails', () => ({ getCityTrailSummaries: trails }));
 vi.mock('@/utils/request-hostname', () => ({
   getRequestHostname: async () => 'bikechatt.com',
+}));
+vi.mock('@/payload/read/site-icons', () => ({
+  getSiteIcons: vi.fn(async () => ({ icons: {}, manifestIcons: [] })),
 }));
 vi.mock('./EmbedClient', () => ({ default: () => null }));
 
@@ -35,4 +39,9 @@ describe('embed data loading', () => {
       expect(routes).not.toHaveBeenCalled();
     },
   );
+});
+
+it('uses the embedded city for favicon metadata', async () => {
+  await generateMetadata({ searchParams: Promise.resolve({ city: 'bend' }) });
+  expect(getSiteIcons).toHaveBeenCalledWith('bend');
 });

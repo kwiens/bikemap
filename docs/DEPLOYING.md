@@ -151,7 +151,8 @@ Replace with your own:
 
 - **Logos** — `public/Bike-Chatt_Logo-*.svg` (referenced by the About page;
   rename and update the paths in `src/app/about/page.tsx`)
-- **Icons** — `favicon.png`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
+- **Icons** — upload an SVG in Theme → City logos, or customize the default SVGs
+  referenced by `src/utils/site-icon.ts`.
 - **iOS splash screens** — `public/splash/*`
 - **README screenshots** — `screenshot-splash.png`, `screenshot-route.png`
 

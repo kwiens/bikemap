@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import manifest from './manifest';
 import { siteConfig } from '@/config/site.config';
+
+vi.mock('server-only', () => ({}));
+vi.mock('@/payload/read/theme', () => ({
+  getCityLogo: vi.fn(async () => undefined),
+}));
 
 describe('manifest', () => {
   it('builds the PWA manifest from siteConfig', async () => {
@@ -18,6 +23,6 @@ describe('manifest', () => {
     const icons = (await manifest()).icons ?? [];
     expect(icons.length).toBeGreaterThan(0);
     expect(icons.some((i) => i.purpose === 'maskable')).toBe(true);
-    expect(icons.every((i) => i.src.startsWith('/icon-'))).toBe(true);
+    expect(icons.every((icon) => icon.type === 'image/svg+xml')).toBe(true);
   });
 });

@@ -10,6 +10,7 @@ import { siteConfig } from '@/config/site.config';
 import { MAP_EVENTS } from '@/events';
 import { dispatch } from '@/test/fixtures';
 import { FeatureSettingsProvider } from './FeatureSettingsContext';
+import { SiteBrandingProvider } from './SiteBrandingContext';
 import { DEFAULT_FEATURE_SETTINGS } from '@/config/features.config';
 
 // Mock all sidebar children to keep tests focused on MapLegendProvider state
@@ -135,6 +136,29 @@ describe('MapLegendProvider', () => {
     expect(
       screen.queryByTestId('mountain-bike-trails'),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows the configured logo at the top of the sidebar', () => {
+    render(
+      <SiteBrandingProvider
+        branding={{
+          [siteConfig.cityId]: {
+            logoAlt: 'City cycling logo',
+            logoUrl: '/media/logo.svg',
+          },
+        }}
+      >
+        <MapLegendProvider>
+          <div />
+        </MapLegendProvider>
+      </SiteBrandingProvider>,
+    );
+
+    const logo = screen.getByRole('img', { name: 'City cycling logo' });
+    expect(logo).toHaveAttribute('src', '/media/logo.svg');
+    expect(
+      screen.getByRole('button', { name: 'Close sidebar' }),
+    ).toBeInTheDocument();
   });
 
   it('hides the category selector when Casual routes are disabled', () => {
@@ -431,15 +455,26 @@ describe('embed mode', () => {
     expect(container.querySelector('[class*="translate-x-0"]')).not.toBeNull();
   });
 
-  it('does not write the settings cookie when the sidebar is toggled', () => {
-    const { container } = renderEmbed({ sidebarOpen: false });
-    const toggleBtn = container.querySelector(
-      '.toggle-btn',
-    ) as HTMLButtonElement;
-    expect(toggleBtn).toBeTruthy();
+  it('keeps keyboard focus on the toggle and makes the closed panel inert', () => {
+    renderEmbed({ sidebarOpen: false });
+    const open = screen.getByRole('button', { name: 'Open sidebar' });
+    const panel = document.getElementById(open.getAttribute('aria-controls')!);
+    expect(panel).toHaveAttribute('inert');
+    open.focus();
+    fireEvent.click(open);
+    const close = screen.getByRole('button', { name: 'Close sidebar' });
+    expect(close).toHaveFocus();
+    expect(panel).not.toHaveAttribute('inert');
+    fireEvent.click(close);
+    expect(screen.getByRole('button', { name: 'Open sidebar' })).toHaveFocus();
+    expect(panel).toHaveAttribute('inert');
+  });
 
-    fireEvent.click(toggleBtn);
-    fireEvent.click(toggleBtn);
+  it('does not write the settings cookie when the sidebar is toggled', () => {
+    renderEmbed({ sidebarOpen: false });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open sidebar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close sidebar' }));
 
     expect(document.cookie).not.toContain('-settings=');
   });

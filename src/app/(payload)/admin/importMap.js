@@ -12,6 +12,7 @@ import { ColorField as ColorField_9867b71f70a870a7cadc249fe18ef53e } from '@/pay
 import { DashboardSummary as DashboardSummary_7002eb233364b9ff475024992de73882 } from '@/payload/components/DashboardSummary'
 import { AdminNavLinks as AdminNavLinks_8d087cb194ffed5de144ee14c449f56b } from '@/payload/components/AdminNavLinks'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+import { VercelBlobClientUploadHandler as VercelBlobClientUploadHandler_16c82c5e25f430251a3e3ba57219ff4e } from '@payloadcms/storage-vercel-blob/client'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -28,5 +29,6 @@ export const importMap = {
   "@/payload/components/ColorField#ColorField": ColorField_9867b71f70a870a7cadc249fe18ef53e,
   "@/payload/components/DashboardSummary#DashboardSummary": DashboardSummary_7002eb233364b9ff475024992de73882,
   "@/payload/components/AdminNavLinks#AdminNavLinks": AdminNavLinks_8d087cb194ffed5de144ee14c449f56b,
-  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
+  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
+  "@payloadcms/storage-vercel-blob/client#VercelBlobClientUploadHandler": VercelBlobClientUploadHandler_16c82c5e25f430251a3e3ba57219ff4e
 }

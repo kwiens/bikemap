@@ -70,3 +70,7 @@ scripts/.*_run.log
 
 # scratch / local-only files
 tmp/
+
+# Payload uploads are runtime content, not source assets.
+public/media/*
+!public/media/.gitkeep

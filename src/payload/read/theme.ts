@@ -1,7 +1,14 @@
 import 'server-only';
 
 import { getPayload } from 'payload';
+import { cache } from 'react';
 import config from '@payload-config';
+import type { CityBranding } from '@/components/SiteBrandingContext';
+import type { Media } from '@/payload-types';
+
+import { siteConfigs } from '@/config/site.config';
+import type { CityId } from '@/data/cities/types';
+import { SVG_MIME_TYPE } from '@/utils/logo-svg';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -11,9 +18,24 @@ export interface ThemeDoc {
   sidebarColor?: null | string;
   surfaceColor?: null | string;
   textColor?: null | string;
+  logos?: Partial<
+    Record<
+      CityId,
+      | null
+      | number
+      | Partial<
+          Pick<
+            Media,
+            'alt' | 'filename' | 'mimeType' | 'prefix' | '_objectKey' | 'url'
+          >
+        >
+    >
+  > | null;
 }
 
-const FRONTEND_VARIABLES: Array<[keyof ThemeDoc, string]> = [
+type ThemeColorField = Exclude<keyof ThemeDoc, 'logos'>;
+
+const FRONTEND_VARIABLES: Array<[ThemeColorField, string]> = [
   ['primaryColor', '--app-primary'],
   ['sidebarColor', '--app-secondary'],
   ['surfaceColor', '--app-surface'],
@@ -71,23 +93,47 @@ export async function getThemeCss(): Promise<string> {
   return theme ? buildThemeCss(theme) : '';
 }
 
-export async function getFrontendThemeCss(): Promise<string> {
-  const theme = await readTheme();
-  return theme ? buildFrontendThemeCss(theme) : '';
+export async function getFrontendTheme(): Promise<{
+  branding: CityBranding;
+  css: string;
+}> {
+  const theme = await readTheme(1);
+  const branding: CityBranding = {};
+  for (const { cityId } of Object.values(siteConfigs)) {
+    const logo = selectedSvgLogo(theme, cityId);
+    if (logo?.url) {
+      branding[cityId] = { logoAlt: logo.alt ?? null, logoUrl: logo.url };
+    }
+  }
+
+  return { branding, css: theme ? buildFrontendThemeCss(theme) : '' };
+}
+
+export async function getCityLogo(cityId: CityId) {
+  return selectedSvgLogo(await readTheme(1), cityId);
+}
+
+function selectedSvgLogo(theme: ThemeDoc | null, cityId: CityId) {
+  const logo = theme?.logos?.[cityId];
+  return logo && typeof logo === 'object' && logo.mimeType === SVG_MIME_TYPE
+    ? logo
+    : undefined;
 }
 
 /** Database failures must never take either the map or admin login down. */
-async function readTheme(): Promise<ThemeDoc | null> {
+const readTheme = cache(async function readTheme(
+  depth = 0,
+): Promise<ThemeDoc | null> {
   if (!process.env.DATABASE_URL) return null;
 
   try {
     const payload = await getPayload({ config });
     return (await payload.findGlobal({
       slug: 'theme',
-      depth: 0,
+      depth,
     })) as ThemeDoc;
   } catch (error) {
     console.error('Could not read the site theme; using defaults.', error);
     return null;
   }
-}
+});

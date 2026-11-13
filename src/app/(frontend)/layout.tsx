@@ -5,9 +5,11 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import './globals.css';
 import './map.css';
 import Script from 'next/script';
+import { SiteBrandingProvider } from '@/components/SiteBrandingContext';
 import { siteConfigForHostname } from '@/config/site.config';
+import { getSiteIcons } from '@/payload/read/site-icons';
+import { getFrontendTheme } from '@/payload/read/theme';
 import { getRequestHostname } from '@/utils/request-hostname';
-import { getFrontendThemeCss } from '@/payload/read/theme';
 
 // Self-hosted to keep production builds reproducible and offline-capable
 // (next/font/google would fetch from Google Fonts at build time).
@@ -34,16 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: {
       canonical: config.url,
     },
-    icons: {
-      icon: [
-        { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
-        { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-        { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-      ],
-      apple: [
-        { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-      ],
-    },
+    icons: (await getSiteIcons(config.cityId)).icons,
   };
 }
 
@@ -64,7 +57,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const config = siteConfigForHostname(await getRequestHostname());
-  const themeCss = await getFrontendThemeCss();
+  const { branding, css: themeCss } = await getFrontendTheme();
 
   return (
     <html lang="en">
@@ -74,8 +67,6 @@ export default async function RootLayout({
           // eslint-disable-next-line @eslint-react/dom-no-dangerously-set-innerhtml -- the builder cannot emit markup or arbitrary CSS.
           <style dangerouslySetInnerHTML={{ __html: themeCss }} />
         )}
-        <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content={config.shortName} />
@@ -163,7 +154,9 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <SiteBrandingProvider branding={branding}>
+          {children}
+        </SiteBrandingProvider>
         <Analytics />
         <Script src="/register-sw.js" strategy="lazyOnload" />
       </body>

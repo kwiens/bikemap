@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
 import {
@@ -49,6 +49,7 @@ import { bikeNetworkUrl, bikeResources, mapFeatures } from '@/data/geo_data';
 import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { useFeatureSettings } from '@/components/FeatureSettingsContext';
+import { SiteLogo } from '@/components/SiteBrandingContext';
 
 // Main provider component
 export function MapLegendProvider({ children }: { children: React.ReactNode }) {
@@ -103,12 +104,22 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [showBikeNetwork, setShowBikeNetwork] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
+  const shouldRestoreToggleFocus = useRef(false);
+  const sidebarId = useId();
 
   // Third-party frames drop the settings cookie anyway (no SameSite=None).
-  const toggle = useCallback(
-    () => toggleSidebar({ persist: !isEmbed }),
-    [isEmbed],
-  );
+  const toggle = useCallback(() => {
+    shouldRestoreToggleFocus.current =
+      document.activeElement === toggleButtonRef.current;
+    toggleSidebar({ persist: !isEmbed });
+  }, [isEmbed]);
+
+  useEffect(() => {
+    if (shouldRestoreToggleFocus.current) {
+      toggleButtonRef.current?.focus();
+      shouldRestoreToggleFocus.current = false;
+    }
+  }, [isOpen]);
 
   // On a phone the sidebar overlays the map, so it gets out of the way after
   // a selection or a tap on the map. Neither is a preference worth saving.
@@ -322,36 +333,66 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* Toggle button */}
-      <div
-        className={cn(
-          'fixed left-4 top-[calc(1rem+env(safe-area-inset-top))]',
-          isOpen ? 'z-[960]' : 'z-[900]',
-        )}
-      >
-        <button
-          ref={toggleButtonRef}
-          onClick={toggle}
-          className={TOGGLE_BTN_CLASS}
-          type="button"
-        >
-          <FontAwesomeIcon
-            icon={isOpen ? faTimes : faLayerGroup}
-            className={TOGGLE_ICON_CLASS}
-          />
-        </button>
-      </div>
+      {!isOpen && (
+        <div className="fixed left-4 top-[calc(1rem+env(safe-area-inset-top))] z-[900]">
+          <button
+            ref={toggleButtonRef}
+            onClick={toggle}
+            className={TOGGLE_BTN_CLASS}
+            type="button"
+            aria-label="Open sidebar"
+            aria-controls={sidebarId}
+            aria-expanded={false}
+          >
+            <FontAwesomeIcon
+              icon={faLayerGroup}
+              className={TOGGLE_ICON_CLASS}
+            />
+          </button>
+        </div>
+      )}
 
       {/* Sidebar - always in DOM but transforms off-screen when closed */}
       <div
         ref={sidebarRef}
+        id={sidebarId}
+        inert={!isOpen}
         className={cn(
           SIDEBAR_THEME_CLASS,
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
+        {isOpen && (
+          <button
+            ref={toggleButtonRef}
+            type="button"
+            onClick={toggle}
+            aria-label="Close sidebar"
+            aria-controls={sidebarId}
+            aria-expanded={true}
+            className="absolute -right-12 top-[calc(1rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full border border-app-primary/50 bg-app-secondary text-app-primary shadow-md transition-colors hover:bg-app-primary hover:text-app-secondary"
+          >
+            <FontAwesomeIcon icon={faTimes} className="h-4 w-4" />
+          </button>
+        )}
+
+        <div className="flex min-h-[72px] items-center justify-center border-b border-app-primary/40 bg-app-secondary px-5 pb-3 pt-[calc(12px+env(safe-area-inset-top))]">
+          <div className="flex min-w-0 justify-center">
+            <SiteLogo
+              cityId={siteConfig.cityId}
+              alt={`${siteConfig.name} logo`}
+              className="max-h-12 max-w-full object-contain"
+            >
+              <span className="truncate text-sm font-semibold text-app-surface">
+                {siteConfig.name}
+              </span>
+            </SiteLogo>
+          </div>
+        </div>
+
         {isEmbed ? (
           /* The host fixes the embed mode, so a compact label replaces tabs. */
-          <div className="flex items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-app-primary/40 bg-app-secondary pt-[calc(17px+env(safe-area-inset-top))]">
+          <div className="flex items-center border-b border-app-primary/40 bg-app-secondary px-4 py-3">
             <span className="text-sm font-medium text-app-surface">
               {siteConfig.name} ·{' '}
               {embedOptions.mode === 'mtb' ? 'MTB routes' : 'Casual routes'}
@@ -359,7 +400,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
           </div>
         ) : hasRoutesSection ? (
           /* Casual / MTB toggle in header */
-          <div className="flex justify-center items-center py-[17px] px-4 pl-[68px] pb-3 border-b border-app-primary/40 bg-app-secondary pt-[calc(17px+env(safe-area-inset-top))]">
+          <div className="flex items-center justify-center border-b border-app-primary/40 bg-app-secondary px-4 py-3">
             <div className="flex bg-app-surface/10 rounded-full p-1 w-full border border-app-surface/20">
               <button
                 type="button"
@@ -388,7 +429,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         ) : (
-          <div className="border-b border-app-primary/40 bg-app-secondary pb-5 pl-[68px] pr-4 pt-[calc(24px+env(safe-area-inset-top))] text-sm font-medium text-app-surface">
+          <div className="border-b border-app-primary/40 bg-app-secondary px-4 py-3 text-sm font-medium text-app-surface">
             MTB routes
           </div>
         )}

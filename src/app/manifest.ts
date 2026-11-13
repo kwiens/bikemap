@@ -1,3 +1,4 @@
+import { getSiteIcons } from '@/payload/read/site-icons';
 import type { MetadataRoute } from 'next';
 import { siteConfigForHostname } from '@/config/site.config';
 import { getRequestHostname } from '@/utils/request-hostname';
@@ -17,25 +18,6 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     orientation: 'portrait',
     background_color: siteConfig.backgroundColor,
     theme_color: siteConfig.themeColor,
-    icons: [
-      {
-        src: '/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/icon-512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'any',
-      },
-      {
-        src: '/icon-512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'maskable',
-      },
-    ],
+    icons: (await getSiteIcons(siteConfig.cityId)).manifestIcons,
   };
 }
