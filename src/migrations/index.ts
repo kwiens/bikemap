@@ -9,7 +9,8 @@ import * as migration_20261002_041000_ensure_theme_global from './20261002_04100
 import * as migration_20261002_043000_expand_theme_palette from './20261002_043000_expand_theme_palette';
 import * as migration_20261002_050000_simplify_theme_palette from './20261002_050000_simplify_theme_palette';
 import * as migration_20261029_220844_add_drawn_routes from './20261029_220844_add_drawn_routes';
-
+import * as migration_20261112_231534_add_attractions from './20261112_231534_add_attractions';
+import * as migration_20261112_232901_seed_school_traffic_gardens from './20261112_232901_seed_school_traffic_gardens';
 import * as refreshChattanoogaElevation from './20261112_233931_refresh_chattanooga_elevation';
 
 import * as addRouteFeatured from './20261112_235419_add_route_featured';
@@ -68,7 +69,17 @@ export const migrations = [
   {
     up: migration_20261029_220844_add_drawn_routes.up,
     down: migration_20261029_220844_add_drawn_routes.down,
-    name: '20261029_220844_add_drawn_routes'
+    name: '20261029_220844_add_drawn_routes',
+  },
+  {
+    up: migration_20261112_231534_add_attractions.up,
+    down: migration_20261112_231534_add_attractions.down,
+    name: '20261112_231534_add_attractions',
+  },
+  {
+    up: migration_20261112_232901_seed_school_traffic_gardens.up,
+    down: migration_20261112_232901_seed_school_traffic_gardens.down,
+    name: '20261112_232901_seed_school_traffic_gardens',
   },
   {
     up: refreshChattanoogaElevation.up,

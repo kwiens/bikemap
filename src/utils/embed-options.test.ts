@@ -22,13 +22,14 @@ function trail(
 describe('embedBuilderConfig trails', () => {
   it('offers one option per selectable slug', () => {
     const { trails } = embedBuilderConfig(
-      undefined,
+      'chattanooga',
       [],
       [
         trail('Larry', 'Larry (North)', 'larry'),
         trail('Larry', 'Larry (South)', 'larry'),
         trail('Curly', 'Curly'),
       ],
+      false,
     );
 
     expect(trails).toEqual([
@@ -36,4 +37,14 @@ describe('embedBuilderConfig trails', () => {
       { id: 'curly', name: 'Curly', slug: 'curly' },
     ]);
   });
+});
+
+it('offers the Attractions layer only when the map has attractions', () => {
+  const available = embedBuilderConfig('bend', [], [], true);
+  const empty = embedBuilderConfig('bend', [], [], false);
+
+  expect(available.availableLayers).toContain('attractions');
+  expect(empty.availableLayers).toEqual(
+    available.availableLayers.filter((layer) => layer !== 'attractions'),
+  );
 });

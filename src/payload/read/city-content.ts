@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { FullCityContent } from '@/data/city-content';
 import type { CityId } from '@/data/cities/types';
+import { getCityAttractions } from './attractions';
 import { getCityRoutes } from './routes';
 import { getCityTrailSummaries } from './trails';
 
@@ -15,9 +16,10 @@ import { getCityTrailSummaries } from './trails';
  * page.
  */
 export async function getCityContent(cityId: CityId): Promise<FullCityContent> {
-  const [{ trails }, { routes }] = await Promise.all([
+  const [{ trails }, { routes }, attractions] = await Promise.all([
     getCityTrailSummaries(cityId),
     getCityRoutes(cityId),
+    getCityAttractions(cityId),
   ]);
-  return { cityId, routes, trails };
+  return { cityId, routes, trails, attractions };
 }

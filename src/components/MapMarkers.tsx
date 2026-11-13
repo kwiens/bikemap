@@ -1,9 +1,6 @@
 import mapboxgl from 'mapbox-gl';
-import type {
-  MapFeature,
-  BikeResource,
-  BikeRentalLocation,
-} from '@/data/geo_data';
+import type { BikeResource, BikeRentalLocation } from '@/data/geo_data';
+import { attractionIcon, type MapFeature } from '@/data/map-features';
 import { mapConfig } from '@/config/map.config';
 import { escapeHtml } from '@/utils/html';
 import { formatDistance } from '@/utils/format';
@@ -60,8 +57,10 @@ export class MarkerManager {
     });
   }
 
-  getMarkers(): mapboxgl.Marker[] {
-    return this.markers;
+  findAttractionById(id: number): mapboxgl.Marker | undefined {
+    return this.markers.find(
+      (marker) => marker.getElement().dataset.attractionId === String(id),
+    );
   }
 
   openPopupFor(marker: mapboxgl.Marker): void {
@@ -169,20 +168,12 @@ function createPopupHTML(
 
 // Helper function to create attraction marker using direct DOM manipulation
 export function createAttractionMarker(feature: MapFeature): mapboxgl.Marker {
-  // Get icon class - default to map marker
-  let iconClass = 'fa-map-marker-alt';
-
-  if (feature.icon?.iconName) {
-    // Automatically construct the FontAwesome class from the icon name
-    iconClass = `fa-${feature.icon.iconName}`;
-  }
-
-  // Create element
   const el = createMarkerElement(
     'map-marker attraction-marker',
-    iconClass,
+    `fa-${attractionIcon(feature.icon).iconName}`,
     '#3b82f6',
   );
+  el.dataset.attractionId = String(feature.id);
 
   // Create popup
   const popup = new mapboxgl.Popup({

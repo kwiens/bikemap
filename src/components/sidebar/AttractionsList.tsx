@@ -1,8 +1,9 @@
-import { mapFeatures } from '@/data/geo_data';
+import { attractionIcon } from '@/data/map-features';
 import { LocationList } from './LocationList';
 import type { AttractionsListProps } from './types';
 
 export function AttractionsList({
+  attractions,
   show,
   onCenterLocation,
 }: AttractionsListProps) {
@@ -11,8 +12,8 @@ export function AttractionsList({
       show={show}
       title="Attractions"
       colorTheme="blue"
-      items={mapFeatures}
-      getIcon={(location) => location.icon}
+      items={attractions}
+      getIcon={(location) => attractionIcon(location.icon)}
       onCenterLocation={onCenterLocation}
     />
   );

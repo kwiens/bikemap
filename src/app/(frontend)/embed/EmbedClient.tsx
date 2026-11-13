@@ -20,11 +20,12 @@ export default function EmbedClient({
   /** Only the content family selected by the embed mode is loaded. */
   content: CityContent;
 }): ReactElement {
-  publishCityContent(content);
+  const isActiveCity = publishCityContent(content);
+  const attractions = isActiveCity ? (content.attractions ?? []) : [];
 
   return (
     <main className="overflow-hidden fixed inset-0 m-0 p-0">
-      <EmbedMap />
+      <EmbedMap attractions={attractions} />
     </main>
   );
 }

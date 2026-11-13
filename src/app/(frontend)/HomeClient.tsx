@@ -26,14 +26,15 @@ export default function HomeClient({
    *  during render and when it is refused. */
   content: CityContent;
 }): ReactElement {
-  publishCityContent(content);
+  const isActiveCity = publishCityContent(content);
+  const attractions = isActiveCity ? (content.attractions ?? []) : [];
 
   // On mount, check URL for shared trail/route link and auto-select
   useUrlDeepLink();
 
   return (
     <main className="overflow-hidden fixed inset-0 m-0 p-0">
-      <BikeMap />
+      <BikeMap attractions={attractions} />
       <PwaInstallPrompt />
       <WelcomeModal />
     </main>

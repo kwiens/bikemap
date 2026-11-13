@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { MapFeature } from '@/data/map-features';
 import BikeMap from '@/components/Map';
 import { EmbedProvider } from '@/components/EmbedContext';
 import { parseEmbedOptions } from '@/utils/embed';
@@ -9,7 +10,11 @@ import { useUrlDeepLink } from '@/hooks/useUrlDeepLink';
 // Only ever rendered client-side (the /embed page imports it with
 // `next/dynamic({ ssr: false })`), so reading `window.location.search`
 // directly here is safe.
-export default function EmbedMap() {
+export default function EmbedMap({
+  attractions,
+}: {
+  attractions: MapFeature[];
+}) {
   const [options] = useState(() => parseEmbedOptions(window.location.search));
 
   // Use the already-decoded selection for the chosen route family so query
@@ -24,7 +29,7 @@ export default function EmbedMap() {
 
   return (
     <EmbedProvider options={options}>
-      <BikeMap />
+      <BikeMap attractions={attractions} />
     </EmbedProvider>
   );
 }

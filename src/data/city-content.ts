@@ -16,6 +16,7 @@ import { activeCityId } from '@/config/map.config';
 import type { BikeRoute } from './bike-routes';
 import type { CityId } from './cities/types';
 import type { ContentStore } from './content-store';
+import type { MapFeature } from './map-features';
 import type { MountainBikeTrail } from './mountain-bike-trails';
 import { routeStore } from './route-source';
 import { trailStore } from './trail-source';
@@ -41,11 +42,14 @@ const contentStores: ContentStores = {
  */
 export interface CityContent extends Partial<CityContentData> {
   cityId: CityId;
+  // Marker consumers receive the city-checked list as a prop.
+  attractions?: MapFeature[];
 }
 
 /** What the full page reads: every list, so a type added to `CityContentData`
  *  but not to `getCityContent` is a type error, not a silently empty store. */
-export type FullCityContent = CityContentData & { cityId: CityId };
+export type FullCityContent = CityContentData &
+  Required<Pick<CityContent, 'cityId' | 'attractions'>>;
 
 /**
  * Publish server-read content into the stores, during render, before any

@@ -6,6 +6,7 @@ import { getRequestHostname } from '@/utils/request-hostname';
 import { siteConfigForHostname } from '@/config/site.config';
 import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
+import { getCityAttractions } from '@/payload/read/attractions';
 import { getCityRoutes } from '@/payload/read/routes';
 import { getCityTrailSummaries } from '@/payload/read/trails';
 import {
@@ -98,15 +99,16 @@ export default async function AboutPage({
   const region = mapConfig.region.displayName;
   const showBikeChattAssets = siteConfig.cityId === 'chattanooga';
   const isBend = siteConfig.cityId === 'bend';
-  const [{ routes }, { trails }] = await Promise.all([
+  const [{ routes }, { trails }, attractions] = await Promise.all([
     getCityRoutes(siteConfig.cityId),
     getCityTrailSummaries(siteConfig.cityId),
+    getCityAttractions(siteConfig.cityId),
   ]);
   const builderConfig = embedBuilderConfig(
-    hostname,
+    siteConfig.cityId,
     routes,
     trails,
-    query.city,
+    attractions.length > 0,
   );
 
   return (

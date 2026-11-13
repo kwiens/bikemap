@@ -1,7 +1,6 @@
 import type { BikeResource } from '@/data/bike-resources';
 import type { BikeRoute } from '@/data/bike-routes';
 import type { LocalResource } from '@/data/local-resources';
-import type { MapFeature } from '@/data/map-features';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 
 export type CityId = 'chattanooga' | 'bend';
@@ -36,7 +35,6 @@ export interface MountainBikeCityConfig {
 export interface CityData {
   cityId: CityId;
   bikeRoutes: BikeRoute[];
-  mapFeatures: MapFeature[];
   bikeResources: BikeResource[];
   localResources: LocalResource[];
   mountainBikeTrails: MountainBikeTrail[];

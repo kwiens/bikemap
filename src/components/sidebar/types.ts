@@ -1,9 +1,9 @@
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import type { MapFeature } from '@/data/map-features';
 
 export interface LocationProps {
+  id?: number;
   name: string;
   description: string;
-  icon?: IconDefinition;
   latitude?: number;
   longitude?: number;
   address?: string;
@@ -24,6 +24,7 @@ export interface BikeRoutesProps {
 }
 
 export interface MapLayersProps {
+  hasAttractions: boolean;
   showAttractions: boolean;
   showBikeResources: boolean;
   showBikeRentals: boolean;
@@ -33,6 +34,7 @@ export interface MapLayersProps {
 }
 
 export interface AttractionsListProps {
+  attractions: MapFeature[];
   show: boolean;
   onCenterLocation: (location: LocationProps) => void;
 }

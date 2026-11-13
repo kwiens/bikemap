@@ -3,6 +3,7 @@ import { shouldRunMigrations } from './ci-build-policy';
 
 if (shouldRunMigrations(process.env)) {
   runPnpm('db:migrate');
+  runPnpm('db:seed:attractions');
   // Bend route geometry derives from a committed source, so production can
   // safely sync these eight rows after the schema is current. The importer
   // skips unchanged rows and therefore does not create a version per deploy.

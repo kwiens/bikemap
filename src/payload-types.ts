@@ -69,6 +69,7 @@ export interface Config {
   collections: {
     routes: Route;
     trails: Trail;
+    attractions: Attraction;
     'trail-areas': TrailArea;
     'trail-ratings': TrailRating;
     'trail-kinds': TrailKind;
@@ -83,6 +84,7 @@ export interface Config {
   collectionsSelect: {
     routes: RoutesSelect<false> | RoutesSelect<true>;
     trails: TrailsSelect<false> | TrailsSelect<true>;
+    attractions: AttractionsSelect<false> | AttractionsSelect<true>;
     'trail-areas': TrailAreasSelect<false> | TrailAreasSelect<true>;
     'trail-ratings': TrailRatingsSelect<false> | TrailRatingsSelect<true>;
     'trail-kinds': TrailKindsSelect<false> | TrailKindsSelect<true>;
@@ -463,6 +465,42 @@ export interface TrailKind {
   createdAt: string;
 }
 /**
+ * Published attractions appear as pins and cards in the Attractions layer.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "attractions".
+ */
+export interface Attraction {
+  id: number;
+  name: string;
+  city: 'chattanooga' | 'bend';
+  description: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  icon:
+    | 'pin'
+    | 'aquarium'
+    | 'art'
+    | 'bicycle'
+    | 'carousel'
+    | 'community'
+    | 'film'
+    | 'games'
+    | 'hiking'
+    | 'mountain'
+    | 'nature'
+    | 'park'
+    | 'railroad'
+    | 'shopping'
+    | 'volcano'
+    | 'water'
+    | 'zoo';
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
  * Who can sign in and edit.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -530,6 +568,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'trails';
         value: number | Trail;
+      } | null)
+    | ({
+        relationTo: 'attractions';
+        value: number | Attraction;
       } | null)
     | ({
         relationTo: 'trail-areas';
@@ -649,6 +691,22 @@ export interface TrailsSelect<T extends boolean = true> {
   bounds?: T;
   elevationProfile?: T;
   geometrySource?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "attractions_select".
+ */
+export interface AttractionsSelect<T extends boolean = true> {
+  name?: T;
+  city?: T;
+  description?: T;
+  address?: T;
+  latitude?: T;
+  longitude?: T;
+  icon?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;

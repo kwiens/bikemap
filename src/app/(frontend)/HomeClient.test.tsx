@@ -78,7 +78,12 @@ vi.mock('@/data/geo_data', () => ({
 // Imported after the mocks are set up.
 import HomeClient from './HomeClient';
 
-const CONTENT = { cityId: activeCityId, routes: ROUTES, trails: TRAILS };
+const CONTENT = {
+  cityId: activeCityId,
+  routes: ROUTES,
+  trails: TRAILS,
+  attractions: [],
+};
 
 describe('HomeClient — share link URL parameter handling', () => {
   let dispatchSpy: ReturnType<typeof vi.spyOn>;

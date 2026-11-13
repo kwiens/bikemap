@@ -10,13 +10,13 @@ import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { useEmbed } from '@/components/EmbedContext';
 
 import {
-  mapFeatures,
   bikeResources,
   hiddenStyleLayerIds,
   bikeNetworkUrl,
   bikeRoutesUrl,
   inlineBikeRouteIds,
 } from '@/data/geo_data';
+import type { MapFeature } from '@/data/map-features';
 import { getBikeRoutes } from '@/data/route-source';
 import { inactiveStyleRouteLayerIds } from '@/data/mapbox-style';
 import { getMountainBikeTrails } from '@/data/trail-source';
@@ -83,7 +83,7 @@ import {
   onMapEvent,
 } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
-import { clearMapReady, setMapReady } from '@/utils/map-ready';
+import { clearMapReady, onMapReady, setMapReady } from '@/utils/map-ready';
 import { fetchRouteCollection, runtimeRouteIds } from '@/utils/route-source';
 
 // Ride recording is unreachable in embed mode, and its subtree (history, GPX,
@@ -117,7 +117,11 @@ if (!hasMapboxToken) {
 }
 
 // MapboxMap component - isolated from UI state changes
-const MapboxMap = memo(function MapboxMap() {
+const MapboxMap = memo(function MapboxMap({
+  attractions,
+}: {
+  attractions: MapFeature[];
+}) {
   const { isEmbed, options: embedOptions } = useEmbed();
   const isMtbEmbed = isEmbed && embedOptions.mode === 'mtb';
   const bikeRoutes = useMemo(
@@ -557,13 +561,6 @@ const MapboxMap = memo(function MapboxMap() {
         if (visible) {
           bikeResourceMarkers.current.hide();
 
-          if (attractionMarkers.current.length === 0) {
-            const markers = mapFeatures.map((feature) =>
-              createAttractionMarker(feature),
-            );
-            attractionMarkers.current.setMarkers(markers);
-          }
-
           attractionMarkers.current.show(map.current);
         } else {
           attractionMarkers.current.hide();
@@ -619,9 +616,14 @@ const MapboxMap = memo(function MapboxMap() {
 
       let coordinates: [number, number] | null = null;
 
-      // If we have latitude and longitude, use them directly
-      if (location.latitude && location.longitude) {
-        coordinates = [location.longitude, location.latitude];
+      const { latitude, longitude } = location;
+      if (
+        typeof latitude === 'number' &&
+        typeof longitude === 'number' &&
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude)
+      ) {
+        coordinates = [longitude, latitude];
       }
       // If we have an address, geocode it
       else if (location.address && mapboxgl.accessToken) {
@@ -631,7 +633,7 @@ const MapboxMap = memo(function MapboxMap() {
         );
       }
 
-      if (coordinates) {
+      if (coordinates && map.current) {
         pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
         map.current.flyTo({
           center: coordinates,
@@ -658,8 +660,22 @@ const MapboxMap = memo(function MapboxMap() {
         // the just-enabled layer while this closure's state is still stale.
         const markersVisible = markerLayersVisibleRef.current;
 
-        // Check if this location is an attraction - show the markers if they're not already shown
-        const isAttraction = findLocationInArray(mapFeatures, coordinates);
+        // Attraction cards carry the Payload id. Several locations can share coordinates.
+        if (typeof location.id === 'number') {
+          if (!markersVisible.attractions) {
+            dispatchMapEvent(MAP_EVENTS.LAYER_TOGGLE, {
+              layer: 'attractions',
+              visible: true,
+            });
+          }
+          const marker = attractionMarkers.current.findAttractionById(
+            location.id,
+          );
+          if (marker) attractionMarkers.current.openPopupFor(marker);
+          return;
+        }
+
+        const isAttraction = findLocationInArray(attractions, coordinates);
 
         if (isAttraction && !markersVisible.attractions) {
           // Toggle attractions layer on
@@ -726,7 +742,7 @@ const MapboxMap = memo(function MapboxMap() {
         }
       }
     },
-    [],
+    [attractions],
   );
 
   // Sidebar → map commands. useMapEvent reads the latest handler through a
@@ -783,6 +799,19 @@ const MapboxMap = memo(function MapboxMap() {
       if (marker) marker.remove();
     };
   }, []);
+
+  useEffect(
+    () =>
+      onMapReady(() => {
+        attractionMarkers.current.setMarkers(
+          attractions.map(createAttractionMarker),
+        );
+        if (map.current && markerLayersVisibleRef.current.attractions) {
+          attractionMarkers.current.show(map.current);
+        }
+      }),
+    [attractions],
+  );
 
   // Initialize map on component mount
   useEffect(() => {
@@ -1162,15 +1191,8 @@ const MapboxMap = memo(function MapboxMap() {
           }
 
           // Clear existing marker managers before initialization
-          attractionMarkers.current.clear();
           bikeResourceMarkers.current.clear();
           bikeRentalMarkers.current.clear();
-
-          // Pre-create attraction markers (they will be added to map only when toggled on)
-          const attractionMarkerList = mapFeatures.map((feature) =>
-            createAttractionMarker(feature),
-          );
-          attractionMarkers.current.setMarkers(attractionMarkerList);
 
           // Pre-create bike resource markers
           const bikeResourceMarkerList = bikeResources.map((resource) =>
@@ -1411,12 +1433,16 @@ function MapUnavailable() {
 }
 
 // Main Map component - manages layout and UI chrome
-export default function BikeMap() {
+export default function BikeMap({
+  attractions,
+}: {
+  attractions: MapFeature[];
+}) {
   const { isEmbed } = useEmbed();
   return (
-    <MapLegendProvider>
+    <MapLegendProvider attractions={attractions}>
       <div className="w-screen h-full relative overflow-visible">
-        <MapboxMap />
+        <MapboxMap attractions={attractions} />
         {/* Ride recording needs geolocation + persistent storage — not for embeds */}
         {!isEmbed && <RidesPanel />}
       </div>

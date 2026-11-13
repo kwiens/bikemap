@@ -32,7 +32,7 @@ export function LocationList<T extends LocationProps>({
       <div className="flex flex-col gap-2">
         {items.map((location) => (
           <SidebarCard
-            key={location.name}
+            key={location.id ?? location.name}
             colorTheme={colorTheme}
             icon={getIcon(location)}
             title={location.name}

@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import EmbedPage from './page';
 
-const { routes, trails } = vi.hoisted(() => ({
+const { attractions, routes, trails } = vi.hoisted(() => ({
+  attractions: vi.fn(async () => [{ id: 1, name: 'Traffic Garden' }]),
   routes: vi.fn(async () => ({
     geojson: { features: [{ id: 'heavy' }], type: 'FeatureCollection' },
     routes: [{ id: 'riverwalk' }],
     status: 'ok',
   })),
   trails: vi.fn(async () => ({ status: 'ok', trails: [{ id: 'pondo' }] })),
+}));
+vi.mock('@/payload/read/attractions', () => ({
+  getCityAttractions: attractions,
 }));
 vi.mock('@/payload/read/routes', () => ({ getCityRoutes: routes }));
 vi.mock('@/payload/read/trails', () => ({ getCityTrailSummaries: trails }));
@@ -20,17 +24,22 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('embed data loading', () => {
   it.each([undefined, 'casual', 'invalid'])(
-    'loads only routes for mode %s',
+    'loads routes and attractions for mode %s',
     async (mode) => {
       await EmbedPage({ searchParams: Promise.resolve({ mode }) });
       expect(routes).toHaveBeenCalledOnce();
+      expect(attractions).toHaveBeenCalledOnce();
       expect(trails).not.toHaveBeenCalled();
     },
   );
   it('passes the client only the list it publishes', async () => {
     const casual = await EmbedPage({ searchParams: Promise.resolve({}) });
     expect(casual.props).toEqual({
-      content: { cityId: 'chattanooga', routes: [{ id: 'riverwalk' }] },
+      content: {
+        cityId: 'chattanooga',
+        routes: [{ id: 'riverwalk' }],
+        attractions: [{ id: 1, name: 'Traffic Garden' }],
+      },
     });
 
     const mtb = await EmbedPage({
@@ -46,6 +55,7 @@ describe('embed data loading', () => {
       await EmbedPage({ searchParams: Promise.resolve({ mode }) });
       expect(trails).toHaveBeenCalledOnce();
       expect(routes).not.toHaveBeenCalled();
+      expect(attractions).not.toHaveBeenCalled();
     },
   );
 });

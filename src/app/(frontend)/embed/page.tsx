@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import React from 'react';
 import { resolveActiveCityId } from '@/config/map.config';
+import { getCityAttractions } from '@/payload/read/attractions';
 import { getCityRoutes } from '@/payload/read/routes';
 import { getCityTrailSummaries } from '@/payload/read/trails';
 import { parseEmbedMode } from '@/utils/embed';
@@ -21,9 +22,15 @@ export default async function EmbedPage({
   // Only the list the client publishes: the readers also return status and,
   // for routes, every route's GeoJSON, which would otherwise ride along in every
   // embed's RSC payload.
-  const content =
-    mode === 'mtb'
-      ? { cityId, trails: (await getCityTrailSummaries(cityId)).trails }
-      : { cityId, routes: (await getCityRoutes(cityId)).routes };
+  if (mode === 'mtb') {
+    const { trails } = await getCityTrailSummaries(cityId);
+    return <EmbedClient content={{ cityId, trails }} />;
+  }
+
+  const [{ routes }, attractions] = await Promise.all([
+    getCityRoutes(cityId),
+    getCityAttractions(cityId),
+  ]);
+  const content = { cityId, routes, attractions };
   return <EmbedClient content={content} />;
 }
