@@ -18,30 +18,30 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
    CREATE TYPE "public"."enum_trail_conditions_source" AS ENUM('public', 'admin');
   CREATE TYPE "public"."enum_trail_conditions_city" AS ENUM('chattanooga', 'bend');
   CREATE TABLE "trail_conditions" (
-  	"id" serial PRIMARY KEY NOT NULL,
-  	"trail_id" integer NOT NULL,
-  	"condition_id" integer NOT NULL,
-  	"observed_at" timestamp(3) with time zone NOT NULL,
-  	"source" "enum_trail_conditions_source" DEFAULT 'public' NOT NULL,
-  	"hidden" boolean DEFAULT false,
-  	"city" "enum_trail_conditions_city" DEFAULT 'bend' NOT NULL,
-  	"reporter_hash" varchar,
-  	"updated_at" timestamp(3) with time zone DEFAULT now() NOT NULL,
-  	"created_at" timestamp(3) with time zone DEFAULT now() NOT NULL
+    "id" serial PRIMARY KEY NOT NULL,
+    "trail_id" integer NOT NULL,
+    "condition_id" integer NOT NULL,
+    "observed_at" timestamp(3) with time zone NOT NULL,
+    "source" "enum_trail_conditions_source" DEFAULT 'public' NOT NULL,
+    "hidden" boolean DEFAULT false,
+    "city" "enum_trail_conditions_city" DEFAULT 'bend' NOT NULL,
+    "reporter_hash" varchar,
+    "updated_at" timestamp(3) with time zone DEFAULT now() NOT NULL,
+    "created_at" timestamp(3) with time zone DEFAULT now() NOT NULL
   );
-  
+
   CREATE TABLE "trail_condition_types" (
-  	"id" serial PRIMARY KEY NOT NULL,
-  	"name" varchar NOT NULL,
-  	"value" varchar NOT NULL,
-  	"color" varchar DEFAULT '#6b7280' NOT NULL,
-  	"sort_order" numeric DEFAULT 50 NOT NULL,
-  	"active" boolean DEFAULT true,
-  	"description" varchar,
-  	"updated_at" timestamp(3) with time zone DEFAULT now() NOT NULL,
-  	"created_at" timestamp(3) with time zone DEFAULT now() NOT NULL
+    "id" serial PRIMARY KEY NOT NULL,
+    "name" varchar NOT NULL,
+    "value" varchar NOT NULL,
+    "color" varchar DEFAULT '#6b7280' NOT NULL,
+    "sort_order" numeric DEFAULT 50 NOT NULL,
+    "active" boolean DEFAULT true,
+    "description" varchar,
+    "updated_at" timestamp(3) with time zone DEFAULT now() NOT NULL,
+    "created_at" timestamp(3) with time zone DEFAULT now() NOT NULL
   );
-  
+
   ALTER TABLE "payload_locked_documents_rels" ADD COLUMN "trail_conditions_id" integer;
   ALTER TABLE "payload_locked_documents_rels" ADD COLUMN "trail_condition_types_id" integer;
   ALTER TABLE "trail_conditions" ADD CONSTRAINT "trail_conditions_trail_id_trails_id_fk" FOREIGN KEY ("trail_id") REFERENCES "public"."trails"("id") ON DELETE set null ON UPDATE no action;

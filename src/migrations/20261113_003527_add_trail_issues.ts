@@ -6,18 +6,18 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   CREATE TYPE "public"."enum_trail_issues_category" AS ENUM('down-tree', 'washed-out', 'broken-feature', 'missing-sign', 'other');
   CREATE TYPE "public"."enum_trail_issues_city" AS ENUM('chattanooga', 'bend');
   CREATE TABLE "trail_issues" (
-  	"id" serial PRIMARY KEY NOT NULL,
-  	"status" "enum_trail_issues_status" DEFAULT 'open' NOT NULL,
-  	"category" "enum_trail_issues_category" NOT NULL,
-  	"trail_id" integer,
-  	"trail_name" varchar NOT NULL,
-  	"city" "enum_trail_issues_city" NOT NULL,
-  	"comment" varchar,
-  	"has_photo" boolean DEFAULT false,
-  	"reporter_hash" varchar NOT NULL,
-  	"submission_id" varchar NOT NULL,
-  	"updated_at" timestamp(3) with time zone DEFAULT now() NOT NULL,
-  	"created_at" timestamp(3) with time zone DEFAULT now() NOT NULL
+    "id" serial PRIMARY KEY NOT NULL,
+    "status" "enum_trail_issues_status" DEFAULT 'open' NOT NULL,
+    "category" "enum_trail_issues_category" NOT NULL,
+    "trail_id" integer,
+    "trail_name" varchar NOT NULL,
+    "city" "enum_trail_issues_city" NOT NULL,
+    "comment" varchar,
+    "has_photo" boolean DEFAULT false,
+    "reporter_hash" varchar NOT NULL,
+    "submission_id" varchar NOT NULL,
+    "updated_at" timestamp(3) with time zone DEFAULT now() NOT NULL,
+    "created_at" timestamp(3) with time zone DEFAULT now() NOT NULL
   );
 
   -- Keep photo bytes out of ordinary Payload reads and write them in the same

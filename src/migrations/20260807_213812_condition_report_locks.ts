@@ -14,13 +14,13 @@ import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
 export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
    CREATE TABLE "condition_reporting" (
-  	"id" serial PRIMARY KEY NOT NULL,
-  	"enabled" boolean DEFAULT true,
-  	"disabled_message" varchar,
-  	"updated_at" timestamp(3) with time zone,
-  	"created_at" timestamp(3) with time zone
+    "id" serial PRIMARY KEY NOT NULL,
+    "enabled" boolean DEFAULT true,
+    "disabled_message" varchar,
+    "updated_at" timestamp(3) with time zone,
+    "created_at" timestamp(3) with time zone
   );
-  
+
   ALTER TABLE "trails" ADD COLUMN "condition_reports_closed" boolean DEFAULT false;
   ALTER TABLE "trails" ADD COLUMN "condition_reports_note" varchar;
   ALTER TABLE "_trails_v" ADD COLUMN "version_condition_reports_closed" boolean DEFAULT false;
