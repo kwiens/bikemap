@@ -1,9 +1,9 @@
 'use client';
 
 import type { CityId } from '@/data/cities/types';
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
-export interface SiteBranding {
+interface SiteBranding {
   logoAlt: string | null;
   logoUrl: string | null;
 }
@@ -41,13 +41,40 @@ export function SiteLogo({
 
   if (!branding?.logoUrl) return children ?? null;
 
+  return (
+    <UploadedLogo
+      key={branding.logoUrl}
+      url={branding.logoUrl}
+      alt={branding.logoAlt ?? alt}
+      className={className}
+    >
+      {children}
+    </UploadedLogo>
+  );
+}
+
+function UploadedLogo({
+  url,
+  alt,
+  className,
+  children,
+}: {
+  url: string;
+  alt: string;
+  className: string;
+  children?: ReactNode;
+}) {
+  const [hasFailed, setHasFailed] = useState(false);
+  if (hasFailed) return children ?? null;
+
   // The caller controls the bounding box while the SVG keeps its aspect ratio.
   return (
     // eslint-disable-next-line @next/next/no-img-element -- uploaded logos do not have fixed dimensions.
     <img
-      src={branding.logoUrl}
-      alt={branding.logoAlt ?? alt}
+      src={url}
+      alt={alt}
       className={className}
+      onError={() => setHasFailed(true)}
     />
   );
 }

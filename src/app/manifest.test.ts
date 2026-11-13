@@ -4,7 +4,7 @@ import { siteConfig } from '@/config/site.config';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/payload/read/theme', () => ({
-  getFrontendTheme: vi.fn(async () => ({ branding: {}, css: '' })),
+  getCityLogo: vi.fn(async () => undefined),
 }));
 
 describe('manifest', () => {

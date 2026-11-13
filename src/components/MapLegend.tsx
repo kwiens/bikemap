@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
 import {
@@ -104,12 +104,22 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
   const [showBikeNetwork, setShowBikeNetwork] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
+  const shouldRestoreToggleFocus = useRef(false);
+  const sidebarId = useId();
 
   // Third-party frames drop the settings cookie anyway (no SameSite=None).
-  const toggle = useCallback(
-    () => toggleSidebar({ persist: !isEmbed }),
-    [isEmbed],
-  );
+  const toggle = useCallback(() => {
+    shouldRestoreToggleFocus.current =
+      document.activeElement === toggleButtonRef.current;
+    toggleSidebar({ persist: !isEmbed });
+  }, [isEmbed]);
+
+  useEffect(() => {
+    if (shouldRestoreToggleFocus.current) {
+      toggleButtonRef.current?.focus();
+      shouldRestoreToggleFocus.current = false;
+    }
+  }, [isOpen]);
 
   // On a phone the sidebar overlays the map, so it gets out of the way after
   // a selection or a tap on the map. Neither is a preference worth saving.
@@ -331,6 +341,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             className={TOGGLE_BTN_CLASS}
             type="button"
             aria-label="Open sidebar"
+            aria-controls={sidebarId}
+            aria-expanded={false}
           >
             <FontAwesomeIcon
               icon={faLayerGroup}
@@ -343,6 +355,8 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       {/* Sidebar - always in DOM but transforms off-screen when closed */}
       <div
         ref={sidebarRef}
+        id={sidebarId}
+        inert={!isOpen}
         className={cn(
           SIDEBAR_THEME_CLASS,
           isOpen ? 'translate-x-0' : '-translate-x-full',
@@ -350,9 +364,12 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
       >
         {isOpen && (
           <button
+            ref={toggleButtonRef}
             type="button"
             onClick={toggle}
             aria-label="Close sidebar"
+            aria-controls={sidebarId}
+            aria-expanded={true}
             className="absolute -right-12 top-[calc(1rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full border border-app-primary/50 bg-app-secondary text-app-primary shadow-md transition-colors hover:bg-app-primary hover:text-app-secondary"
           >
             <FontAwesomeIcon icon={faTimes} className="h-4 w-4" />
@@ -412,7 +429,7 @@ export function MapLegendProvider({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         ) : (
-          <div className="border-b border-app-primary/40 bg-app-secondary pb-5 pl-[68px] pr-4 pt-[calc(24px+env(safe-area-inset-top))] text-sm font-medium text-app-surface">
+          <div className="border-b border-app-primary/40 bg-app-secondary px-4 py-3 text-sm font-medium text-app-surface">
             MTB routes
           </div>
         )}

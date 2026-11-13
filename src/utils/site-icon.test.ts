@@ -2,19 +2,22 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
-import { getFrontendTheme } from '@/payload/read/theme';
+import { getCityLogo } from '@/payload/read/theme';
 import { renderSiteIcon, SITE_ICON_SIZES } from './site-icon';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/payload/read/theme', () => ({ getFrontendTheme: vi.fn() }));
+vi.mock('@/payload/read/theme', () => ({ getCityLogo: vi.fn() }));
+
+vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_QAStore_test');
 
 const logo =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><path fill="red" d="M0 0h200v100H0z"/></svg>';
 
-function setBendLogo(logoUrl: string) {
-  vi.mocked(getFrontendTheme).mockResolvedValue({
-    branding: { bend: { logoUrl, logoAlt: 'Bend' } },
-    css: '',
+function setBendLogo(filename: string, prefix?: string, objectKey?: string) {
+  vi.mocked(getCityLogo).mockResolvedValue({
+    filename,
+    prefix,
+    _objectKey: objectKey,
   });
 }
 
@@ -27,7 +30,7 @@ function embeddedArtwork(svg: string): string {
 it.each(SITE_ICON_SIZES)(
   'preserves the vector in a %i-pixel SVG viewport',
   async (size) => {
-    setBendLogo('https://example.com/bend.svg');
+    setBendLogo('bend.svg');
     vi.mocked(fetch).mockResolvedValue(new Response(logo));
     const response = await renderSiteIcon('bend', size);
     expect(response.headers.get('Content-Type')).toBe('image/svg+xml');
@@ -43,7 +46,7 @@ it.each(SITE_ICON_SIZES)(
 );
 
 it('fits maskable artwork inside the safe circle', async () => {
-  setBendLogo('https://example.com/bend.svg');
+  setBendLogo('bend.svg');
   vi.mocked(fetch).mockResolvedValue(new Response(logo));
   const svg = await (await renderSiteIcon('bend', 512, true)).text();
   expect(svg).toContain('<image x="22" y="22" width="56" height="56"');
@@ -51,7 +54,7 @@ it('fits maskable artwork inside the safe circle', async () => {
 });
 
 it('uses different default vectors for the two cities', async () => {
-  vi.mocked(getFrontendTheme).mockResolvedValue({ branding: {}, css: '' });
+  vi.mocked(getCityLogo).mockResolvedValue(undefined);
   const [bend, chatt] = await Promise.all([
     renderSiteIcon('bend', 192),
     renderSiteIcon('chattanooga', 192),
@@ -63,7 +66,7 @@ it('uses different default vectors for the two cities', async () => {
 });
 
 it('falls back without caching invalid uploads', async () => {
-  setBendLogo('https://example.com/invalid.svg');
+  setBendLogo('invalid.svg');
   vi.mocked(fetch).mockResolvedValue(new Response('Not SVG'));
   const response = await renderSiteIcon('bend', 32);
   expect(embeddedArtwork(await response.text())).toContain('<svg');
@@ -74,12 +77,12 @@ it('loads uploaded vectors from Blob for same-origin Payload URLs', async () => 
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_QAStore_test');
   vi.stubEnv('STORAGE_VERCEL_BLOB_BASE_URL', undefined);
   try {
-    setBendLogo('/api/media/file/bend%20logo.svg');
+    setBendLogo('bend logo.svg', 'city logos/qa', 'storage-key');
     vi.mocked(fetch).mockResolvedValue(new Response(logo));
     const response = await renderSiteIcon('bend', 180);
     expect(fetch).toHaveBeenCalledWith(
-      'https://qastore.public.blob.vercel-storage.com/bend%20logo.svg',
-      { signal: expect.any(AbortSignal) },
+      'https://qastore.public.blob.vercel-storage.com/city%20logos/qa/storage-key/bend%20logo.svg',
+      { signal: expect.any(AbortSignal), redirect: 'error' },
     );
     expect(response.headers.get('Cache-Control')).toContain('max-age=3600');
     expect(embeddedArtwork(await response.text())).toBe(logo);
@@ -95,7 +98,7 @@ it('loads local Payload uploads from disk', async () => {
     await mkdir(path.join(directory, 'public/media'), { recursive: true });
     await writeFile(path.join(directory, 'public/media/local.svg'), logo);
     vi.spyOn(process, 'cwd').mockReturnValue(directory);
-    setBendLogo('/api/media/file/local.svg');
+    setBendLogo('local.svg');
     const response = await renderSiteIcon('bend', 180);
     expect(embeddedArtwork(await response.text())).toBe(logo);
   } finally {

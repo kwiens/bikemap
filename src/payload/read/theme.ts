@@ -4,6 +4,7 @@ import { getPayload } from 'payload';
 import { cache } from 'react';
 import config from '@payload-config';
 import type { CityBranding } from '@/components/SiteBrandingContext';
+import type { Media } from '@/payload-types';
 
 import { siteConfigs } from '@/config/site.config';
 import type { CityId } from '@/data/cities/types';
@@ -22,11 +23,12 @@ export interface ThemeDoc {
       CityId,
       | null
       | number
-      | {
-          alt?: null | string;
-          mimeType?: null | string;
-          url?: null | string;
-        }
+      | Partial<
+          Pick<
+            Media,
+            'alt' | 'filename' | 'mimeType' | 'prefix' | '_objectKey' | 'url'
+          >
+        >
     >
   > | null;
 }
@@ -98,19 +100,24 @@ export async function getFrontendTheme(): Promise<{
   const theme = await readTheme(1);
   const branding: CityBranding = {};
   for (const { cityId } of Object.values(siteConfigs)) {
-    const logo = theme?.logos?.[cityId];
-    if (logo && typeof logo === 'object' && logo.mimeType === SVG_MIME_TYPE) {
-      branding[cityId] = {
-        logoAlt: logo.alt ?? null,
-        logoUrl: logo.url ?? null,
-      };
+    const logo = selectedSvgLogo(theme, cityId);
+    if (logo?.url) {
+      branding[cityId] = { logoAlt: logo.alt ?? null, logoUrl: logo.url };
     }
   }
 
-  return {
-    branding,
-    css: theme ? buildFrontendThemeCss(theme) : '',
-  };
+  return { branding, css: theme ? buildFrontendThemeCss(theme) : '' };
+}
+
+export async function getCityLogo(cityId: CityId) {
+  return selectedSvgLogo(await readTheme(1), cityId);
+}
+
+function selectedSvgLogo(theme: ThemeDoc | null, cityId: CityId) {
+  const logo = theme?.logos?.[cityId];
+  return logo && typeof logo === 'object' && logo.mimeType === SVG_MIME_TYPE
+    ? logo
+    : undefined;
 }
 
 /** Database failures must never take either the map or admin login down. */

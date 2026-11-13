@@ -4,15 +4,14 @@ import { createHash } from 'node:crypto';
 import type { Metadata, MetadataRoute } from 'next';
 import type { CityId } from '@/data/cities/types';
 import { SVG_MIME_TYPE } from '@/utils/logo-svg';
-import { getFrontendTheme } from './theme';
+import { getCityLogo } from './theme';
 
 /** Uploads receive unique URLs, so replacing a logo also changes every icon URL. */
 export async function getSiteIcons(cityId: CityId): Promise<{
   icons: Metadata['icons'];
   manifestIcons: MetadataRoute.Manifest['icons'];
 }> {
-  const { branding } = await getFrontendTheme();
-  const logoUrl = branding[cityId]?.logoUrl;
+  const logoUrl = (await getCityLogo(cityId))?.url;
   const version = logoUrl
     ? createHash('sha256').update(`svg:${logoUrl}`).digest('hex').slice(0, 16)
     : undefined;

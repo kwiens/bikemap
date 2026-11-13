@@ -1,10 +1,14 @@
 import 'server-only';
 
 import { readFile } from 'node:fs/promises';
+import {
+  buildStoragePathData,
+  sanitizePrefix,
+} from '@payloadcms/plugin-cloud-storage/utilities';
 import path from 'node:path';
 import { siteConfigs } from '@/config/site.config';
 import type { CityId } from '@/data/cities/types';
-import { getFrontendTheme } from '@/payload/read/theme';
+import { getCityLogo } from '@/payload/read/theme';
 import { readLogoSvg, SVG_MIME_TYPE } from './logo-svg';
 
 export const SITE_ICON_SIZES = [32, 180, 192, 512] as const;
@@ -20,9 +24,8 @@ export async function renderSiteIcon(
   size: SiteIconSize,
   isMaskable = false,
 ): Promise<Response> {
-  const { branding } = await getFrontendTheme();
-  const logoUrl = branding[cityId]?.logoUrl;
-  const artwork = logoUrl ? await loadUploadedLogo(logoUrl) : undefined;
+  const upload = await getCityLogo(cityId);
+  const artwork = upload ? await loadUploadedLogo(upload) : undefined;
   const logo =
     artwork ??
     (await readFile(
@@ -49,9 +52,13 @@ export async function renderSiteIcon(
   });
 }
 
-async function loadUploadedLogo(url: string): Promise<string | undefined> {
+type UploadedLogo = NonNullable<Awaited<ReturnType<typeof getCityLogo>>>;
+
+async function loadUploadedLogo(
+  logo: UploadedLogo,
+): Promise<string | undefined> {
   try {
-    return readLogoSvg(await readLogo(url));
+    return readLogoSvg(await readLogo(logo));
   } catch (error) {
     console.error(
       'Could not render city icon; using existing branding.',
@@ -61,25 +68,38 @@ async function loadUploadedLogo(url: string): Promise<string | undefined> {
   }
 }
 
-async function readLogo(url: string): Promise<Buffer> {
-  if (url.startsWith('/')) {
-    // Payload uses the same media proxy URL for disk and Blob uploads.
-    const filename = path.basename(
-      decodeURIComponent(new URL(url, 'http://local').pathname),
-    );
-    const storeId = process.env.BLOB_READ_WRITE_TOKEN?.match(
-      /^vercel_blob_rw_([a-z\d]+)_[a-z\d]+$/i,
-    )?.[1];
-    if (!storeId) {
-      return readFile(path.join(process.cwd(), 'public/media', filename));
-    }
-
-    const blobOrigin =
-      process.env.STORAGE_VERCEL_BLOB_BASE_URL ||
-      `https://${storeId.toLowerCase()}.public.blob.vercel-storage.com`;
-    url = `${blobOrigin.replace(/\/$/, '')}/${encodeURIComponent(filename)}`;
+async function readLogo(logo: UploadedLogo): Promise<Buffer> {
+  const filename = logo.filename;
+  if (
+    !filename ||
+    path.basename(filename) !== filename ||
+    !filename.endsWith('.svg')
+  ) {
+    throw new Error('Logo has no valid SVG filename');
   }
-  const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  const storeId = process.env.BLOB_READ_WRITE_TOKEN?.match(
+    /^vercel_blob_rw_([a-z\d]+)_[a-z\d]+$/i,
+  )?.[1];
+  if (!storeId) {
+    return readFile(path.join(process.cwd(), 'public/media', filename));
+  }
+
+  // Match the Blob adapter's lookup using the saved Media fields, including
+  // optional prefixes. The browser keeps using Payload's same-origin URL.
+  const docPrefix = [logo.prefix, logo._objectKey]
+    .map((segment) => sanitizePrefix(segment ?? ''))
+    .filter(Boolean)
+    .join('/');
+  const { storageFilePath } = buildStoragePathData({ docPrefix, filename });
+  const blobOrigin =
+    process.env.STORAGE_VERCEL_BLOB_BASE_URL ||
+    `https://${storeId.toLowerCase()}.public.blob.vercel-storage.com`;
+  const key = storageFilePath.split('/').map(encodeURIComponent).join('/');
+  const url = `${blobOrigin.replace(/\/$/, '')}/${key}`;
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(5000),
+    redirect: 'error',
+  });
   if (!response.ok) throw new Error(`Logo fetch returned ${response.status}`);
   return Buffer.from(await response.arrayBuffer());
 }

@@ -133,6 +133,7 @@ export default async function AboutPage({
       <main className="max-w-2xl mx-auto px-5 py-12">
         {/* Hero */}
         <div className="flex flex-col items-center text-center mb-14">
+          <h1 className="sr-only">About {siteConfig.name}</h1>
           <SiteLogo
             cityId={siteConfig.cityId}
             alt={`${siteConfig.name} logo`}
@@ -153,9 +154,9 @@ export default async function AboutPage({
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-app-secondary text-app-primary">
                   <MapIcon className="h-8 w-8" />
                 </div>
-                <h1 className="text-4xl font-bold tracking-tight text-app-secondary">
+                <p className="text-4xl font-bold tracking-tight text-app-secondary">
                   {siteConfig.name}
-                </h1>
+                </p>
               </div>
             )}
           </SiteLogo>

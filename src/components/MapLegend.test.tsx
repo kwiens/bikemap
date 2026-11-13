@@ -144,7 +144,7 @@ describe('MapLegendProvider', () => {
         branding={{
           [siteConfig.cityId]: {
             logoAlt: 'City cycling logo',
-            logoUrl: '/media/logo.png',
+            logoUrl: '/media/logo.svg',
           },
         }}
       >
@@ -155,7 +155,7 @@ describe('MapLegendProvider', () => {
     );
 
     const logo = screen.getByRole('img', { name: 'City cycling logo' });
-    expect(logo).toHaveAttribute('src', '/media/logo.png');
+    expect(logo).toHaveAttribute('src', '/media/logo.svg');
     expect(
       screen.getByRole('button', { name: 'Close sidebar' }),
     ).toBeInTheDocument();
@@ -453,6 +453,21 @@ describe('embed mode', () => {
   it('sidebar starts open (translate-x-0) when sidebarOpen is true', () => {
     const { container } = renderEmbed({ sidebarOpen: true });
     expect(container.querySelector('[class*="translate-x-0"]')).not.toBeNull();
+  });
+
+  it('keeps keyboard focus on the toggle and makes the closed panel inert', () => {
+    renderEmbed({ sidebarOpen: false });
+    const open = screen.getByRole('button', { name: 'Open sidebar' });
+    const panel = document.getElementById(open.getAttribute('aria-controls')!);
+    expect(panel).toHaveAttribute('inert');
+    open.focus();
+    fireEvent.click(open);
+    const close = screen.getByRole('button', { name: 'Close sidebar' });
+    expect(close).toHaveFocus();
+    expect(panel).not.toHaveAttribute('inert');
+    fireEvent.click(close);
+    expect(screen.getByRole('button', { name: 'Open sidebar' })).toHaveFocus();
+    expect(panel).toHaveAttribute('inert');
   });
 
   it('does not write the settings cookie when the sidebar is toggled', () => {
