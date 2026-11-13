@@ -31,6 +31,7 @@ describe('embed data loading', () => {
     const casual = await EmbedPage({ searchParams: Promise.resolve({}) });
     expect(casual.props).toEqual({
       content: { cityId: 'chattanooga', routes: [{ id: 'riverwalk' }] },
+      mode: 'casual',
     });
 
     const mtb = await EmbedPage({
@@ -38,6 +39,7 @@ describe('embed data loading', () => {
     });
     expect(mtb.props).toEqual({
       content: { cityId: 'chattanooga', trails: [{ id: 'pondo' }] },
+      mode: 'mtb',
     });
   });
   it.each(['mtb', ['mtb', 'casual']])(

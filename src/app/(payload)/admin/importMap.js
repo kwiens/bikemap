@@ -1,5 +1,6 @@
 import { RouteMapEditor as RouteMapEditor_a5dd9371ecb0667c3349a39e9566863c } from '@/payload/components/RouteMapEditor'
 import { RouteLineEditor as RouteLineEditor_b790cbc630163ac4500cd03e90d620db } from '@/payload/components/RouteLineEditor'
+import { TrailConditionLog as TrailConditionLog_99c3b61efc8df4edfdf8681317d13e83 } from '@/payload/components/TrailConditionLog'
 import { TrailDisplayNameField as TrailDisplayNameField_e98aef2becee800628e4b2016d1a744a } from '@/payload/components/DerivedTextField'
 import { TrailSlugField as TrailSlugField_e98aef2becee800628e4b2016d1a744a } from '@/payload/components/DerivedTextField'
 import { TrailMapEditor as TrailMapEditor_3ac3e0a5a2d5f3d2cb9858c36a6e6bef } from '@/payload/components/TrailMapEditor'
@@ -8,6 +9,7 @@ import { OsmBuildReport as OsmBuildReport_7fae1a551cc8eca6bdac5f4c01e2bf46 } fro
 import { DerivedMeasurementField as DerivedMeasurementField_042381939ca4647870a8e8cdbf375ba4 } from '@/payload/components/ElevationProfileAdmin'
 import { ElevationProfileAdmin as ElevationProfileAdmin_042381939ca4647870a8e8cdbf375ba4 } from '@/payload/components/ElevationProfileAdmin'
 import { GeometrySourceField as GeometrySourceField_a49a1ab63145cd656d8d5d4b425ef25b } from '@/payload/components/GeometrySourceField'
+import { TrailIssuePhoto as TrailIssuePhoto_e80e1ec74d677ce501f1cd08032e690b } from '@/payload/components/TrailIssuePhoto'
 import { ColorField as ColorField_9867b71f70a870a7cadc249fe18ef53e } from '@/payload/components/ColorField'
 import { DashboardSummary as DashboardSummary_7002eb233364b9ff475024992de73882 } from '@/payload/components/DashboardSummary'
 import { AdminNavLinks as AdminNavLinks_8d087cb194ffed5de144ee14c449f56b } from '@/payload/components/AdminNavLinks'
@@ -17,6 +19,7 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 export const importMap = {
   "@/payload/components/RouteMapEditor#RouteMapEditor": RouteMapEditor_a5dd9371ecb0667c3349a39e9566863c,
   "@/payload/components/RouteLineEditor#RouteLineEditor": RouteLineEditor_b790cbc630163ac4500cd03e90d620db,
+  "@/payload/components/TrailConditionLog#TrailConditionLog": TrailConditionLog_99c3b61efc8df4edfdf8681317d13e83,
   "@/payload/components/DerivedTextField#TrailDisplayNameField": TrailDisplayNameField_e98aef2becee800628e4b2016d1a744a,
   "@/payload/components/DerivedTextField#TrailSlugField": TrailSlugField_e98aef2becee800628e4b2016d1a744a,
   "@/payload/components/TrailMapEditor#TrailMapEditor": TrailMapEditor_3ac3e0a5a2d5f3d2cb9858c36a6e6bef,
@@ -25,6 +28,7 @@ export const importMap = {
   "@/payload/components/ElevationProfileAdmin#DerivedMeasurementField": DerivedMeasurementField_042381939ca4647870a8e8cdbf375ba4,
   "@/payload/components/ElevationProfileAdmin#ElevationProfileAdmin": ElevationProfileAdmin_042381939ca4647870a8e8cdbf375ba4,
   "@/payload/components/GeometrySourceField#GeometrySourceField": GeometrySourceField_a49a1ab63145cd656d8d5d4b425ef25b,
+  "@/payload/components/TrailIssuePhoto#TrailIssuePhoto": TrailIssuePhoto_e80e1ec74d677ce501f1cd08032e690b,
   "@/payload/components/ColorField#ColorField": ColorField_9867b71f70a870a7cadc249fe18ef53e,
   "@/payload/components/DashboardSummary#DashboardSummary": DashboardSummary_7002eb233364b9ff475024992de73882,
   "@/payload/components/AdminNavLinks#AdminNavLinks": AdminNavLinks_8d087cb194ffed5de144ee14c449f56b,

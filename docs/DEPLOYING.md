@@ -159,7 +159,7 @@ Replace with your own:
 
 Skip this and the map still works: it renders from the checked-in data in
 `src/data/`. Add it and you get `/admin`, where someone without a GitHub account
-can edit trails.
+can edit trails, and where riders' condition reports land.
 
 Any Postgres works — Neon, Supabase, RDS, your own. No extensions needed.
 

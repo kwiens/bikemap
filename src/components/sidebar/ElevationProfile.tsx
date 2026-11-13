@@ -31,7 +31,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronDown,
   faChevronUp,
+  faClockRotateLeft,
   faDownload,
+  faPenToSquare,
+  faTriangleExclamation,
   faShareAlt,
   faChartArea,
   faTimes,
@@ -39,6 +42,12 @@ import {
 import { cn } from '@/lib/utils';
 import { activeCityId } from '@/config/map.config';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
+import { useTrailConditions } from '@/components/TrailConditionsProvider';
+import {
+  TrailConditionHistory,
+  TrailConditionsStrip,
+} from './TrailConditionsStrip';
+
 const CHART_HEIGHT = 100;
 const CHART_PADDING_TOP = 4;
 const CHART_PADDING_BOTTOM = 4;
@@ -103,6 +112,19 @@ function profileSlug(trailName: string): string {
   return trail ? slugForTrail(trail) : slugify(trailName);
 }
 
+/**
+ * The slug conditions are keyed by, or null.
+ *
+ * Stricter than `profileSlug`, which invents one for an unrecognised name.
+ * Conditions attach to a curated trail, so an OSM way, a route or a ride has
+ * none — guessing would key reports against a trail that doesn't exist.
+ */
+function curatedSlug(trailName: string): string | null {
+  const trail = getMountainBikeTrails().find(
+    (item) => item.trailName === trailName,
+  );
+  return trail ? slugForTrail(trail) : null;
+}
 /**
  * Maximum color stops per chart.
  *
@@ -311,6 +333,10 @@ export function ElevationProfile() {
   const [trailName, setTrailName] = useState<string | null>(null);
   const [profileSource, setProfileSource] = useState<ProfileSource>(null);
   const [profile, setProfile] = useState<ElevationProfileData | null>(null);
+  // The curated trail conditions are shown for, if this selection is one. State
+  // rather than derived from `trailName`, since a ride and an OSM way both put
+  // a name there and neither has conditions.
+  const [conditionSlug, setConditionSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hover, setHover] = useState<number | string | null>(null);
   const hoverIndex = typeof hover === 'number' ? hover : null;
@@ -324,7 +350,19 @@ export function ElevationProfile() {
   const profileRef = useRef<ElevationProfileData | null>(null);
 
   const [collapsed, setCollapsed] = useState(false);
-  const [isShowingActions, setIsShowingActions] = useState(false);
+  const [paneView, setPaneView] = useState<'profile' | 'actions' | 'history'>(
+    'profile',
+  );
+  const viewButtonRef = useRef<HTMLButtonElement>(null);
+  const historyButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingFocusRef = useRef<'view' | 'history' | null>(null);
+
+  const {
+    latest: conditions,
+    issueReportingAvailable,
+    lockedReason: reasonFor,
+    options: conditionOptions,
+  } = useTrailConditions();
 
   // The ride whose loadRide() is in flight. Any other selection, deselect or
   // a recording start nulls it, so a slow IndexedDB read can't paint a ride
@@ -333,7 +371,8 @@ export function ElevationProfile() {
 
   const clearProfile = () => {
     latestRideIdRef.current = null;
-    setIsShowingActions(false);
+    setPaneView('profile');
+    setConditionSlug(null);
     sourceRef.current = null;
     setProfileSource(null);
     setTrailName(null);
@@ -347,12 +386,13 @@ export function ElevationProfile() {
   useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName: name }) => {
     latestRideIdRef.current = null;
     if (sourceRef.current !== 'trail' || trailName !== name) {
-      setIsShowingActions(false);
+      setPaneView('profile');
     }
     sourceRef.current = 'trail';
     setProfileSource('trail');
     rideIdRef.current = null;
     setTrailName(name);
+    setConditionSlug(curatedSlug(name));
     window.history.replaceState(null, '', trailSelectionUrl(isEmbed, name));
   });
 
@@ -362,7 +402,8 @@ export function ElevationProfile() {
   // fetching a non-existent /data/elevation/<city>/<slug>.json and clearing us.
   useMapEvent(MAP_EVENTS.OSM_TRAIL_SELECT, ({ profile: osmProfile }) => {
     latestRideIdRef.current = null;
-    setIsShowingActions(false);
+    setPaneView('profile');
+    setConditionSlug(null);
     sourceRef.current = 'osm';
     setProfileSource('osm');
     rideIdRef.current = null;
@@ -391,7 +432,8 @@ export function ElevationProfile() {
 
   useMapEvent(MAP_EVENTS.TRAIL_DESELECT, () => {
     if (sourceRef.current === 'trail' || sourceRef.current === 'osm') {
-      setIsShowingActions(false);
+      setPaneView('profile');
+      setConditionSlug(null);
       sourceRef.current = null;
       setProfileSource(null);
       setTrailName(null);
@@ -409,7 +451,8 @@ export function ElevationProfile() {
     });
     if (!ride || latestRideIdRef.current !== rideId) return;
     const elevProfile = rideToElevationProfile(ride);
-    setIsShowingActions(false);
+    setPaneView('profile');
+    setConditionSlug(null);
     sourceRef.current = 'ride';
     setProfileSource('ride');
     rideIdRef.current = rideId;
@@ -515,7 +558,14 @@ export function ElevationProfile() {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [profile, isShowingActions, collapsed]);
+  }, [profile, paneView, collapsed]);
+
+  useEffect(() => {
+    const target = pendingFocusRef.current;
+    pendingFocusRef.current = null;
+    if (target === 'history') historyButtonRef.current?.focus();
+    if (target === 'view') viewButtonRef.current?.focus();
+  }, [paneView]);
 
   const chart = useMemo(
     () =>
@@ -591,9 +641,40 @@ export function ElevationProfile() {
   const hasProfile =
     !!trailName && !loading && !!profile && profile.profile.length >= 2;
 
-  if (!hasProfile || !profile) return null;
+  /**
+   * The pane's second reason to open. It used to need a chart, which would have
+   * hidden conditions on trails without a stored or bundled chart, including
+   * those whose ways Overpass couldn't resolve.
+   *
+   * `conditionOptions` is in the test because with no database there is no
+   * vocabulary, and the pane must not open on an empty strip.
+   */
+  const hasConditions =
+    !!trailName && !!conditionSlug && conditionOptions.length > 0;
+  const lockedReason =
+    hasConditions && conditionSlug ? reasonFor(conditionSlug) : null;
+  const canReport = hasConditions && lockedReason === null && !isEmbed;
+  const canReportIssue = !!conditionSlug && !isEmbed && issueReportingAvailable;
+  const isShowingHistory = paneView === 'history' && hasConditions;
+  const isShowingActions = paneView === 'actions';
+  const isShowingProfile = !isShowingActions && !isShowingHistory;
 
-  const points = profile.profile;
+  if (!hasProfile && !hasConditions && !canReportIssue) {
+    return null;
+  }
+
+  // No longer narrowed off `hasProfile`, which is no longer the only way past
+  // the guard above.
+  const points = hasProfile && profile ? profile.profile : null;
+
+  function changePaneView(
+    view: typeof paneView,
+    focus: 'view' | 'history' = 'view',
+  ) {
+    pendingFocusRef.current = focus;
+    clearHover();
+    setPaneView(view);
+  }
 
   // Mountain icon toggle button (visible when collapsed)
   if (collapsed) {
@@ -608,7 +689,9 @@ export function ElevationProfile() {
           onClick={() => setCollapsed(false)}
           className={cn(TOGGLE_BTN_CLASS, 'min-h-12 min-w-12')}
           type="button"
-          title="Show elevation profile"
+          title={
+            hasProfile ? 'Show elevation profile' : 'Show trail conditions'
+          }
         >
           <FontAwesomeIcon icon={faChartArea} className={TOGGLE_ICON_CLASS} />
         </button>
@@ -627,6 +710,11 @@ export function ElevationProfile() {
     >
       <div className="mb-1 flex items-center gap-1">
         <div className="min-w-0 flex-1">
+          {isShowingHistory && (
+            <h2 className="text-base font-semibold text-gray-900">
+              Condition history
+            </h2>
+          )}
           {profileSource === 'ride' && rideIdRef.current ? (
             <button
               type="button"
@@ -648,7 +736,7 @@ export function ElevationProfile() {
               {trailName}
             </span>
           )}
-          {!isShowingActions && (
+          {isShowingProfile && points && profile && (
             <div className="flex flex-wrap gap-x-3 text-xs text-gray-600">
               {/* Headline mileage: profile.distance, which carries the
                   authoritative total (precomputed OSM stats, curated JSON,
@@ -665,14 +753,15 @@ export function ElevationProfile() {
         <button
           className={cn(PANE_CONTROL_CLASS, 'bg-gray-50')}
           onClick={() => {
-            clearHover();
-            setIsShowingActions(!isShowingActions);
+            if (isShowingHistory) changePaneView('actions', 'history');
+            else changePaneView(isShowingProfile ? 'actions' : 'profile');
           }}
+          ref={viewButtonRef}
           type="button"
         >
           <FontAwesomeIcon
             aria-hidden="true"
-            icon={isShowingActions ? faChevronDown : faChevronUp}
+            icon={isShowingProfile ? faChevronUp : faChevronDown}
           />
           {isShowingActions ? 'Profile' : 'Actions'}
         </button>
@@ -681,7 +770,7 @@ export function ElevationProfile() {
           className={cn(PANE_CONTROL_CLASS, 'px-0 text-xl')}
           onClick={() => {
             clearHover();
-            setIsShowingActions(false);
+            setPaneView('profile');
             setCollapsed(true);
           }}
           type="button"
@@ -690,8 +779,59 @@ export function ElevationProfile() {
         </button>
       </div>
 
+      {hasConditions && conditionSlug && !isShowingHistory && (
+        <TrailConditionsStrip
+          report={conditions[conditionSlug]}
+          lockedReason={lockedReason}
+        />
+      )}
+
       {isShowingActions && (
         <div className="grid grid-cols-1 gap-2 py-2 min-[360px]:grid-cols-2">
+          {hasConditions && (
+            <button
+              type="button"
+              className={PANE_ACTION_CLASS}
+              onClick={() => changePaneView('history')}
+              ref={historyButtonRef}
+            >
+              <FontAwesomeIcon aria-hidden="true" icon={faClockRotateLeft} />
+              History
+            </button>
+          )}
+          {canReport && conditionSlug && trailName && (
+            <button
+              type="button"
+              className={PANE_ACTION_CLASS}
+              onClick={() => {
+                dispatchMapEvent(MAP_EVENTS.CONDITION_REPORT_OPEN, {
+                  slug: conditionSlug,
+                  trailName,
+                });
+              }}
+            >
+              <FontAwesomeIcon aria-hidden="true" icon={faPenToSquare} />
+              Report condition
+            </button>
+          )}
+          {canReportIssue && conditionSlug && trailName && (
+            <button
+              type="button"
+              className={PANE_ACTION_CLASS}
+              onClick={() => {
+                dispatchMapEvent(MAP_EVENTS.ISSUE_REPORT_OPEN, {
+                  slug: conditionSlug,
+                  trailName,
+                });
+              }}
+            >
+              <FontAwesomeIcon
+                aria-hidden="true"
+                icon={faTriangleExclamation}
+              />
+              Report trail issue
+            </button>
+          )}
           <button
             type="button"
             className={PANE_ACTION_CLASS}
@@ -709,24 +849,35 @@ export function ElevationProfile() {
             <FontAwesomeIcon aria-hidden="true" icon={faShareAlt} />
             Share link
           </button>
-          <button
-            type="button"
-            className={PANE_ACTION_CLASS}
-            onClick={async () => {
-              if ((await share.exportFile(gpxExport(profile))) === 'failed') {
-                dispatchMapEvent(MAP_EVENTS.TOAST, {
-                  message: 'Could not export GPX',
-                });
-              }
-            }}
-          >
-            <FontAwesomeIcon aria-hidden="true" icon={faDownload} />
-            Download GPX
-          </button>
+          {/* Conditions can be shown without a measured profile. */}
+          {profile && points && (
+            <button
+              type="button"
+              className={PANE_ACTION_CLASS}
+              onClick={async () => {
+                if ((await share.exportFile(gpxExport(profile))) === 'failed') {
+                  dispatchMapEvent(MAP_EVENTS.TOAST, {
+                    message: 'Could not export GPX',
+                  });
+                }
+              }}
+            >
+              <FontAwesomeIcon aria-hidden="true" icon={faDownload} />
+              Download GPX
+            </button>
+          )}
         </div>
       )}
 
-      {!isShowingActions && profile.osm && (
+      {isShowingHistory && conditionSlug && (
+        <TrailConditionHistory
+          key={conditionSlug}
+          slug={conditionSlug}
+          canReport={canReport}
+        />
+      )}
+
+      {isShowingProfile && profile?.osm && (
         <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-1 -mt-0.5">
           <span className="truncate capitalize">
             {[
@@ -751,7 +902,7 @@ export function ElevationProfile() {
         </div>
       )}
 
-      {!isShowingActions && (
+      {isShowingProfile && points && profile && (
         <div className="flex relative">
           <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
             <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
@@ -799,7 +950,7 @@ export function ElevationProfile() {
         </div>
       )}
 
-      {!isShowingActions && (
+      {isShowingProfile && points && (
         <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
           {hoverIndex !== null ? (
             <>
