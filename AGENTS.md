@@ -49,6 +49,25 @@ and a generated architecture summary in the description; `@claude` in a PR
 or issue asks Claude for help. The review instructions and setup live in
 [`.github/claude/README.md`](.github/claude/README.md).
 
+### Vercel previews for Payload schema changes
+
+Vercel previews can inherit production's database credentials, and preview
+builds skip Payload migrations. A deployment can be Ready and pass CI while
+`/admin` fails because its database is missing a new table or column. See the
+[deployment guide](docs/DEPLOYING.md#preview-and-production-database-policy).
+
+1. For a PR that needs a new Payload schema, use an isolated QA database. Verify
+   that both the preview's pooled `DATABASE_URL` and the migration connection
+   `DATABASE_URL_UNPOOLED` target that database. Apply the PR's committed
+   migrations there before testing. Keep production migrations in the
+   production deployment workflow.
+2. Resolve the exact preview URL you plan to share, including any Vercel branch
+   alias, and confirm it points to the deployment using the migrated QA
+   database. Recheck the alias after redeploying.
+3. On that URL, open `/admin`, sign in with a QA account, and verify that the
+   dashboard and the affected collection or settings page load. Run any test
+   writes in QA. Share the verified URL and tell testers to use their QA account.
+
 ## Architecture
 
 This is a Next.js App Router application displaying an interactive Mapbox map of bike routes, trails, and resources. It is **multi-city**: Chattanooga, TN ([bikechatt.com](https://bikechatt.com)) and Bend, OR (ridebend.org) run from the same codebase, selected per-request by hostname (or `NEXT_PUBLIC_CITY_ID` in development).
