@@ -23,12 +23,14 @@ import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 import {
+  PUBLIC_TRAIL_CACHE_DATA_VERSION,
   PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
   PUBLIC_TRAIL_GEOJSON_CACHE_TAG,
   PUBLIC_TRAIL_SUMMARIES_CACHE_TAG,
 } from '@/payload/cache/public-trails';
 import { appearanceFor } from './appearance';
 import type { Trail, TrailKind, TrailRating } from '@/payload-types';
+import { parseGeographicBounds } from '@/utils/geographic-bounds';
 
 type TrailReadStatus = 'empty' | 'ok' | 'unavailable';
 type TrailSummaryDocument = Pick<
@@ -61,23 +63,18 @@ function kindOf(trail: Pick<Trail, 'kind'>): TrailKind | null {
   return trail.kind && typeof trail.kind === 'object' ? trail.kind : null;
 }
 
-function boundsFor(
-  value: Trail['bounds'],
-): [number, number, number, number] | undefined {
-  if (!Array.isArray(value) || value.length !== 4) {
-    return undefined;
-  }
-  const numbers = value.map(Number);
-  return numbers.every(Number.isFinite)
-    ? (numbers as [number, number, number, number])
-    : undefined;
-}
-
 function osmIdsFor(value: Trail['osmIds']): number[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }
-  const ids = value.map(Number).filter((id) => Number.isInteger(id) && id > 0);
+  const ids = value
+    .filter(
+      (id) =>
+        typeof id === 'number' ||
+        (typeof id === 'string' && /^\d+$/.test(id.trim())),
+    )
+    .map(Number)
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
   return ids.length > 0 ? ids : undefined;
 }
 
@@ -104,7 +101,7 @@ function toMountainBikeTrail(trail: TrailSummaryDocument): MountainBikeTrail {
   const appearance = appearanceFor(ratingOf(trail), kindOf(trail));
   return {
     color: appearance.color,
-    defaultBounds: boundsFor(trail.bounds),
+    defaultBounds: parseGeographicBounds(trail.bounds),
     displayName: trail.displayName ?? trail.trailName ?? '',
     distance: trail.distance ?? undefined,
     elevationGain: trail.elevationGain ?? undefined,
@@ -206,7 +203,7 @@ async function readCityTrailSummaries(
 
 const readCachedCityTrailSummaries = unstable_cache(
   readCityTrailSummaries,
-  ['public-city-trail-summaries'],
+  ['public-city-trail-summaries', PUBLIC_TRAIL_CACHE_DATA_VERSION],
   {
     revalidate: PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
     tags: [PUBLIC_TRAIL_SUMMARIES_CACHE_TAG],
@@ -292,7 +289,7 @@ function decompressCityTrailGeojson(value: string): CityTrailGeojsonData {
 
 const readCachedCityTrailGeojson = unstable_cache(
   readCompressedCityTrailGeojson,
-  ['public-city-trail-geojson'],
+  ['public-city-trail-geojson', PUBLIC_TRAIL_CACHE_DATA_VERSION],
   {
     revalidate: PUBLIC_TRAIL_CACHE_REVALIDATE_SECONDS,
     tags: [PUBLIC_TRAIL_GEOJSON_CACHE_TAG],

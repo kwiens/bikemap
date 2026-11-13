@@ -2,12 +2,11 @@
  * Builds a curated trail from the OSM ways it rides on.
  *
  * This is the TypeScript equivalent of what scripts/build_bend_trails.py does
- * offline, reduced to the part an editor needs when they press save: given a
+ * offline, reduced to the part an editor needs for a preview: given a
  * list of OSM way ids, fetch the ways, join them into a line, measure it, and
  * sample its elevation.
  *
- * The trail's geometry is *derived*, never authored. Re-running this against a
- * refreshed OSM extract is how a rerouted trail updates itself.
+ * Refreshing the OSM preview lets a curator review an upstream reroute.
  */
 import { assembleWays, NOTABLE_GAP_M, type AssemblyGap } from './assemble';
 import { measureParts, type MeasureOptions } from './measure';
@@ -53,7 +52,7 @@ export async function buildTrailFromOsm(
   options: BuildOptions = {},
 ): Promise<BuiltTrail> {
   const requested = [...new Set(osmIds)].filter(
-    (id) => Number.isInteger(id) && id > 0,
+    (id) => Number.isSafeInteger(id) && id > 0,
   );
 
   const empty: BuiltTrail = {
@@ -98,21 +97,11 @@ export async function buildTrailFromOsm(
 
   const { gaps, orderedIds, parts } = assembleWays(ordered);
 
-  const warnings: string[] = [];
-  if (missingIds.length > 0) {
-    warnings.push(
-      `${missingIds.length} of ${requested.length} ways no longer exist in OSM (${missingIds.join(', ')}). The trail was built from the rest.`,
-    );
-  }
-  const notable = gaps.filter((gap) => gap.distanceMeters > NOTABLE_GAP_M);
-  if (notable.length > 0) {
-    warnings.push(
-      `The picked ways form ${parts.length} disconnected pieces; the largest break is ${notable[0].distanceMeters} m. A connecting way is probably missing.`,
-    );
-  }
-
   const measured = await measureParts(parts, name, options);
-  warnings.push(...measured.warnings);
+  const warnings = [
+    ...osmWayWarnings(requested.length, missingIds, parts.length, gaps),
+    ...measured.warnings,
+  ];
 
   return {
     bounds: measured.bounds,
@@ -126,4 +115,30 @@ export async function buildTrailFromOsm(
     profile: measured.profile,
     report: { gaps, missingIds, resolvedIds: orderedIds, warnings },
   };
+}
+
+/**
+ * What is wrong with the picked ways themselves, apart from measuring them.
+ * The save hook re-derives these for a reviewed preview instead of trusting the
+ * preview's warnings, which also carry that preview's terrain sampling.
+ */
+export function osmWayWarnings(
+  requestedCount: number,
+  missingIds: number[],
+  partCount: number,
+  gaps: { distanceMeters: number }[],
+): string[] {
+  const warnings: string[] = [];
+  if (missingIds.length > 0) {
+    warnings.push(
+      `${missingIds.length} of ${requestedCount} ways no longer exist in OSM (${missingIds.join(', ')}). The trail was built from the rest.`,
+    );
+  }
+  const notable = gaps.filter((gap) => gap.distanceMeters > NOTABLE_GAP_M);
+  if (notable.length > 0) {
+    warnings.push(
+      `The picked ways form ${partCount} disconnected pieces; the largest break is ${notable[0].distanceMeters} m. A connecting way is probably missing.`,
+    );
+  }
+  return warnings;
 }

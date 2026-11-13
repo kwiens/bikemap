@@ -6,10 +6,8 @@ while other content can remain explicitly configured to use static files or
 Mapbox Studio layers. Payload-owned route geometry has no implicit Studio
 fallback.
 
-Each file exports a typed array; the `interface` at the top of the file is the
-contract. `icon` fields are Font Awesome `IconDefinition` values imported from
-`@fortawesome/free-solid-svg-icons` — use an existing icon, don't add a new
-library.
+The TypeScript interfaces define the data contract. Fields typed as
+`IconDefinition` use icons from `@fortawesome/free-solid-svg-icons`.
 
 | File | Export | What it is |
 |---|---|---|
@@ -21,16 +19,17 @@ library.
 | `local-resources.ts` | `localResources: LocalResource[]` | Community resource links |
 | `gbfs.ts` | — | Live bike-share API client (no static data) |
 
-`geo_data.ts` is a barrel that re-exports the above; import from `@/data/geo_data`.
+Client code uses `@/data/geo_data` for active-city static config and
+`@/data/route-source` or `@/data/trail-source` for published summaries.
+Server code passes an explicit city to the Payload readers.
 The MTB trail array lives in its own `mountain-bike-trails.data.ts` so the
 3,000-line literal doesn't bury the types and region logic.
 
 ## BikeRoute (`bike-routes.ts`)
 
-The TypeScript arrays are import metadata, not the public Casual list. Published
-Route records supply both display metadata and geometry through
-`/api/map/routes?city=<city>`. Imported and Trail-backed routes have no Studio
-or checked-in route-GeoJSON fallback. A Route may select a same-city Trail, in
+The TypeScript route arrays supply import metadata. The page reads published
+Casual summaries from Payload on the server. The browser loads drawable lines
+from `/api/map/routes?city=<city>`. A Route may select a same-city Trail, in
 which case the read path uses that Trail's current geometry, distance, and
 bounds. Chattanooga's five not-yet-migrated routes explicitly select their
 existing Studio layers; their cards still come from Payload.
@@ -46,6 +45,8 @@ existing Studio layers; their cards still come from Payload.
 | `opacity` | `number` | 0–1 |
 | `distance` | `number` | Miles |
 | `kind?` | `ride \| greenway \| path \| trail` | Editorial route classification |
+| `featured?` | `boolean` | Show the route in the Casual sidebar |
+| `hideArrows?` | `boolean` | Hide arrows for a route that can be ridden in either direction |
 | `defaultBounds?` | `[swLng, swLat, neLng, neLat]` | Zoom-to-fit fallback when runtime bounds aren't available |
 | `bounds?` | `mapboxgl.LngLatBounds` | Computed at runtime — do not hand-author |
 

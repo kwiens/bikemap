@@ -3,7 +3,7 @@
 import {
   act,
   fireEvent,
-  render,
+  render as renderReact,
   screen,
   waitFor,
 } from '@testing-library/react';
@@ -18,8 +18,22 @@ import {
   loadProfile,
   profilePointToXY,
 } from './ElevationProfile';
+import { EmbedProvider } from '@/components/EmbedContext';
 import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
+import { mapSelectionHarness } from '@/test/map-selection';
+import { getLayout, initLayout } from '@/hooks/useLayout';
 import { MAP_EVENTS } from '@/events';
+import type { RecordedRide } from '@/data/ride';
+
+const loadRideMock = vi.hoisted(() => vi.fn());
+vi.mock('@/utils/ride-storage', () => ({ loadRide: loadRideMock }));
+import { parseEmbedOptions } from '@/utils/embed';
+
+const selection = mapSelectionHarness();
+
+function render(ui: React.ReactElement) {
+  return renderReact(ui, { wrapper: selection.Wrapper });
+}
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -183,7 +197,11 @@ describe('downsampleStops', () => {
     const points = makePoints(50);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
-    const stops = downsampleStops(points, colors, maxDist);
+    const stops = downsampleStops(
+      points.map(([distance]) => distance),
+      colors,
+      maxDist,
+    );
     expect(stops).toHaveLength(50);
   });
 
@@ -191,7 +209,11 @@ describe('downsampleStops', () => {
     const points = makePoints(700);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
-    const stops = downsampleStops(points, colors, maxDist);
+    const stops = downsampleStops(
+      points.map(([distance]) => distance),
+      colors,
+      maxDist,
+    );
     expect(stops).toHaveLength(600);
   });
 
@@ -199,7 +221,11 @@ describe('downsampleStops', () => {
     const points = makePoints(500);
     const colors = points.map(() => 'rgb(34,197,94)');
     const maxDist = points[points.length - 1][0];
-    const stops = downsampleStops(points, colors, maxDist);
+    const stops = downsampleStops(
+      points.map(([distance]) => distance),
+      colors,
+      maxDist,
+    );
     expect(stops[0].offset).toBe(0);
     expect(stops[stops.length - 1].offset).toBeCloseTo(1, 2);
   });
@@ -373,7 +399,42 @@ describe('loadProfile', () => {
 });
 
 describe('ElevationProfile selection source', () => {
-  it('uses readable grade text with a separate color swatch', () => {
+  it('keeps the new selection when an earlier OSM profile finishes', async () => {
+    const profile: ElevationProfileData = {
+      trail: 'Old OSM trail',
+      distance: 100,
+      gain: 20,
+      loss: 0,
+      min: 100,
+      max: 120,
+      profile: [
+        [0, 100, -85.3, 35],
+        [100, 120, -85.301, 35.001],
+      ],
+    };
+    let resolveProfile!: (profile: ElevationProfileData) => void;
+    const result = new Promise<ElevationProfileData>((resolve) => {
+      resolveProfile = resolve;
+    });
+    render(<ElevationProfile />);
+    let pending: Promise<void>;
+    act(() => {
+      pending = selection.selectOsmTrail(() => result);
+    });
+    expect(selection.get()).toMatchObject({ kind: 'osm', profile: null });
+    selection.select({ kind: 'area', areaName: 'Raccoon Mountain' });
+    await act(async () => {
+      resolveProfile(profile);
+      await pending;
+    });
+    expect(selection.get()).toEqual({
+      kind: 'area',
+      areaName: 'Raccoon Mountain',
+    });
+    expect(screen.queryByText(profile.trail)).toBeNull();
+  });
+
+  it('uses readable grade text with a separate color swatch', async () => {
     const profile: ElevationProfileData = {
       trail: 'Test Trail',
       distance: 400,
@@ -391,12 +452,8 @@ describe('ElevationProfile selection source', () => {
     };
 
     render(<ElevationProfile />);
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, {
-          detail: { profile },
-        }),
-      );
+    await act(async () => {
+      await selection.selectOsmTrail(async () => profile);
     });
 
     const chart = screen.getByRole('img', {
@@ -413,6 +470,60 @@ describe('ElevationProfile selection source', () => {
     expect(grade.querySelector('[aria-hidden="true"]')).toHaveStyle({
       backgroundColor: gradeToColor(computeGrades(profile.profile)[2]),
     });
+  });
+
+  it('shows a gap label and clears the map hover between chart sections', async () => {
+    const profile: ElevationProfileData = {
+      trail: 'Disconnected trail',
+      distance: 400,
+      gain: 0,
+      loss: 0,
+      min: 100,
+      max: 200,
+      profile: [
+        [0, 100, -85.3, 35],
+        [200, 100, -85.301, 35.001],
+        [200, 200, -85.305, 35.005],
+        [400, 200, -85.306, 35.006],
+      ],
+      geometryGapDetails: [
+        { feet: 620, from: [-85.301, 35.001], to: [-85.305, 35.005] },
+      ],
+    };
+    const hover = vi.fn();
+    window.addEventListener(MAP_EVENTS.ELEVATION_HOVER, hover);
+    try {
+      render(<ElevationProfile />);
+      await act(async () => {
+        await selection.selectOsmTrail(async () => profile);
+      });
+      const chart = screen.getByRole('img', {
+        name: 'Elevation profile for Disconnected trail',
+      });
+      vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
+        left: 0,
+        width: 400,
+      } as DOMRect);
+      fireEvent.mouseMove(chart, { clientX: 200 });
+      expect(chart).toHaveAccessibleDescription('620 ft between sections');
+      expect(
+        screen.getByText('620 ft between sections', { selector: 'div' }),
+      ).toBeVisible();
+      expect(hover).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          detail: { lng: null, lat: null },
+        }),
+      );
+
+      fireEvent.mouseMove(chart, { clientX: 205 });
+      expect(hover).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          detail: { lng: -85.306, lat: 35.006 },
+        }),
+      );
+    } finally {
+      window.removeEventListener(MAP_EVENTS.ELEVATION_HOVER, hover);
+    }
   });
 
   it('loads a curated profile when an OSM trail with the same name was selected', async () => {
@@ -443,22 +554,12 @@ describe('ElevationProfile selection source', () => {
       } as Response);
 
     render(<ElevationProfile />);
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.OSM_TRAIL_SELECT, {
-          detail: { profile: osmProfile },
-        }),
-      );
+    await act(async () => {
+      await selection.selectOsmTrail(async () => osmProfile);
     });
     expect(screen.getByText('+999 ft climbing')).toBeInTheDocument();
 
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-          detail: { trailName: 'Big Forest' },
-        }),
-      );
-    });
+    selection.select({ kind: 'trail', trailName: 'Big Forest' });
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -467,5 +568,116 @@ describe('ElevationProfile selection source', () => {
       );
       expect(screen.getByText('+123 ft climbing')).toBeInTheDocument();
     });
+  });
+});
+
+describe('ElevationProfile ride selection', () => {
+  const ride: RecordedRide = {
+    id: 'ride-1',
+    name: 'Morning Ride',
+    startTime: 0,
+    endTime: 400_000,
+    points: Array.from({ length: 6 }, (_, i) => ({
+      lng: -85.3 - i * 0.001,
+      lat: 35 + i * 0.001,
+      altitude: 200 + i * 5,
+      timestamp: i * 60_000,
+    })),
+    stats: {
+      distance: 600,
+      elapsedTime: 300_000,
+      movingTime: 300_000,
+      avgSpeed: 2,
+      maxSpeed: 3,
+      elevationGain: 25,
+      elevationLoss: 0,
+      elevationMin: 200,
+      elevationMax: 225,
+    },
+    bounds: [-85.305, 35, -85.3, 35.005],
+  };
+
+  afterEach(() => {
+    loadRideMock.mockReset();
+  });
+
+  it('shows a selected ride', async () => {
+    initLayout();
+    loadRideMock.mockResolvedValue(ride);
+    render(<ElevationProfile />);
+    await act(async () => {
+      await selection.selectRide('ride-1');
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Morning Ride' }));
+    expect(getLayout().ridesPanelOpen).toBe(true);
+    expect(loadRideMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['a route replaced it', { kind: 'route', routeId: 'zoo-loop' } as const],
+    ['it was deselected', null],
+  ])('drops a ride that finishes loading after %s', async (_label, next) => {
+    let resolveRide: (value: RecordedRide) => void = () => {};
+    loadRideMock.mockReturnValue(
+      new Promise<RecordedRide>((resolve) => {
+        resolveRide = resolve;
+      }),
+    );
+    render(<ElevationProfile />);
+    let pending: Promise<void>;
+    await act(async () => {
+      pending = selection.selectRide('ride-1');
+    });
+    await waitFor(() => expect(loadRideMock).toHaveBeenCalledWith('ride-1'));
+    selection.select(next);
+    await act(async () => {
+      resolveRide(ride);
+      await pending;
+    });
+    expect(selection.get()).toEqual(next);
+    expect(screen.queryByText('Morning Ride')).toBeNull();
+  });
+
+  it('ignores a ride that cannot be read', async () => {
+    loadRideMock.mockRejectedValue(new Error('IndexedDB blocked'));
+    render(<ElevationProfile />);
+    await act(async () => {
+      await selection.selectRide('ride-1');
+    });
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(console.error).toHaveBeenCalledWith(
+      'Failed to load ride:',
+      expect.any(Error),
+    );
+  });
+});
+
+describe('ElevationProfile embed URL state', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('rewrites only the trail and keeps the embed configuration', () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 404 } as Response);
+    window.history.replaceState(
+      null,
+      '',
+      '/embed?mode=mtb&zoom=12&route=riverwalk&trail=old-trail',
+    );
+
+    render(
+      <EmbedProvider options={parseEmbedOptions(window.location.search)}>
+        <ElevationProfile />
+      </EmbedProvider>,
+    );
+
+    selection.select({ kind: 'trail', trailName: 'Big Forest' });
+    expect(window.location.pathname).toBe('/embed');
+    expect(
+      Object.fromEntries(new URLSearchParams(window.location.search)),
+    ).toEqual({ mode: 'mtb', zoom: '12', trail: 'big-forest' });
+
+    selection.select(null);
+    expect(window.location.search).toBe('?mode=mtb&zoom=12');
   });
 });

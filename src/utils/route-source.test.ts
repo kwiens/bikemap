@@ -16,7 +16,7 @@ describe('route source', () => {
     ] as BikeRoute[];
 
     expect(runtimeRouteIds(routes)).toEqual(['imported', 'trail']);
-    expect(runtimeRouteIds(routes, ['configured'])).toEqual([
+    expect(runtimeRouteIds(routes, ['configured', 'studio'])).toEqual([
       'configured',
       'imported',
       'trail',
@@ -63,6 +63,18 @@ describe('route source', () => {
 
     await expect(fetchRouteCollection('/unavailable')).resolves.toBeNull();
     await expect(fetchRouteCollection('/empty')).resolves.toBeNull();
+  });
+
+  it('rejects JSON with features but no FeatureCollection type', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ features: [{}] }),
+      }),
+    );
+
+    await expect(fetchRouteCollection('/wrong-type')).resolves.toBeNull();
   });
 
   it('bounds how long a slow database can delay map initialization', async () => {

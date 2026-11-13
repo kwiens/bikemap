@@ -3,6 +3,7 @@
 import React, {
   useState,
   useEffect,
+  useId,
   useCallback,
   useMemo,
   useRef,
@@ -12,24 +13,32 @@ import type { ElevationProfile as ElevationProfileData } from '@/data/geo_data';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { slugify } from '@/utils/string';
-import { downloadFile } from '@/utils/format';
+import {
+  elevationProfileBreaks,
+  layoutElevationChart,
+  parseElevationProfile,
+  type ElevationChartLayout,
+} from '@/utils/elevation-profile';
 import { buildProfileGpx } from '@/utils/gpx';
-import { MAP_EVENTS } from '@/events';
-import { loadRide } from '@/utils/ride-storage';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
+import { useMapEvent } from '@/hooks/useMapEvent';
+import { setRidesPanelOpen, useLayout } from '@/hooks/useLayout';
+import { useMapSelection } from '@/components/map-selection';
+import { usePlatform } from '@/platform/context';
+import type { ExportFile } from '@/platform/types';
 import { rideToElevationProfile } from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faChevronDown,
+  faChevronUp,
   faDownload,
   faShareAlt,
   faChartArea,
   faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
-import { getSetting } from '@/utils/settings';
 import { activeCityId } from '@/config/map.config';
-import { useEmbed } from '@/components/EmbedContext';
 import { TOGGLE_BTN_CLASS, TOGGLE_ICON_CLASS } from '@/components/styles';
-
 const CHART_HEIGHT = 100;
 const CHART_PADDING_TOP = 4;
 const CHART_PADDING_BOTTOM = 4;
@@ -50,7 +59,9 @@ async function fetchProfile(
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }
-  return response.json();
+  const profile = parseElevationProfile(await response.json());
+  if (!profile) throw new Error('Invalid elevation profile');
+  return profile;
 }
 
 /**
@@ -74,16 +85,20 @@ export async function loadProfile(
   city: CityId,
   signal: AbortSignal,
 ): Promise<ElevationProfileData> {
+  const encodedSlug = encodeURIComponent(slug);
   try {
     return await fetchProfile(
-      `/api/map/elevation/${slug}?city=${encodeURIComponent(city)}`,
+      `/api/map/elevation/${encodedSlug}?city=${encodeURIComponent(city)}`,
       signal,
     );
   } catch (error) {
-    if ((error as Error).name === 'AbortError') {
+    if (
+      signal.aborted ||
+      (error instanceof Error && error.name === 'AbortError')
+    ) {
       throw error;
     }
-    return fetchProfile(`/data/elevation/${city}/${slug}.json`, signal);
+    return fetchProfile(`/data/elevation/${city}/${encodedSlug}.json`, signal);
   }
 }
 
@@ -113,10 +128,10 @@ const GRADE_SMOOTHING_WINDOW = 1;
 
 const CHART_SVG_CLASS =
   'w-full h-[15vh] min-h-[80px] max-h-[160px] cursor-crosshair rounded touch-none';
-const ACTION_BTN_CLASS =
-  'bg-transparent border-none cursor-pointer text-gray-400 text-2xl px-2 py-1 rounded hover:text-gray-600 hover:bg-gray-50';
-
-type ProfileSource = 'trail' | 'osm' | 'route' | 'ride' | null;
+const PANE_CONTROL_CLASS =
+  'inline-flex min-h-12 min-w-12 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-gray-700 hover:bg-gray-100';
+const PANE_ACTION_CLASS =
+  'flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-sm font-medium text-gray-800 hover:bg-gray-100 active:bg-gray-200';
 
 export function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
@@ -152,26 +167,13 @@ export function computeGrades(
 ): number[] {
   if (points.length < 2) return points.map(() => 0);
 
-  const gapEdges = new Set(
-    gapDetails.map(({ from, to }) =>
-      profileEdgeKey(from[0], from[1], to[0], to[1]),
-    ),
-  );
-  const segmentStarts = new Set<number>();
+  const segmentStarts = elevationProfileBreaks(points, gapDetails);
   const rises: number[] = [0];
   const runs: number[] = [0];
   for (let i = 1; i < points.length; i++) {
     const previous = points[i - 1];
     const current = points[i];
     const run = current[0] - previous[0];
-    if (
-      run <= 0 ||
-      gapEdges.has(
-        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
-      )
-    ) {
-      segmentStarts.add(i);
-    }
     const rise = current[1] - previous[1];
     runs.push(run > 0 ? run : 0);
     rises.push(run > 0 ? rise : 0);
@@ -203,42 +205,6 @@ export function computeGrades(
   return smoothed;
 }
 
-function profileEdgeKey(
-  fromLng: number,
-  fromLat: number,
-  toLng: number,
-  toLat: number,
-): string {
-  return `${fromLng},${fromLat}:${toLng},${toLat}`;
-}
-
-function profileSegmentRanges(
-  points: [number, number, number, number][],
-  gapDetails: ElevationProfileData['geometryGapDetails'] = [],
-): [number, number][] {
-  if (points.length === 0) return [];
-  const gapEdges = new Set(
-    gapDetails.map(({ from, to }) =>
-      profileEdgeKey(from[0], from[1], to[0], to[1]),
-    ),
-  );
-  const starts = [0];
-  for (let index = 1; index < points.length; index++) {
-    const previous = points[index - 1];
-    const current = points[index];
-    if (
-      current[0] <= previous[0] ||
-      gapEdges.has(
-        profileEdgeKey(previous[2], previous[3], current[2], current[3]),
-      )
-    ) {
-      starts.push(index);
-    }
-  }
-  starts.push(points.length);
-  return starts.slice(0, -1).map((start, index) => [start, starts[index + 1]]);
-}
-
 // Force strictly increasing offsets. Consecutive profile points can share a
 // distance (multi-segment trails repeat distance at a seam), which would yield
 // duplicate gradient offsets — invalid as React keys and pointless zero-width
@@ -256,24 +222,24 @@ function uniqueOffsets(
 }
 
 export function downsampleStops(
-  points: [number, number, number, number][],
+  pointX: number[],
   colors: string[],
-  maxDist: number,
+  width: number,
 ): { offset: number; color: string }[] {
-  if (points.length <= MAX_GRADIENT_STOPS) {
+  if (pointX.length <= MAX_GRADIENT_STOPS) {
     return uniqueOffsets(
       colors.map((color, i) => ({
-        offset: maxDist > 0 ? points[i][0] / maxDist : 0,
+        offset: width > 0 ? pointX[i] / width : 0,
         color,
       })),
     );
   }
-  const step = (points.length - 1) / (MAX_GRADIENT_STOPS - 1);
+  const step = (pointX.length - 1) / (MAX_GRADIENT_STOPS - 1);
   const stops: { offset: number; color: string }[] = [];
   for (let i = 0; i < MAX_GRADIENT_STOPS; i++) {
     const idx = Math.round(i * step);
     stops.push({
-      offset: maxDist > 0 ? points[idx][0] / maxDist : 0,
+      offset: width > 0 ? pointX[idx] / width : 0,
       color: colors[idx],
     });
   }
@@ -283,13 +249,16 @@ export function downsampleStops(
 // Profile data cache to avoid refetching on revisit
 const profileCache = new Map<string, ElevationProfileData>();
 
-function downloadGpx(profile: ElevationProfileData): void {
-  const gpx = buildProfileGpx(
-    profile.trail,
-    profile.profile,
-    profile.geometryGapDetails,
-  );
-  downloadFile(gpx, `${slugify(profile.trail)}.gpx`, 'application/gpx+xml');
+function gpxExport(profile: ElevationProfileData): ExportFile {
+  return {
+    filename: `${slugify(profile.trail)}.gpx`,
+    mimeType: 'application/gpx+xml',
+    content: buildProfileGpx(
+      profile.trail,
+      profile.profile,
+      profile.geometryGapDetails,
+    ),
+  };
 }
 
 // Find the closest profile point to a given lng/lat using squared Euclidean distance
@@ -322,283 +291,90 @@ export function findClosestProfileIndex(
   return bestIdx;
 }
 
+function trailSelectionUrl(name?: string): string {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('route');
+  url.searchParams.delete('trail');
+  if (name) url.searchParams.set('trail', profileSlug(name));
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 export function ElevationProfile() {
-  // Embeds never carry the settings cookie (that's the whole premise of
-  // embed mode), so `getSetting('sidebarOpen')` always misses there and the
-  // `?? true` fallback would wrongly assume the sidebar is open. MapLegend
-  // seeds its own `isOpen` from `embedOptions.sidebarOpen` in that case (see
-  // MapLegend.tsx) and only ever dispatches SIDEBAR_TOGGLE on a user toggle,
-  // never for the initial value — so we have to seed from the same embed
-  // option here to agree with it initially. Outside embed mode this is
-  // byte-for-byte the previous behavior.
-  const { isEmbed, options: embedOptions } = useEmbed();
-  const [trailName, setTrailName] = useState<string | null>(null);
-  const [profileSource, setProfileSource] = useState<ProfileSource>(null);
-  const [profile, setProfile] = useState<ElevationProfileData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  // Which side panels are open decides where the pane sits (and, on a
+  // phone, whether it shows at all).
+  const { sidebarOpen, ridesPanelOpen } = useLayout();
+  const { share } = usePlatform();
+  const selection = useMapSelection();
+  const curatedTrail = selection?.kind === 'trail' ? selection.trailName : null;
+  const ride = selection?.kind === 'ride' ? selection.ride : null;
+  const [loadedTrail, setLoadedTrail] = useState<{
+    name: string;
+    profile: ElevationProfileData;
+  } | null>(null);
+  const rideProfile = useMemo(
+    () => (ride ? rideToElevationProfile(ride) : null),
+    [ride],
+  );
+  const profile =
+    selection?.kind === 'osm'
+      ? selection.profile
+      : curatedTrail && loadedTrail?.name === curatedTrail
+        ? loadedTrail.profile
+        : rideProfile;
+  const trailName = curatedTrail ?? ride?.name ?? profile?.trail;
+  const [hover, setHover] = useState<number | string | null>(null);
+  const hoverIndex = typeof hover === 'number' ? hover : null;
   const [locationIndex, setLocationIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
-  const [sidebarOpen, setSidebarOpen] = useState(() =>
-    isEmbed ? embedOptions.sidebarOpen : (getSetting('sidebarOpen') ?? true),
-  );
-  const [ridesPanelOpen, setRidesPanelOpen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
-  // Track whether current profile is from a route, trail, or ride selection
-  const sourceRef = useRef<ProfileSource>(null);
-  const rideIdRef = useRef<string | null>(null);
-  // Keep profile in a ref so location handler always sees latest
-  const profileRef = useRef<ElevationProfileData | null>(null);
-
   const [collapsed, setCollapsed] = useState(false);
+  const [isShowingActions, setIsShowingActions] = useState(false);
+  const hasTrailInUrl = useRef(false);
 
   useEffect(() => {
-    const handleTrailSelect = (e: Event) => {
-      const { trailName: name } = (e as CustomEvent).detail;
-      sourceRef.current = 'trail';
-      setProfileSource('trail');
-      rideIdRef.current = null;
-      setTrailName(name);
+    if (curatedTrail || hasTrailInUrl.current) {
       window.history.replaceState(
-        null,
+        window.history.state,
         '',
-        `?trail=${encodeURIComponent(profileSlug(name))}`,
+        trailSelectionUrl(curatedTrail ?? undefined),
       );
-    };
-    // OSM trails ship a ready-built profile (no curated JSON to load by name),
-    // and aren't restorable by slug on reload, so no URL state is written.
-    // Seed the cache so the trailName effect takes its cache-hit path instead of
-    // fetching a non-existent /data/elevation/<city>/<slug>.json and clearing us.
-    const handleOsmTrailSelect = (e: Event) => {
-      const { profile: osmProfile } = (e as CustomEvent).detail as {
-        profile: ElevationProfileData;
-      };
-      sourceRef.current = 'osm';
-      setProfileSource('osm');
-      rideIdRef.current = null;
-      // Cache keys are namespaced by source: an OSM way sharing a curated
-      // trail's name must not shadow the curated /data/elevation JSON.
-      profileCache.set(`osm:${osmProfile.trail}`, osmProfile);
-      setTrailName(osmProfile.trail);
-      setProfile(osmProfile);
-      profileRef.current = osmProfile;
-      setHoverIndex(null);
-      setLocationIndex(null);
-      setLoading(false);
-    };
-    const handleRouteSelect = () => {
-      // Routes never show an elevation profile, so selecting one must clear
-      // whatever profile is currently displayed (trail or ride) — otherwise a
-      // map route-click leaves the previous trail's chart visible. (sourceRef is
-      // only ever 'trail' or 'ride', so the old `=== 'route'` guard never hit.)
-      if (sourceRef.current !== null) {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        setProfile(null);
-        profileRef.current = null;
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    };
-    const handleTrailDeselect = () => {
-      if (sourceRef.current === 'trail' || sourceRef.current === 'osm') {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    };
-    const handleRouteDeselect = () => {
-      if (sourceRef.current === 'route') {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    };
-    const handleSidebarToggle = (e: Event) => {
-      setSidebarOpen((e as CustomEvent).detail.isOpen);
-    };
-    const handleRidesPanelToggle = (e: Event) => {
-      setRidesPanelOpen((e as CustomEvent).detail.isOpen);
-    };
-    let latestRideId: string | null = null;
-    const handleRideSelect = async (e: Event) => {
-      const { rideId } = (e as CustomEvent).detail;
-      latestRideId = rideId;
-      const ride = await loadRide(rideId);
-      if (!ride || latestRideId !== rideId) return; // stale check
-      const elevProfile = rideToElevationProfile(ride);
-      sourceRef.current = 'ride';
-      setProfileSource('ride');
-      rideIdRef.current = rideId;
-      if (elevProfile) {
-        setTrailName(ride.name);
-        profileCache.set(`ride:${ride.name}`, elevProfile);
-        setProfile(elevProfile);
-        profileRef.current = elevProfile;
-        setHoverIndex(null);
-        setLocationIndex(null);
-        setLoading(false);
-      } else {
-        setTrailName(null);
-        setProfile(null);
-        profileRef.current = null;
-      }
-    };
-    const handleRideDeselect = () => {
-      if (sourceRef.current === 'ride') {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        setProfile(null);
-        profileRef.current = null;
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    };
-    const handleRecordingStart = () => {
-      // Hide elevation profile during recording — not enough data for a
-      // meaningful chart and the panel just gets in the way.
-      sourceRef.current = null;
-      setProfileSource(null);
-      setTrailName(null);
-      setProfile(null);
-      profileRef.current = null;
-    };
-    const handleRecordingStop = () => {
-      if (sourceRef.current === 'ride') {
-        sourceRef.current = null;
-        setProfileSource(null);
-        setTrailName(null);
-        setProfile(null);
-        profileRef.current = null;
-      }
-    };
-
-    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
-    window.addEventListener(MAP_EVENTS.OSM_TRAIL_SELECT, handleOsmTrailSelect);
-    window.addEventListener(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
-    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
-    window.addEventListener(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
-    window.addEventListener(MAP_EVENTS.SIDEBAR_TOGGLE, handleSidebarToggle);
-    window.addEventListener(
-      MAP_EVENTS.RIDES_PANEL_TOGGLE,
-      handleRidesPanelToggle,
-    );
-    window.addEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
-    window.addEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
-    window.addEventListener(
-      MAP_EVENTS.RIDE_RECORDING_START,
-      handleRecordingStart,
-    );
-    window.addEventListener(
-      MAP_EVENTS.RIDE_RECORDING_STOP,
-      handleRecordingStop,
-    );
-
-    return () => {
-      window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
-      window.removeEventListener(
-        MAP_EVENTS.OSM_TRAIL_SELECT,
-        handleOsmTrailSelect,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.TRAIL_DESELECT,
-        handleTrailDeselect,
-      );
-      window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
-      window.removeEventListener(
-        MAP_EVENTS.ROUTE_DESELECT,
-        handleRouteDeselect,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.SIDEBAR_TOGGLE,
-        handleSidebarToggle,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.RIDES_PANEL_TOGGLE,
-        handleRidesPanelToggle,
-      );
-      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
-      window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
-      window.removeEventListener(
-        MAP_EVENTS.RIDE_RECORDING_START,
-        handleRecordingStart,
-      );
-      window.removeEventListener(
-        MAP_EVENTS.RIDE_RECORDING_STOP,
-        handleRecordingStop,
-      );
-    };
-  }, []);
-
-  // Listen for GPS location updates and find closest point on trail
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { lng, lat } = (e as CustomEvent).detail;
-      if (!profileRef.current) {
-        setLocationIndex(null);
-        return;
-      }
-      const idx = findClosestProfileIndex(profileRef.current.profile, lng, lat);
-      setLocationIndex((prev) => (prev === idx ? prev : idx));
-    };
-
-    window.addEventListener(MAP_EVENTS.LOCATION_UPDATE, handler);
-    return () =>
-      window.removeEventListener(MAP_EVENTS.LOCATION_UPDATE, handler);
-  }, []);
+      hasTrailInUrl.current = Boolean(curatedTrail);
+    }
+  }, [curatedTrail]);
 
   useEffect(() => {
-    if (!trailName) {
-      setProfile(null);
-      profileRef.current = null;
-      setLocationIndex(null);
-      return;
-    }
-
-    // Ride profiles are set directly by the RIDE_SELECT handler — skip fetch
-    if (profileSource === 'ride') return;
-
-    const cacheKey = `${profileSource ?? 'trail'}:${trailName}`;
-    const cached = profileCache.get(cacheKey);
-    if (cached) {
-      setProfile(cached);
-      profileRef.current = cached;
-      setHoverIndex(null);
-      setLocationIndex(null);
-      return;
-    }
-
-    // OSM profiles are seeded into the cache by their select handler and have
-    // no curated JSON to fetch — a miss here just means nothing to show.
-    if (profileSource === 'osm') return;
-
-    setLoading(true);
-    setProfile(null);
-    profileRef.current = null;
-    setHoverIndex(null);
+    setIsShowingActions(false);
+    setHover(null);
     setLocationIndex(null);
+    dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: null, lat: null });
+  }, [selection]);
+
+  // Follow the rider along the displayed profile.
+  useMapEvent(MAP_EVENTS.LOCATION_UPDATE, ({ lng, lat }) => {
+    const idx = profile
+      ? findClosestProfileIndex(profile.profile, lng, lat)
+      : null;
+    setLocationIndex((prev) => (prev === idx ? prev : idx));
+  });
+
+  useEffect(() => {
+    if (!curatedTrail) return;
+    const cached = profileCache.get(curatedTrail);
+    if (cached) {
+      setLoadedTrail({ name: curatedTrail, profile: cached });
+      return;
+    }
 
     const controller = new AbortController();
-    const slug = encodeURIComponent(profileSlug(trailName));
-
-    // `activeCityId` is the browser's own resolution (this runs on the client,
-    // so it sees window.location) — the API needs it because slugs are unique
-    // per city, not globally.
-    loadProfile(slug, activeCityId, controller.signal)
-      .then((data: ElevationProfileData) => {
-        profileCache.set(`trail:${trailName}`, data);
-        setProfile(data);
-        profileRef.current = data;
-        setLoading(false);
+    loadProfile(profileSlug(curatedTrail), activeCityId, controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        profileCache.set(curatedTrail, data);
+        setLoadedTrail({ name: curatedTrail, profile: data });
       })
-      .catch((err) => {
-        if (err.name !== 'AbortError') setLoading(false);
-      });
-
+      .catch(() => {});
     return () => controller.abort();
-  }, [trailName, profileSource]);
+  }, [curatedTrail]);
 
   // Measure chart width via ResizeObserver
   useEffect(() => {
@@ -611,34 +387,46 @@ export function ElevationProfile() {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [profile]);
+  }, [profile, isShowingActions, collapsed]);
+
+  const chart = useMemo(
+    () =>
+      layoutElevationChart(
+        profile?.profile ?? [],
+        chartWidth,
+        profile?.geometryGapDetails,
+      ),
+    [profile, chartWidth],
+  );
 
   const updateHoverFromX = useCallback(
     (clientX: number, rect: DOMRect) => {
-      if (!profile || profile.profile.length === 0) return;
-      const x = clientX - rect.left;
-      const fraction = Math.max(0, Math.min(1, x / rect.width));
-      const maxDist = profile.profile[profile.profile.length - 1][0];
-      const targetDist = fraction * maxDist;
+      if (!profile || !chart.pointX.length || rect.width <= 0) return;
+      const fraction = Math.max(
+        0,
+        Math.min(1, (clientX - rect.left) / rect.width),
+      );
+      const x = fraction * chartWidth;
+      const gap = chart.breaks.find(({ left, right }) => x > left && x < right);
+      if (gap) {
+        setHover(gap.label);
+        dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: null, lat: null });
+        return;
+      }
 
       let lo = 0;
-      let hi = profile.profile.length - 1;
+      let hi = chart.pointX.length - 1;
       while (lo < hi) {
         const mid = (lo + hi) >> 1;
-        if (profile.profile[mid][0] < targetDist) lo = mid + 1;
+        if (chart.pointX[mid] < x) lo = mid + 1;
         else hi = mid;
       }
-      const idx = Math.max(0, Math.min(lo, profile.profile.length - 1));
-      setHoverIndex(idx);
+      setHover(lo);
 
-      const pt = profile.profile[idx];
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.ELEVATION_HOVER, {
-          detail: { lng: pt[2], lat: pt[3] },
-        }),
-      );
+      const pt = profile.profile[lo];
+      dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: pt[2], lat: pt[3] });
     },
-    [profile],
+    [profile, chart, chartWidth],
   );
 
   const handleMouseMove = useCallback(
@@ -658,12 +446,8 @@ export function ElevationProfile() {
   );
 
   const clearHover = useCallback(() => {
-    setHoverIndex(null);
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.ELEVATION_HOVER, {
-        detail: { lng: null, lat: null },
-      }),
-    );
+    setHover(null);
+    dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: null, lat: null });
   }, []);
 
   const grades = useMemo(
@@ -676,19 +460,11 @@ export function ElevationProfile() {
     [grades],
   );
 
-  const hasProfile =
-    !!trailName && !loading && !!profile && profile.profile.length >= 2;
+  const hasProfile = !!trailName && !!profile && profile.profile.length >= 2;
 
-  if (!hasProfile) {
-    return null;
-  }
+  if (!hasProfile || !profile) return null;
 
   const points = profile.profile;
-  // Headline mileage: profile.distance, which carries the authoritative total
-  // (precomputed OSM stats, curated JSON, accuracy-filtered ride stats) and can
-  // differ from the tile-simplified chart geometry's sum (the chart subcomponents
-  // derive their own x-axis normalizer from the points).
-  const headlineDistFt = profile.distance;
 
   // Mountain icon toggle button (visible when collapsed)
   if (collapsed) {
@@ -701,7 +477,7 @@ export function ElevationProfile() {
       >
         <button
           onClick={() => setCollapsed(false)}
-          className={TOGGLE_BTN_CLASS}
+          className={cn(TOGGLE_BTN_CLASS, 'min-h-12 min-w-12')}
           type="button"
           title="Show elevation profile"
         >
@@ -714,81 +490,106 @@ export function ElevationProfile() {
   return (
     <div
       className={cn(
-        'fixed bottom-4 right-4 bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-600 pointer-events-auto transition-all duration-300',
-        'max-md:left-2 max-md:right-2 max-md:bottom-[60px] max-md:px-2 max-md:pt-2 max-md:pb-1',
+        'fixed bottom-4 right-4 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain bg-white rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.15)] px-4 pt-2.5 pb-1.5 z-600 pointer-events-auto transition-all duration-300',
+        'max-md:left-2 max-md:right-2 max-md:bottom-[max(60px,env(safe-area-inset-bottom))] max-md:px-3 max-md:pt-2 max-md:pb-2',
         sidebarOpen ? 'left-[296px] max-md:hidden' : 'left-4',
         ridesPanelOpen && 'right-[296px]',
       )}
     >
-      <div className="flex items-center gap-3 mb-1">
-        {profileSource === 'ride' && rideIdRef.current ? (
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(
-                new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
-                  detail: { rideId: rideIdRef.current, openPanel: true },
-                }),
-              );
-            }}
-            className="text-[13px] font-semibold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis bg-transparent border-none cursor-pointer p-0 hover:text-blue-700 hover:underline"
-          >
-            {trailName}
-          </button>
-        ) : (
-          <span className="text-[13px] font-semibold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">
-            {trailName}
-          </span>
-        )}
-        <div className="flex gap-3 text-[11px] text-gray-500 ml-auto shrink-0">
-          <span>{(headlineDistFt / 5280).toFixed(1)} mi</span>
-          <span>+{Math.round(profile.gain).toLocaleString()} ft climbing</span>
+      <div className="mb-1 flex items-center gap-1">
+        <div className="min-w-0 flex-1">
+          {ride ? (
+            <button
+              type="button"
+              onClick={() => setRidesPanelOpen(true)}
+              className="block min-h-12 max-w-full cursor-pointer truncate text-left text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              {trailName}
+            </button>
+          ) : (
+            <span className="block truncate text-sm font-semibold text-gray-800">
+              {trailName}
+            </span>
+          )}
+          {!isShowingActions && (
+            <div className="flex flex-wrap gap-x-3 text-xs text-gray-600">
+              {/* Headline mileage: profile.distance, which carries the
+                  authoritative total (precomputed OSM stats, curated JSON,
+                  accuracy-filtered ride stats) and can differ from the
+                  tile-simplified chart geometry's sum (the chart subcomponents
+                  derive their own x-axis normalizer from the points). */}
+              <span>{(profile.distance / 5280).toFixed(1)} mi</span>
+              <span>
+                +{Math.round(profile.gain).toLocaleString()} ft climbing
+              </span>
+            </div>
+          )}
         </div>
-        <div className="flex gap-1 ml-2 shrink-0">
-          <button
-            type="button"
-            className={ACTION_BTN_CLASS}
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(window.location.href);
-                window.dispatchEvent(
-                  new CustomEvent(MAP_EVENTS.TOAST, {
-                    detail: { message: 'Link copied' },
-                  }),
-                );
-              } catch (error) {
-                console.error('Failed to copy link:', error);
-                window.dispatchEvent(
-                  new CustomEvent(MAP_EVENTS.TOAST, {
-                    detail: { message: 'Could not copy link' },
-                  }),
-                );
-              }
-            }}
-            title="Copy link"
-          >
-            <FontAwesomeIcon icon={faShareAlt} />
-          </button>
-          <button
-            type="button"
-            className={ACTION_BTN_CLASS}
-            onClick={() => downloadGpx(profile)}
-            title="Download GPX"
-          >
-            <FontAwesomeIcon icon={faDownload} />
-          </button>
-          <button
-            type="button"
-            className={ACTION_BTN_CLASS}
-            onClick={() => setCollapsed(true)}
-            title="Collapse"
-          >
-            <FontAwesomeIcon icon={faTimes} />
-          </button>
-        </div>
+        <button
+          className={cn(PANE_CONTROL_CLASS, 'bg-gray-50')}
+          onClick={() => {
+            clearHover();
+            setIsShowingActions(!isShowingActions);
+          }}
+          type="button"
+        >
+          <FontAwesomeIcon
+            aria-hidden="true"
+            icon={isShowingActions ? faChevronDown : faChevronUp}
+          />
+          {isShowingActions ? 'Profile' : 'Actions'}
+        </button>
+        <button
+          aria-label="Hide elevation pane"
+          className={cn(PANE_CONTROL_CLASS, 'px-0 text-xl')}
+          onClick={() => {
+            clearHover();
+            setIsShowingActions(false);
+            setCollapsed(true);
+          }}
+          type="button"
+        >
+          <FontAwesomeIcon aria-hidden="true" icon={faTimes} />
+        </button>
       </div>
 
-      {profile.osm && (
+      {isShowingActions && (
+        <div className="grid grid-cols-1 gap-2 py-2 min-[360px]:grid-cols-2">
+          <button
+            type="button"
+            className={PANE_ACTION_CLASS}
+            onClick={async () => {
+              const outcome = await share.shareLink(window.location.href);
+              if (outcome === 'copied') {
+                dispatchMapEvent(MAP_EVENTS.TOAST, { message: 'Link copied' });
+              } else if (outcome === 'failed') {
+                dispatchMapEvent(MAP_EVENTS.TOAST, {
+                  message: 'Could not share link',
+                });
+              }
+            }}
+          >
+            <FontAwesomeIcon aria-hidden="true" icon={faShareAlt} />
+            Share link
+          </button>
+          <button
+            type="button"
+            className={PANE_ACTION_CLASS}
+            onClick={async () => {
+              if ((await share.exportFile(gpxExport(profile))) === 'failed') {
+                dispatchMapEvent(MAP_EVENTS.TOAST, {
+                  message: 'Could not export GPX',
+                });
+              }
+            }}
+          >
+            <FontAwesomeIcon aria-hidden="true" icon={faDownload} />
+            Download GPX
+          </button>
+        </div>
+      )}
+
+      {!isShowingActions && profile.osm && (
         <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-1 -mt-0.5">
           <span className="truncate capitalize">
             {[
@@ -813,66 +614,73 @@ export function ElevationProfile() {
         </div>
       )}
 
-      <div className="flex relative">
-        <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
-          <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
-            {Math.round(profile.max).toLocaleString()} ft
-          </span>
-          <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
-            {Math.round(profile.min).toLocaleString()} ft
-          </span>
-        </div>
+      {!isShowingActions && (
+        <div className="flex relative">
+          <div className="flex flex-col justify-between py-0.5 shrink-0 w-[42px]">
+            <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
+              {Math.round(profile.max).toLocaleString()} ft
+            </span>
+            <span className="text-[9px] text-gray-400 text-right pr-1 leading-none">
+              {Math.round(profile.min).toLocaleString()} ft
+            </span>
+          </div>
 
-        <div className="relative flex-1">
-          <ElevationSvg
-            points={points}
-            gradeColors={gradeColors}
-            profile={profile}
-            chartWidth={chartWidth}
-            svgRef={svgRef}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={clearHover}
-            onTouchStart={handleTouch}
-            onTouchMove={handleTouch}
-            onTouchEnd={clearHover}
-          />
-          {locationIndex !== null && (
-            <LocationIndicator
-              points={points}
-              profile={profile}
-              chartWidth={chartWidth}
-              locationIndex={locationIndex}
-            />
-          )}
-          {hoverIndex !== null && (
-            <HoverIndicator
+          <div className="relative flex-1">
+            <ElevationSvg
               points={points}
               gradeColors={gradeColors}
               profile={profile}
+              chart={chart}
               chartWidth={chartWidth}
-              hoverIndex={hoverIndex}
+              svgRef={svgRef}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={clearHover}
+              onTouchStart={handleTouch}
+              onTouchMove={handleTouch}
+              onTouchEnd={clearHover}
             />
+            {locationIndex !== null && (
+              <LocationIndicator
+                points={points}
+                profile={profile}
+                chart={chart}
+                chartWidth={chartWidth}
+                locationIndex={locationIndex}
+              />
+            )}
+            {hoverIndex !== null && (
+              <HoverIndicator
+                points={points}
+                gradeColors={gradeColors}
+                profile={profile}
+                chart={chart}
+                chartWidth={chartWidth}
+                hoverIndex={hoverIndex}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {!isShowingActions && (
+        <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
+          {hoverIndex !== null ? (
+            <>
+              {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
+              <span className="inline-flex items-center gap-1 text-gray-700">
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-2 w-2 rounded-full border border-black/10"
+                  style={{ backgroundColor: gradeColors[hoverIndex] }}
+                />
+                {formatGrade(grades[hoverIndex])}
+              </span>
+            </>
+          ) : (
+            (hover ?? '\u00A0')
           )}
         </div>
-      </div>
-
-      <div className="text-[11px] text-gray-600 text-center py-0.5 min-h-4">
-        {hoverIndex !== null ? (
-          <>
-            {`${(points[hoverIndex][0] / 5280).toFixed(2)} mi \u00B7 ${Math.round(points[hoverIndex][1]).toLocaleString()} ft \u00B7 `}
-            <span className="inline-flex items-center gap-1 text-gray-700">
-              <span
-                aria-hidden="true"
-                className="inline-block h-2 w-2 rounded-full border border-black/10"
-                style={{ backgroundColor: gradeColors[hoverIndex] }}
-              />
-              {formatGrade(grades[hoverIndex])}
-            </span>
-          </>
-        ) : (
-          '\u00A0'
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -882,6 +690,7 @@ const ElevationSvg = React.memo(function ElevationSvg({
   points,
   gradeColors,
   profile,
+  chart,
   chartWidth,
   svgRef,
   onMouseMove,
@@ -893,6 +702,7 @@ const ElevationSvg = React.memo(function ElevationSvg({
   points: [number, number, number, number][];
   gradeColors: string[];
   profile: ElevationProfileData;
+  chart: ElevationChartLayout;
   chartWidth: number;
   svgRef: React.RefObject<SVGSVGElement | null>;
   onMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -901,42 +711,34 @@ const ElevationSvg = React.memo(function ElevationSvg({
   onTouchMove: (e: React.TouchEvent<SVGSVGElement>) => void;
   onTouchEnd: () => void;
 }) {
-  const maxDist = points[points.length - 1][0];
+  const descriptionId = useId();
   const yRange = profile.max - profile.min || 1;
 
-  const xScale = (d: number) => (d / maxDist) * chartWidth;
   const yScale = (e: number) =>
     CHART_PADDING_TOP +
     PLOT_HEIGHT -
     ((e - profile.min) / yRange) * PLOT_HEIGHT;
 
   const baseline = CHART_HEIGHT - CHART_PADDING_BOTTOM;
-  const ranges = profileSegmentRanges(points, profile.geometryGapDetails);
-  const linePath = ranges
-    .map(([start, end]) =>
-      points
-        .slice(start, end)
-        .map(
-          (point, index) =>
-            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
-        )
-        .join(' '),
+  const segments = chart.ranges.map(([start, end]) => ({
+    start,
+    end,
+    path: points
+      .slice(start, end)
+      .map(
+        (point, index) =>
+          `${index === 0 ? 'M' : 'L'}${chart.pointX[start + index].toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
+      )
+      .join(' '),
+  }));
+  const linePath = segments.map(({ path }) => path).join(' ');
+  const areaPath = segments
+    .map(
+      ({ start, end, path }) =>
+        `${path} L${chart.pointX[end - 1].toFixed(1)} ${baseline} L${chart.pointX[start].toFixed(1)} ${baseline} Z`,
     )
     .join(' ');
-  const areaPath = ranges
-    .map(([start, end]) => {
-      const segmentLine = points
-        .slice(start, end)
-        .map(
-          (point, index) =>
-            `${index === 0 ? 'M' : 'L'}${xScale(point[0]).toFixed(1)} ${yScale(point[1]).toFixed(1)}`,
-        )
-        .join(' ');
-      return `${segmentLine} L${xScale(points[end - 1][0]).toFixed(1)} ${baseline} L${xScale(points[start][0]).toFixed(1)} ${baseline} Z`;
-    })
-    .join(' ');
-
-  const gradientStops = downsampleStops(points, gradeColors, maxDist);
+  const gradientStops = downsampleStops(chart.pointX, gradeColors, chartWidth);
 
   return (
     <svg
@@ -951,7 +753,13 @@ const ElevationSvg = React.memo(function ElevationSvg({
       ref={svgRef}
       role="img"
       aria-label={`Elevation profile for ${profile.trail}`}
+      aria-describedby={chart.breaks.length > 0 ? descriptionId : undefined}
     >
+      {chart.breaks.length > 0 && (
+        <desc id={descriptionId}>
+          {chart.breaks.map(({ label }) => label).join('. ')}
+        </desc>
+      )}
       <defs>
         <linearGradient
           id="grade-stroke"
@@ -999,6 +807,21 @@ const ElevationSvg = React.memo(function ElevationSvg({
         vectorEffect="non-scaling-stroke"
       />
 
+      {chart.breaks.map(({ left, right, label }) => (
+        <line
+          key={left}
+          x1={(left + right) / 2}
+          x2={(left + right) / 2}
+          y1={CHART_PADDING_TOP}
+          y2={baseline}
+          stroke="#9ca3af"
+          strokeDasharray="2 3"
+          vectorEffect="non-scaling-stroke"
+        >
+          <title>{label}</title>
+        </line>
+      ))}
+
       <path d={areaPath} fill="url(#grade-fill)" />
       <path
         d={linePath}
@@ -1018,11 +841,11 @@ export function profilePointToXY(
   index: number,
   profile: ElevationProfileData,
   chartWidth: number,
+  chart = layoutElevationChart(points, chartWidth, profile.geometryGapDetails),
 ): { x: number; y: number } {
-  const maxDist = points[points.length - 1][0];
   const yRange = profile.max - profile.min || 1;
   return {
-    x: (points[index][0] / maxDist) * chartWidth,
+    x: chart.pointX[index],
     y:
       CHART_PADDING_TOP +
       PLOT_HEIGHT -
@@ -1035,16 +858,24 @@ function HoverIndicator({
   points,
   gradeColors,
   profile,
+  chart,
   chartWidth,
   hoverIndex,
 }: {
   points: [number, number, number, number][];
   gradeColors: string[];
   profile: ElevationProfileData;
+  chart: ElevationChartLayout;
   chartWidth: number;
   hoverIndex: number;
 }) {
-  const { x, y } = profilePointToXY(points, hoverIndex, profile, chartWidth);
+  const { x, y } = profilePointToXY(
+    points,
+    hoverIndex,
+    profile,
+    chartWidth,
+    chart,
+  );
 
   return (
     <svg
@@ -1079,15 +910,23 @@ function HoverIndicator({
 function LocationIndicator({
   points,
   profile,
+  chart,
   chartWidth,
   locationIndex,
 }: {
   points: [number, number, number, number][];
   profile: ElevationProfileData;
+  chart: ElevationChartLayout;
   chartWidth: number;
   locationIndex: number;
 }) {
-  const { x, y } = profilePointToXY(points, locationIndex, profile, chartWidth);
+  const { x, y } = profilePointToXY(
+    points,
+    locationIndex,
+    profile,
+    chartWidth,
+    chart,
+  );
   const leftPct = (x / chartWidth) * 100;
   const topPct = (y / CHART_HEIGHT) * 100;
 

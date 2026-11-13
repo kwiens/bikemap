@@ -5,6 +5,8 @@
 // inside a third-party frame. `parseEmbedOptions` is the single decoder;
 // `buildEmbedSearch` is its inverse (used by the demo/snippet builder).
 
+import { parseDecimal } from './parse-decimal';
+
 /** Marker/overlay layers a host page may turn on at load. */
 export const EMBED_LAYERS = [
   'attractions',
@@ -14,6 +16,8 @@ export const EMBED_LAYERS = [
 ] as const;
 
 export type EmbedLayer = (typeof EMBED_LAYERS)[number];
+
+export type EmbedMode = 'casual' | 'mtb';
 
 /**
  * The marker/overlay layers that form a mutually-exclusive radio group in the
@@ -29,11 +33,15 @@ export const MARKER_LAYERS = [
 ] as const satisfies readonly EmbedLayer[];
 
 export interface EmbedOptions {
+  /** Which curated route family the embed exposes. */
+  mode: EmbedMode;
   /** Whether the routes sidebar starts open. Defaults to closed — a 280px
    *  drawer eats most of a typical embed width. */
   sidebarOpen: boolean;
-  /** Route slug (see `slugify(route.name)`) to select once the map is ready. */
+  /** Public route id. Older links can use a slug derived from the route name. */
   route?: string;
+  /** Curated trail slug to select once an MTB embed is ready. */
+  trail?: string;
   /** Initial map center as [lng, lat]; falls back to the city default. */
   center?: [number, number];
   /** Initial zoom; falls back to the city default. */
@@ -46,6 +54,7 @@ export interface EmbedOptions {
 }
 
 export const DEFAULT_EMBED_OPTIONS: EmbedOptions = {
+  mode: 'casual',
   sidebarOpen: false,
   layers: [],
 };
@@ -56,14 +65,17 @@ export const DEFAULT_EMBED_OPTIONS: EmbedOptions = {
  * still render a map.
  *
  * Supported params:
+ *   mode=casual|mtb
  *   sidebar=open|closed
  *   route=<slug>
+ *   trail=<slug>
  *   center=<lng>,<lat>
  *   zoom=<number>
  *   layers=attractions,bikeResources,bikeRentals,bikeNetwork  (comma list;
  *     at most one of attractions/bikeResources/bikeRentals is kept — the
  *     first one that appears — since the map treats them as a radio group;
- *     bikeNetwork is independent and may accompany it)
+ *     bikeNetwork is independent and may accompany it; ignored when
+ *     mode=mtb)
  */
 export function parseEmbedOptions(
   search: string | URLSearchParams,
@@ -73,12 +85,19 @@ export function parseEmbedOptions(
 
   const options: EmbedOptions = { ...DEFAULT_EMBED_OPTIONS, layers: [] };
 
+  options.mode = parseEmbedMode(params.get('mode') ?? undefined);
+
   const sidebar = params.get('sidebar');
   if (sidebar === 'open') options.sidebarOpen = true;
   else if (sidebar === 'closed') options.sidebarOpen = false;
 
-  const route = params.get('route')?.trim();
-  if (route) options.route = route;
+  if (options.mode === 'mtb') {
+    const trail = params.get('trail')?.trim();
+    if (trail) options.trail = trail;
+  } else {
+    const route = params.get('route')?.trim();
+    if (route) options.route = route;
+  }
 
   const center = parseCenter(params.get('center'));
   if (center) options.center = center;
@@ -86,9 +105,18 @@ export function parseEmbedOptions(
   const zoom = parseZoom(params.get('zoom'));
   if (zoom !== undefined) options.zoom = zoom;
 
-  options.layers = parseLayers(params.get('layers'));
+  // Layer toggles live only in the Casual sidebar, so an MTB embed that
+  // honoured them would show markers nothing in the frame can turn off.
+  if (options.mode === 'casual') {
+    options.layers = parseLayers(params.get('layers'));
+  }
 
   return options;
+}
+
+/** Shared by the server data loader and the iframe option decoder. */
+export function parseEmbedMode(mode: string | string[] | undefined): EmbedMode {
+  return (Array.isArray(mode) ? mode[0] : mode) === 'mtb' ? 'mtb' : 'casual';
 }
 
 /**
@@ -97,13 +125,17 @@ export function parseEmbedOptions(
  */
 export function buildEmbedSearch(options: Partial<EmbedOptions>): string {
   const params = new URLSearchParams();
+  if (options.mode === 'mtb') params.set('mode', 'mtb');
   if (options.sidebarOpen) params.set('sidebar', 'open');
-  if (options.route) params.set('route', options.route);
+  if (options.mode !== 'mtb' && options.route)
+    params.set('route', options.route);
+  if (options.mode === 'mtb' && options.trail)
+    params.set('trail', options.trail);
   if (options.center) {
     params.set('center', options.center.map(formatCoord).join(','));
   }
   if (options.zoom !== undefined) params.set('zoom', String(options.zoom));
-  if (options.layers && options.layers.length > 0) {
+  if (options.mode !== 'mtb' && options.layers && options.layers.length > 0) {
     params.set('layers', options.layers.join(','));
   }
   return params.toString();
@@ -114,33 +146,13 @@ export function isEmbedLayer(value: string): value is EmbedLayer {
   return (EMBED_LAYERS as readonly string[]).includes(value);
 }
 
-/**
- * Parse a `lng,lat` pair. Exported so the snippet builder validates exactly
- * what the embed will accept, rather than keeping a second copy of the rules.
- */
-/**
- * A plain decimal number, optionally signed, with an optional fraction or
- * exponent. `Number()` alone also accepts `0x2d`, `0b101`, `0o17` and
- * `Infinity`, so `?center=0x2d,0x1e` would coerce to a perfectly in-range
- * (45, 30) — a point in the Adriatic — and pass every range check.
- */
-const DECIMAL_PATTERN = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
-
-function parseDecimal(raw: string): number | undefined {
-  if (!DECIMAL_PATTERN.test(raw)) return undefined;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : undefined;
-}
-
+/** Parses the same coordinate pair in embeds and in the snippet builder. */
 export function parseCenter(raw: string | null): [number, number] | undefined {
   if (!raw) return undefined;
-  const trimmedParts = raw.split(',').map((p) => p.trim());
-  // Reject empty/whitespace-only components before coercing — Number('')
-  // and Number(' ') are 0, which would silently pass as a valid coordinate.
-  if (trimmedParts.length !== 2) return undefined;
-  const parts = trimmedParts.map(parseDecimal);
-  if (parts.some((n) => n === undefined)) return undefined;
-  const [lng, lat] = parts as [number, number];
+  const parts = raw.split(',');
+  if (parts.length !== 2) return undefined;
+  const [lng, lat] = parts.map(parseDecimal);
+  if (lng === undefined || lat === undefined) return undefined;
   if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return undefined;
   return [lng, lat];
 }
@@ -155,7 +167,7 @@ export function parseZoom(raw: string | null): number | undefined {
   // truthy, so it must be checked explicitly (and Number(' ') === 0 would
   // otherwise silently pass as a valid zoom).
   if (!raw) return undefined;
-  const zoom = parseDecimal(raw.trim());
+  const zoom = parseDecimal(raw);
   if (zoom === undefined || zoom < 0 || zoom > 24) return undefined;
   return zoom;
 }

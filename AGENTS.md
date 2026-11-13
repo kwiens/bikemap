@@ -2,6 +2,18 @@
 
 This file provides guidance to AI coding agents when working with code in this repository.
 
+## Start here
+
+| If you are changing | Start with | Verification |
+|---|---|---|
+| Public map, route arrows, or layer selection | [selection store](src/components/map-selection.tsx), [Map.tsx](src/components/Map.tsx), [map utilities](src/utils/map.ts), [route arrows](src/utils/route-arrows.ts), [typed events](src/events.ts) | Map utility tests and a browser check of map and sidebar selection |
+| Map sidebar or ride panel | [MapLegend.tsx](src/components/MapLegend.tsx), [RidesPanel.tsx](src/components/RidesPanel.tsx), [layout store](src/hooks/useLayout.ts) | Adjacent component and layout tests, including a narrow viewport |
+| Embeds or multi-city links | [Embed page](src/app/(frontend)/embed/page.tsx), [URL options](src/utils/embed.ts), [deep links](src/hooks/useUrlDeepLink.ts), [city config](src/config/map.config.ts) | Embed page, snippet builder, and deep-link tests |
+| Admin geometry or snapping | [Editor entry points](docs/guides/osm-trail-editor.md#editor-entry-points), [routing graph](src/payload/routing/graph.ts), [editor controller](src/payload/routing/editor-controller.ts) | Geometry editor and routing tests, plus save/reopen and basemap switching |
+| Payload fields, reads, or seed data | [Collections](src/payload/collections), [public readers](src/payload/read), [migrations](src/migrations/index.ts), [data sources](docs/DATA.md) | Affected reader or hook tests and migration checks |
+| GPS, compass, wake lock, or sharing | [Platform contracts](src/platform/types.ts), [location tracking](src/hooks/useLocationTracking.ts), [ride recording](src/hooks/useRideRecording.ts), [native protocol](docs/guides/native-shell.md) | Platform and hook tests. Native behavior also needs a host app |
+| Deployment or CI | [Deployment guide](docs/DEPLOYING.md), [build policy](scripts/ci-build-policy.ts), [test workflow](.github/workflows/test.yml) | `pnpm check`, `pnpm test:run`, and an isolated build |
+
 ## Commands
 
 ```bash
@@ -9,7 +21,7 @@ pnpm dev          # Start development server at localhost:3000
 pnpm build        # Build for production
 pnpm test         # Run tests in watch mode
 pnpm test:run     # Run tests once
-pnpm check        # Run ESLint, Biome formatting, types, and Knip
+pnpm check        # Run ESLint, Biome, TypeScript, Knip, and the lockfile dedupe check
 pnpm lint:fix     # Auto-fix ESLint and formatting issues
 pnpm dedupe:check # Verify the lockfile has no avoidable duplicates
 ```
@@ -92,7 +104,14 @@ src/
 │   ├── bike-network.ts    # Classified bike-network overlay constants
 │   ├── ride.ts            # Ride recording types
 │   └── gbfs.ts            # Live bike share API integration (station + free-bike)
-├── hooks/                 # useRideRecording, useWakeLock, useMapResize, useToast
+├── hooks/                 # useRideRecording, useLocationTracking, useKeepAwake,
+│                          # useLayout, useMapEvent, useMapResize, useToast
+├── platform/              # Device services behind interfaces (GPS, keep-awake,
+│   ├── types.ts           # compass) — see "Platform services" below
+│   ├── context.tsx        # PlatformProvider / usePlatform (default: web)
+│   ├── position-watch.ts  # One shared, ref-counted GPS stream
+│   ├── web/               # Browser implementations
+│   └── native/            # React Native WebView bridge (Expo shell)
 ├── utils/
 │   ├── map.ts             # Map layer plumbing, selection, bounds, geocoding
 │   ├── terrain-rgb.ts     # Shared Terrain-RGB decode + tile math
@@ -122,29 +141,41 @@ src/
    - `geo_data.ts`: barrel re-exporting the **active city's** static config (`bikeResources`, route/network URLs, and trail-layer config). Published routes and trails reach the map through `route-source.ts` and `trail-source.ts`. Published attractions are read by `src/payload/read/attractions.ts` and passed to the map and sidebar as props.
    - `gbfs.ts`: live bike share data (station-based for Chattanooga, free-bike/Veo for Bend — a discriminated `GBFSConfig` union)
 
-### Event-Driven Communication
+### Map selection and events
 
-The app uses custom DOM events (`window.dispatchEvent`) for component communication. **All event names live in `src/events.ts` (`MAP_EVENTS`)** — never use string literals. The full set:
+`src/components/map-selection.tsx` owns the active route, trail, area, OSM way,
+or saved ride. The public page and embed each mount a `MapSelectionProvider`.
+Read the snapshot with `useMapSelection()`. Use `useMapSelectionStore()` to
+select a feature or clear it with `select(null)`. The Mapbox map subscribes
+once its layers are ready. The store loads a saved ride once for the map,
+profile, and history, and applies asynchronous ride and OSM results only while
+their selection is still current.
+
+Use custom DOM events on `window` for transient commands and notifications. **All event names live in `src/events.ts` (`MAP_EVENTS`) and every payload shape in `MapEventDetails`** — never use string literals, and never call `new CustomEvent` / `addEventListener` for these directly. Use the typed helpers:
+
+- `dispatchMapEvent(MAP_EVENTS.X, detail)` — the detail is checked against `MapEventDetails`; detail-less events take one argument.
+- `onMapEvent(MAP_EVENTS.X, (detail) => …)` — returns the unsubscribe function (return it from a `useEffect`, or collect several for a manual teardown).
+- `useMapEvent(MAP_EVENTS.X, handler)` (`src/hooks/useMapEvent.ts`) — subscribes for a component's lifetime and reads the latest handler through a ref, so callers pass a plain closure and never re-register.
+
+Adding an event means adding its name to `MAP_EVENTS` **and** its detail type to `MapEventDetails`.
+
+**Panel layout is not event-mirrored state.** Which side panel is open lives in one store, `src/hooks/useLayout.ts`: components read it with `useLayout()` and change it with `setSidebarOpen` / `setRidesPanelOpen` / the `toggle*` helpers. The store keeps the two panels mutually exclusive, persists the sidebar only for a deliberate toggle (`persist: true`), and dispatches `sidebar-toggle` / `rides-panel-toggle` itself. Never keep a local copy of this state fed by those events — that is the duplication the store replaced. `MapLegendProvider` seeds it per mount with `useSeedLayout` (cookie, or the embed option). Viewport checks go through `isMobileViewport()`, and panels dismiss on a phone via `useOutsideTap`.
+
+The full set:
 
 | Event | Purpose |
 |-------|---------|
-| `route-select` / `route-deselect` | Curated route selection (bidirectional Map ⇄ sidebar; deselect resets route opacity on the map) |
-| `trail-select` / `trail-deselect` | Curated MTB trail selection (bidirectional; drives elevation pane) |
-| `osm-trail-select` | Nationwide OSM trail clicked — carries a ready-built `ElevationProfile` |
-| `area-select` | Rec-area heading clicked — zoom to area bounds |
 | `layer-toggle` | Show/hide a layer: `attractions`, `bikeResources`, `bikeRentals` (radio-style markers), `osmTrails`, `bikeNetwork` |
 | `center-location` | Pan map to a location (and open its popup) |
-| `sidebar-toggle` | Sidebar opened/closed — map resize + elevation pane layout |
+| `sidebar-toggle` | Sidebar opened/closed — dispatched by the layout store (`src/hooks/useLayout.ts`); the map resizes on it |
 | `elevation-hover` | Elevation chart hover — moves the map hover marker |
 | `location-update` | GPS fix — recenter / elevation-pane location dot |
 | `ride-style-chosen` | Welcome modal preference — selects default sidebar tab |
 | `ride-recording-start/stop/update` | Ride recorder lifecycle → live map track |
-| `ride-select` / `ride-deselect` | Saved ride selection (map track + elevation pane + panel) |
-| `rides-panel-toggle` | Rides panel opened/closed (closes the sidebar, with a `sidebar-toggle` dispatch) |
+| `rides-panel-toggle` | Rides panel opened/closed — dispatched by the layout store |
 | `toast` | Show a toast via the map's toast host |
 | `map-ready` | Map fully initialized (also sets `window.__mapReady` for late listeners) |
 
-**Important**: `route-select` and `trail-select` are bidirectional — both Map and MapLegend listen. When clicking on the map, the map dispatches and MapLegend updates its selection state; when clicking in the sidebar, MapLegend dispatches and Map handles the visual update. Event payloads are untyped (`CustomEvent.detail`) — check the dispatching site for the shape.
 
 ### Marker System
 
@@ -180,9 +211,10 @@ The converter writes `public/data/chattanooga/trails.geojson`, grouping source
 pieces into one `MultiLineString` per raw `Trail` value and merging
 `public/data/chattanooga/trails-supplemental.geojson`. That data-only supplement
 contains the six permitted Godsey Ridge lines absent from the regional
-shapefile; their coordinates came from the checked-in elevation profiles that
-were originally sampled from the legacy Mapbox layer. The seed matches all 224
-curated rows and stores geometry as `geometrySource: 'imported'`.
+shapefile and the connector omitted from its multipart Cherokee Trail record;
+their coordinates came from checked-in elevation profiles that were originally
+sampled from the legacy Mapbox layer. The seed matches all 224 curated rows and
+stores geometry as `geometrySource: 'imported'`.
 `prepare:chattanooga-measurements` uses the same `measureParts` implementation
 as Payload to regenerate summary metadata and the city-scoped static profiles
 from those exact 224 lines. The seed imports the prepared profile alongside
@@ -200,8 +232,14 @@ Production deploys run committed Payload migrations before the new code goes
 live. Migration `20260919_223908_backfill_chattanooga_supplemental_trails`
 backfills the six supplemental lines and profiles into existing Chattanooga
 rows and their latest Payload versions. It preserves both records if either
-copy's geometry source is already `edited`. The city seed remains the
-repeatable full import for a new or rebuilt database.
+copy's geometry source is already `edited`. Migration
+`20260921_152202_repair_cherokee_trail_geometry` similarly repairs only the
+known two-part Cherokee geometry and preserves diverged or curator-owned rows.
+The city seed remains the repeatable full import for a new or rebuilt database.
+Raw-SQL migrations skip the hooks that expire the public trail cache, so a
+migration that changes trail rows must also set
+`PUBLIC_TRAIL_CACHE_DATA_VERSION` (`src/payload/cache/public-trails.ts`) to its
+name; otherwise the new build serves cached pre-migration trails for a day.
 
 `ensureMtnBikeSource(map)` attaches `MTN_BIKE_SOURCE_ID` as GeoJSON, reads
 `/api/map/trails?city=chattanooga`, and falls back to the checked-in GeoJSON if
@@ -245,12 +283,13 @@ The script outputs:
 - `public/data/elevation/chattanooga/{slug}.json` — per-trail elevation profile (distance, gain, loss, min, max, coordinate samples). Elevation JSONs are city-scoped: Bend's live in `public/data/elevation/bend/` (written by `scripts/build_bend_trails.py`), and the client fetches from `elevationBasePath` (`geo_data.ts`).
 - Updates `src/data/mountain-bike-trails.data.ts` — summary stats (distance, elevationGain, elevationLoss, elevationMin, elevationMax)
 
-#### Adding a New Trail
+#### Adding a new curated trail
 
-1. Find the trail name in Chrome DevTools (see above)
-2. Add an entry to the `mountainBikeTrails` array in `src/data/mountain-bike-trails.data.ts` with `trailName`, `displayName`, `recArea`, `rating`, `color`, and `icon`
-3. Run `scripts/add_trail_elevation.py --trail "Trail Name"` to generate elevation data and populate `distance`, elevation stats, and `defaultBounds`
-4. If the trail is in a new `recArea`, add it to `REGION_MAP` in `mountain-bike-trails.ts`
+Create a Trail in Payload, select its city and trail complex, then pick OSM
+ways and refresh the preview or draw/import a line. Save and publish the
+reviewed geometry. Follow the [editor guide](docs/guides/osm-trail-editor.md)
+for editing and the [GIS import guide](docs/guides/chattanooga-gis-import.md)
+for Chattanooga seed and fallback updates.
 
 ### Nationwide OSM Bike Trails
 
@@ -278,18 +317,11 @@ from the curated Chattanooga MTB/route layers and off by default.
   picked per-category from the Mapbox style's built-in **Maki** sprite (`parking`
   / `information`) — no custom sprite/spreet step. It shares the trails toggle
   via `setOsmTrailsVisible`.
-- Selectable: a transparent extra-wide hit layer (`OSM_TRAILS_HIT_LAYER_ID`) is
-  the tap target. `registerOsmTrailSelection` (`utils/map.ts`) handles a click by
-  (1) reassembling the way's geometry across tiles by `OSM_ID`
-  (`collectOsmWayLines`), (2) highlighting the whole trail (`highlightOsmTrail` —
-  a blue line over a white casing, like a selected route), and (3) dispatching
-  `OSM_TRAIL_SELECT` with a ready-built `ElevationProfile` so the shared
-  `ElevationProfile` pane shows the trail's name + distance + elevation chart
-  (there is **no** popup — the pane is the only info surface). A `selectionId`
-  guards against a stale async terrain sample showing the wrong trail; selecting
-  a curated route/trail or any deselect clears the highlight, and the pane clears
-  via its own listeners. `ElevationProfile` seeds `profileCache` for the OSM name
-  so its `trailName` effect doesn't try to fetch a non-existent curated JSON.
+- A transparent wide layer (`OSM_TRAILS_HIT_LAYER_ID`) provides the tap
+  target. `osmTrailAtPoint` (`utils/map.ts`) collects the way across loaded
+  tiles. `Map.tsx` checks curated features first, then selects the OSM line.
+  The map draws the highlight immediately and the selection store publishes
+  the elevation profile when it is ready.
 
 #### Precomputed length + elevation
 
@@ -344,26 +376,69 @@ clicked way, those stats drive the pane's **headline numbers** (via
 - **Client**: `lookupPrecomputedElevation(osmId, lng, lat)` in
   `src/utils/osm-elevation.ts` loads the manifest once, then lazily loads + caches
   the region file(s) whose bbox covers the clicked point and looks up the way id.
-  `registerOsmTrailSelection` (`utils/map.ts`) passes any hit to
+  `osmTrailAtPoint` (`utils/map.ts`) passes any hit to
   `buildOsmElevationProfile(lines, name, token, precomputed)` so the precomputed
   totals become the pane's headline stats; on a miss the totals are computed from
   the real-time samples instead.
 
+### Platform services (GPS, keep-awake, compass)
+
+The map runs in a browser today and inside an Expo (React Native WebView) shell
+later, where the native side provides background location, keep-awake and the
+compass. Everything that touches a device capability goes through
+`src/platform/`:
+
+- **`types.ts`** defines the contracts: `GeolocationService`, `PositionWatch`,
+  `KeepAwakeService`, `HeadingService`, bundled as `PlatformServices` with a
+  `kind: 'web' | 'native'`. Fixes are the app's own `PositionFix`, never a DOM
+  `GeolocationPosition`; errors are `'permission-denied' | 'unavailable' |
+  'timeout'`.
+- **`web/`** wraps the Web APIs. Nothing outside `src/platform` may call
+  `navigator.geolocation`, `navigator.wakeLock` or listen to
+  `deviceorientation` directly.
+- **`usePlatform()`** (`context.tsx`) returns the services. Without a provider
+  the stable facade selects its backend on the first device action, so a late
+  host announcement after render does not lock in browser services. The Expo
+  shell supplies `injectedJavaScriptObject.bikemap` (or legacy
+  `window.__bikemapNative`) before that action. The page talks over the WebView message
+  channel (`src/platform/native/`, protocol in `protocol.ts`, host-side
+  contract in [`docs/guides/native-shell.md`](docs/guides/native-shell.md));
+  anything else is the browser. Change `protocol.ts` and that guide together.
+  A capability the host doesn't claim keeps its web implementation.
+- **`positions` is one shared, ref-counted GPS stream.** `useLocationTracking`
+  (the dot, follow-me and compass mode) and `useRideRecording` both subscribe
+  to it, so recording never starts a second watch. The first subscriber
+  starts the hardware, the last stops it. `positions.requestFix()` returns a
+  one-off fix without broadcasting it — a cached coarse fix paints the dot on a
+  cold start but must never become a ride track point.
+- **The stream decides when GPS is gone** (`isFatalPositionError`) and passes
+  `isFatal` to every subscriber's `onError`. A denied permission is fatal;
+  `unavailable` is fatal only before the first fix (no provider). After a
+  fix it is a transient loss of signal — iOS reports a tunnel or bridge that
+  way and keeps the watch running — so tracking hides the dot and the
+  recorder keeps recording. Don't let a subscriber classify errors itself:
+  one that joined later would disagree with the stream.
+- **`useKeepAwake(active)`** holds the platform's screen lock; holders are
+  counted, so tracking and recording can each hold it.
+- The GPS watch starts on the first explicit opt-in (locate button or Record),
+  never on map load, and stays on for the life of the map once started so a
+  rider can turn following off and still see where they are.
+
 ### Mapbox UI Overlays
 
-- The Mapbox canvas (`.map-container`) uses `position: absolute` with `z-index: 500` and covers the full viewport. It will obscure any sibling or child elements with a lower z-index.
-- To overlay UI on the map, render elements **inside the `MapboxMap` component's fragment** (the `<>` in its return), as siblings of `.map-container`. Do **not** place overlays in the outer `BikeMap` wrapper — they will be hidden behind the map canvas.
-- Overlay elements must use `z-index: 1000` or higher and `position: absolute` to appear above the map. See the route toast in `Map.tsx` and elevation overlay in `ElevationProfile.tsx` for working examples.
-- The sidebar (MapLegend) manages its own stacking context separately and is not affected by this.
+`MapboxMap` renders the absolute map container and its controls as siblings.
+Follow the existing stacking order in `Map.tsx`, `MapLegend.tsx`, and
+`RidesPanel.tsx`. Route arrows render inside the Mapbox canvas container
+with pointer events disabled so route hit-testing stays on the map canvas.
 
 ### Embed Mode (`/embed`)
 
-The map can be framed on third-party sites via `<iframe src="https://bikechatt.com/embed?...">`. `EmbedSnippetBuilder` (`src/components/embed/`) takes its routes and available layers as a prop from `embedBuilderConfig()` (`src/utils/embed-options.ts`), resolved server-side from the request hostname — it must never import `@/data/geo_data`, which binds the active city at module load and so resolves to the default city during SSR. It is the self-serve setup form — controls, a live preview, and a copy-paste snippet — rendered in two places: the **About page** (the canonical place partners are pointed at) and `/embed/demo`, a mock partner page showing the embed in context. It renders no heading of its own, so each host page supplies its own; it validates `center` with the embed's own `parseCenter` so the form can't accept a value the map would drop.
+The map can be framed on third-party sites via `<iframe src="https://bikechatt.com/embed?...">`. `EmbedSnippetBuilder` (`src/components/embed/`) takes its routes, trails, and available layers as a prop from `embedBuilderConfig()` (`src/utils/embed-options.ts`), resolved server-side from the request hostname — it must never import `@/data/geo_data`, which binds the active city at module load and so resolves to the default city during SSR. It is the self-serve setup form — a Casual/MTB choice, an always-visible live preview, collapsed advanced controls, and a copy-paste snippet — rendered in two places: the **About page** (the canonical place partners are pointed at) and `/embed/demo`, a mock partner page showing the embed in context. It renders no heading of its own, so each host page supplies its own; it validates `center` with the embed's own `parseCenter` so the form can't accept a value the map would drop.
 
-- **Everything is URL-driven.** `parseEmbedOptions` / `buildEmbedSearch` in `src/utils/embed.ts` are the single encoder/decoder for the supported params (`sidebar`, `route`, `center`, `zoom`, `layers`). Never rely on cookies or `localStorage` in embed mode — browsers drop the settings cookie (no `SameSite=None`) and partition storage inside a third-party frame. Anything that also needs a decoded param (e.g. `useUrlDeepLink`) takes it as an argument rather than re-reading the query string, so there is exactly one decoder.
+- **Everything is URL-driven.** `parseEmbedOptions` / `buildEmbedSearch` in `src/utils/embed.ts` are the single encoder/decoder for the supported params (`mode`, `sidebar`, `route`, `trail`, `center`, `zoom`, `layers`). Never rely on cookies or `localStorage` in embed mode — browsers drop the settings cookie (no `SameSite=None`) and partition storage inside a third-party frame. Anything that also needs a decoded param (e.g. `useUrlDeepLink`) takes it as an argument rather than re-reading the query string, so there is exactly one decoder.
 - **`layers` keeps at most one marker layer.** `attractions` / `bikeResources` / `bikeRentals` (`MARKER_LAYERS`) are a radio group in the map — `handleLayerToggle` hides the others when one is shown — so `parseLayers` keeps only the first of them and drops the rest; `bikeNetwork` is an independent line overlay and may accompany it. The snippet builder mirrors this with a radio group so a partner cannot generate an impossible combination.
-- **Embed mode skips the trail stack entirely.** `Map.tsx` gates `ensureMtnBikeSource` / `initMtnBikeLayers` / `ensureOsmTrailsSource` / `registerOsmTrailSelection` on `!isEmbed`. That keeps two vector sources and their tile traffic off the critical path on a partner's page, and — just as important — stops trail lines being clickable when there is no trails UI to show the result.
-- **`EmbedProvider` / `useEmbed()`** (`src/components/EmbedContext.tsx`) is how `Map.tsx` and `MapLegend.tsx` learn they are embedded. Outside `/embed` the context defaults to `isEmbed: false`, so the main app never branches on it. In embed mode: Casual (routes) tab only, no MTB pill, sidebar closed by default, no `RidesPanel` / `WelcomeModal` / `PwaInstallPrompt`, no cookie writes, and an `EmbedAttribution` "Open in …" link overlays the map.
+- **Embed mode loads one route family.** Casual embeds skip `ensureMtnBikeSource` / `initMtnBikeLayers` / `ensureOsmTrailsSource`, keeping trail tile traffic off the critical path. MTB embeds attach that stack and suppress Casual route data and interactions.
+- **`EmbedProvider` / `useEmbed()`** (`src/components/EmbedContext.tsx`) is how `Map.tsx` and `MapLegend.tsx` learn they are embedded. Outside `/embed` the context defaults to `isEmbed: false`, so the main app never branches on it. In embed mode: the host fixes the Casual or MTB section, there is no in-frame route-family pill, the sidebar is closed by default, there is no `RidesPanel` / `WelcomeModal` / `PwaInstallPrompt`, settings never write cookies, and an `EmbedAttribution` "Open in …" link overlays the map.
 - **Framing headers** come from `embedHeaders()` in `src/utils/embed-headers.ts`, wired into `next.config.ts`. `/embed` — that exact path, not a prefix — gets `frame-ancestors` from the `EMBED_ALLOWED_ORIGINS` env var (unset = any site); every other path, `/embed/demo` included, gets `frame-ancestors 'self'`. The two `source` patterns must stay mutually exclusive: Next appends the headers of every matching rule and browsers intersect multiple CSPs, so an overlap silently applies the stricter one and blanks the frame. `EMBED_ALLOWED_ORIGINS` is read at **build** time, so changing it needs a redeploy. The Mapbox token's URL restriction keeps working because the iframe document's origin is ours.
 - **Partner snippet requirements:** `allow="geolocation; fullscreen; gyroscope; accelerometer; magnetometer"` for locate-me/compass, and an explicit height (the snippet uses `aspect-ratio`). `public/register-sw.js` skips registration inside frames.
 - CORS is not involved: the iframe runs on our origin, so tile/GBFS/data fetches are unchanged. Parent↔iframe control, if ever needed, is a `postMessage` adapter over `MAP_EVENTS` with an origin check.
@@ -419,13 +494,13 @@ All component styling uses Tailwind utility classes. The only remaining custom C
 
 Tests are in `*.test.ts` or `*.test.tsx` files adjacent to their source files. Run with `pnpm test:run`.
 
-Coverage spans ~30 test files: map utilities (`src/utils/map.test.ts`), config/city selection (`src/config/map.config.test.ts`), GBFS (`src/data/gbfs.test.ts`), ride recording/stats/storage (`src/hooks/useRideRecording.test.ts`, `src/utils/ride-*.test.ts`, `src/utils/elevation-accuracy.test.ts`), elevation (`dem`, `osm-elevation`, `gpx`), and components (`MapLegend`, `RidesPanel`, sidebar components). `src/components/Map.tsx` has no tests (known gap — see the deferred GPS/compass hook extraction).
+Coverage spans ~90 test files: map utilities (`src/utils/map.test.ts`), config/city selection (`src/config/map.config.test.ts`), GBFS (`src/data/gbfs.test.ts`), ride recording/stats/storage (`src/hooks/useRideRecording.test.ts`, `src/utils/ride-*.test.ts`, `src/utils/elevation-accuracy.test.ts`), elevation (`dem`, `osm-elevation`, `gpx`), location tracking and the platform services (`src/hooks/useLocationTracking.test.tsx`, `src/platform/**`), and components (`MapLegend`, `RidesPanel`, sidebar components). `src/components/Map.tsx` itself has no tests; its GPS, compass and recording glue lives in tested hooks.
 
 ### Mapbox Testing Limitations
 
 **Synthetic events don't trigger Mapbox layer clicks.** Mapbox's internal event system requires real user interactions to detect clicks on map layers. When testing:
 - You cannot programmatically click on route lines using `MouseEvent`
-- Use `window.dispatchEvent(new CustomEvent('route-select', { detail: { routeId } }))` to simulate what the map would do
+- In component tests, use `mapSelectionHarness` from `src/test/map-selection.tsx` to select a route or trail through the same store the map uses.
 - The Chrome DevTools MCP server can take screenshots but cannot trigger Mapbox layer events
 
 ### Browser Testing
@@ -448,38 +523,43 @@ Payload 3 runs inside this Next app (admin at `/admin`, config at
 `src/payload.config.ts`).
 
 **The core idea: by default a trail does not own its geometry.** It stores the
-OSM ways it rides on (`osmIds`), and the `resolveTrailGeometry` `beforeChange`
-hook rebuilds `geom`, `distance`, `elevation*`, and `bounds` from Overpass +
-Mapbox Terrain-RGB on save. `distance` and the elevation fields are always
-read-only — they are measured from the line, never typed.
+OSM ways it rides on (`osmIds`). The editor resolves them through Overpass into
+an unsaved preview; after a curator reviews it, the `resolveTrailGeometry`
+`beforeChange` hook validates and measures that exact line on save without
+fetching OSM again. `distance` and the elevation fields are always read-only —
+they are measured from the line, never typed.
 
-The admin has **one map** (`TrailMapEditor`, the "Trail geometry" field) with
-three modes: **Pick ways** (the default), **Move points**, and **Draw**. When
-OSM is wrong or missing, the latter two let a curator drag/insert/delete points
-or draw a line from scratch. **The first such edit flips `geometrySource` to
-`'edited'`**, which
-stops the OSM rebuild for that trail — otherwise the next save would refetch the
-ways and discard the edit. The line is then owned in the CMS; only the
-measurements are still derived, via the same `measureParts` the OSM path uses.
-"Discard edits and rebuild from OSM" reverses it.
+Trails and routes share `GeometryMapEditor`. Trails use **Pick ways** to
+preview a replacement from OSM ids. **Move points**, **Draw**, **Follow trail**,
+and **Route** edit the current line and flip a trail to
+`geometrySource: 'edited'`. The CMS then owns the geometry and derives
+measurements with the same `measureParts` used for OSM previews. The ordinary
+Save button persists the reviewed geometry. See the
+[editor entry points](docs/guides/osm-trail-editor.md#editor-entry-points)
+for the controller and tests behind each tool.
 
 - `src/payload/osm/overpass.ts` — fetch full-resolution ways by id (retry/backoff)
 - `src/payload/osm/assemble.ts` — join ways end to end; report gaps, never drop
-- `src/payload/osm/geometry.ts` — parse/validate `geom`; the editor's vertex ops
+- `src/payload/osm/geometry.ts` — parse and validate GeoJSON `geom`
 - `src/payload/osm/terrain.ts` — terrain sampling via `sharp` (Node has no canvas)
 - `src/payload/osm/measure.ts` — distance/bounds/elevation, shared by both paths
 - `src/payload/osm/build.ts` — orchestrates the OSM path
-- `src/payload/components/TrailMapEditor.tsx` — the one admin map (pick/move/draw)
+- `src/payload/components/TrailMapEditor.tsx` — binds the shared geometry editor to trail fields
 - `src/payload/read/trails.ts` — reads trails back out for the public map
 - `src/payload/collections/Routes.ts` + `src/payload/read/routes.ts` — Casual
-  route records and the public map read path. A route either owns imported
-  geometry, selects a same-city Trail and reuses its current measurements, or
+  route records and the public map read path. A route is either built on the
+  map (`composed`, the default — see "Route editor" below), owns imported or
+  drawn geometry, selects a same-city Trail and reuses its current measurements, or
   explicitly names a legacy Mapbox Studio layer that has not been migrated.
   Casual reads Routes only; linking a Trail is how a curator exposes it there
   without duplicating its line. Use
   `pnpm db:import:chattanooga-routes` rather than committing generated route
   GeoJSON. Bend's seed derives its eight imported routes directly from the
   committed bike-network source.
+- `src/payload/routing/` + `components/RouteMapEditor.tsx` — the route editor.
+  A curator clicks waypoints; each leg is routed over a graph of the city's
+  published trails plus OSM roads and paths, so two waypoints on one trail take
+  just the stretch between them. See "Route editor" below.
 - `src/payload/collections/Attractions.ts` + `src/payload/read/attractions.ts` —
   editable point listings for the public map and embeds. Run
   `pnpm db:seed:attractions` to import the bundled cities once. Make subsequent
@@ -500,15 +580,35 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   snapshot without osmIds), and **only Bend is seeded by default**
 
 **How the public map gets its trails and routes.** `src/app/(frontend)/page.tsx` is a
-server component: it calls `getCityTrailSummaries()` (Payload's Local API — a
-typed function call, no HTTP hop) plus `getCityRoutes()`, and passes both into
-`HomeClient` as props. The client publishes them to `src/data/trail-source.ts`
-and `src/data/route-source.ts` during render. The page resolves
-its city from the request hostname, so it reads `headers()` and renders per
-request. The trail summaries and GeoJSON use separate 24-hour Data Cache entries
-that collection hooks expire after content edits. `/api/map/trails` also sends
-`Cache-Control: max-age=60, stale-while-revalidate=3600`, so existing clients may
-serve one stale response while they refresh after an edit.
+server component: it calls `getCityContent()` (`src/payload/read/city-content.ts`),
+which reads every published object type through Payload's Local API in parallel
+(a typed function call, no HTTP hop) and returns one `CityContent` bundle.
+`HomeClient` hands it to `publishCityContent()` (`src/data/city-content.ts`)
+during render. Trail and route consumers use `src/data/trail-source.ts` and
+`src/data/route-source.ts`, both built on `src/data/content-store.ts`.
+Attractions travel as props to marker consumers. The page resolves its
+city from the request hostname, so it reads `headers()` and renders per
+request. The trail summaries and GeoJSON use separate 24-hour Data Cache
+entries that collection hooks expire after content edits. `/api/map/trails`
+also sends `Cache-Control: max-age=60, stale-while-revalidate=3600`, so
+existing clients may serve one stale response while they refresh after an
+edit.
+
+**Adding a Payload object type to the public map** (trailheads, events, …):
+
+1. Add a collection and a `src/payload/read/<type>.ts` reader that never
+   throws. If the reader goes through `unstable_cache` (as the trail readers
+   do), also add `afterChange` / `afterDelete` hooks that revalidate its tag —
+   see `src/payload/cache/` — or the admin's edits won't show for 24 hours.
+   `getCityRoutes` is uncached; pick deliberately.
+2. Add the list to the bundle in `src/data/city-content.ts` and read it in
+   `getCityContent`. `FullCityContent` requires every list.
+3. Pass the list to its consumers as a prop, as attractions do. For content
+   used by Mapbox callbacks across components, follow the existing trail
+   and route stores and subscribe where consumers cache derived state.
+
+If an embed mode renders the new type, add its reader to `embed/page.tsx`.
+Each embed loads the content it renders.
 
 Things to know before touching it:
 
@@ -521,9 +621,10 @@ Things to know before touching it:
   database, or an empty result all return an empty list, and
   `setMountainBikeTrails` ignores an empty list so the checked-in data stays in
   place. Preserve that — losing the CMS must not take the public map down.
-- **Bulk writes must pass `context: { skipOsmRebuild: true }`**, or the
-  `beforeChange` hook fires one Overpass request per row and gets the machine
-  rate-limited. Trails with `geometrySource: 'imported'` are skipped anyway.
+- **Bulk writes must pass `context: { skipOsmRebuild: true }`** so prepared OSM
+  geometry and measurements can be imported directly instead of being rejected
+  for lacking an interactive preview. Trails with `geometrySource: 'imported'`
+  are skipped anyway.
 - **The elevation chart prefers the database, with a city-scoped static fallback.**
   The pane fetches `/api/map/elevation/<slug>?city=<city>`, serving the profile
   measured on the trail's last save. A miss falls back to
@@ -532,13 +633,12 @@ Things to know before touching it:
   city in both lookups so same-named trails cannot collide. Chattanooga's seed
   imports its prepared profiles directly; `pnpm backfill:elevation` measures
   any trail that still has geometry but no profile, without touching Overpass.
-- **Multi-part lines are measured in walking order, not stored order.**
-  `measureParts` walks every line in `walkingOrder` (`osm/assemble.ts`), so
-  pieces stored out of sequence or backwards (common in the GIS import) don't
-  make the chart leap between far ends of the trail. Gain and
-  loss swap when a piece is walked the other way, so changing that ordering
-  changes stored numbers: regenerate with `pnpm prepare:chattanooga-measurements`
-  and re-measure the database with
+- **Multi-part lines are measured by continuous section.**
+  `elevationSections` joins nearby endpoints and orders the resulting
+  sections for display. `measureParts` samples each section independently
+  so gaps contribute neither distance nor climbing. Changing ordering can
+  change gain and loss. Regenerate the static artifacts with
+  `pnpm prepare:chattanooga-measurements` and refresh stored measurements with
   `pnpm backfill:elevation -- --city=<city> --force --multipart`.
 - **`computeElevation`'s spike filter needs a run cap.** It replaces readings
   further than `ELEVATION_SPIKE_THRESHOLD` (25 m) from a running EMA. On a
@@ -559,6 +659,40 @@ Things to know before touching it:
   `slugify('Tiddlywinks (Upper)')` is `tiddlywinks-(upper)` against a stored
   `tiddlywinks-upper` whose static elevation file is named after it. Overwriting
   on open would break charts by looking at a page.
+- **Route editor (`geometrySource: 'composed'`).** The editor writes only the
+  route's `plan` (waypoints + routed legs, `routing/plan.ts`);
+  `resolveRouteSource` derives `geom`, `distance`, and `bounds` from it on
+  every save, so never accept those from the client for a composed route.
+  Things to know:
+  - **The controller** (`routing/editor-controller.ts`) owns the plan, undo/redo,
+    ordered pending clicks, and asynchronous routing. `RouteMapEditor` binds it
+    to Payload and renders Mapbox layers and markers. Keep document state in
+    the controller; its immutable leg identities reject stale routing results.
+    `dispose` invalidates pending work; `activate` supports React's effect replay.
+  - **Routing primitives are shared** with the trail tracer: `shortest-path.ts`,
+    `segment-snap.ts`, `segment-index.ts`, and `geometry.ts` under `routing/`.
+    Keep costs and stitching in `graph.ts` and strict OSM topology in
+    `osm/trail-network.ts`. The spatial index caps geographic expansion at 256
+    cells and scans existing segments for longer lines or larger searches.
+  - **The graph** (`routing/graph.ts`) joins OSM ways by shared node ids and
+    our curated trails by *stitching*: any dead end within `STITCH_METERS` of
+    another line is connected to it. Chattanooga's GIS trails share no nodes
+    with OSM, so without stitching they are islands. Edge cost is length ×
+    `COST_FACTORS` (trails cheapest, primary roads dearest — discouraged,
+    never excluded; motorways and trunks are not fetched at all).
+  - **The network comes from Overpass in fixed 0.04° cells** through the
+    admin-only `GET /api/routes/network?cell=x,y`, cached per server instance
+    for six hours. Every cell is a query against the public instance, which
+    sheds load (504) after a burst, so keep cells large and requests few —
+    don't shrink `ROUTE_CELL_DEG` or widen `LEG_MARGIN_DEG` casually.
+  - **Snapping prefers a curated trail** within `TRAIL_SNAP_PREFERENCE_METERS`
+    of the nearest line, because OSM often maps the same trail a few meters
+    off ours and the route should ride on (and be named for) our trail.
+  - **A route is a snapshot.** Editing a trail does not move routes built
+    along it; reopen the route and move a waypoint to re-route.
+  - The enum default is a function (`() => 'composed'`) on purpose: Postgres
+    can't use an enum value as a column default in the transaction that adds
+    it.
 - **There is one user role: admin.** Everyone signed in can edit everything.
   Keep writing access rules as `req.user?.role === 'admin'` rather than
   `Boolean(req.user)` — that way a second role added later starts with no
@@ -610,9 +744,9 @@ Things to know before touching it:
   Theme global. Class names like `.btn__content` are internals that move between
   releases. `--theme-elevation-*` resolves to a `--color-base-*` scale that dark
   mode *inverts*, so retinting that ramp themes both modes at once.
-- **`getThemeCss` never throws**, same rule as the public trail readers — a
-  theme row must never lock anyone out of the admin. Its `customCss` is injected verbatim,
-  so `sanitizeCss` strips `<`/`>`; don't remove that.
+- **`getThemeCss` falls back to the default palette on read errors.** It
+  emits CSS variables from validated hex colors. `getFrontendThemeCss`
+  applies the same saved palette to the public app.
 - **The project is ESM** (`"type": "module"` — Payload 3's CLI requires it). New
   root config files must be ESM or `.cjs`.
 - **There is no root `src/app/layout.tsx`, on purpose.** Payload's `RootLayout`
@@ -633,9 +767,12 @@ Things to know before touching it:
 - **Overpass is a shared community endpoint.** It rate-limits (429) and sheds
   load (504) routinely. The client retries with backoff; don't script bulk
   requests against the public instance.
-- **Geometry rebuilds only when `osmIds` change** (or the line moves, for an
-  edited trail), or when the `rebuildGeometry` checkbox is ticked. Don't make the
-  hook unconditional — it costs an Overpass round trip plus terrain sampling.
+- **Ordinary saves never rebuild OSM geometry.** The trail editor's refresh
+  action calls the preview endpoint, renders the returned line, and marks that
+  exact reviewed geometry for the save hook. A changed `osmIds` list without a
+  matching preview is rejected. This keeps Overpass latency and upstream
+  changes out of the save transaction and prevents a curator from publishing a
+  line they never saw.
 - **Payload runs collection `beforeChange` hooks *before* field `validate`.** A
   field validator only ever sees what the hooks returned, so a server-side check
   that must not be bypassed belongs in the hook — that's why
@@ -645,36 +782,21 @@ Things to know before touching it:
   Re-run `pnpm generate:types` after any collection change and commit both.
 - **Re-run `pnpm generate:importmap`** after adding or renaming an admin
   component, or Payload won't find it.
-- **`TrailMapEditor`'s init effect must never re-run.** Its cleanup calls
-  `map.remove()`, so any dependency that changes identity tears the map down
-  mid-drag. Every callback it lists is `useCallback(fn, [])`; anything that
-  varies (form values, `setValue`) is read from a ref. For the same reason
-  nothing in it may `setState` at mousemove rate — that re-renders the entire
-  Payload document form on every frame.
-- **Terra Draw does the line editing** (`terra-draw` +
-  `terra-draw-mapbox-gl-adapter`): drag/insert/delete points, snapping, and
-  undo/redo. It edits `LineString`s, so parts map 1:1 to features via
-  `partsToFeatures`/`featuresToParts`. Its `change` event can't distinguish our
-  writes from a user's, so `loadingRef` guards the load — without it, opening a
-  trail marks the form dirty and flips it to "Edited by hand".
-- **Picking a way does not add it to the line.** Geometry is assembled from
-  Overpass server-side on save, so a just-picked way has no editable points until
-  then — `TrailMapEditor` tracks the ways the current line was built from and
-  warns when they diverge. Selecting a feature also fires three `change` events,
-  so `readBack` commits only when the line actually moved; otherwise clicking a
-  line marks the trail "Edited by hand".
-- **Terra Draw's undo/redo is opt-in.** Without the `undoRedo` constructor
-  option, `undo()`/`redo()` exist and do nothing. `sessionLevel` undoes completed
-  actions (a dragged point); `modeLevel` undoes steps inside an unfinished draw.
-  Both are wired, plus keyboard shortcuts.
-- **Right-click removes a point; `Delete` removes the whole piece** — and Terra
-  Draw **cannot undo the second**, while `canUndo()`/`undo()` both claim success.
-  Left-clicking a point then pressing `Delete` does *not* delete the point, it
-  deletes the selected feature. `src/payload/osm/deleted-pieces.ts` snapshots the
-  line whenever the piece count drops so the editor's Undo can restore it; the
-  toolbar's `canUndo` is the union of that stack and Terra Draw's. Don't reword
-  the Move points hint without re-reading `terra-draw-gestures.test.ts` — the
-  hint used to recommend the destructive gesture as the way to remove a point.
+- **`use-geometry-editor-map.ts` owns the map lifecycle.** It creates the
+  map and tools, reinstalls their layers on `style.load`, and disposes them on
+  unmount. `GeometryMapEditor` owns geometry, undo, and Payload writes. The
+  lifecycle hook reads the latest callbacks without rebuilding the map.
+  Pointer-rate updates render directly to Mapbox, Terra Draw, or the live
+  distance DOM node.
+- **Completed line edits use editor-owned history.** `edit-history.ts` holds
+  geometry and ownership snapshots. Terra Draw's mode history handles the
+  unfinished stroke, and `route-tool.ts` handles unfinished snapped clicks.
+- **Picked OSM ways are inputs to a preview.** The line becomes editable
+  after refresh. Compare coordinates in `readBack` before committing because
+  selecting a feature also emits Terra Draw changes.
+- **Right-click removes a vertex and Delete removes the selected piece in
+  Adjust line.** Use Select points for explicit multi-point deletion. See
+  `terra-draw-gestures.test.ts` for the adapter behavior.
 - **Terra Draw features must carry `properties.mode`**, and `addFeatures`
   *returns* rejections instead of throwing (`{ valid: false, reason: 'Mode
   property does not exist' }`). Miss either and the line silently never enters
@@ -694,3 +816,13 @@ Things to know before touching it:
 - Mapbox credentials belong in `.env.local`; see `.env.example` for required keys.
 - Never commit secrets or `.env.local` to version control.
 - `DATABASE_URL` and `PAYLOAD_SECRET` are only needed for the content backend.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

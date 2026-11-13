@@ -6,9 +6,9 @@ import {
   toast,
   useConfig,
   useDocumentInfo,
+  useForm,
   useFormBackgroundProcessing,
   useFormFields,
-  useFormModified,
   useFormProcessing,
 } from '@payloadcms/ui';
 import { RefreshCw } from 'lucide-react';
@@ -16,7 +16,11 @@ import { formatAdminURL } from 'payload/shared';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
 import type { RecalculateTrailElevationResponse } from '@/payload/endpoints/recalculate-trail-elevation';
 import { parseTrailGeometry } from '@/payload/osm/geometry';
-import { parseElevationProfile } from '@/utils/elevation-profile';
+import {
+  layoutElevationChart,
+  parseElevationProfile,
+  type ElevationChartLayout,
+} from '@/utils/elevation-profile';
 import { Banner } from './admin-ui';
 
 interface MeasurementSnapshot {
@@ -31,6 +35,7 @@ interface MeasurementSnapshot {
 
 interface ChartPaths {
   area: string;
+  breaks: ElevationChartLayout['breaks'];
   line: string;
 }
 
@@ -39,11 +44,15 @@ interface ApiError {
 }
 
 interface AdminFormField {
+  errorMessage?: string;
+  initialValue?: unknown;
+  valid?: boolean;
   value?: unknown;
 }
 
 interface MeasurementFormFields {
   bounds?: AdminFormField;
+  city?: AdminFormField;
   distance?: AdminFormField;
   elevationGain?: AdminFormField;
   elevationLoss?: AdminFormField;
@@ -52,36 +61,33 @@ interface MeasurementFormFields {
   elevationProfile?: AdminFormField;
   geom?: AdminFormField;
   geometrySource?: AdminFormField;
+  rebuildElevation?: AdminFormField;
+  rebuildGeometry?: AdminFormField;
+  slug?: AdminFormField;
+  trailName?: AdminFormField;
+  displayName?: AdminFormField;
 }
 
 /**
  * The actionable form of a stored elevation profile.
  *
  * Raw point tuples remain hidden JSON; this field shows what a curator needs
- * to judge the result, and can rebuild it from the last saved geometry without
- * asking them to save unrelated form fields or run a script.
+ * to judge the result. Calculation updates the open form so the chart can be
+ * reviewed before the normal Save draft or Publish action persists it.
  */
 export function ElevationProfileAdmin() {
-  const {
-    data,
-    hasSavePermission,
-    id,
-    incrementVersionCount,
-    isEditing,
-    setData,
-    setLastUpdateTime,
-  } = useDocumentInfo();
+  const { data, hasSavePermission, id, isEditing } = useDocumentInfo();
   const {
     config: {
       routes: { api: apiRoute },
       serverURL,
     },
   } = useConfig();
-  const isModified = useFormModified();
   const isProcessing = useFormProcessing();
   const isBackgroundProcessing = useFormBackgroundProcessing();
   const isFormProcessing = isProcessing || isBackgroundProcessing;
   const boundsField = useAdminFormField('bounds');
+  const cityField = useAdminFormField('city');
   const distanceField = useAdminFormField('distance');
   const elevationGainField = useAdminFormField('elevationGain');
   const elevationLossField = useAdminFormField('elevationLoss');
@@ -90,7 +96,16 @@ export function ElevationProfileAdmin() {
   const elevationProfileField = useAdminFormField('elevationProfile');
   const geometryField = useAdminFormField('geom');
   const geometrySourceField = useAdminFormField('geometrySource');
+  const rebuildElevationField = useAdminFormField('rebuildElevation');
+  const rebuildGeometryField = useAdminFormField('rebuildGeometry');
+  const slugField = useAdminFormField('slug');
+  const displayNameField = useAdminFormField('displayName');
+  const trailNameField = useAdminFormField('trailName');
+  // The save hook reports elevation failures against this UI field's path.
+  // Payload records them in form state but has no input here to show them on.
+  const saveError = useAdminFormField('elevationProfileAdmin');
   const dispatchFields = useFormFields(([, dispatch]) => dispatch);
+  const { setModified } = useForm();
   const [result, setResult] = useState<MeasurementSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -116,6 +131,7 @@ export function ElevationProfileAdmin() {
   const formFields = useMemo<MeasurementFormFields>(
     () => ({
       bounds: boundsField,
+      city: cityField,
       distance: distanceField,
       elevationGain: elevationGainField,
       elevationLoss: elevationLossField,
@@ -124,9 +140,15 @@ export function ElevationProfileAdmin() {
       elevationProfile: elevationProfileField,
       geom: geometryField,
       geometrySource: geometrySourceField,
+      rebuildElevation: rebuildElevationField,
+      rebuildGeometry: rebuildGeometryField,
+      slug: slugField,
+      displayName: displayNameField,
+      trailName: trailNameField,
     }),
     [
       boundsField,
+      cityField,
       distanceField,
       elevationGainField,
       elevationLossField,
@@ -135,6 +157,11 @@ export function ElevationProfileAdmin() {
       elevationProfileField,
       geometryField,
       geometrySourceField,
+      rebuildElevationField,
+      rebuildGeometryField,
+      slugField,
+      displayNameField,
+      trailNameField,
     ],
   );
   const formSnapshot = useMemo(
@@ -142,7 +169,20 @@ export function ElevationProfileAdmin() {
     [data, formFields],
   );
   const snapshot = result ?? formSnapshot;
+  const isPreview =
+    result !== null ||
+    fieldValue(formFields, data, 'rebuildElevation') === true ||
+    fieldValue(formFields, data, 'rebuildGeometry') === true;
   const geometry = fieldValue(formFields, data, 'geom');
+  const city = fieldValue(formFields, data, 'city');
+  const slug = fieldValue(formFields, data, 'slug');
+  const calculationName =
+    fieldValue(formFields, data, 'displayName') ??
+    fieldValue(formFields, data, 'trailName');
+  const calculationSourceKey = useMemo(
+    () => JSON.stringify([geometry, calculationName, city, slug]),
+    [calculationName, city, geometry, slug],
+  );
   const parsedGeometry = parseTrailGeometry(geometry);
   const hasGeometry = parsedGeometry.ok && parsedGeometry.parts.length > 0;
   const geometrySource = fieldValue(formFields, data, 'geometrySource');
@@ -152,9 +192,19 @@ export function ElevationProfileAdmin() {
     Boolean(id && isEditing) &&
     hasSavePermission !== false &&
     hasElevationSource &&
-    !isModified &&
     !isFormProcessing &&
     !isCalculating;
+
+  // A result belongs to the exact line and name sent to the server. Abort and
+  // discard it when another editor field changes either value, or a late
+  // response could display measurements for a line that is no longer open.
+  useEffect(() => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setResult(null);
+    setError(null);
+    setIsCalculating(false);
+  }, [calculationSourceKey]);
 
   async function handleUpdateElevation(): Promise<void> {
     if (!canUpdateElevation || id === undefined) {
@@ -173,7 +223,14 @@ export function ElevationProfileAdmin() {
         serverURL,
       });
       const response = await fetch(endpoint, {
+        body: JSON.stringify({
+          city,
+          geometry,
+          name: calculationName,
+          slug,
+        }),
         credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         method: 'POST',
         signal: controller.signal,
       });
@@ -189,20 +246,10 @@ export function ElevationProfileAdmin() {
 
       const next = snapshotFromResponse(body);
       setResult(next);
-      updateFormFields(dispatchFields, next);
-      setData({
-        ...data,
-        bounds: next.bounds,
-        distance: next.distance,
-        elevationGain: next.elevationGain,
-        elevationLoss: next.elevationLoss,
-        elevationMax: next.elevationMax,
-        elevationMin: next.elevationMin,
-        elevationProfile: next.profile,
-        updatedAt: body.updatedAt,
-      });
-      setLastUpdateTime(Date.now());
-      incrementVersionCount();
+      updateFormFields(dispatchFields, next, formFields, data);
+      // A field UPDATE never touches the form-level modified flag, and Save
+      // draft / Publish stay disabled on an unedited document until it is set.
+      setModified(true);
       toast.success(body.message);
     } catch (caught) {
       if (isAbortError(caught)) {
@@ -211,7 +258,7 @@ export function ElevationProfileAdmin() {
       const message =
         caught instanceof Error
           ? caught.message
-          : 'Elevation could not be updated.';
+          : 'Elevation could not be calculated.';
       setError(message);
       toast.error(message);
     } finally {
@@ -227,7 +274,6 @@ export function ElevationProfileAdmin() {
     id,
     isEditing,
     isFormProcessing,
-    isModified,
     hasElevationSource,
   });
 
@@ -251,7 +297,7 @@ export function ElevationProfileAdmin() {
         </div>
         {snapshot.profile && (
           <span className="shrink-0 rounded-full bg-(--theme-elevation-100) px-[0.55rem] py-1 text-xs text-(--theme-elevation-650,var(--theme-elevation-600))">
-            Stored with trail ·{' '}
+            {isPreview ? 'Unsaved preview' : 'Stored with trail'} ·{' '}
             {snapshot.profile.profile.length.toLocaleString()} samples
           </span>
         )}
@@ -262,15 +308,18 @@ export function ElevationProfileAdmin() {
       ) : (
         <Banner>
           {hasGeometry
-            ? 'No elevation profile is stored yet. Use “Calculate and save elevation” below to create it from the saved trail line.'
+            ? 'No elevation profile is stored yet. Calculate it below, review the preview, then save the trail if it looks right.'
             : canImportBundledProfile
-              ? 'No elevation profile is stored with this trail yet. Use “Import and save bundled profile” below to copy in the existing rider profile.'
-              : 'No elevation profile is stored yet. Save a trail line first, then calculate and save its elevation.'}
+              ? 'No elevation profile is stored with this trail yet. Preview the bundled rider profile below, then save the trail if it looks right.'
+              : 'No elevation profile is stored yet. Add a trail line first, then calculate its elevation.'}
         </Banner>
       )}
 
       <MeasurementSummary snapshot={snapshot} />
 
+      {saveError?.valid === false && saveError.errorMessage && (
+        <Banner tone="error">{saveError.errorMessage}</Banner>
+      )}
       {error && <Banner tone="error">{error}</Banner>}
       {unavailableReason && <Banner>{unavailableReason}</Banner>}
 
@@ -286,16 +335,16 @@ export function ElevationProfileAdmin() {
         >
           {isCalculating
             ? canImportBundledProfile
-              ? 'Importing and saving…'
-              : 'Calculating and saving…'
+              ? 'Loading preview…'
+              : 'Calculating…'
             : canImportBundledProfile
-              ? 'Import and save bundled profile'
-              : 'Calculate and save elevation'}
+              ? 'Preview bundled profile'
+              : 'Calculate elevation'}
         </Button>
         <span className="text-[0.8rem] text-(--theme-elevation-600) leading-[1.4]">
           {canImportBundledProfile
-            ? 'This stores the bundled profile with the trail immediately—no separate Save draft is needed. It does not require an editable trail line here.'
-            : 'This stores the profile with the trail immediately—no separate Save draft is needed. It replaces the distance, climb, descent, range, bounds, and chart points.'}
+            ? 'This loads the bundled profile into the form without saving it. Review it, then use Save draft or Publish to keep it.'
+            : 'This replaces the distance, climb, descent, range, bounds, and chart points in the form without saving. Review the result, then use Save draft or Publish to keep it.'}
         </span>
       </div>
     </section>
@@ -313,17 +362,24 @@ export function DerivedMeasurementField() {
 function ProfileChart({ profile }: { profile: ElevationProfile }) {
   const gradientId = `elevation-fill-${useId().replaceAll(':', '')}`;
   const paths = useMemo(() => buildChartPaths(profile), [profile]);
+  const descriptionId = `${gradientId}-breaks`;
   const range = `${formatFeet(profile.min)}–${formatFeet(profile.max)}`;
 
   return (
     <figure className="m-0 overflow-hidden rounded-(--style-radius-s) border border-solid border-(--theme-elevation-150) bg-(--theme-elevation-50) px-2 pb-[0.35rem] pt-2">
       <svg
         aria-label={`Elevation profile for ${profile.trail}: ${range}`}
+        aria-describedby={paths.breaks.length > 0 ? descriptionId : undefined}
         className="block h-[clamp(9rem,22vw,13.75rem)] w-full"
         preserveAspectRatio="none"
         role="img"
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
       >
+        {paths.breaks.length > 0 && (
+          <desc id={descriptionId}>
+            {paths.breaks.map(({ label }) => label).join('. ')}
+          </desc>
+        )}
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop
@@ -349,6 +405,20 @@ function ProfileChart({ profile }: { profile: ElevationProfile }) {
             y1={fraction * CHART_HEIGHT}
             y2={fraction * CHART_HEIGHT}
           />
+        ))}
+        {paths.breaks.map(({ left, right, label }) => (
+          <line
+            key={left}
+            stroke="var(--theme-elevation-500)"
+            strokeDasharray="2 3"
+            vectorEffect="non-scaling-stroke"
+            x1={(left + right) / 2}
+            x2={(left + right) / 2}
+            y1={CHART_PADDING}
+            y2={CHART_HEIGHT - CHART_PADDING}
+          >
+            <title>{label}</title>
+          </line>
         ))}
         <path d={paths.area} fill={`url(#${gradientId})`} />
         <path
@@ -426,67 +496,49 @@ export function buildChartPaths(profile: ElevationProfile): ChartPaths {
     max = Math.max(max, point[1]);
   }
   if (points.length === 0) {
-    return { area: '', line: '' };
+    return { area: '', breaks: [], line: '' };
   }
 
-  const maxDistance = Math.max(points[points.length - 1][0], 1);
   const elevationRange = max - min || 1;
-  const x = (distance: number) => (distance / maxDistance) * CHART_WIDTH;
   const y = (elevation: number) =>
     CHART_PADDING +
     (1 - (elevation - min) / elevationRange) *
       (CHART_HEIGHT - CHART_PADDING * 2);
-  const ranges = segmentRanges(points, profile.geometryGapDetails);
+  const { breaks, pointX, ranges } = layoutElevationChart(
+    points,
+    CHART_WIDTH,
+    profile.geometryGapDetails,
+  );
 
   const segments = ranges.map(([start, end]) => ({
     end,
-    path: pathThrough(points, start, end, x, y),
+    path: pathThrough(points, start, end, pointX, y),
     start,
   }));
   const line = segments.map(({ path }) => path).join(' ');
   const area = segments
     .map(({ end, path, start }) => {
-      return `${path} L${coordinate(x(points[end - 1][0]))} ${CHART_HEIGHT} L${coordinate(x(points[start][0]))} ${CHART_HEIGHT} Z`;
+      return `${path} L${coordinate(pointX[end - 1])} ${CHART_HEIGHT} L${coordinate(pointX[start])} ${CHART_HEIGHT} Z`;
     })
     .join(' ');
 
-  return { area, line };
+  return { area, breaks, line };
 }
 
 function pathThrough(
   points: ElevationProfile['profile'],
   start: number,
   end: number,
-  x: (distance: number) => number,
+  pointX: number[],
   y: (elevation: number) => number,
 ): string {
   return points
     .slice(start, end)
     .map(
-      ([distance, elevation], index) =>
-        `${index === 0 ? 'M' : 'L'}${coordinate(x(distance))} ${coordinate(y(elevation))}`,
+      ([, elevation], index) =>
+        `${index === 0 ? 'M' : 'L'}${coordinate(pointX[start + index])} ${coordinate(y(elevation))}`,
     )
     .join(' ');
-}
-
-function segmentRanges(
-  points: ElevationProfile['profile'],
-  gaps: ElevationProfile['geometryGapDetails'] = [],
-): [number, number][] {
-  const gapEdges = new Set(
-    gaps.map(({ from, to }) => `${from[0]},${from[1]}:${to[0]},${to[1]}`),
-  );
-  const starts = [0];
-  for (let index = 1; index < points.length; index++) {
-    const previous = points[index - 1];
-    const current = points[index];
-    const edge = `${previous[2]},${previous[3]}:${current[2]},${current[3]}`;
-    if (current[0] <= previous[0] || gapEdges.has(edge)) {
-      starts.push(index);
-    }
-  }
-  starts.push(points.length);
-  return starts.slice(0, -1).map((start, index) => [start, starts[index + 1]]);
 }
 
 function snapshotFromValues(
@@ -536,6 +588,8 @@ function updateFormFields(
     value: unknown;
   }) => void,
   snapshot: MeasurementSnapshot,
+  fields: MeasurementFormFields,
+  data: Record<string, unknown> | undefined,
 ): void {
   const values: Record<string, unknown> = {
     bounds: snapshot.bounds,
@@ -545,12 +599,15 @@ function updateFormFields(
     elevationMax: snapshot.elevationMax,
     elevationMin: snapshot.elevationMin,
     elevationProfile: snapshot.profile,
+    rebuildElevation: true,
   };
 
   for (const [path, value] of Object.entries(values)) {
+    const fieldPath = path as keyof MeasurementFormFields;
     dispatch({
-      initialValue: value,
-      modified: false,
+      initialValue:
+        fields[fieldPath]?.initialValue ?? fieldValue(fields, data, fieldPath),
+      modified: true,
       path,
       type: 'UPDATE',
       value,
@@ -593,7 +650,6 @@ function isRecalculation(
   const measurements = candidate.measurements;
   return Boolean(
     typeof candidate.message === 'string' &&
-      typeof candidate.updatedAt === 'string' &&
       parseElevationProfile(candidate.profile) &&
       measurements &&
       readBounds(measurements.bounds) === measurements.bounds &&
@@ -612,7 +668,7 @@ function messageFrom(body: unknown): string {
       return message;
     }
   }
-  return 'Elevation could not be updated.';
+  return 'Elevation could not be calculated.';
 }
 
 function actionUnavailableReason({
@@ -620,14 +676,12 @@ function actionUnavailableReason({
   id,
   isEditing,
   isFormProcessing,
-  isModified,
   hasElevationSource,
 }: {
   hasSavePermission: boolean | undefined;
   id: number | string | undefined;
   isEditing: boolean | undefined;
   isFormProcessing: boolean;
-  isModified: boolean;
   hasElevationSource: boolean;
 }): string | null {
   if (!id || !isEditing) {
@@ -639,11 +693,8 @@ function actionUnavailableReason({
   if (isFormProcessing) {
     return 'Wait for the current save to finish before recalculating.';
   }
-  if (isModified) {
-    return 'Save the trail first so the profile follows the latest geometry.';
-  }
   if (!hasElevationSource) {
-    return 'Save a trail line first, then calculate its elevation here.';
+    return 'Add a trail line first, then calculate its elevation here.';
   }
   return null;
 }

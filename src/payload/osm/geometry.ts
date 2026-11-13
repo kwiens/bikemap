@@ -31,12 +31,14 @@ export type GeometryParse =
 /** Two points is the minimum that draws a line. */
 export const MIN_POINTS_PER_PART = 2;
 
-function isPosition(value: unknown): value is [number, number] {
+export function isPosition(value: unknown): value is [number, number] {
   if (!Array.isArray(value) || value.length < 2) {
     return false;
   }
-  const [lng, lat] = value.map(Number);
+  const [lng, lat] = value;
   return (
+    typeof lng === 'number' &&
+    typeof lat === 'number' &&
     Number.isFinite(lng) &&
     Number.isFinite(lat) &&
     lng >= -180 &&
@@ -115,7 +117,7 @@ export function parseTrailGeometry(value: unknown): GeometryParse {
     // vertex down to one point is a normal thing to do mid-edit, and the part
     // simply stops existing.
     if (run.length >= MIN_POINTS_PER_PART) {
-      parts.push(run.map(([lng, lat]) => [Number(lng), Number(lat)]));
+      parts.push(run.map(([lng, lat]) => [lng, lat]));
     }
   }
 
@@ -179,10 +181,12 @@ export function partsToFeatures(
   parts: [number, number][][],
   mode: string,
 ): LinePartFeature[] {
-  return parts
+  // Snapped route plans can carry full floating-point precision. Normalize at
+  // the Terra Draw boundary so loading them cannot silently drop the line.
+  return roundParts(parts)
     .filter((part) => part.length >= MIN_POINTS_PER_PART)
     .map((part) => ({
-      geometry: { coordinates: cloneParts([part])[0], type: 'LineString' },
+      geometry: { coordinates: part, type: 'LineString' },
       properties: { mode },
       type: 'Feature',
     }));
@@ -208,11 +212,36 @@ export function featuresToParts(features: unknown[]): [number, number][][] {
     }
     const points = geometry.coordinates.filter(isPosition);
     if (points.length >= MIN_POINTS_PER_PART) {
-      parts.push(points.map(([lng, lat]) => [Number(lng), Number(lat)]));
+      parts.push(points.map(([lng, lat]) => [lng, lat]));
     }
   }
 
   return parts;
+}
+
+/**
+ * Decimal places kept on coordinates the editor computes — about 1 cm, the
+ * precision OSM itself stores.
+ *
+ * Terra Draw rejects any coordinate with more than 9 decimal places
+ * ("Feature has coordinates with excessive precision"), and like every
+ * `addFeatures` rejection it does so silently: the line just isn't there. A
+ * snapped route point or a point moved by a computed offset easily carries 14.
+ */
+export const COORDINATE_DECIMALS = 7;
+
+/** Copies coordinate runs, rounded to {@link COORDINATE_DECIMALS}. */
+export function roundParts(parts: [number, number][][]): [number, number][][] {
+  const scale = 10 ** COORDINATE_DECIMALS;
+  return parts.map((part) =>
+    part.map(
+      ([lng, lat]) =>
+        [Math.round(lng * scale) / scale, Math.round(lat * scale) / scale] as [
+          number,
+          number,
+        ],
+    ),
+  );
 }
 
 /**
@@ -229,10 +258,26 @@ export function cloneParts(parts: [number, number][][]): [number, number][][] {
   );
 }
 
-function safeParse(value: string): unknown {
+/** JSON.parse that yields null instead of throwing. */
+export function safeParse(value: string): unknown {
   try {
     return JSON.parse(value);
   } catch {
     return null;
   }
+}
+
+/**
+ * Drops consecutive duplicate points. A stopped GPS logs the same fix over and
+ * over, and a router can emit a join point twice; one copy draws the same line.
+ */
+export function dropRepeatedPoints<T extends [number, number]>(
+  points: T[],
+): T[] {
+  return points.filter(
+    (point, index) =>
+      index === 0 ||
+      point[0] !== points[index - 1][0] ||
+      point[1] !== points[index - 1][1],
+  );
 }

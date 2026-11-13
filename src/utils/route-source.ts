@@ -18,7 +18,9 @@ export function runtimeRouteIds(
   // must join the configured ids without a code change.
   const ids = new Set(configuredIds);
   for (const route of routes) {
-    if (route.geometrySource && route.geometrySource !== 'studio') {
+    if (route.geometrySource === 'studio') {
+      ids.delete(route.id);
+    } else if (route.geometrySource) {
       ids.add(route.id);
     }
   }
@@ -51,7 +53,10 @@ export async function fetchRouteCollection(
       return null;
     }
     const collection = (await response.json()) as GeoJSON.FeatureCollection;
-    if (!Array.isArray(collection?.features)) {
+    if (
+      collection?.type !== 'FeatureCollection' ||
+      !Array.isArray(collection.features)
+    ) {
       console.warn(`Route GeoJSON at ${url} was not a FeatureCollection.`);
       return null;
     }

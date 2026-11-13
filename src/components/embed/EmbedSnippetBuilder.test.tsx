@@ -13,6 +13,10 @@ const CONFIG = {
     { id: 'route-1', name: 'Riverwalk Loop', slug: 'riverwalk-loop' },
     { id: 'route-2', name: 'Zoo Loop', slug: 'zoo-loop' },
   ],
+  trails: [
+    { id: 'Cherokee Trail', name: 'Cherokee Trail', slug: 'cherokee-trail' },
+    { id: 'Chunky', name: 'Chunky', slug: 'chunky' },
+  ],
   availableLayers: [
     'attractions',
     'bikeResources',
@@ -48,29 +52,50 @@ describe('EmbedSnippetBuilder', () => {
     expect(getSnippetText()).toContain('sidebar=open');
   });
 
-  it('does not boot a map until the preview is asked for', () => {
+  it('shows the live preview immediately', () => {
     render(<EmbedSnippetBuilder baseUrl={baseUrl} config={CONFIG} />);
-
-    // The builder sits on the public About page and each preview boot is a
-    // billed Mapbox map load, so nothing loads on render.
-    expect(screen.queryByTitle('Bike map preview')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show live preview' }));
 
     const iframe = screen.getByTitle('Bike map preview') as HTMLIFrameElement;
     expect(iframe.getAttribute('src')).toBe('/embed?city=chattanooga');
+    expect(
+      screen.queryByRole('button', { name: 'Show live preview' }),
+    ).not.toBeInTheDocument();
   });
 
-  it('loads the preview with the options chosen before it was shown', () => {
+  it('updates the snippet immediately when preview options change', () => {
     render(<EmbedSnippetBuilder baseUrl={baseUrl} config={CONFIG} />);
 
     fireEvent.click(screen.getByLabelText('Attractions'));
-    fireEvent.click(screen.getByRole('button', { name: 'Show live preview' }));
+    expect(getSnippetText()).toContain('layers=attractions');
+  });
 
-    const iframe = screen.getByTitle('Bike map preview') as HTMLIFrameElement;
-    expect(iframe.getAttribute('src')).toBe(
-      '/embed?layers=attractions&city=chattanooga',
-    );
+  it('builds an MTB embed and supports a selected trail', () => {
+    render(<EmbedSnippetBuilder baseUrl={baseUrl} config={CONFIG} />);
+
+    fireEvent.click(screen.getByLabelText('MTB routes'));
+    expect(getSnippetText()).toContain('mode=mtb');
+    expect(screen.getByLabelText('Selected trail')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Markers')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Selected trail'), {
+      target: { value: 'cherokee-trail' },
+    });
+    expect(getSnippetText()).toContain('trail=cherokee-trail');
+    expect(getSnippetText()).not.toContain('route=');
+  });
+
+  it('keeps secondary controls inside collapsed advanced settings', () => {
+    render(<EmbedSnippetBuilder baseUrl={baseUrl} config={CONFIG} />);
+
+    const advanced = screen.getByText('Advanced settings').closest('details');
+    expect(advanced).not.toHaveAttribute('open');
+    expect(advanced).toContainElement(screen.getByLabelText('Sidebar'));
+    expect(advanced).toContainElement(screen.getByLabelText('Selected route'));
+    expect(advanced).toContainElement(screen.getByLabelText('Zoom'));
+    expect(advanced).toContainElement(screen.getByLabelText('Center'));
+    expect(advanced).toContainElement(screen.getByText('Markers'));
+    expect(screen.getByText('Code snippet')).toBeInTheDocument();
+    expect(screen.queryByText(/Paste it as-is/)).not.toBeInTheDocument();
   });
 
   it('only offers layers the city can actually render', () => {
@@ -207,11 +232,9 @@ describe('EmbedSnippetBuilder', () => {
     try {
       render(<EmbedSnippetBuilder baseUrl={baseUrl} config={CONFIG} />);
 
-      fireEvent.click(
-        screen.getByRole('button', { name: 'Show live preview' }),
-      );
       const iframe = screen.getByTitle('Bike map preview') as HTMLIFrameElement;
       const initialElement = iframe;
+      const initialSrc = iframe.getAttribute('src');
 
       fireEvent.click(screen.getByLabelText('Attractions'));
       // Snippet text updates immediately, unaffected by the debounce.
@@ -219,6 +242,7 @@ describe('EmbedSnippetBuilder', () => {
 
       // The iframe element itself is never recreated (no `key` remount).
       expect(screen.getByTitle('Bike map preview')).toBe(initialElement);
+      expect(iframe.getAttribute('src')).toBe(initialSrc);
 
       // Advancing past the debounce window should not throw even though
       // jsdom's contentWindow.location.replace is a no-op/unimplemented —

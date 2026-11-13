@@ -11,7 +11,7 @@
 // longer exists, having skipped the MAP_READY listener that would have
 // recovered them.
 
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent, onMapEvent } from '@/events';
 
 const READY_FLAG = '__mapReady';
 
@@ -27,7 +27,7 @@ export function isMapReady(): boolean {
 /** Called by Map.tsx when the map is initialized: sets the flag, then fires. */
 export function setMapReady(): void {
   flags()[READY_FLAG] = true;
-  window.dispatchEvent(new Event(MAP_EVENTS.MAP_READY));
+  dispatchMapEvent(MAP_EVENTS.MAP_READY);
 }
 
 /** Called by Map.tsx on teardown so a remount can't see a stale flag. */
@@ -45,6 +45,5 @@ export function onMapReady(callback: () => void): () => void {
     callback();
     return () => {};
   }
-  window.addEventListener(MAP_EVENTS.MAP_READY, callback, { once: true });
-  return () => window.removeEventListener(MAP_EVENTS.MAP_READY, callback);
+  return onMapEvent(MAP_EVENTS.MAP_READY, callback, { once: true });
 }

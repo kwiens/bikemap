@@ -1,9 +1,14 @@
 'use client';
 
+import { getMountainBikeTrails } from '@/data/trail-source';
+import { slugForTrail } from '@/data/mountain-bike-trails';
+import { getBikeRoutes } from '@/data/route-source';
+import { useMapSelection } from '@/components/map-selection';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 import { useEmbed } from '@/components/EmbedContext';
 import { siteConfig } from '@/config/site.config';
+import { cityIdForQuery } from '@/config/map.config';
 
 // Small "open the real site" pill shown only inside `/embed` — third-party
 // hosts frame the map via <iframe>, so this is the only way a viewer gets to
@@ -12,11 +17,27 @@ import { siteConfig } from '@/config/site.config';
 export function EmbedAttribution() {
   const { isEmbed, options } = useEmbed();
 
+  const isMtb = options.mode === 'mtb';
+  const selection = useMapSelection();
   if (!isEmbed) return null;
 
-  const href = options.route
-    ? `${siteConfig.url}?route=${encodeURIComponent(options.route)}`
-    : siteConfig.url;
+  let slug;
+  if (isMtb && selection?.kind === 'trail') {
+    const trail = getMountainBikeTrails().find(
+      (item) => item.trailName === selection.trailName,
+    );
+    if (trail) slug = slugForTrail(trail);
+  } else if (!isMtb && selection?.kind === 'route') {
+    slug = getBikeRoutes().find((route) => route.id === selection.routeId)?.id;
+  }
+
+  const url = new URL(siteConfig.url);
+  if (slug) url.searchParams.set(isMtb ? 'trail' : 'route', slug);
+  const city = cityIdForQuery(
+    new URLSearchParams(window.location.search).get('city'),
+  );
+  if (city) url.searchParams.set('city', city);
+  const href = url.search ? url.toString() : siteConfig.url;
 
   return (
     <a

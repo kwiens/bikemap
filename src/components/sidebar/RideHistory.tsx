@@ -5,11 +5,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBicycle } from '@fortawesome/free-solid-svg-icons';
 import type { RecordedRide, RideSummary } from '@/data/ride';
 import { MAP_EVENTS } from '@/events';
-import {
-  getRideSummaries,
-  getStorageUsage,
-  loadRide,
-} from '@/utils/ride-storage';
+import { useMapEvent } from '@/hooks/useMapEvent';
+import { getRideSummaries, getStorageUsage } from '@/utils/ride-storage';
 import {
   formatDistance,
   formatDurationShort,
@@ -21,18 +18,21 @@ import { cn } from '@/lib/utils';
 import { RideDetail } from './RideDetail';
 
 export interface RideHistoryProps {
-  selectedRideId: string | null;
+  selectedRide: RecordedRide | null;
+  pendingRideId?: string;
+  onRideDeselect: () => void;
   onRideSelect: (rideId: string) => void;
   isRecording?: boolean;
 }
 
 export function RideHistory({
-  selectedRideId,
+  selectedRide,
+  pendingRideId,
+  onRideDeselect,
   onRideSelect,
   isRecording,
 }: RideHistoryProps) {
   const [summaries, setSummaries] = useState<RideSummary[]>([]);
-  const [selectedRide, setSelectedRide] = useState<RecordedRide | null>(null);
 
   const refreshSummaries = useCallback(() => {
     getRideSummaries()
@@ -42,45 +42,19 @@ export function RideHistory({
 
   useEffect(() => {
     refreshSummaries();
-  }, [refreshSummaries]);
+  }, [refreshSummaries, selectedRide]);
 
-  useEffect(() => {
-    const refresh = () => refreshSummaries();
-
-    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, refresh);
-    window.addEventListener(MAP_EVENTS.RIDE_SELECT, refresh);
-    window.addEventListener(MAP_EVENTS.RIDE_DESELECT, refresh);
-    return () => {
-      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_STOP, refresh);
-      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, refresh);
-      window.removeEventListener(MAP_EVENTS.RIDE_DESELECT, refresh);
-    };
-  }, [refreshSummaries]);
-
-  useEffect(() => {
-    if (selectedRideId) {
-      loadRide(selectedRideId)
-        .then(setSelectedRide)
-        .catch(() => {});
-    } else {
-      setSelectedRide(null);
-    }
-  }, [selectedRideId]);
-
-  const handleDetailClose = () => {
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
-  };
-
-  const handleDeleted = () => {
-    window.dispatchEvent(new CustomEvent(MAP_EVENTS.RIDE_DESELECT));
-  };
-
+  // A finished recording adds a ride, and starting one may first save an
+  // unfinished ride from the recovery slot; select/deselect may follow a
+  // rename or delete in RideDetail.
+  useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, refreshSummaries);
+  useMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, refreshSummaries);
   if (selectedRide) {
     return (
       <RideDetail
         ride={selectedRide}
-        onClose={handleDetailClose}
-        onDeleted={handleDeleted}
+        onClose={onRideDeselect}
+        onDeleted={onRideDeselect}
       />
     );
   }
@@ -121,9 +95,9 @@ export function RideHistory({
           tabIndex={0}
           className={cn(
             'p-2 rounded cursor-pointer transition-all duration-200 border border-transparent',
-            selectedRideId === s.id
-              ? 'bg-blue-600/10 border-blue-600'
-              : 'hover:bg-blue-600/5 hover:border-blue-500',
+            pendingRideId === s.id
+              ? 'bg-app-primary/15 border-app-primary'
+              : 'hover:bg-app-primary/10 hover:border-app-primary',
           )}
         >
           <div className="flex items-center gap-3">

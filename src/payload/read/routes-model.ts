@@ -1,4 +1,11 @@
 import { faRoute } from '@fortawesome/free-solid-svg-icons';
+import { readRelationshipId } from '@/payload/relationship-id';
+import { parseGeographicBounds } from '@/utils/geographic-bounds';
+import {
+  parseTrailGeometry,
+  toTrailGeometry,
+  type TrailGeometry,
+} from '@/payload/osm/geometry';
 import type {
   BikeRoute,
   RouteGeometrySource,
@@ -11,6 +18,7 @@ export interface StoredRoute {
   defaultWidth?: null | number;
   description?: null | string;
   distance?: null | number;
+  featured?: null | boolean;
   geom?: null | unknown;
   geometrySource?: null | RouteGeometrySource;
   hideArrows?: null | boolean;
@@ -32,7 +40,7 @@ export interface StoredRouteTrail {
 
 export interface RouteFeatureCollection {
   features: {
-    geometry: unknown;
+    geometry: TrailGeometry;
     properties: { id: string; sourceFeatureCount?: number };
     type: 'Feature';
   }[];
@@ -80,6 +88,10 @@ export function publicBikeRoutes(
       return [];
     }
     const trail = trailFor(route, sourceTrails);
+    const bounds =
+      parseGeographicBounds(trail?.bounds) ??
+      parseGeographicBounds(route.bounds);
+    const reverseBounds = reverseBoundsFor(route.reverseArrowBounds);
     return [
       {
         id: route.routeId,
@@ -90,30 +102,21 @@ export function publicBikeRoutes(
         defaultWidth: route.defaultWidth ?? 8,
         opacity: route.opacity ?? 1,
         distance: trail?.distance ?? route.distance ?? 0,
+        featured: route.featured === true,
         geometrySource: route.geometrySource ?? 'imported',
         ...(route.kind ? { kind: route.kind } : {}),
         ...(route.hideArrows ? { hideArrows: true } : {}),
         ...(route.reverseDirection ? { reverseDirection: true } : {}),
-        ...(boundsFor(trail?.bounds ?? route.bounds)
-          ? { defaultBounds: boundsFor(trail?.bounds ?? route.bounds) }
-          : {}),
-        ...(reverseBoundsFor(route.reverseArrowBounds)
-          ? { reverseArrowBounds: reverseBoundsFor(route.reverseArrowBounds) }
-          : {}),
+        ...(bounds ? { defaultBounds: bounds } : {}),
+        ...(reverseBounds ? { reverseArrowBounds: reverseBounds } : {}),
       },
     ];
   });
 }
 
-function sourceTrailId(route: StoredRoute): string | null {
-  const relation = route.sourceTrail;
-  if (typeof relation === 'number' || typeof relation === 'string') {
-    return String(relation);
-  }
-  if (relation && typeof relation === 'object' && relation.id != null) {
-    return String(relation.id);
-  }
-  return null;
+export function sourceTrailId(route: StoredRoute): string | null {
+  const id = readRelationshipId(route.sourceTrail);
+  return id === null ? null : String(id);
 }
 
 function trailFor(
@@ -130,24 +133,14 @@ function trailFor(
 function geometryFor(
   route: StoredRoute,
   sourceTrails: ReadonlyMap<string, StoredRouteTrail>,
-): unknown | null {
-  return route.geometrySource === 'trail'
-    ? (trailFor(route, sourceTrails)?.geom ?? null)
-    : route.geometrySource === 'studio'
-      ? null
-      : (route.geom ?? null);
-}
-
-function boundsFor(
-  value: unknown,
-): [number, number, number, number] | undefined {
-  if (!Array.isArray(value) || value.length !== 4) {
-    return undefined;
-  }
-  const numbers = value.map(Number);
-  return numbers.every(Number.isFinite)
-    ? (numbers as [number, number, number, number])
-    : undefined;
+): TrailGeometry | null {
+  if (route.geometrySource === 'studio') return null;
+  const geom =
+    route.geometrySource === 'trail'
+      ? trailFor(route, sourceTrails)?.geom
+      : route.geom;
+  const parsed = parseTrailGeometry(geom);
+  return parsed.ok ? toTrailGeometry(parsed.parts) : null;
 }
 
 function reverseBoundsFor(
@@ -157,7 +150,7 @@ function reverseBoundsFor(
     return undefined;
   }
   const bounds = value.flatMap((candidate) => {
-    const parsed = boundsFor(candidate);
+    const parsed = parseGeographicBounds(candidate);
     return parsed ? [parsed] : [];
   });
   return bounds.length > 0 ? bounds : undefined;

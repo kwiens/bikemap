@@ -19,6 +19,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mountainBikeTrails } from '../src/data/mountain-bike-trails.data';
 import { slugForTrail } from '../src/data/mountain-bike-trails';
+import { lengthMeters } from '../src/payload/osm/assemble';
+import { MIN_ELEVATION_PART_METERS } from '../src/payload/osm/elevation-sections';
 import { measureParts, type Measurements } from '../src/payload/osm/measure';
 
 const repoRoot = path.resolve(
@@ -104,11 +106,9 @@ function requireEveryPartInProfile(
   trailName: string,
   geometry: MultiLineString,
   profile: NonNullable<Measurements['profile']>,
+  expectedBreaks: number,
 ): void {
-  if (
-    (profile.geometryGapDetails?.length ?? 0) !==
-    Math.max(0, geometry.coordinates.length - 1)
-  ) {
+  if ((profile.geometryGapDetails?.length ?? 0) !== expectedBreaks) {
     throw new Error(
       `${trailName}: its prepared profile omitted a geometry break; no files were written.`,
     );
@@ -121,6 +121,7 @@ function requireEveryPartInProfile(
   );
 
   for (const part of geometry.coordinates) {
+    if (lengthMeters([part]) < MIN_ELEVATION_PART_METERS) continue;
     const endpoints = [part[0], part[part.length - 1]];
     for (const [longitude, latitude] of endpoints) {
       if (!profileCoordinates.has(`${longitude},${latitude}`)) {
@@ -173,6 +174,7 @@ async function prepareTrails(
       trail.trailName,
       geom,
       measured.profile as NonNullable<Measurements['profile']>,
+      measured.gaps.length,
     );
     prepared.push({
       measurement,

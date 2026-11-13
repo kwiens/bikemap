@@ -3,11 +3,7 @@
 import type { ReactElement } from 'react';
 import dynamic from 'next/dynamic';
 import React from 'react';
-import { activeCityId } from '@/config/map.config';
-import type { MapFeature } from '@/data/map-features';
-import type { BikeRoute } from '@/data/bike-routes';
-import type { CityId } from '@/data/cities/types';
-import { setBikeRoutes } from '@/data/route-source';
+import { type CityContent, publishCityContent } from '@/data/city-content';
 
 const EmbedMap = dynamic(() => import('@/components/embed/EmbedMap'), {
   ssr: false,
@@ -19,22 +15,17 @@ const EmbedMap = dynamic(() => import('@/components/embed/EmbedMap'), {
 });
 
 export default function EmbedClient({
-  cityId,
-  routes,
-  attractions,
+  content,
 }: {
-  cityId: CityId;
-  routes: BikeRoute[];
-  attractions: MapFeature[];
+  /** Only the content family selected by the embed mode is loaded. */
+  content: CityContent;
 }): ReactElement {
-  const isActiveCity = cityId === activeCityId;
-  if (isActiveCity) {
-    setBikeRoutes(routes);
-  }
+  const isActiveCity = publishCityContent(content);
+  const attractions = isActiveCity ? (content.attractions ?? []) : [];
 
   return (
     <main className="overflow-hidden fixed inset-0 m-0 p-0">
-      <EmbedMap attractions={isActiveCity ? attractions : []} />
+      <EmbedMap attractions={attractions} />
     </main>
   );
 }

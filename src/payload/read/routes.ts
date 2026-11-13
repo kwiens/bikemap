@@ -7,6 +7,7 @@ import type { BikeRoute } from '@/data/bike-routes';
 import {
   publicBikeRoutes,
   routeFeatureCollection,
+  sourceTrailId,
   type RouteFeatureCollection,
   type StoredRouteTrail,
 } from './routes-model';
@@ -39,6 +40,7 @@ export async function getCityRoutes(city: CityId): Promise<CityRouteData> {
         defaultWidth: true,
         description: true,
         distance: true,
+        featured: true,
         geom: true,
         geometrySource: true,
         hideArrows: true,
@@ -60,14 +62,9 @@ export async function getCityRoutes(city: CityId): Promise<CityRouteData> {
     const sourceTrailIds = [
       ...new Set(
         result.docs.flatMap((route) => {
-          if (route.geometrySource !== 'trail' || route.sourceTrail == null) {
-            return [];
-          }
-          const relation = route.sourceTrail;
-          if (typeof relation === 'number') {
-            return [relation];
-          }
-          return typeof relation === 'object' && relation ? [relation.id] : [];
+          const id =
+            route.geometrySource === 'trail' ? sourceTrailId(route) : null;
+          return id ? [id] : [];
         }),
       ),
     ];
@@ -92,10 +89,11 @@ export async function getCityRoutes(city: CityId): Promise<CityRouteData> {
       }
     }
 
+    const routes = publicBikeRoutes(result.docs, sourceTrails);
     return {
       geojson: routeFeatureCollection(result.docs, sourceTrails),
-      routes: publicBikeRoutes(result.docs, sourceTrails),
-      status: result.docs.length > 0 ? 'ok' : 'empty',
+      routes,
+      status: routes.length > 0 ? 'ok' : 'empty',
     };
   } catch (error) {
     console.error(`Could not read routes for "${city}" from Payload.`, error);

@@ -2,13 +2,18 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import {
+  render as renderReact,
+  screen,
+  fireEvent,
+} from '@testing-library/react';
 import type { MapFeature } from '@/data/map-features';
 import { MapLegendProvider } from './MapLegend';
 import { EmbedProvider } from './EmbedContext';
 import { DEFAULT_EMBED_OPTIONS, type EmbedOptions } from '@/utils/embed';
 import { siteConfig } from '@/config/site.config';
 import { MAP_EVENTS } from '@/events';
+import { mapSelectionHarness } from '@/test/map-selection';
 import { dispatch } from '@/test/fixtures';
 
 // Mock all sidebar children to keep tests focused on MapLegendProvider state
@@ -86,7 +91,8 @@ vi.mock('./sidebar', () => ({
   ),
 }));
 
-vi.mock('./styles', () => ({
+vi.mock('./styles', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./styles')>()),
   TOGGLE_BTN_CLASS: 'toggle-btn',
   TOGGLE_ICON_CLASS: 'toggle-icon',
 }));
@@ -95,6 +101,12 @@ let mockRideStyle: string | null = null;
 vi.mock('./WelcomeModal', () => ({
   getRideStyle: () => mockRideStyle,
 }));
+
+const selection = mapSelectionHarness();
+
+function render(ui: React.ReactElement) {
+  return renderReact(ui, { wrapper: selection.Wrapper });
+}
 
 describe('MapLegendProvider', () => {
   const events: Array<{ type: string; detail: unknown }> = [];
@@ -160,7 +172,7 @@ describe('MapLegendProvider', () => {
     expect(screen.queryByTestId('bike-routes')).not.toBeInTheDocument();
   });
 
-  it('ROUTE_SELECT event sets selectedRoute and clears selectedTrail', () => {
+  it('a route replaces the trail and switches to Casual', () => {
     mockRideStyle = 'mountain';
     render(
       <MapLegendProvider attractions={[]}>
@@ -169,28 +181,33 @@ describe('MapLegendProvider', () => {
     );
 
     // First select a trail
-    dispatch(MAP_EVENTS.TRAIL_SELECT, { trailName: 'Trail A' });
+    selection.select({ kind: 'trail', trailName: 'Trail A' });
     expect(screen.getByTestId('mountain-bike-trails')).toHaveAttribute(
       'data-selected-trail',
       'Trail A',
     );
 
     // Now select a route — should clear trail
-    dispatch(MAP_EVENTS.ROUTE_SELECT, { routeId: 'route-1' });
+    selection.select({ kind: 'route', routeId: 'route-1' });
+    expect(screen.getByTestId('bike-routes')).toHaveAttribute(
+      'data-selected-route',
+      'route-1',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'MTB' }));
     expect(screen.getByTestId('mountain-bike-trails')).toHaveAttribute(
       'data-selected-trail',
       '',
     );
   });
 
-  it('TRAIL_SELECT event sets selectedTrail and switches to trails section', () => {
+  it('a trail selection switches to the trails section', () => {
     render(
       <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
 
-    dispatch(MAP_EVENTS.TRAIL_SELECT, { trailName: 'Trail A' });
+    selection.select({ kind: 'trail', trailName: 'Trail A' });
 
     expect(screen.getByTestId('mountain-bike-trails')).toBeInTheDocument();
     expect(screen.getByTestId('mountain-bike-trails')).toHaveAttribute(
@@ -199,27 +216,27 @@ describe('MapLegendProvider', () => {
     );
   });
 
-  it('ROUTE_DESELECT clears selectedRoute', () => {
+  it('clearing selection clears the route card', () => {
     render(
       <MapLegendProvider attractions={[]}>
         <div />
       </MapLegendProvider>,
     );
 
-    dispatch(MAP_EVENTS.ROUTE_SELECT, { routeId: 'route-1' });
+    selection.select({ kind: 'route', routeId: 'route-1' });
     expect(screen.getByTestId('bike-routes')).toHaveAttribute(
       'data-selected-route',
       'route-1',
     );
 
-    dispatch(MAP_EVENTS.ROUTE_DESELECT);
+    selection.select(null);
     expect(screen.getByTestId('bike-routes')).toHaveAttribute(
       'data-selected-route',
       '',
     );
   });
 
-  it('TRAIL_DESELECT clears selectedTrail', () => {
+  it('clearing selection clears the trail card', () => {
     mockRideStyle = 'mountain';
     render(
       <MapLegendProvider attractions={[]}>
@@ -227,8 +244,8 @@ describe('MapLegendProvider', () => {
       </MapLegendProvider>,
     );
 
-    dispatch(MAP_EVENTS.TRAIL_SELECT, { trailName: 'Trail A' });
-    dispatch(MAP_EVENTS.TRAIL_DESELECT);
+    selection.select({ kind: 'trail', trailName: 'Trail A' });
+    selection.select(null);
     expect(screen.getByTestId('mountain-bike-trails')).toHaveAttribute(
       'data-selected-trail',
       '',
@@ -243,15 +260,13 @@ describe('MapLegendProvider', () => {
     );
 
     // Select a route
-    dispatch(MAP_EVENTS.ROUTE_SELECT, { routeId: 'route-1' });
+    selection.select({ kind: 'route', routeId: 'route-1' });
     expect(screen.getByTestId('bike-routes')).toHaveAttribute(
       'data-selected-route',
       'route-1',
     );
 
-    // Simulate what Map.tsx does on empty-area click: dispatch both deselects
-    dispatch(MAP_EVENTS.ROUTE_DESELECT);
-    dispatch(MAP_EVENTS.TRAIL_DESELECT);
+    selection.select(null);
 
     expect(screen.getByTestId('bike-routes')).toHaveAttribute(
       'data-selected-route',
@@ -259,7 +274,45 @@ describe('MapLegendProvider', () => {
     );
   });
 
-  it('area select dispatches deselect events before area-select', () => {
+  it('selects a route from the sidebar', () => {
+    render(
+      <MapLegendProvider attractions={[]}>
+        <div />
+      </MapLegendProvider>,
+    );
+    fireEvent.click(screen.getByText('Select Route'));
+    expect(selection.get()).toEqual({ kind: 'route', routeId: 'route-1' });
+  });
+
+  it('selects a trail from the sidebar', () => {
+    mockRideStyle = 'mountain';
+    render(
+      <MapLegendProvider attractions={[]}>
+        <div />
+      </MapLegendProvider>,
+    );
+    fireEvent.click(screen.getByText('Select Trail'));
+    expect(selection.get()).toEqual({ kind: 'trail', trailName: 'Trail A' });
+  });
+
+  it('exposes the sidebar state to assistive technology', () => {
+    render(
+      <MapLegendProvider attractions={[]}>
+        <div />
+      </MapLegendProvider>,
+    );
+    const toggle = screen.getByRole('button', { name: 'Close map menu' });
+    const sidebar = document.getElementById(
+      toggle.getAttribute('aria-controls') ?? '',
+    );
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAccessibleName('Open map menu');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(sidebar).toHaveAttribute('inert');
+  });
+
+  it('an area replaces the previously selected trail', () => {
     mockRideStyle = 'mountain';
     render(
       <MapLegendProvider attractions={[]}>
@@ -267,18 +320,16 @@ describe('MapLegendProvider', () => {
       </MapLegendProvider>,
     );
 
+    fireEvent.click(screen.getByText('Select Trail'));
     fireEvent.click(screen.getByText('Select Area'));
-
-    const eventTypes = events.map((e) => e.type);
-    const deselectIdx = eventTypes.indexOf(MAP_EVENTS.ROUTE_DESELECT);
-    const trailDeselectIdx = eventTypes.indexOf(MAP_EVENTS.TRAIL_DESELECT);
-    const areaSelectIdx = eventTypes.indexOf(MAP_EVENTS.AREA_SELECT);
-
-    expect(deselectIdx).not.toBe(-1);
-    expect(trailDeselectIdx).not.toBe(-1);
-    expect(areaSelectIdx).not.toBe(-1);
-    expect(deselectIdx).toBeLessThan(areaSelectIdx);
-    expect(trailDeselectIdx).toBeLessThan(areaSelectIdx);
+    expect(selection.get()).toEqual({
+      kind: 'area',
+      areaName: 'Raccoon Mountain',
+    });
+    expect(screen.getByTestId('mountain-bike-trails')).toHaveAttribute(
+      'data-selected-trail',
+      '',
+    );
   });
 
   it('renders map layers in routes section', () => {
@@ -369,11 +420,15 @@ describe('embed mode', () => {
     delete (window as unknown as { __mapReady?: boolean }).__mapReady;
   });
 
-  it('is Casual-only: no MTB pill, routes section renders, trails does not', () => {
+  it('renders the Casual section without route-family tabs', () => {
     const { container } = renderEmbed();
 
-    expect(screen.queryByText('MTB')).not.toBeInTheDocument();
-    expect(screen.queryByText('Casual')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'MTB' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Casual' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('bike-routes')).toBeInTheDocument();
     expect(
       screen.queryByTestId('mountain-bike-trails'),
@@ -381,7 +436,18 @@ describe('embed mode', () => {
     // No Information section in embed mode
     expect(screen.queryByTestId('info')).not.toBeInTheDocument();
     // Compact header label instead of the pill
-    expect(container.textContent).toContain(siteConfig.name);
+    expect(container.textContent).toContain(
+      `${siteConfig.name} · Casual routes`,
+    );
+  });
+
+  it('renders the MTB section selected by the host page', () => {
+    const { container } = renderEmbed({ mode: 'mtb' });
+
+    expect(screen.getByTestId('mountain-bike-trails')).toBeInTheDocument();
+    expect(screen.queryByTestId('bike-routes')).not.toBeInTheDocument();
+    expect(screen.getByText('Nationwide trails')).toBeInTheDocument();
+    expect(container.textContent).toContain(`${siteConfig.name} · MTB routes`);
   });
 
   it('sidebar starts closed (-translate-x-full) when sidebarOpen is false', () => {

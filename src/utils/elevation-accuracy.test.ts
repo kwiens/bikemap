@@ -1,13 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { computeElevation, haversineDistance } from './ride-stats';
 import {
-  computeElevation,
-  haversineDistance,
-  ELEVATION_EMA_ALPHA,
-  ELEVATION_DEAD_BAND,
-  ELEVATION_SPIKE_THRESHOLD,
+  createLiveElevationAccumulator,
   ELEVATION_SPIKE_MAX_RUN,
-  ELEVATION_MIN_DISTANCE,
-} from './ride-stats';
+} from './elevation';
 import type { RidePoint } from '../data/ride';
 
 // Real GPS data extracted from paired Strava + BikeChatt GPX recordings
@@ -254,64 +250,15 @@ describe('elevation accuracy vs Strava (real GPS data)', () => {
   });
 });
 
-/**
- * Simulate the live recording elevation algorithm from useRideRecording.
- * Must stay in sync with the actual hook implementation.
- */
+/** Feed the recorded track through the production live elevation pipeline. */
 function simulateLiveElevation(pts: GpxPoint[]): number {
-  let ema: number | null = null;
-  let lastAccepted: number | null = null;
-  let rejectRun = 0;
-  let anchor: number | null = null;
-  let distSinceAnchor = 0;
+  const elevation = createLiveElevationAccumulator();
   let gain = 0;
-
   for (let i = 0; i < pts.length; i++) {
-    const [lat, lng, rawAlt] = pts[i];
-
-    // Accumulate horizontal distance
-    if (i > 0) {
-      distSinceAnchor += haversineDistance(
-        pts[i - 1][0],
-        pts[i - 1][1],
-        lat,
-        lng,
-      );
-    }
-
-    // Spike rejection against the last accepted raw reading (Filter 2)
-    let alt = rawAlt;
-    if (
-      lastAccepted !== null &&
-      Math.abs(alt - lastAccepted) > ELEVATION_SPIKE_THRESHOLD &&
-      rejectRun < ELEVATION_SPIKE_MAX_RUN
-    ) {
-      alt = lastAccepted;
-      rejectRun += 1;
-    } else {
-      lastAccepted = alt;
-      rejectRun = 0;
-    }
-
-    if (ema === null) {
-      ema = alt;
-      anchor = alt;
-      continue;
-    }
-
-    ema = ELEVATION_EMA_ALPHA * alt + (1 - ELEVATION_EMA_ALPHA) * ema;
-
-    if (distSinceAnchor >= ELEVATION_MIN_DISTANCE) {
-      const delta = ema - anchor!;
-      if (delta > ELEVATION_DEAD_BAND) {
-        gain += delta;
-        anchor = ema;
-        distSinceAnchor = 0;
-      } else if (delta < -ELEVATION_DEAD_BAND) {
-        anchor = ema;
-        distSinceAnchor = 0;
-      }
-    }
+    const [lat, lng, altitude] = pts[i];
+    const distanceMeters =
+      i > 0 ? haversineDistance(pts[i - 1][0], pts[i - 1][1], lat, lng) : 0;
+    gain = elevation.add(altitude, distanceMeters);
   }
   return gain;
 }

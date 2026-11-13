@@ -5,13 +5,8 @@ import dynamic from 'next/dynamic';
 import React from 'react';
 import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
 import { WelcomeModal } from '@/components/WelcomeModal';
-import { activeCityId } from '@/config/map.config';
-import type { CityId } from '@/data/cities/types';
-import type { MapFeature } from '@/data/map-features';
-import type { BikeRoute } from '@/data/bike-routes';
-import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
-import { setBikeRoutes } from '@/data/route-source';
-import { setMountainBikeTrails } from '@/data/trail-source';
+import { type CityContent, publishCityContent } from '@/data/city-content';
+import { MapSelectionProvider } from '@/components/map-selection';
 import { useUrlDeepLink } from '@/hooks/useUrlDeepLink';
 
 // Dynamically import the Map component with no SSR since Mapbox requires window
@@ -25,41 +20,32 @@ const BikeMap = dynamic(() => import('@/components/Map'), {
 });
 
 export default function HomeClient({
-  cityId,
-  routes,
-  trails,
-  attractions,
+  content,
 }: {
-  /** The city the server resolved from the request host. */
-  cityId: CityId;
-  /** Published Payload routes. Routes intentionally have no static fallback. */
-  routes: BikeRoute[];
-  /** Trails read from Payload on the server. Empty means "use the checked-in
-   *  data", which is what happens with no database configured. */
-  trails: MountainBikeTrail[];
-  attractions: MapFeature[];
+  /** Everything the server read from Payload for the city it resolved from
+   *  the request host. See `publishCityContent` for why it is published
+   *  during render and when it is refused. */
+  content: CityContent;
 }): ReactElement {
-  // Publish the server's trails into the module store *during render*, before
-  // the map or sidebar read them. They don't change for the life of the page,
-  // so this needs no state and triggers no re-render.
-  //
-  // Server and browser resolve the city independently — the server from the
-  // request host, this module from `window.location`. A response served for
-  // another host must not replace this city's trails, so they have to agree.
-  const isActiveCity = cityId === activeCityId;
-  if (isActiveCity) {
-    setBikeRoutes(routes);
-    setMountainBikeTrails(trails);
-  }
-
-  // On mount, check URL for shared trail/route link and auto-select
-  useUrlDeepLink();
+  const isActiveCity = publishCityContent(content);
+  const attractions = isActiveCity ? (content.attractions ?? []) : [];
 
   return (
     <main className="overflow-hidden fixed inset-0 m-0 p-0">
-      <BikeMap attractions={isActiveCity ? attractions : []} />
+      <MapSelectionProvider>
+        <HomeMap attractions={attractions} />
+      </MapSelectionProvider>
       <PwaInstallPrompt />
       <WelcomeModal />
     </main>
   );
+}
+
+function HomeMap({
+  attractions,
+}: {
+  attractions: NonNullable<CityContent['attractions']>;
+}) {
+  useUrlDeepLink();
+  return <BikeMap attractions={attractions} />;
 }

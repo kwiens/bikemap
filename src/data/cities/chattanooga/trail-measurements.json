@@ -26,8 +26,8 @@
   "ADA Accessible Trail": {
     "defaultBounds": [-85.1097581, 35.0825544, -85.1052411, 35.0892083],
     "distance": 1.08,
-    "elevationGain": 52,
-    "elevationLoss": 65,
+    "elevationGain": 64,
+    "elevationLoss": 63,
     "elevationMax": 1039,
     "elevationMin": 967
   },
@@ -114,7 +114,7 @@
   "Bicycles/Pedestrians": {
     "defaultBounds": [-85.1163509, 35.0843688, -85.0964359, 35.0970648],
     "distance": 5.31,
-    "elevationGain": 377,
+    "elevationGain": 387,
     "elevationLoss": 337,
     "elevationMax": 1002,
     "elevationMin": 827
@@ -273,9 +273,9 @@
   },
   "Cherokee Trail": {
     "defaultBounds": [-85.3185096, 35.0711287, -85.311946, 35.078549],
-    "distance": 1.17,
-    "elevationGain": 239,
-    "elevationLoss": 63,
+    "distance": 1.3,
+    "elevationGain": 288,
+    "elevationLoss": 53,
     "elevationMax": 1033,
     "elevationMin": 778
   },
@@ -290,8 +290,8 @@
   "Chief Richard Taylor Nature Trail": {
     "defaultBounds": [-85.1181071, 34.9110805, -85.1108555, 34.9144985],
     "distance": 1,
-    "elevationGain": 10,
-    "elevationLoss": 21,
+    "elevationGain": 20,
+    "elevationLoss": 10,
     "elevationMax": 758,
     "elevationMin": 737
   },
@@ -378,8 +378,8 @@
   "Crabtree Farm Trail Connection": {
     "defaultBounds": [-85.3096882, 35.0084388, -85.2991541, 35.0122235],
     "distance": 1.12,
-    "elevationGain": 51,
-    "elevationLoss": 31,
+    "elevationGain": 31,
+    "elevationLoss": 42,
     "elevationMax": 667,
     "elevationMin": 638
   },
@@ -483,7 +483,7 @@
     "defaultBounds": [-85.1151302, 35.0898056, -85.1061185, 35.096678],
     "distance": 1.27,
     "elevationGain": 73,
-    "elevationLoss": 123,
+    "elevationLoss": 133,
     "elevationMax": 991,
     "elevationMin": 879
   },
@@ -514,8 +514,8 @@
   "Electric Avenue": {
     "defaultBounds": [-85.4193649, 35.0387982, -85.3854006, 35.0479882],
     "distance": 3.22,
-    "elevationGain": 341,
-    "elevationLoss": 160,
+    "elevationGain": 367,
+    "elevationLoss": 170,
     "elevationMax": 1784,
     "elevationMin": 1540
   },
@@ -714,8 +714,8 @@
   "Hawks Ridge": {
     "defaultBounds": [-85.1209313, 35.0880143, -85.1060972, 35.0991794],
     "distance": 3.02,
-    "elevationGain": 449,
-    "elevationLoss": 321,
+    "elevationGain": 439,
+    "elevationLoss": 354,
     "elevationMax": 988,
     "elevationMin": 858
   },
@@ -730,8 +730,8 @@
   "Hidden Lake Trail": {
     "defaultBounds": [-85.1153253, 35.0877401, -85.1091459, 35.0922272],
     "distance": 0.68,
-    "elevationGain": 112,
-    "elevationLoss": 77,
+    "elevationGain": 132,
+    "elevationLoss": 66,
     "elevationMax": 1019,
     "elevationMin": 902
   },
@@ -989,7 +989,7 @@
     "elevationGain": 0,
     "elevationLoss": 94,
     "elevationMax": 1873,
-    "elevationMin": 1768
+    "elevationMin": 1769
   },
   "Krebs Cycle": {
     "defaultBounds": [-85.0613581, 35.0442466, -85.0564375, 35.0512775],

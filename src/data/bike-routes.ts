@@ -2,6 +2,19 @@ import {
   faRoute,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
+import { slugify } from '@/utils/string';
+
+/** Route ids survive renames. Accept the original name-based URLs on read. */
+export function routeFromLink(
+  routes: readonly BikeRoute[],
+  value: string | undefined,
+): BikeRoute | undefined {
+  if (!value) return undefined;
+  return (
+    routes.find((route) => route.id === value) ??
+    routes.find((route) => slugify(route.name) === value)
+  );
+}
 
 export interface BikeRoute {
   id: string; // Mapbox layer ID
@@ -12,6 +25,7 @@ export interface BikeRoute {
   defaultWidth: number; // Default line width
   opacity: number; // Line opacity (0-1)
   distance: number; // Route distance in miles
+  featured?: boolean; // List in the home map's Casual menu
   reverseDirection?: boolean; // Flip arrow direction on this route
   reverseArrowBounds?: [number, number, number, number][]; // Flip arrow geometry within [swLng, swLat, neLng, neLat]
   hideArrows?: boolean; // Don't show directional arrows on this route
@@ -22,7 +36,12 @@ export interface BikeRoute {
 }
 
 export type RouteKind = 'ride' | 'greenway' | 'path' | 'trail';
-export type RouteGeometrySource = 'imported' | 'studio' | 'trail';
+export type RouteGeometrySource =
+  | 'composed'
+  | 'drawn'
+  | 'imported'
+  | 'studio'
+  | 'trail';
 
 export const bikeRoutes: BikeRoute[] = [
   {

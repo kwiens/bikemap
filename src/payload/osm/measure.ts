@@ -11,17 +11,17 @@
  * estimate distance while you drag, but the number that gets *stored* comes
  * from here, sampled against the same DEM at the same zoom every time.
  */
-import {
-  boundsOf,
-  gapsBetweenParts,
-  lengthMeters,
-  walkingOrder,
-  type AssemblyGap,
-} from './assemble';
+import { boundsOf, lengthMeters, type AssemblyGap } from './assemble';
+import { elevationSections } from './elevation-sections';
 import { sampleTerrainParts, type TerrainPoint } from './terrain';
 import { M_TO_FT, METERS_TO_MILES } from './units';
-import { computeElevation, pointsToElevationProfile } from '@/utils/ride-stats';
+import {
+  computeElevation,
+  haversineDistance,
+  pointsToElevationProfile,
+} from '@/utils/ride-stats';
 import type { ElevationProfile } from '@/data/mountain-bike-trails';
+import type { ElevationTotals } from '@/utils/elevation';
 
 export interface Measurements {
   /** [swLng, swLat, neLng, neLat], for zoom-to-fit. */
@@ -29,8 +29,8 @@ export interface Measurements {
   /** Miles. */
   distance: number;
   /**
-   * Breaks between consecutive parts in walking order, worst first. Part
-   * indices refer to the `parts` that were passed in, not the walk.
+   * Breaks between measured sections, worst first. Part indices refer to the
+   * supplied geometry.
    */
   gaps: AssemblyGap[];
   /** Feet. Null when no terrain could be read. */
@@ -64,38 +64,38 @@ export const EMPTY_MEASUREMENTS: Measurements = {
 };
 
 /**
- * Measures connected runs of coordinates.
- *
- * Gaps between parts are not walked, so a trail in two pieces measures the sum
- * of the pieces rather than including the hop between them. The parts are put
- * in walking order first, whatever order they were stored in: the profile
- * follows that order, and so do gain and loss, which swap when a part is
- * walked the other way.
+ * Measures each continuous section, including joins between source parts.
+ * Distance and climbing exclude the transition between sections.
  */
 export async function measureParts(
   parts: [number, number][][],
   name: string,
   options: MeasureOptions = {},
 ): Promise<Measurements> {
-  // Blanking short parts keeps their slots, so step indices stay indices into
-  // `parts` and the gaps below can be reported against the stored line.
-  const steps = walkingOrder(
-    parts.map((part) => (part.length >= 2 ? part : [])),
-  );
-  if (steps.length === 0) {
+  const sections = elevationSections(parts);
+  if (sections.length === 0) {
     return { ...EMPTY_MEASUREMENTS };
   }
-  const usable = steps.map(({ index, reversed }) =>
-    reversed ? [...parts[index]].reverse() : parts[index],
-  );
-  const gaps = gapsBetweenParts(usable).map((gap) => ({
-    ...gap,
-    fromPart: steps[gap.fromPart].index,
-    toPart: steps[gap.toPart].index,
-  }));
+  const runs = sections.map(({ coordinates }) => coordinates);
+  const gaps = sections
+    .slice(1)
+    .map((section, index) => {
+      const previous = sections[index];
+      const [fromLng, fromLat] =
+        previous.coordinates[previous.coordinates.length - 1];
+      const [toLng, toLat] = section.coordinates[0];
+      return {
+        distanceMeters: Math.round(
+          haversineDistance(fromLat, fromLng, toLat, toLng),
+        ),
+        fromPart: previous.lastPart,
+        toPart: section.firstPart,
+      };
+    })
+    .sort((a, b) => b.distanceMeters - a.distanceMeters);
 
   const warnings: string[] = [];
-  const meters = lengthMeters(usable);
+  const meters = lengthMeters(runs);
 
   let profile: ElevationProfile | null = null;
   let gain: number | null = null;
@@ -104,10 +104,7 @@ export async function measureParts(
   let max: number | null = null;
 
   if (options.withElevation !== false && options.mapboxToken) {
-    // Per part, never across: the pieces of a trail are separated by ground the
-    // trail does not cross, and neither the climb over it nor its length is the
-    // trail's.
-    const sampled = await sampleTerrainParts(usable, options.mapboxToken);
+    const sampled = await sampleTerrainParts(runs, options.mapboxToken);
     if (sampled) {
       const totals = totalsAcrossParts(sampled);
       gain = Math.round(totals.gain * M_TO_FT);
@@ -123,7 +120,7 @@ export async function measureParts(
   }
 
   return {
-    bounds: boundsOf(usable),
+    bounds: boundsOf(parts),
     distance: Number((meters * METERS_TO_MILES).toFixed(2)),
     elevationGain: gain,
     elevationLoss: loss,
@@ -133,14 +130,6 @@ export async function measureParts(
     profile,
     warnings,
   };
-}
-
-/** Meters, the unit `computeElevation` reports and the `stats` override takes. */
-interface ElevationTotals {
-  gain: number;
-  loss: number;
-  max: number;
-  min: number;
 }
 
 /**

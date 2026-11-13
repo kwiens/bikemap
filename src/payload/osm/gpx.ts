@@ -9,7 +9,8 @@
  * Client-safe on purpose: it runs in the admin bundle, against the browser's
  * `DOMParser`, and has no Node-only imports.
  */
-import { MIN_POINTS_PER_PART } from './geometry';
+import { dropRepeatedPoints, MIN_POINTS_PER_PART } from './geometry';
+import { parseDecimal } from '@/utils/parse-decimal';
 
 /**
  * How far, in meters, a simplified line may stray from the recording.
@@ -76,10 +77,10 @@ export function parseGpx(
   }
 
   const segments = byLocalName(doc, 'trkseg');
-  const runs =
-    segments.length > 0
-      ? segments.map((segment) => byLocalName(segment, 'trkpt'))
-      : byLocalName(doc, 'rte').map((route) => byLocalName(route, 'rtept'));
+  const trackRuns = segments.map((segment) => byLocalName(segment, 'trkpt'));
+  const runs = trackRuns.some((run) => run.length >= MIN_POINTS_PER_PART)
+    ? trackRuns
+    : byLocalName(doc, 'rte').map((route) => byLocalName(route, 'rtept'));
 
   const pointCount = runs.reduce((total, run) => total + run.length, 0);
   if (pointCount > maxPoints) {
@@ -92,7 +93,7 @@ export function parseGpx(
   let pointsRead = 0;
   const parts: [number, number][][] = [];
   for (const run of runs) {
-    const points = dropRepeats(run.flatMap(positionOf));
+    const points = dropRepeatedPoints(run.flatMap(positionOf));
     pointsRead += points.length;
     if (points.length >= MIN_POINTS_PER_PART) {
       parts.push(simplifyLine(points, toleranceMeters));
@@ -213,18 +214,7 @@ function positionOf(point: Element): [number, number][] {
  * is 0, so without the blank check an empty `lat=""` would plot at the equator.
  */
 function coordinateOf(point: Element, name: 'lat' | 'lon'): number {
-  const raw = point.getAttribute(name)?.trim();
-  return raw ? Number(raw) : Number.NaN;
-}
-
-/** A stopped recorder logs the same fix over and over; one copy is enough. */
-function dropRepeats(points: [number, number][]): [number, number][] {
-  return points.filter(
-    (point, index) =>
-      index === 0 ||
-      point[0] !== points[index - 1][0] ||
-      point[1] !== points[index - 1][1],
-  );
+  return parseDecimal(point.getAttribute(name) ?? '') ?? NaN;
 }
 
 /**

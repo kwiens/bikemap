@@ -3,6 +3,7 @@ import {
   featuresToParts,
   parseTrailGeometry,
   partsToFeatures,
+  roundParts,
   samePartsAs,
   toTrailGeometry,
 } from './geometry';
@@ -70,6 +71,18 @@ describe('parseTrailGeometry', () => {
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toMatch(/longitude, latitude/);
   });
+
+  it.each([null, false, '', ['0'], {}])(
+    'rejects the non-numeric ordinate %j',
+    (ordinate) => {
+      expect(
+        parseTrailGeometry({
+          coordinates: [A, [ordinate, 44]],
+          type: 'LineString',
+        }).ok,
+      ).toBe(false);
+    },
+  );
 
   it('rejects a non-line geometry', () => {
     const parsed = parseTrailGeometry({ coordinates: A, type: 'Point' });
@@ -192,5 +205,23 @@ describe('parts <-> Terra Draw features', () => {
         {},
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('roundParts', () => {
+  it('rounds to the precision Terra Draw accepts, without touching its input', () => {
+    const parts: [number, number][][] = [
+      [
+        [-121.39671298408157, 44.032515251951345],
+        [-121.3, 44.1],
+      ],
+    ];
+    expect(roundParts(parts)).toEqual([
+      [
+        [-121.396713, 44.0325153],
+        [-121.3, 44.1],
+      ],
+    ]);
+    expect(parts[0][0][0]).toBe(-121.39671298408157);
   });
 });

@@ -134,7 +134,7 @@ export interface UserAuthOperations {
   };
 }
 /**
- * Every published Route appears in Casual mode. Its geometry may come from an import, an existing Trail, or a current Mapbox Studio layer.
+ * Published routes appear on the map. Feature a route to list it in the home menu. Build a route from trails and roads or reuse an import, an existing Trail, or a Mapbox Studio layer.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "routes".
@@ -152,9 +152,9 @@ export interface Route {
   routeId?: string | null;
   kind?: ('ride' | 'greenway' | 'path' | 'trail') | null;
   /**
-   * Imported and Trail sources are database geometry. Studio is explicit for legacy routes that have not been migrated yet.
+   * Start new to draw a line, build a route with trail and road snapping, or reuse existing geometry.
    */
-  geometrySource: 'imported' | 'trail' | 'studio';
+  geometrySource: 'drawn' | 'composed' | 'imported' | 'trail' | 'studio';
   /**
    * Select a curated trail to expose it in the Casual routes tab.
    */
@@ -163,6 +163,10 @@ export interface Route {
    * Short description shown under the route in Casual mode.
    */
   description?: string | null;
+  /**
+   * Show this route in the home map’s Casual menu.
+   */
+  featured?: boolean | null;
   color: string;
   defaultWidth: number;
   opacity: number;
@@ -196,8 +200,17 @@ export interface Route {
     | number
     | boolean
     | null;
+  plan?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   /**
-   * Normalized WGS84 route geometry. Import tooling owns this value when the source is Imported geometry.
+   * Draw a line, import a GPX file, or adjust its points. Save to measure distance and bounds.
    */
   geom?:
     | {
@@ -271,10 +284,8 @@ export interface Trail {
     | number
     | boolean
     | null;
-  /**
-   * Use this if the line or its measurements look out of date. OpenStreetMap lines are fetched again; drawn lines are measured again.
-   */
   rebuildGeometry?: boolean | null;
+  rebuildElevation?: boolean | null;
   osmReport?:
     | {
         [k: string]: unknown;
@@ -636,6 +647,7 @@ export interface RoutesSelect<T extends boolean = true> {
   geometrySource?: T;
   sourceTrail?: T;
   description?: T;
+  featured?: T;
   color?: T;
   defaultWidth?: T;
   opacity?: T;
@@ -644,6 +656,7 @@ export interface RoutesSelect<T extends boolean = true> {
   reverseDirection?: T;
   bounds?: T;
   reverseArrowBounds?: T;
+  plan?: T;
   geom?: T;
   sourcePath?: T;
   sourceSha256?: T;
@@ -668,6 +681,7 @@ export interface TrailsSelect<T extends boolean = true> {
   geom?: T;
   osmIds?: T;
   rebuildGeometry?: T;
+  rebuildElevation?: T;
   osmReport?: T;
   distance?: T;
   elevationGain?: T;
@@ -815,7 +829,7 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   createdAt?: T;
 }
 /**
- * How the admin looks. Changes apply on the next page load. Clear a field to fall back to the default.
+ * Choose colors for the public map. Save and reload the map to see your changes. Clear a color to use its default.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "theme".
@@ -823,23 +837,25 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 export interface Theme {
   id: number;
   /**
-   * Focus rings and highlights. Default #c3f44d.
+   * Colors selected routes, trails, rides, and keyboard focus rings. Also colors selected tabs on Ride Bend.
+   */
+  primaryColor?: string | null;
+  /**
+   * Colors headings and icon backgrounds on the About page, plus the menu and floating buttons on Ride Bend.
+   */
+  sidebarColor?: string | null;
+  /**
+   * Colors page backgrounds, cards, and forms, plus the menu and floating buttons on Bike Chatt.
+   */
+  surfaceColor?: string | null;
+  /**
+   * Colors text and Bike Chatt’s floating button icons. Also tints gray text, borders, and dividers.
+   */
+  textColor?: string | null;
+  /**
+   * Colors layer switches when they are on and floating buttons when hovered on Ride Bend.
    */
   accentColor?: string | null;
-  /**
-   * Deep brand colour. Default #1a434e.
-   */
-  deepColor?: string | null;
-  /**
-   * The cast of the greys everything is built from. Applies to both light and dark mode, because Payload derives dark mode by inverting the same scale.
-   */
-  neutralTint?: ('cool' | 'neutral' | 'warm') | null;
-  cornerStyle?: ('sharp' | 'soft' | 'round') | null;
-  fontFamily?: ('geist' | 'system' | 'serif') | null;
-  /**
-   * Escape hatch for anything the fields above do not cover. Injected verbatim into the admin. Admins only — treat it as code.
-   */
-  customCss?: string | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -848,12 +864,11 @@ export interface Theme {
  * via the `definition` "theme_select".
  */
 export interface ThemeSelect<T extends boolean = true> {
+  primaryColor?: T;
+  sidebarColor?: T;
+  surfaceColor?: T;
+  textColor?: T;
   accentColor?: T;
-  deepColor?: T;
-  neutralTint?: T;
-  cornerStyle?: T;
-  fontFamily?: T;
-  customCss?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;

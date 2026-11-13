@@ -12,10 +12,28 @@
 @import 'mapbox-gl/dist/mapbox-gl.css' layer(vendor);
 @import '@fortawesome/fontawesome-svg-core/styles.css' layer(vendor);
 
-@theme {
-  --color-app-primary: #c3f44d;
-  --color-app-secondary: #1a434e;
+/* Payload sets the palette on :root. Inline theme tokens resolve at the element
+ * that uses them, including opacity modifiers on the Tailwind utilities. */
+@theme inline {
+  --color-app-primary: rgb(var(--app-primary));
+  --color-app-secondary: rgb(var(--app-secondary));
+  --color-app-surface: rgb(var(--app-surface));
+  --color-app-ink: rgb(var(--app-ink));
+  --color-app-accent: rgb(var(--app-accent));
+  --color-white: rgb(var(--app-surface));
+  --color-gray-50: color-mix(in srgb, rgb(var(--app-surface)) 97%, rgb(var(--app-ink)));
+  --color-gray-100: color-mix(in srgb, rgb(var(--app-surface)) 93%, rgb(var(--app-ink)));
+  --color-gray-200: color-mix(in srgb, rgb(var(--app-surface)) 85%, rgb(var(--app-ink)));
+  --color-gray-300: color-mix(in srgb, rgb(var(--app-surface)) 72%, rgb(var(--app-ink)));
+  --color-gray-400: color-mix(in srgb, rgb(var(--app-surface)) 52%, rgb(var(--app-ink)));
+  --color-gray-500: color-mix(in srgb, rgb(var(--app-surface)) 35%, rgb(var(--app-ink)));
+  --color-gray-600: color-mix(in srgb, rgb(var(--app-surface)) 24%, rgb(var(--app-ink)));
+  --color-gray-700: color-mix(in srgb, rgb(var(--app-surface)) 14%, rgb(var(--app-ink)));
+  --color-gray-800: color-mix(in srgb, rgb(var(--app-surface)) 7%, rgb(var(--app-ink)));
+  --color-gray-900: rgb(var(--app-ink));
+}
 
+@theme {
   /*
    * Tailwind 3's absolute line heights. v4 switched to unitless ratios, which
    * children inherit as ratios, so a `text-[10px]` icon inside `text-sm`
@@ -138,6 +156,14 @@
  * unlayered `* { padding: 0 }` would override every `p-*` class.
  */
 @layer base {
+  :root {
+    --app-primary: 195 244 77;
+    --app-secondary: 26 67 78;
+    --app-surface: 255 255 255;
+    --app-ink: 26 67 78;
+    --app-accent: 165 215 48;
+  }
+
   /* Tailwind 3 defaults that v4 dropped and this UI was built against. */
   *,
   ::after,
@@ -185,6 +211,8 @@
   }
 
   body {
+    background: rgb(var(--app-surface));
+    color: rgb(var(--app-ink));
     margin: 0;
     padding: 0;
     overflow: hidden;

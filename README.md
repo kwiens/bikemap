@@ -27,8 +27,10 @@ Open Bike Map is a fork-and-edit, not a rewrite. Everything a community controls
 
 - **`src/config/site.config.ts`** — branding (name, description, colors, PWA identity).
 - **`src/config/map.config.ts`** — geography (Mapbox style, default view, GBFS feed, region).
-- **`src/data/*`** — routes, trails, shops, and points of interest as plain typed arrays. No database, no CMS.
+- **`src/data/*`** — city configuration, seed metadata, shops, and bundled trail and attraction fallbacks.
 - **`public/*`** — logos, icons, splash screens.
+
+Add Postgres to publish curated routes and manage routes, trails, and attractions at **`/admin`**. The map also runs without a database and uses the configured trail and attraction fallbacks.
 
 The full step-by-step is in **[docs/DEPLOYING.md](docs/DEPLOYING.md)**; the data-file contract is in **[docs/DATA.md](docs/DATA.md)**.
 
@@ -36,7 +38,7 @@ The full step-by-step is in **[docs/DEPLOYING.md](docs/DEPLOYING.md)**; the data
 
 ### For riders
 
-- **Curated bike routes** — Hand-picked road, greenway, and connector routes styled in Mapbox Studio with descriptions, distance, and zoom-to-fit bounds.
+- **Curated bike routes** — Published routes with descriptions, distance, and zoom-to-fit bounds. Curators can draw, snap, import, or link a trail in Payload. Legacy routes can explicitly use Mapbox Studio geometry.
 - **Mountain bike trails** — 220+ trails in the reference deployment, grouped by recreation area and region, color-coded by difficulty, with per-trail elevation profiles.
 - **Real-time bike share** — Live station availability via the [GBFS](https://gbfs.org/) standard, configurable per region.
 - **Points of interest** — Attractions, bike shops, rentals, and local resources as toggleable map layers.
@@ -57,7 +59,7 @@ A full client-side GPS ride tracker:
 
 ### For curators / community maintainers
 
-- **Two config files** drive geography and branding; content is plain TypeScript in `src/data/` — see [docs/DATA.md](docs/DATA.md).
+- **Two config files** drive geography and branding. [Data sources](docs/DATA.md) explains which content comes from Payload, checked-in files, or external feeds.
 - **Trail tooling** — Python scripts extract trail geometry from a Mapbox tileset and sample elevation from Terrain-RGB to generate per-trail profiles. See [docs/DEPLOYING.md](docs/DEPLOYING.md).
 - **GPX export** — download rides and routes as standard GPX 1.1 files.
 
@@ -104,7 +106,7 @@ scripts/                   Python tooling for trails & elevation
 
 ## Getting started
 
-**Prerequisites:** Node.js 20+ and pnpm 10+.
+Use the Node version in [`.nvmrc`](.nvmrc) and the pnpm version in [`package.json`](package.json). See the [development setup](CONTRIBUTING.md#development-setup).
 
 ```bash
 git clone https://github.com/kwiens/bikemap.git
@@ -132,7 +134,8 @@ http://localhost:3000/?city=bend
 | `pnpm build` | Production build |
 | `pnpm start` | Run production build |
 | `pnpm test` / `pnpm test:run` | Vitest (watch / single run) |
-| `pnpm lint` / `pnpm lint:fix` | Lint + format (check / auto-fix) |
+| `pnpm check` | Lint, formatting, types, unused code, and lockfile checks |
+| `pnpm lint:fix` | Apply lint and formatting fixes |
 
 The Python trail-elevation pipeline is optional and documented in [docs/DEPLOYING.md](docs/DEPLOYING.md).
 
@@ -140,7 +143,7 @@ The Python trail-elevation pipeline is optional and documented in [docs/DEPLOYIN
 
 Tests live next to source as `*.test.ts(x)` and run under Vitest with jsdom — covering GBFS integration, ride stats and storage, DEM correction, GPX building, compass smoothing, and sidebar components.
 
-Mapbox layer events cannot be triggered synthetically — for layer-click testing, dispatch the corresponding custom event from `src/events.ts` directly.
+Use `mapSelectionHarness` from `src/test/map-selection.tsx` to test application reactions to map selection. Use a browser pointer action to verify Mapbox hit-testing.
 
 ## Deploying for your community
 
@@ -154,14 +157,13 @@ Pull requests welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for dev set
 
 ### Native app wrapper for the App Store and Google Play
 
-Open Bike Map is already a Progressive Web App — it installs to the home screen, runs offline-friendly via a service worker, and ships custom splash screens. But that doesn't match how most riders look for a bike app: they search the App Store or Google Play.
+Open Bike Map installs to the home screen as a Progressive Web App and ships custom splash screens. Map tiles and live content require a network connection.
 
-The plan is a thin native wrapper around the existing web app — most likely [Capacitor](https://capacitorjs.com/) — shipping the same codebase to the iOS App Store and Google Play alongside the web PWA. Beyond discoverability, it buys better background GPS for long rides, more reliable wake lock, native share sheets for GPX export, and a path to push notifications. The web app stays the source of truth; the wrapper is mechanical.
+The plan is a thin Expo (React Native) shell around the existing web app, shipping the same codebase to the iOS App Store and Google Play alongside the web PWA. The shell hosts the map in a WebView and provides what the web can't do well: background GPS for long rides, a reliable keep-awake, the device compass, and native share sheets. The map asks for those over a small JSON bridge — see [`docs/guides/native-shell.md`](docs/guides/native-shell.md) for the contract — and falls back to the Web APIs anywhere the shell doesn't provide them. The web app stays the source of truth; the shell is mechanical.
 
 ### Other things on the roadmap
 
-- **Multi-community switcher** — host several cities from one deployment by selecting `mapConfig` per route or subdomain.
-- **Trail conditions / closures** — community-curated overlay so locals can flag a trail as wet, closed, or rerouted.
+- **In-app community switcher** — let riders select a city in the UI. Deployments already support hostname routing and the city query override.
 - **Cloud ride sync (opt-in)** — rides are local-only today; an optional account would sync history across devices.
 - **Heatmaps from recorded rides** — anonymized aggregate to surface which informal connectors riders actually use.
 

@@ -18,15 +18,19 @@ import { FieldShell, inputStyle, useFieldId } from './admin-ui';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
-/** The swatch needs a valid 6-digit hex; anything else shows as black. */
-function swatchValue(value: string): string {
-  return HEX.test(value) ? value : '#000000';
-}
-
 export function ColorField({ field, path }: TextFieldClientProps) {
   const { setValue, showError, value } = useField<string>({ path });
   const current = value ?? '';
   const label = typeof field?.label === 'string' ? field.label : path;
+  const description = field?.admin?.description
+    ? String(field.admin.description)
+    : undefined;
+  const placeholder = field?.admin?.placeholder;
+  const defaultColor =
+    typeof placeholder === 'string' && HEX.test(placeholder)
+      ? placeholder
+      : undefined;
+  const swatchColor = HEX.test(current) ? current : (defaultColor ?? '#000000');
 
   // The label points at the hex box rather than the swatch: it is the field's
   // source of truth, and it is the one you can type into.
@@ -34,9 +38,7 @@ export function ColorField({ field, path }: TextFieldClientProps) {
 
   return (
     <FieldShell
-      description={
-        field?.admin?.description ? String(field.admin.description) : undefined
-      }
+      description={description}
       htmlFor={inputId}
       label={label}
       path={path}
@@ -56,13 +58,13 @@ export function ColorField({ field, path }: TextFieldClientProps) {
             width: 48,
           }}
           type="color"
-          value={swatchValue(current)}
+          value={swatchColor}
         />
         <input
           className="field-type__wrap"
           id={inputId}
           onChange={(event) => setValue(event.target.value)}
-          placeholder="#c3f44d"
+          placeholder={defaultColor ?? '#c3f44d'}
           spellCheck={false}
           style={{
             ...inputStyle(true),

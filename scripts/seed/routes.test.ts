@@ -2,7 +2,11 @@ import { faRoute } from '@fortawesome/free-solid-svg-icons';
 import type { Payload } from 'payload';
 import { describe, expect, it, vi } from 'vitest';
 import type { BikeRoute } from '../../src/data/bike-routes';
-import { upsertStudioRoute } from './routes';
+import {
+  type ImportedRoute,
+  upsertImportedRoute,
+  upsertStudioRoute,
+} from './routes';
 
 const route: BikeRoute = {
   color: '#F97316',
@@ -32,6 +36,7 @@ describe('upsertStudioRoute', () => {
       collection: 'routes',
       data: expect.objectContaining({
         _status: 'published',
+        featured: true,
         geom: null,
         geometrySource: 'studio',
         routeId: route.id,
@@ -39,26 +44,31 @@ describe('upsertStudioRoute', () => {
     });
   });
 
-  it('does not restore Studio after a curator migrates the route', async () => {
-    const update = vi.fn();
-    const payload = {
-      find: vi.fn().mockResolvedValue({
-        docs: [{ id: 7, geometrySource: 'trail' }],
-      }),
-      update,
-    } as unknown as Payload;
+  it.each(['trail', 'composed', 'drawn'])(
+    'does not restore Studio over a %s route',
+    async (geometrySource) => {
+      const update = vi.fn();
+      const payload = {
+        find: vi.fn().mockResolvedValue({
+          docs: [{ id: 7, geometrySource }],
+        }),
+        update,
+      } as unknown as Payload;
 
-    await expect(
-      upsertStudioRoute(payload, { city: 'chattanooga', route }),
-    ).resolves.toBe('preserved');
-    expect(update).not.toHaveBeenCalled();
-  });
+      await expect(
+        upsertStudioRoute(payload, { city: 'chattanooga', route }),
+      ).resolves.toBe('preserved');
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
 
   it('repairs an imported placeholder that has no geometry', async () => {
     const update = vi.fn().mockResolvedValue({});
     const payload = {
       find: vi.fn().mockResolvedValue({
-        docs: [{ id: 7, geom: null, geometrySource: 'imported' }],
+        docs: [
+          { id: 7, geom: null, geometrySource: 'imported', featured: false },
+        ],
       }),
       update,
     } as unknown as Payload;
@@ -71,5 +81,63 @@ describe('upsertStudioRoute', () => {
       id: 7,
       data: expect.objectContaining({ geometrySource: 'studio' }),
     });
+    expect(update.mock.calls[0][0].data).not.toHaveProperty('featured');
+  });
+});
+
+describe('upsertImportedRoute', () => {
+  const input: ImportedRoute = {
+    city: 'bend',
+    geom: {
+      type: 'MultiLineString',
+      coordinates: [
+        [
+          [-121.31, 44.05],
+          [-121.3, 44.06],
+        ],
+      ],
+    },
+    route,
+    sourceFeatureCount: 1,
+    sourcePath: 'public/data/bend/bike-network.geojson',
+    sourceSha256: 'abc123',
+  };
+
+  it.each(['trail', 'composed', 'drawn'])(
+    'does not restore imported geometry over a %s route',
+    async (geometrySource) => {
+      const update = vi.fn();
+      const payload = {
+        find: vi.fn().mockResolvedValue({
+          docs: [{ id: 7, geometrySource }],
+        }),
+        update,
+      } as unknown as Payload;
+
+      await expect(upsertImportedRoute(payload, input)).resolves.toBe(
+        'preserved',
+      );
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refreshes a stale imported route', async () => {
+    const update = vi.fn().mockResolvedValue({});
+    const payload = {
+      find: vi.fn().mockResolvedValue({
+        docs: [
+          { id: 7, geom: null, geometrySource: 'imported', featured: false },
+        ],
+      }),
+      update,
+    } as unknown as Payload;
+
+    await expect(upsertImportedRoute(payload, input)).resolves.toBe('updated');
+    expect(update).toHaveBeenCalledWith({
+      collection: 'routes',
+      id: 7,
+      data: expect.objectContaining({ geometrySource: 'imported' }),
+    });
+    expect(update.mock.calls[0][0].data).not.toHaveProperty('featured');
   });
 });

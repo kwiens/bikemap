@@ -3,8 +3,17 @@ import * as migration_20260919_194419 from './20260919_194419';
 import * as migration_20260919_215743 from './20260919_215743';
 import * as migration_20260919_223908_backfill_chattanooga_supplemental_trails from './20260919_223908_backfill_chattanooga_supplemental_trails';
 import * as migration_20260919_224403 from './20260919_224403';
+import * as migration_20260921_152202_repair_cherokee_trail_geometry from './20260921_152202_repair_cherokee_trail_geometry';
+import * as migration_20261001_221021_add_composed_routes from './20261001_221021_add_composed_routes';
+import * as migration_20261002_041000_ensure_theme_global from './20261002_041000_ensure_theme_global';
+import * as migration_20261002_043000_expand_theme_palette from './20261002_043000_expand_theme_palette';
+import * as migration_20261002_050000_simplify_theme_palette from './20261002_050000_simplify_theme_palette';
+import * as migration_20261029_220844_add_drawn_routes from './20261029_220844_add_drawn_routes';
 import * as migration_20261112_231534_add_attractions from './20261112_231534_add_attractions';
 import * as migration_20261112_232901_seed_school_traffic_gardens from './20261112_232901_seed_school_traffic_gardens';
+import * as refreshChattanoogaElevation from './20261112_233931_refresh_chattanooga_elevation';
+
+import * as addRouteFeatured from './20261112_235419_add_route_featured';
 
 export const migrations = [
   {
@@ -33,6 +42,36 @@ export const migrations = [
     name: '20260919_224403',
   },
   {
+    up: migration_20260921_152202_repair_cherokee_trail_geometry.up,
+    down: migration_20260921_152202_repair_cherokee_trail_geometry.down,
+    name: '20260921_152202_repair_cherokee_trail_geometry',
+  },
+  {
+    up: migration_20261001_221021_add_composed_routes.up,
+    down: migration_20261001_221021_add_composed_routes.down,
+    name: '20261001_221021_add_composed_routes',
+  },
+  {
+    up: migration_20261002_041000_ensure_theme_global.up,
+    down: migration_20261002_041000_ensure_theme_global.down,
+    name: '20261002_041000_ensure_theme_global',
+  },
+  {
+    up: migration_20261002_043000_expand_theme_palette.up,
+    down: migration_20261002_043000_expand_theme_palette.down,
+    name: '20261002_043000_expand_theme_palette',
+  },
+  {
+    up: migration_20261002_050000_simplify_theme_palette.up,
+    down: migration_20261002_050000_simplify_theme_palette.down,
+    name: '20261002_050000_simplify_theme_palette',
+  },
+  {
+    up: migration_20261029_220844_add_drawn_routes.up,
+    down: migration_20261029_220844_add_drawn_routes.down,
+    name: '20261029_220844_add_drawn_routes',
+  },
+  {
     up: migration_20261112_231534_add_attractions.up,
     down: migration_20261112_231534_add_attractions.down,
     name: '20261112_231534_add_attractions',
@@ -41,5 +80,15 @@ export const migrations = [
     up: migration_20261112_232901_seed_school_traffic_gardens.up,
     down: migration_20261112_232901_seed_school_traffic_gardens.down,
     name: '20261112_232901_seed_school_traffic_gardens',
+  },
+  {
+    up: refreshChattanoogaElevation.up,
+    down: refreshChattanoogaElevation.down,
+    name: '20261112_233931_refresh_chattanooga_elevation',
+  },
+  {
+    up: addRouteFeatured.up,
+    down: addRouteFeatured.down,
+    name: '20261112_235419_add_route_featured',
   },
 ];

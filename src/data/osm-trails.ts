@@ -8,6 +8,25 @@
 // filter and color on. The layer is hidden by default and toggled from the
 // "Map Layers" sidebar section.
 
+import type { FilterSpecification } from 'mapbox-gl';
+
+// Bike-relevant trails. A way qualifies when bikes are explicitly permitted
+// (`bicycle` in yes/designated/permissive — this wins even over a general
+// access restriction), OR it carries an `mtb:scale` tag (MTB singletrack often
+// lacks an explicit bicycle tag) or is a cycleway AND is not bike-denied
+// (`bicycle=no/private`) or access-restricted (`access=no/private`). This keeps
+// foot-only / horse-only and explicitly off-limits paths out of the layer.
+export const OSM_BIKE_TRAIL_FILTER: FilterSpecification = [
+  'any',
+  ['in', ['get', 'bicycle'], ['literal', ['yes', 'designated', 'permissive']]],
+  [
+    'all',
+    ['any', ['has', 'mtb:scale'], ['==', ['get', 'highway'], 'cycleway']],
+    ['!', ['in', ['get', 'bicycle'], ['literal', ['no', 'private']]]],
+    ['!', ['in', ['get', 'access'], ['literal', ['no', 'private']]]],
+  ],
+];
+
 export const OSM_TRAILS_SOURCE_ID = 'osm-trails-source';
 export const OSM_TRAILS_LAYER_ID = 'osm-trails';
 export const OSM_TRAILS_CASING_LAYER_ID = 'osm-trails-casing';

@@ -29,11 +29,12 @@ export function parseElevationProfile(value: unknown): ElevationProfile | null {
   const profile = value as Partial<ElevationProfile>;
   if (
     typeof profile.trail !== 'string' ||
-    !isFiniteNumber(profile.distance) ||
-    !isFiniteNumber(profile.gain) ||
-    !isFiniteNumber(profile.loss) ||
+    !isNonnegative(profile.distance) ||
+    !isNonnegative(profile.gain) ||
+    !isNonnegative(profile.loss) ||
     !isFiniteNumber(profile.min) ||
     !isFiniteNumber(profile.max) ||
+    profile.min > profile.max ||
     !Array.isArray(profile.profile) ||
     profile.profile.length === 0 ||
     !profile.profile.every(isProfilePoint) ||
@@ -73,14 +74,93 @@ export function measurementsFromElevationProfile(
   };
 }
 
+/** Finds section boundaries in both stored profiles and legacy ride charts. */
+export function elevationProfileBreaks(
+  points: ElevationProfile['profile'],
+  gaps: ElevationProfile['geometryGapDetails'] = [],
+): Map<number, ElevationProfileGapDetail | undefined> {
+  const byEdge = new Map(
+    gaps.map((gap) => [
+      `${gap.from[0]},${gap.from[1]}:${gap.to[0]},${gap.to[1]}`,
+      gap,
+    ]),
+  );
+  const breaks = new Map<number, ElevationProfileGapDetail | undefined>();
+  for (let index = 1; index < points.length; index++) {
+    const [distance, , lng, lat] = points[index];
+    const [previousDistance, , previousLng, previousLat] = points[index - 1];
+    const gap = byEdge.get(`${previousLng},${previousLat}:${lng},${lat}`);
+    const hasJumpAtSameDistance =
+      distance === previousDistance &&
+      (lng !== previousLng || lat !== previousLat);
+    if (gap || distance < previousDistance || hasJumpAtSameDistance) {
+      breaks.set(index, gap);
+    }
+  }
+  return breaks;
+}
+
+export interface ElevationChartLayout {
+  pointX: number[];
+  ranges: [number, number][];
+  breaks: { left: number; right: number; label: string }[];
+}
+
+/** Gives breaks display space without adding distance to the profile. */
+export function layoutElevationChart(
+  points: ElevationProfile['profile'],
+  width: number,
+  gapDetails: ElevationProfile['geometryGapDetails'],
+): ElevationChartLayout {
+  const boundaries = elevationProfileBreaks(points, gapDetails);
+  // Keep at least 80% of a narrow chart for the measured terrain.
+  const gapWidth = Math.min(14, (width * 0.2) / Math.max(boundaries.size, 1));
+  const plotWidth = width - gapWidth * boundaries.size;
+  let distance = 0;
+  const distances = points.map(([position], index) => {
+    if (index > 0 && !boundaries.has(index)) {
+      distance += position - points[index - 1][0];
+    }
+    return distance;
+  });
+  const breaks: ElevationChartLayout['breaks'] = [];
+  const starts = points.length ? [0] : [];
+  const pointX = distances.map((position, index) => {
+    const left =
+      (position / (distance || 1)) * plotWidth + breaks.length * gapWidth;
+    if (!boundaries.has(index)) return left;
+
+    const feet = boundaries.get(index)?.feet ?? 0;
+    const right = left + gapWidth;
+    starts.push(index);
+    breaks.push({
+      left,
+      right,
+      label:
+        feet > 0
+          ? `${feet.toLocaleString()} ft between sections`
+          : 'Section break',
+    });
+    return right;
+  });
+  return {
+    breaks,
+    pointX,
+    ranges: starts.map((start, index) => [
+      start,
+      starts[index + 1] ?? points.length,
+    ]),
+  };
+}
+
 function isProfilePoint(value: unknown): boolean {
   return (
     Array.isArray(value) &&
     value.length >= 4 &&
-    isFiniteNumber(value[0]) &&
+    isNonnegative(value[0]) &&
     isFiniteNumber(value[1]) &&
-    isFiniteNumber(value[2]) &&
-    isFiniteNumber(value[3])
+    isLongitude(value[2]) &&
+    isLatitude(value[3])
   );
 }
 
@@ -90,7 +170,7 @@ function isGapDetail(value: unknown): value is ElevationProfileGapDetail {
   }
   const gap = value as Partial<ElevationProfileGapDetail>;
   return (
-    isFiniteNumber(gap.feet) && isCoordinate(gap.from) && isCoordinate(gap.to)
+    isNonnegative(gap.feet) && isCoordinate(gap.from) && isCoordinate(gap.to)
   );
 }
 
@@ -98,9 +178,21 @@ function isCoordinate(value: unknown): value is [number, number] {
   return (
     Array.isArray(value) &&
     value.length >= 2 &&
-    isFiniteNumber(value[0]) &&
-    isFiniteNumber(value[1])
+    isLongitude(value[0]) &&
+    isLatitude(value[1])
   );
+}
+
+function isLongitude(value: unknown): boolean {
+  return isFiniteNumber(value) && Math.abs(value) <= 180;
+}
+
+function isLatitude(value: unknown): boolean {
+  return isFiniteNumber(value) && Math.abs(value) <= 90;
+}
+
+function isNonnegative(value: unknown): boolean {
+  return isFiniteNumber(value) && value >= 0;
 }
 
 function isFiniteNumber(value: unknown): value is number {

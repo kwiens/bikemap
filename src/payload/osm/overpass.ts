@@ -8,10 +8,12 @@
  * (This mirrors the choice made in scripts/osm_trail_elevation.py.)
  *
  * The public endpoint is a shared community resource. Requests here are
- * deliberately small — a handful of way ids from one editor pressing save —
- * and must send a User-Agent or Overpass answers 406.
+ * deliberately small — a handful of way ids from one editor pressing save, or
+ * one capped, cached box of trail network for Follow trails — and must send a
+ * User-Agent or Overpass answers 406.
  */
 import { MAX_WAYS_PER_REQUEST } from './ids';
+import type { NetworkWay } from './trail-network';
 
 /** A single OSM way with its full-resolution geometry. */
 export interface OsmWay {
@@ -29,14 +31,14 @@ export interface OverpassOptions {
   timeoutSeconds?: number;
 }
 
-const DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+export const DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
 // Overpass rejects requests without one (HTTP 406). Identify the app so
 // operators can see who's calling.
 const USER_AGENT =
   'open-bike-map/1.0 (+https://github.com/kwiens/bikemap; trail editor)';
 
-interface OverpassElement {
+export interface OverpassElement {
   geometry?: { lat: number; lon: number }[];
   id: number;
   tags?: Record<string, string>;
@@ -67,10 +69,20 @@ const BASE_BACKOFF_MS = 2000;
  */
 const MAX_BACKOFF_MS = 30_000;
 
-const sleep = (ms: number) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    signal?.throwIfAborted();
+    const abort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', abort, { once: true });
   });
+}
 
 /**
  * Retry-After as milliseconds, or null when it can't be read as delay-seconds.
@@ -93,7 +105,7 @@ function retryAfterMs(header: string | null): number | null {
   return Math.min(seconds * 1000, MAX_BACKOFF_MS);
 }
 
-async function requestWithRetry(
+export async function requestWithRetry(
   endpoint: string,
   query: string,
   options: OverpassOptions,
@@ -128,7 +140,10 @@ async function requestWithRetry(
     // to doubling when it is not. Retrying without a wait is worse than not
     // retrying at all against a shared endpoint that just said "slow down".
     const retryAfter = retryAfterMs(response.headers.get('Retry-After'));
-    await sleep(retryAfter ?? BASE_BACKOFF_MS * 2 ** (attempt - 1));
+    await delay(
+      retryAfter ?? BASE_BACKOFF_MS * 2 ** (attempt - 1),
+      options.signal,
+    );
   }
 
   throw new OverpassError(
@@ -137,6 +152,41 @@ async function requestWithRetry(
       : `Overpass request failed with HTTP ${lastStatus}`,
     lastStatus,
   );
+}
+
+/**
+ * The elements of an Overpass response, or an OverpassError when the query
+ * failed while running.
+ *
+ * Overpass reports a timed-out or out-of-memory query as HTTP 200 with a
+ * `remark` and empty or partial `elements`. Read as success, that becomes an
+ * empty network cached for hours — so any `runtime error` remark is a failure,
+ * which the endpoints answer with a 502 and do not cache.
+ */
+export async function readOverpassElements<
+  Element extends OverpassElement = OverpassElement,
+>(response: Response): Promise<Element[]> {
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new OverpassError(
+      'Overpass returned an invalid response.',
+      response.status,
+    );
+  }
+  const { elements, remark } = payload as Record<string, unknown>;
+  if (typeof remark === 'string' && /runtime error/i.test(remark)) {
+    throw new OverpassError(
+      `Overpass could not finish the query (${remark.trim()}). Try again shortly.`,
+      response.status,
+    );
+  }
+  if (!Array.isArray(elements)) {
+    throw new OverpassError(
+      'Overpass returned no elements list.',
+      response.status,
+    );
+  }
+  return elements as Element[];
 }
 
 /**
@@ -152,7 +202,7 @@ export async function fetchWaysByIds(
   options: OverpassOptions = {},
 ): Promise<OsmWay[]> {
   const unique = [...new Set(ids)].filter(
-    (id) => Number.isInteger(id) && id > 0,
+    (id) => Number.isSafeInteger(id) && id > 0,
   );
 
   if (unique.length === 0) {
@@ -175,9 +225,7 @@ export async function fetchWaysByIds(
     options,
   );
 
-  const payload = (await response.json()) as { elements?: OverpassElement[] };
-
-  return (payload.elements ?? [])
+  return (await readOverpassElements(response))
     .filter((element) => element.type === 'way' && element.geometry)
     .map((element) => ({
       coordinates: (element.geometry ?? []).map(
@@ -187,4 +235,56 @@ export async function fetchWaysByIds(
       tags: element.tags ?? {},
     }))
     .filter((way) => way.coordinates.length >= 2);
+}
+
+/**
+ * The bike-relevant ways in a box, with node ids, for the editor's routing.
+ *
+ * The filter mirrors `OSM_BIKE_TRAIL_FILTER` (and the query in
+ * `scripts/osm_trail_elevation.py`), so Follow trails routes over exactly the
+ * grey lines the editor draws. Ways come back whole even where they run outside
+ * the box, which keeps junctions near its edge connected.
+ *
+ * `bbox` is [west, south, east, north].
+ */
+export async function fetchTrailNetwork(
+  [west, south, east, north]: [number, number, number, number],
+  options: OverpassOptions = {},
+): Promise<NetworkWay[]> {
+  const timeout = options.timeoutSeconds ?? 60;
+  const box = `${south},${west},${north},${east}`;
+  const allowed = '["bicycle"!~"^(no|private)$"]["access"!~"^(no|private)$"]';
+  const query =
+    `[out:json][timeout:${timeout}];(` +
+    `way["bicycle"~"^(yes|designated|permissive)$"](${box});` +
+    `way["mtb:scale"]${allowed}(${box});` +
+    `way["highway"="cycleway"]${allowed}(${box});` +
+    ');out geom;';
+
+  const response = await requestWithRetry(
+    options.endpoint ?? DEFAULT_ENDPOINT,
+    query,
+    options,
+  );
+  const elements = await readOverpassElements<
+    OverpassElement & { nodes?: number[] }
+  >(response);
+
+  return elements
+    .filter(
+      (element) =>
+        element.type === 'way' &&
+        element.geometry &&
+        element.nodes &&
+        element.nodes.length === element.geometry.length &&
+        element.nodes.length >= 2,
+    )
+    .map((element) => ({
+      coordinates: (element.geometry ?? []).map(
+        ({ lat, lon }) => [lon, lat] as [number, number],
+      ),
+      id: element.id,
+      name: element.tags?.name ?? null,
+      nodes: element.nodes ?? [],
+    }));
 }

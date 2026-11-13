@@ -6,6 +6,7 @@ import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
 import { getCityAttractions } from '@/payload/read/attractions';
 import { getCityRoutes } from '@/payload/read/routes';
+import { getCityTrailSummaries } from '@/payload/read/trails';
 import { resolveActiveCityId } from '@/config/map.config';
 
 export const metadata: Metadata = {
@@ -25,13 +26,15 @@ export default async function EmbedDemoPage({
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
   const config = siteConfigForHostname(hostname, query.city);
-  const [{ routes }, attractions] = await Promise.all([
+  const [{ routes }, { trails }, attractions] = await Promise.all([
     getCityRoutes(cityId),
+    getCityTrailSummaries(cityId),
     getCityAttractions(cityId),
   ]);
   const builderConfig = embedBuilderConfig(
     cityId,
     routes,
+    trails,
     attractions.length > 0,
   );
 

@@ -65,7 +65,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ steps.pr.outputs.sha }}
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Check out the summary tooling from the default branch
@@ -94,10 +94,12 @@ jobs:
         run: |
           mkdir -p "$WORK_DIR"
           cp .ci-trusted/.github/claude/architecture-summary.md "$WORK_DIR/prompt.md"
-          gh pr view "$PR_NUMBER" --json title,body,baseRefName,commits > "$WORK_DIR/pr.json"
-          gh pr diff "$PR_NUMBER" > "$WORK_DIR/diff.patch"
-          git apply --numstat "$WORK_DIR/diff.patch" > "$WORK_DIR/files.txt" \
-            || gh pr diff "$PR_NUMBER" --name-only > "$WORK_DIR/files.txt"
+          gh pr view "$PR_NUMBER" --json title,body,baseRefName,baseRefOid,commits > "$WORK_DIR/pr.json"
+          # GitHub rejects diffs over 20,000 lines. The complete checkout can
+          # produce the same merge-base diff without the API's size limit.
+          base_sha=$(jq -r .baseRefOid "$WORK_DIR/pr.json")
+          git diff --no-ext-diff "$base_sha...HEAD" > "$WORK_DIR/diff.patch"
+          git diff --no-ext-diff --numstat "$base_sha...HEAD" > "$WORK_DIR/files.txt"
           node .ci-trusted/scripts/pr-section.ts extract "$WORK_DIR/current-section.md"
 
       - name: Write the summary

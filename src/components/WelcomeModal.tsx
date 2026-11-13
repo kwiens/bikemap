@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBicycle,
@@ -11,7 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { cn } from '@/lib/utils';
 import { siteConfig } from '@/config/site.config';
-import { MAP_EVENTS } from '@/events';
+import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { getSetting, setSetting, type RideStyle } from '@/utils/settings';
 
 const features: {
@@ -72,23 +72,28 @@ export function getRideStyle(): RideStyle | null {
 export function WelcomeModal() {
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
+  const closeTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      setVisible(true);
+    try {
+      setVisible(!getRideStyle() && !localStorage.getItem(STORAGE_KEY));
+    } catch {
+      setVisible(!getRideStyle());
     }
+    return () => window.clearTimeout(closeTimer.current);
   }, []);
 
   const choose = (style: RideStyle) => {
-    localStorage.setItem(STORAGE_KEY, '1');
+    if (closeTimer.current !== undefined) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, '1');
+    } catch {
+      // The choice still applies in this session.
+    }
     setSetting('rideStyle', style);
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.RIDE_STYLE_CHOSEN, {
-        detail: { style },
-      }),
-    );
+    dispatchMapEvent(MAP_EVENTS.RIDE_STYLE_CHOSEN, { style });
     setExiting(true);
-    setTimeout(() => {
+    closeTimer.current = window.setTimeout(() => {
       setVisible(false);
     }, 400);
   };
@@ -102,13 +107,11 @@ export function WelcomeModal() {
         exiting ? 'animate-welcome-fade-out' : 'animate-welcome-fade-in',
       )}
     >
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: stop propagation for content area */}
       <div
         className={cn(
           'bg-white rounded-3xl w-full max-w-[400px] px-7 pt-7 pb-6 text-center shadow-[0_24px_48px_rgba(0,0,0,0.25)] animate-welcome-slide-up',
           exiting && 'animate-welcome-slide-down',
         )}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5">
           <span className="inline-flex items-center justify-center w-[60px] h-[60px] rounded-full bg-app-primary text-app-secondary text-[28px] mb-3">
@@ -154,8 +157,9 @@ export function WelcomeModal() {
             <button
               key={c.style}
               type="button"
-              className="flex-1 flex flex-col items-center gap-2 py-4 px-3 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-[#a5d730]"
+              className="flex-1 flex flex-col items-center gap-2 py-4 px-3 border-2 border-gray-200 rounded-2xl bg-white cursor-pointer transition-all duration-150 hover:border-app-primary hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.97] active:border-app-primary"
               onClick={() => choose(c.style)}
+              disabled={exiting}
             >
               <span
                 className={cn(

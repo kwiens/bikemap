@@ -8,6 +8,7 @@ import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
 import { getCityAttractions } from '@/payload/read/attractions';
 import { getCityRoutes } from '@/payload/read/routes';
+import { getCityTrailSummaries } from '@/payload/read/trails';
 import {
   ArrowLeft,
   MessageCircle,
@@ -98,13 +99,15 @@ export default async function AboutPage({
   const region = mapConfig.region.displayName;
   const showBikeChattAssets = siteConfig.cityId === 'chattanooga';
   const isBend = siteConfig.cityId === 'bend';
-  const [{ routes }, attractions] = await Promise.all([
+  const [{ routes }, { trails }, attractions] = await Promise.all([
     getCityRoutes(siteConfig.cityId),
+    getCityTrailSummaries(siteConfig.cityId),
     getCityAttractions(siteConfig.cityId),
   ]);
   const builderConfig = embedBuilderConfig(
     siteConfig.cityId,
     routes,
+    trails,
     attractions.length > 0,
   );
 
