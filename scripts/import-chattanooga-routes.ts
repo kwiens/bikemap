@@ -90,27 +90,25 @@ function importedRoute(feature: NormalizedRouteFeature) {
 
 async function main(): Promise<void> {
   const { dryRun, sourceRoot } = parseArgs(process.argv.slice(2));
-  const features = await normalizeRoutes(sourceRoot);
+  const routes = (await normalizeRoutes(sourceRoot)).map(importedRoute);
 
   if (dryRun) {
     process.stdout.write(
-      `chattanooga routes: validated ${features.length} normalized feature(s); no database writes\n`,
+      `chattanooga routes: validated ${routes.length} normalized feature(s); no database writes\n`,
     );
     return;
   }
 
   const payload = await connect();
   const results = await Promise.all(
-    features.map((feature) =>
-      upsertImportedRoute(payload, importedRoute(feature)),
-    ),
+    routes.map((route) => upsertImportedRoute(payload, route)),
   );
   const created = results.filter((result) => result === 'created').length;
   const updated = results.filter((result) => result === 'updated').length;
   const preserved = results.filter((result) => result === 'preserved').length;
   const unchanged = results.length - created - updated - preserved;
   payload.logger.info(
-    `chattanooga routes: ${created} created, ${updated} updated, ${unchanged} unchanged, ${preserved} trail-linked kept`,
+    `chattanooga routes: ${created} created, ${updated} updated, ${unchanged} unchanged, ${preserved} curator-authored kept`,
   );
 }
 

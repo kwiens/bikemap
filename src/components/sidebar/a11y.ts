@@ -7,9 +7,12 @@ export function pressableProps(onActivate: () => void) {
   return {
     onClick: onActivate,
     onKeyDown: (e: KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
+      if (
+        e.target === e.currentTarget &&
+        (e.key === 'Enter' || e.key === ' ')
+      ) {
         e.preventDefault();
-        onActivate();
+        if (!e.repeat) onActivate();
       }
     },
     role: 'button' as const,

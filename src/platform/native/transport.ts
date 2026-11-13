@@ -38,7 +38,7 @@ function hostWindow(): HostWindow | undefined {
  */
 export function isInsideNativeShell(): boolean {
   const w = hostWindow();
-  return Boolean(w?.ReactNativeWebView);
+  return typeof w?.ReactNativeWebView?.postMessage === 'function';
 }
 
 /** The injected host info, or null outside the shell or when the
@@ -101,7 +101,11 @@ export function createReactNativeWebViewTransport(): BridgeTransport {
 
   return {
     send(command) {
-      hostWindow()?.ReactNativeWebView?.postMessage(encodeCommand(command));
+      const bridge = hostWindow()?.ReactNativeWebView;
+      if (typeof bridge?.postMessage !== 'function') {
+        throw new Error('The native bridge is unavailable.');
+      }
+      bridge.postMessage(encodeCommand(command));
     },
     onEvent(handler) {
       handlers.add(handler);

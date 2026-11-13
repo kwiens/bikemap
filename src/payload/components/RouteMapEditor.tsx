@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useField } from '@payloadcms/ui';
 import type { TrailGeometry } from '@/payload/osm/geometry';
 import {
@@ -27,10 +27,11 @@ export function RouteMapEditor({
     RoutePlan | string | null
   >({ path });
   const { value: name, setValue: setName } = useField<string>({ path: 'name' });
-  const parsed = parseRoutePlan(value);
+  const parsed = useMemo(() => parseRoutePlan(value), [value]);
   const plan = parsed.ok ? parsed.plan : EMPTY_PLAN;
   const hasPointEdits = 'geometry' in plan;
   const [isEditingPoints, setIsEditingPoints] = useState(hasPointEdits);
+  const showsPointEditor = isEditingPoints || hasPointEdits || !parsed.ok;
 
   return (
     <div>
@@ -43,9 +44,9 @@ export function RouteMapEditor({
           type="button"
           className={cn(
             EDITOR_BUTTON,
-            !isEditingPoints && 'bg-[color:var(--theme-elevation-150)]',
+            !showsPointEditor && 'bg-[color:var(--theme-elevation-150)]',
           )}
-          aria-pressed={!isEditingPoints}
+          aria-pressed={!showsPointEditor}
           disabled={hasPointEdits || !parsed.ok}
           onClick={() => setIsEditingPoints(false)}
         >
@@ -55,9 +56,9 @@ export function RouteMapEditor({
           type="button"
           className={cn(
             EDITOR_BUTTON,
-            isEditingPoints && 'bg-[color:var(--theme-elevation-150)]',
+            showsPointEditor && 'bg-[color:var(--theme-elevation-150)]',
           )}
-          aria-pressed={isEditingPoints}
+          aria-pressed={showsPointEditor}
           disabled={!parsed.ok}
           onClick={() => setIsEditingPoints(true)}
         >
@@ -82,7 +83,7 @@ export function RouteMapEditor({
           </button>
         </Banner>
       )}
-      {isEditingPoints || hasPointEdits || !parsed.ok ? (
+      {showsPointEditor ? (
         <GeometryMapEditor
           label="Route line"
           readOnly={readOnly || !parsed.ok}

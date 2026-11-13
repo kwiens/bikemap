@@ -26,6 +26,7 @@ export function BikeRoutes({
           key={route.id}
           {...pressableProps(() => onRouteSelect(route.id))}
           data-selected={selectedRoute === route.id || undefined}
+          aria-pressed={selectedRoute === route.id}
           className={cn(
             'p-2 rounded cursor-pointer transition-all duration-200 border border-transparent',
             selectedRoute === route.id

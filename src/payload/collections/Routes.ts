@@ -37,7 +37,7 @@ export const Routes: CollectionConfig = {
       'updatedAt',
     ],
     description:
-      'Published routes appear on the map. Feature a route to list it in the home menu. Build a route from trails and roads or reuse an import, an existing Trail, or a Mapbox Studio layer.',
+      'Published routes appear on the map. Feature a route to list it in the home menu. Draw a route, build one from trails and roads, or reuse an import, an existing Trail, or a Mapbox Studio layer.',
     group: 'Map content',
     listSearchableFields: ['name', 'routeId'],
   },

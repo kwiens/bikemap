@@ -15,11 +15,11 @@
  */
 import { lengthMeters } from '@/payload/osm/assemble';
 import {
-  isPosition,
   parseTrailGeometry,
   safeParse,
   type TrailGeometry,
 } from '@/payload/osm/geometry';
+import { isPosition } from './geometry';
 import {
   appendStep,
   distance,
@@ -128,7 +128,7 @@ export function parseRoutePlan(value: unknown): PlanParse {
       return fail(`Leg ${index + 1} must start and end at its waypoints.`);
     }
     parsedLegs.push({
-      coordinates: coordinates.map(([lng, lat]) => [Number(lng), Number(lat)]),
+      coordinates: coordinates.map(([lng, lat]) => [lng, lat]),
       mode,
       // Steps are a display aid; a malformed one is dropped, not fatal.
       steps: Array.isArray(steps) ? steps.filter(isStep) : [],
@@ -153,7 +153,7 @@ export function parseRoutePlan(value: unknown): PlanParse {
       ...(editedGeometry !== undefined ? { geometry: editedGeometry } : {}),
       legs: parsedLegs,
       version: 1,
-      waypoints: waypoints.map(([lng, lat]) => [Number(lng), Number(lat)]),
+      waypoints: waypoints.map(([lng, lat]) => [lng, lat]),
     },
   };
 }
@@ -162,9 +162,7 @@ function samePosition(
   a: Position | undefined,
   b: Position | undefined,
 ): boolean {
-  return Boolean(
-    a && b && Number(a[0]) === Number(b[0]) && Number(a[1]) === Number(b[1]),
-  );
+  return Boolean(a && b && a[0] === b[0] && a[1] === b[1]);
 }
 
 /**
@@ -182,7 +180,10 @@ export function planGeometry(plan: RoutePlan): TrailGeometry | null {
     const current = parts.at(-1);
     const end = current?.at(-1);
     if (current && end && distance(end, leg.coordinates[0]) < 1) {
-      current.push(...leg.coordinates.slice(1));
+      // Long legs can exceed the runtime's argument limit for a spread call.
+      for (let i = 1; i < leg.coordinates.length; i++) {
+        current.push(leg.coordinates[i]);
+      }
     } else {
       parts.push(leg.coordinates.map((point) => [...point] as Position));
     }

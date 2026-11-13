@@ -15,6 +15,7 @@ import {
   STYLE_STRAY_TILESET_IDS,
 } from '@/data/mapbox-style';
 import {
+  OSM_BIKE_TRAIL_FILTER,
   OSM_TRAILS_SOURCE_ID,
   OSM_TRAILS_LAYER_ID,
   OSM_TRAILS_CASING_LAYER_ID,
@@ -39,6 +40,7 @@ import {
   BIKE_NETWORK_SOURCE_ID,
 } from '@/data/bike-network';
 import { MAP_EVENTS, dispatchMapEvent, onMapEvent } from '@/events';
+import { parseGeographicBounds } from '@/utils/geographic-bounds';
 
 // --- Shared layer plumbing ----------------------------------------------------
 
@@ -365,175 +367,6 @@ export function calculateRouteBounds(
   return bounds.isEmpty() ? null : bounds;
 }
 
-// Remove line edges traversed by more than one path. Comparing edges instead of
-// individual coordinates preserves arrows where routes merely cross or meet.
-export function removeOverlappingSegments(
-  features: GeoJSON.Feature[],
-): GeoJSON.Feature<GeoJSON.LineString>[] {
-  interface Path {
-    coordinates: GeoJSON.Position[];
-    ownerId: string;
-  }
-
-  const paths: Path[] = [];
-  features.forEach((feature, featureIndex) => {
-    const geom = feature.geometry;
-    if (geom.type === 'LineString') {
-      paths.push({
-        coordinates: geom.coordinates,
-        ownerId: pathOwnerId(feature, featureIndex, 0),
-      });
-    } else if (geom.type === 'MultiLineString') {
-      geom.coordinates.forEach((coordinates, partIndex) => {
-        paths.push({
-          coordinates,
-          ownerId: pathOwnerId(feature, featureIndex, partIndex),
-        });
-      });
-    }
-  });
-
-  if (paths.length === 0) return [];
-
-  const cellSize = 0.00003; // ~3 meters; absorbs vector-tile quantization.
-  const coordinateKey = (coordinate: GeoJSON.Position) =>
-    `${Math.round(coordinate[0] / cellSize)},${Math.round(coordinate[1] / cellSize)}`;
-  const edgeKey = (start: GeoJSON.Position, end: GeoJSON.Position): string => {
-    const startKey = coordinateKey(start);
-    const endKey = coordinateKey(end);
-    return startKey < endKey
-      ? `${startKey}|${endKey}`
-      : `${endKey}|${startKey}`;
-  };
-
-  const edgeOwners = new Map<string, Set<string>>();
-  for (const path of paths) {
-    for (let i = 0; i < path.coordinates.length - 1; i++) {
-      const key = edgeKey(path.coordinates[i], path.coordinates[i + 1]);
-      const owners = edgeOwners.get(key) ?? new Set<string>();
-      owners.add(path.ownerId);
-      edgeOwners.set(key, owners);
-    }
-  }
-
-  const result: GeoJSON.Feature<GeoJSON.LineString>[] = [];
-
-  for (const path of paths) {
-    let currentRun: GeoJSON.Position[] = [];
-
-    for (let i = 0; i < path.coordinates.length - 1; i++) {
-      const start = path.coordinates[i];
-      const end = path.coordinates[i + 1];
-      const owners = edgeOwners.get(edgeKey(start, end));
-
-      if ((owners?.size ?? 0) > 1) {
-        pushLineString(result, currentRun);
-        currentRun = [];
-        continue;
-      }
-
-      if (currentRun.length === 0) currentRun.push(start);
-      currentRun.push(end);
-    }
-
-    pushLineString(result, currentRun);
-  }
-
-  return result;
-}
-
-export function applyArrowDirectionOverrides(
-  features: GeoJSON.Feature<GeoJSON.LineString>[],
-  reverseBounds: [number, number, number, number][] = [],
-): GeoJSON.Feature<GeoJSON.LineString>[] {
-  if (reverseBounds.length === 0) return features;
-
-  return features.flatMap((feature) => {
-    const coordinates = feature.geometry.coordinates;
-    if (coordinates.length < 2) return [];
-
-    const result: GeoJSON.Feature<GeoJSON.LineString>[] = [];
-    let shouldReverse = edgeMatchesBounds(
-      coordinates[0],
-      coordinates[1],
-      reverseBounds,
-    );
-    let currentRun = [coordinates[0], coordinates[1]];
-
-    for (let i = 1; i < coordinates.length - 1; i++) {
-      const edgeShouldReverse = edgeMatchesBounds(
-        coordinates[i],
-        coordinates[i + 1],
-        reverseBounds,
-      );
-
-      if (edgeShouldReverse === shouldReverse) {
-        currentRun.push(coordinates[i + 1]);
-        continue;
-      }
-
-      pushDirectedLineString(result, currentRun, shouldReverse);
-      currentRun = [coordinates[i], coordinates[i + 1]];
-      shouldReverse = edgeShouldReverse;
-    }
-
-    pushDirectedLineString(result, currentRun, shouldReverse);
-    return result;
-  });
-}
-
-function edgeMatchesBounds(
-  start: GeoJSON.Position,
-  end: GeoJSON.Position,
-  bounds: [number, number, number, number][],
-): boolean {
-  const midpointLng = (start[0] + end[0]) / 2;
-  const midpointLat = (start[1] + end[1]) / 2;
-  return bounds.some(
-    ([swLng, swLat, neLng, neLat]) =>
-      midpointLng >= swLng &&
-      midpointLng <= neLng &&
-      midpointLat >= swLat &&
-      midpointLat <= neLat,
-  );
-}
-
-function pushDirectedLineString(
-  result: GeoJSON.Feature<GeoJSON.LineString>[],
-  coordinates: GeoJSON.Position[],
-  reverse: boolean,
-): void {
-  result.push({
-    type: 'Feature',
-    properties: {},
-    geometry: {
-      type: 'LineString',
-      coordinates: reverse ? [...coordinates].reverse() : coordinates,
-    },
-  });
-}
-
-function pathOwnerId(
-  feature: GeoJSON.Feature,
-  featureIndex: number,
-  partIndex: number,
-): string {
-  const featureId = feature.id ?? `feature-${featureIndex}`;
-  return `${String(featureId)}:${partIndex}`;
-}
-
-function pushLineString(
-  result: GeoJSON.Feature<GeoJSON.LineString>[],
-  coordinates: GeoJSON.Position[],
-): void {
-  if (coordinates.length < 2) return;
-  result.push({
-    type: 'Feature',
-    properties: {},
-    geometry: { type: 'LineString', coordinates },
-  });
-}
-
 // Coordinate utilities
 export function findLocationInArray<
   T extends { latitude: number; longitude: number },
@@ -600,8 +433,9 @@ export function calculateTrailBounds(
 export function toLngLatBounds(
   defaultBounds: [number, number, number, number] | undefined,
 ): mapboxgl.LngLatBounds | undefined {
-  if (!defaultBounds) return undefined;
-  const [swLng, swLat, neLng, neLat] = defaultBounds;
+  const bounds = parseGeographicBounds(defaultBounds);
+  if (!bounds) return undefined;
+  const [swLng, swLat, neLng, neLat] = bounds;
   return new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
 }
 
@@ -929,23 +763,6 @@ async function fetchFeatureCollection(
 }
 
 // --- Nationwide OSM bike trails (OpenStreetMap US tile service) ---------------
-
-// Bike-relevant trails. A way qualifies when bikes are explicitly permitted
-// (`bicycle` in yes/designated/permissive — this wins even over a general
-// access restriction), OR it carries an `mtb:scale` tag (MTB singletrack often
-// lacks an explicit bicycle tag) or is a cycleway AND is not bike-denied
-// (`bicycle=no/private`) or access-restricted (`access=no/private`). This keeps
-// foot-only / horse-only and explicitly off-limits paths out of the layer.
-export const OSM_BIKE_TRAIL_FILTER: mapboxgl.FilterSpecification = [
-  'any',
-  ['in', ['get', 'bicycle'], ['literal', ['yes', 'designated', 'permissive']]],
-  [
-    'all',
-    ['any', ['has', 'mtb:scale'], ['==', ['get', 'highway'], 'cycleway']],
-    ['!', ['in', ['get', 'bicycle'], ['literal', ['no', 'private']]]],
-    ['!', ['in', ['get', 'access'], ['literal', ['no', 'private']]]],
-  ],
-];
 
 // Trail POIs we surface: trailhead parking (amenity=parking) and information
 // points (tourism=information). Everything else in trail_poi is hidden.
@@ -1376,6 +1193,7 @@ export function registerOsmTrailSelection(map: mapboxgl.Map): () => void {
     onMapEvent(MAP_EVENTS.TRAIL_SELECT, onForeignSelect),
     onMapEvent(MAP_EVENTS.ROUTE_DESELECT, onForeignSelect),
     onMapEvent(MAP_EVENTS.TRAIL_DESELECT, onForeignSelect),
+    onMapEvent(MAP_EVENTS.RIDE_SELECT, onForeignSelect),
   ];
 
   // Hiding the Nationwide trails layer must also drop any active OSM selection,

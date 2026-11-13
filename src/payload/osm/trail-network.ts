@@ -242,16 +242,13 @@ export function routeBetween(
 }
 
 /** Grid cell keys covering a [west, south, east, north] box. */
-export function cellsCovering([west, south, east, north]: [
-  number,
-  number,
-  number,
-  number,
-]): string[] {
-  return cellCoordinatesCovering(
-    [west, south, east, north],
-    NETWORK_CELL_DEG,
-  ).map(([x, y]) => `${x}:${y}`);
+export function cellsCovering(
+  bounds: [number, number, number, number],
+  maxKeys = Number.POSITIVE_INFINITY,
+): string[] {
+  return cellCoordinatesCovering(bounds, NETWORK_CELL_DEG, maxKeys).map(
+    ([x, y]) => `${x}:${y}`,
+  );
 }
 
 /**

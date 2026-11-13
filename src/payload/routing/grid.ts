@@ -5,18 +5,30 @@ export function cellCoordinatesCovering(
   maxCells = Number.POSITIVE_INFINITY,
 ): [number, number][] {
   const cells: [number, number][] = [];
-  if (maxCells <= 0) return cells;
+  if (
+    maxCells <= 0 ||
+    !Number.isFinite(cellSizeDegrees) ||
+    cellSizeDegrees <= 0 ||
+    ![west, south, east, north].every(Number.isFinite) ||
+    west >= 180 ||
+    east < -180 ||
+    south >= 90 ||
+    north < -90
+  )
+    return cells;
+  const minX = Math.floor(Math.max(-180, west) / cellSizeDegrees);
+  const maxX = Math.min(
+    Math.ceil(180 / cellSizeDegrees) - 1,
+    Math.floor(east / cellSizeDegrees),
+  );
+  const minY = Math.floor(Math.max(-90, south) / cellSizeDegrees);
+  const maxY = Math.min(
+    Math.ceil(90 / cellSizeDegrees) - 1,
+    Math.floor(north / cellSizeDegrees),
+  );
   // Bounded by the number of cells in the box, or the caller's smaller cap.
-  for (
-    let x = Math.floor(west / cellSizeDegrees);
-    x <= Math.floor(east / cellSizeDegrees);
-    x++
-  ) {
-    for (
-      let y = Math.floor(south / cellSizeDegrees);
-      y <= Math.floor(north / cellSizeDegrees);
-      y++
-    ) {
+  for (let x = minX; x <= maxX; x++) {
+    for (let y = minY; y <= maxY; y++) {
       cells.push([x, y]);
       if (cells.length >= maxCells) return cells;
     }

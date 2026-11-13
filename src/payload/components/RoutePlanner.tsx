@@ -204,7 +204,9 @@ export function RoutePlanner({
     );
   }
   const controller = controllerRef.current;
-  controller.setReadOnly(Boolean(readOnly));
+  useEffect(() => {
+    controller.setReadOnly(Boolean(readOnly));
+  }, [controller, readOnly]);
   const { plan, canUndo, canRedo, routing, note } = useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
@@ -221,12 +223,15 @@ export function RoutePlanner({
     if (!bounds) {
       return;
     }
-    const keys = cellsCovering([
-      bounds.getWest(),
-      bounds.getSouth(),
-      bounds.getEast(),
-      bounds.getNorth(),
-    ]);
+    const keys = cellsCovering(
+      [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth(),
+      ],
+      MAX_VIEW_CELLS + 1,
+    );
     if (keys.length <= MAX_VIEW_CELLS) {
       void controller.ensureCells(keys);
     }

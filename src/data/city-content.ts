@@ -1,16 +1,10 @@
 /**
  * Everything the public map reads from Payload for one city, as one bundle.
  *
- * The server builds it (`src/payload/read/city-content.ts`) and the client
- * publishes it into the content stores during render. To add a Payload object
- * type to the public map:
- *
- *   1. add its array to `CityContentData` and a store to `contentStores`
- *      (create the store next to the type's data module),
- *   2. read it in `getCityContent` on the server,
- *   3. have consumers call the store's `get()` at render time.
- *
- * Nothing in HomeClient or the page changes.
+ * The server builds it in `src/payload/read/city-content.ts`. The client
+ * publishes routes and trails into their stores before rendering the map.
+ * Attractions pass through as city-checked props. Add new readers to
+ * `getCityContent` and include their results in `FullCityContent`.
  */
 import { activeCityId } from '@/config/map.config';
 import type { BikeRoute } from './bike-routes';

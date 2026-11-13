@@ -1,7 +1,9 @@
 import type { Measurements } from './measure';
 
 /** Keep the measured line's summaries and per-point chart together on save. */
-export function trailFieldsFromMeasurements(measured: Measurements) {
+export function trailFieldsFromMeasurements(
+  measured: Omit<Measurements, 'gaps' | 'warnings'>,
+) {
   return {
     bounds: measured.bounds,
     distance: measured.distance,

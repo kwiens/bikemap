@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
-import { slugify } from '@/utils/string';
+import { routeFromLink } from '@/data/bike-routes';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { onMapReady } from '@/utils/map-ready';
 
@@ -35,14 +35,17 @@ export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
   const routesEnabled = options?.routes ?? true;
   const routeOverride = options?.route;
   const trailOverride = options?.trail;
+  const hasDecodedOptions = options !== undefined;
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = hasDecodedOptions
+      ? null
+      : new URLSearchParams(window.location.search);
     const trailSlug = trailsEnabled
-      ? (trailOverride ?? params.get('trail'))
+      ? (trailOverride ?? params?.get('trail')?.trim())
       : null;
     const routeSlug = routesEnabled
-      ? (routeOverride ?? params.get('route'))
+      ? (routeOverride ?? params?.get('route')?.trim())
       : null;
 
     if (!trailSlug && !routeSlug) return;
@@ -56,11 +59,11 @@ export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
           dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, {
             trailName: found.trailName,
           });
+          return;
         }
-      } else if (routeSlug) {
-        const found = getBikeRoutes().find(
-          (r) => slugify(r.name) === routeSlug,
-        );
+      }
+      if (routeSlug) {
+        const found = routeFromLink(getBikeRoutes(), routeSlug);
         if (found) {
           dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId: found.id });
         }
@@ -68,5 +71,11 @@ export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
     };
 
     return onMapReady(selectFromUrl);
-  }, [routeOverride, routesEnabled, trailOverride, trailsEnabled]);
+  }, [
+    hasDecodedOptions,
+    routeOverride,
+    routesEnabled,
+    trailOverride,
+    trailsEnabled,
+  ]);
 }

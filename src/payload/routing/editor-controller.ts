@@ -217,7 +217,13 @@ export function createRouteEditorController(
       state = { ...state, routing: 0 };
     },
     setReadOnly(readOnly) {
+      const changed = isReadOnly !== readOnly;
       isReadOnly = readOnly;
+      if (readOnly && changed) {
+        session += 1;
+        cancelClicks();
+        update({ routing: 0 });
+      }
     },
     replacePlan(plan) {
       session += 1;

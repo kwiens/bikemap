@@ -13,20 +13,40 @@ interface Settings {
 
 function readCookie(): Settings {
   if (typeof document === 'undefined') return {};
-  const match = document.cookie.match(
-    new RegExp(`(?:^|; )${COOKIE_NAME}=([^;]*)`),
-  );
-  if (!match) return {};
   try {
-    return JSON.parse(decodeURIComponent(match[1]));
+    const match = document.cookie.match(
+      new RegExp(`(?:^|; )${COOKIE_NAME}=([^;]*)`),
+    );
+    if (!match) return {};
+    const parsed: unknown = JSON.parse(decodeURIComponent(match[1]));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      return {};
+    const { activeTab, rideStyle, sidebarOpen } = parsed as Record<
+      string,
+      unknown
+    >;
+    return {
+      ...(activeTab === 'routes' || activeTab === 'trails'
+        ? { activeTab }
+        : {}),
+      ...(rideStyle === 'casual' || rideStyle === 'mountain'
+        ? { rideStyle }
+        : {}),
+      ...(typeof sidebarOpen === 'boolean' ? { sidebarOpen } : {}),
+    };
   } catch {
     return {};
   }
 }
 
 function writeCookie(settings: Settings) {
+  if (typeof document === 'undefined') return;
   const value = encodeURIComponent(JSON.stringify(settings));
-  document.cookie = `${COOKIE_NAME}=${value}; path=/; max-age=${COOKIE_MAX_AGE}`;
+  try {
+    document.cookie = `${COOKIE_NAME}=${value}; path=/; max-age=${COOKIE_MAX_AGE}`;
+  } catch {
+    // The UI can still apply the preference when cookies are unavailable.
+  }
 }
 
 export function getSetting<K extends keyof Settings>(key: K): Settings[K] {

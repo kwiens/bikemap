@@ -62,7 +62,6 @@ vi.mock('@/config/map.config', () => ({
     defaultView: { center: [-85, 35], zoom: 10 },
   },
 }));
-vi.mock('@/utils/map', () => ({ OSM_BIKE_TRAIL_FILTER: [] }));
 vi.mock('mapbox-gl', () => ({
   default: {
     Map: class {
@@ -266,14 +265,16 @@ function dragLastPoint(to: [number, number]) {
 
 async function upload(container: HTMLElement, text = GPX) {
   const input = container.querySelector('input[type="file"]')!;
-  fireEvent.change(input, {
-    target: {
-      files: [{ name: 'ride.gpx', size: text.length, text: async () => text }],
-    },
+  await act(async () => {
+    fireEvent.change(input, {
+      target: {
+        files: [
+          { name: 'ride.gpx', size: text.length, text: async () => text },
+        ],
+      },
+    });
   });
-  await waitFor(() =>
-    expect(screen.getByText(/Imported ride.gpx|ride.gpx:/)).toBeInTheDocument(),
-  );
+  expect(screen.getByText(/Imported ride.gpx|ride.gpx:/)).toBeInTheDocument();
 }
 
 describe('shared geometry editor', () => {

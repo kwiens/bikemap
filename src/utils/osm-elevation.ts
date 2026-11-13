@@ -10,6 +10,7 @@ import { haversineDistance, pointsToElevationProfile } from './ride-stats';
 import {
   TERRAIN_TILE_SIZE as TILE_SIZE,
   decodeTerrainRgb,
+  OSM_TERRAIN_ZOOM,
   lngLatToTilePixel,
 } from './terrain-rgb';
 import type { ElevationProfile } from '../data/mountain-bike-trails';
@@ -17,7 +18,6 @@ import type { ElevationProfile } from '../data/mountain-bike-trails';
 // Kept as a re-export for existing importers (tests, scripts docs).
 export { decodeTerrainRgb } from './terrain-rgb';
 
-const TERRAIN_ZOOM = 14;
 // Resample segments to roughly the DEM resolution so gain isn't undercounted
 // between sparse vector-tile vertices.
 const SAMPLE_STEP_M = 20;
@@ -138,18 +138,18 @@ async function sampleElevations(
 ): Promise<(number | null)[]> {
   const needed = new Map<string, { x: number; y: number }>();
   for (const [lng, lat] of coords) {
-    const tp = lngLatToTilePixel(lng, lat, TERRAIN_ZOOM);
+    const tp = lngLatToTilePixel(lng, lat, OSM_TERRAIN_ZOOM);
     needed.set(`${tp.x}/${tp.y}`, { x: tp.x, y: tp.y });
   }
   const tiles = new Map<string, ImageData | null>();
   await Promise.all(
     [...needed].map(async ([key, { x, y }]) => {
-      tiles.set(key, await loadTerrainTile(x, y, TERRAIN_ZOOM, token));
+      tiles.set(key, await loadTerrainTile(x, y, OSM_TERRAIN_ZOOM, token));
     }),
   );
 
   return coords.map(([lng, lat]) => {
-    const tp = lngLatToTilePixel(lng, lat, TERRAIN_ZOOM);
+    const tp = lngLatToTilePixel(lng, lat, OSM_TERRAIN_ZOOM);
     const img = tiles.get(`${tp.x}/${tp.y}`);
     if (!img) return null;
     const o = (tp.py * TILE_SIZE + tp.px) * 4;

@@ -72,6 +72,18 @@ describe('parseTrailGeometry', () => {
     expect(parsed.error).toMatch(/longitude, latitude/);
   });
 
+  it.each([null, false, '', ['0'], {}])(
+    'rejects the non-numeric ordinate %j',
+    (ordinate) => {
+      expect(
+        parseTrailGeometry({
+          coordinates: [A, [ordinate, 44]],
+          type: 'LineString',
+        }).ok,
+      ).toBe(false);
+    },
+  );
+
   it('rejects a non-line geometry', () => {
     const parsed = parseTrailGeometry({ coordinates: A, type: 'Point' });
     expect(parsed.ok).toBe(false);

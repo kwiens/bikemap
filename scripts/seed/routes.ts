@@ -49,29 +49,19 @@ export async function upsertImportedRoute(
     sourceSha256: input.sourceSha256,
     sourceTrail: null,
   };
-  const existing = await payload.find({
-    collection: 'routes',
-    depth: 0,
-    limit: 1,
-    pagination: false,
-    where: {
-      and: [{ city: { equals: city } }, { routeId: { equals: route.id } }],
-    },
-  });
+  const existing = await findRoute(payload, city, route.id);
 
-  if (existing.docs[0]) {
-    // A curator deliberately switched this public route to a Trail or rebuilt
-    // it on the map. Keep that choice instead of silently restoring imported
-    // geometry on a deploy or seed rerun.
-    if (isCuratorOwned(existing.docs[0])) {
+  if (existing) {
+    // A curator can replace the imported geometry in the editor.
+    if (isCuratorOwned(existing)) {
       return 'preserved';
     }
-    if (isCurrent(existing.docs[0], data)) {
+    if (isCurrent(existing, data)) {
       return 'unchanged';
     }
     await payload.update({
       collection: 'routes',
-      id: existing.docs[0].id,
+      id: existing.id,
       data,
     });
     return 'updated';

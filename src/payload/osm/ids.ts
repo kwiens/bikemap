@@ -48,8 +48,11 @@ export function parseOsmIds(value: unknown): ParsedOsmIds {
         ok: false,
       };
     }
-    const id = Number(entry);
-    if (!Number.isInteger(id) || id <= 0) {
+    const id =
+      typeof entry === 'string' && !/^\d+$/.test(entry.trim())
+        ? NaN
+        : Number(entry);
+    if (!Number.isSafeInteger(id) || id <= 0) {
       return {
         error: `"${String(entry)}" is not an OSM way id. Ids are positive whole numbers.`,
         ok: false,

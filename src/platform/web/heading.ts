@@ -12,10 +12,14 @@ type OrientationEventConstructor = {
 /** Magnetic heading from an orientation event, or null when it carries none. */
 function compassHeadingOf(event: DeviceOrientationEvent): number | null {
   const withCompass = event as OrientationEventWithCompass;
-  if (typeof withCompass.webkitCompassHeading === 'number') {
+  if (
+    typeof withCompass.webkitCompassHeading === 'number' &&
+    Number.isFinite(withCompass.webkitCompassHeading) &&
+    withCompass.webkitCompassHeading >= 0
+  ) {
     return withCompass.webkitCompassHeading;
   }
-  if (typeof event.alpha === 'number') {
+  if (typeof event.alpha === 'number' && Number.isFinite(event.alpha)) {
     return (360 - event.alpha) % 360;
   }
   return null;

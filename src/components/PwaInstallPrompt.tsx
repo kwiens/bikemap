@@ -14,7 +14,10 @@ function isIosDevice(): boolean {
     return false;
   }
   const userAgent = window.navigator.userAgent.toLowerCase();
-  return /iphone|ipad|ipod/.test(userAgent);
+  return (
+    /iphone|ipad|ipod/.test(userAgent) ||
+    (userAgent.includes('macintosh') && window.navigator.maxTouchPoints > 1)
+  );
 }
 
 function isStandaloneMode(): boolean {
@@ -23,8 +26,8 @@ function isStandaloneMode(): boolean {
   }
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Boolean((window.navigator as any).standalone)
+    (window.navigator as Navigator & { standalone?: boolean }).standalone ===
+      true
   );
 }
 
@@ -32,14 +35,22 @@ function getDismissedFlag(): boolean {
   if (typeof window === 'undefined') {
     return false;
   }
-  return window.localStorage.getItem('pwa-install-dismissed') === 'true';
+  try {
+    return window.localStorage.getItem('pwa-install-dismissed') === 'true';
+  } catch {
+    return false;
+  }
 }
 
 function setDismissedFlag(): void {
   if (typeof window === 'undefined') {
     return;
   }
-  window.localStorage.setItem('pwa-install-dismissed', 'true');
+  try {
+    window.localStorage.setItem('pwa-install-dismissed', 'true');
+  } catch {
+    // The prompt can still be dismissed for this page when storage is blocked.
+  }
 }
 
 export function PwaInstallPrompt(): React.ReactElement | null {
@@ -49,9 +60,11 @@ export function PwaInstallPrompt(): React.ReactElement | null {
   const deferredPrompt = React.useRef<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = React.useState(false);
   const [isIos, setIsIos] = React.useState(false);
+  const [isInstalling, setIsInstalling] = React.useState(false);
 
   React.useEffect(() => {
     if (isNativeShell || getDismissedFlag() || isStandaloneMode()) {
+      setIsVisible(false);
       return;
     }
 
@@ -89,14 +102,22 @@ export function PwaInstallPrompt(): React.ReactElement | null {
     if (!promptEvent) {
       return;
     }
-    await promptEvent.prompt();
-    await promptEvent.userChoice;
     deferredPrompt.current = null;
-    setIsVisible(false);
-    setDismissedFlag();
+    setIsInstalling(true);
+    try {
+      await promptEvent.prompt();
+      await promptEvent.userChoice;
+      setDismissedFlag();
+    } catch {
+      // The browser can invalidate this single-use prompt before the tap.
+    } finally {
+      setIsInstalling(false);
+      setIsVisible(false);
+    }
   };
 
   const handleDismiss = () => {
+    deferredPrompt.current = null;
     setIsVisible(false);
     setDismissedFlag();
   };
@@ -123,6 +144,7 @@ export function PwaInstallPrompt(): React.ReactElement | null {
             <button
               className="min-h-12 min-w-12 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
               onClick={handleInstallClick}
+              disabled={isInstalling}
               type="button"
             >
               Install

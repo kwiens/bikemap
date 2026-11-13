@@ -69,10 +69,20 @@ const BASE_BACKOFF_MS = 2000;
  */
 const MAX_BACKOFF_MS = 30_000;
 
-const sleep = (ms: number) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    signal?.throwIfAborted();
+    const abort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', abort, { once: true });
   });
+}
 
 /**
  * Retry-After as milliseconds, or null when it can't be read as delay-seconds.
@@ -130,7 +140,10 @@ export async function requestWithRetry(
     // to doubling when it is not. Retrying without a wait is worse than not
     // retrying at all against a shared endpoint that just said "slow down".
     const retryAfter = retryAfterMs(response.headers.get('Retry-After'));
-    await sleep(retryAfter ?? BASE_BACKOFF_MS * 2 ** (attempt - 1));
+    await delay(
+      retryAfter ?? BASE_BACKOFF_MS * 2 ** (attempt - 1),
+      options.signal,
+    );
   }
 
   throw new OverpassError(
@@ -153,17 +166,27 @@ export async function requestWithRetry(
 export async function readOverpassElements<
   Element extends OverpassElement = OverpassElement,
 >(response: Response): Promise<Element[]> {
-  const payload = (await response.json()) as {
-    elements?: Element[];
-    remark?: string;
-  };
-  if (payload.remark && /runtime error/i.test(payload.remark)) {
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new OverpassError(
-      `Overpass could not finish the query (${payload.remark.trim()}). Try again shortly.`,
+      'Overpass returned an invalid response.',
       response.status,
     );
   }
-  return payload.elements ?? [];
+  const { elements, remark } = payload as Record<string, unknown>;
+  if (typeof remark === 'string' && /runtime error/i.test(remark)) {
+    throw new OverpassError(
+      `Overpass could not finish the query (${remark.trim()}). Try again shortly.`,
+      response.status,
+    );
+  }
+  if (!Array.isArray(elements)) {
+    throw new OverpassError(
+      'Overpass returned no elements list.',
+      response.status,
+    );
+  }
+  return elements as Element[];
 }
 
 /**
@@ -179,7 +202,7 @@ export async function fetchWaysByIds(
   options: OverpassOptions = {},
 ): Promise<OsmWay[]> {
   const unique = [...new Set(ids)].filter(
-    (id) => Number.isInteger(id) && id > 0,
+    (id) => Number.isSafeInteger(id) && id > 0,
   );
 
   if (unique.length === 0) {

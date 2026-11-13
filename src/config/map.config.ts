@@ -196,16 +196,23 @@ export function cityIdForHostname(
     return undefined;
   }
 
-  let hostMap: Record<string, string>;
+  let hostMap: unknown;
   try {
-    hostMap = JSON.parse(hostMapRaw) as Record<string, string>;
+    hostMap = JSON.parse(hostMapRaw);
   } catch {
+    console.warn('NEXT_PUBLIC_CITY_HOST_MAP must be a JSON object.');
+    return undefined;
+  }
+  if (!hostMap || typeof hostMap !== 'object' || Array.isArray(hostMap)) {
     console.warn('NEXT_PUBLIC_CITY_HOST_MAP must be a JSON object.');
     return undefined;
   }
 
   const normalizedHostname = normalizeHostname(hostname);
-  return parseCityIdOrUndefined(hostMap[normalizedHostname]);
+  const mapped = Object.hasOwn(hostMap, normalizedHostname)
+    ? (hostMap as Record<string, unknown>)[normalizedHostname]
+    : undefined;
+  return isCityId(mapped) ? mapped : undefined;
 }
 
 /** Resolve a `?city=` value. Repeated params follow URLSearchParams.get() and

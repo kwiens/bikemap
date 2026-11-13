@@ -63,7 +63,7 @@ function simulatePosition(
   lng: number,
   lat: number,
   options: {
-    speed?: number;
+    speed?: number | null;
     accuracy?: number;
     altitude?: number;
   } = {},
@@ -72,7 +72,7 @@ function simulatePosition(
     coords: {
       longitude: lng,
       latitude: lat,
-      speed: options.speed ?? 3.0,
+      speed: options.speed === undefined ? 3.0 : options.speed,
       accuracy: options.accuracy ?? 5,
       altitude: options.altitude ?? 200,
       heading: 0,
@@ -339,6 +339,23 @@ describe('useRideRecording', () => {
 
     // Auto-pause doesn't flip isPaused — only manual pause does
     expect(result.current.isPaused).toBe(false);
+  });
+
+  it('keeps recording when the device does not report speed', () => {
+    const points = vi.fn();
+    window.addEventListener(MAP_EVENTS.RIDE_RECORDING_UPDATE, points);
+    try {
+      const { result } = renderHook(() => useRideRecording());
+      act(() => result.current.startRecording());
+      act(() => {
+        for (const lng of [-85.3, -85.31, -85.32, -85.33]) {
+          simulatePosition(lng, 35, { speed: null });
+        }
+      });
+      expect(points).toHaveBeenCalledTimes(4);
+    } finally {
+      window.removeEventListener(MAP_EVENTS.RIDE_RECORDING_UPDATE, points);
+    }
   });
 
   it('cleans up on GPS permission error', () => {

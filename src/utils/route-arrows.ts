@@ -1,7 +1,7 @@
+import type * as GeoJSON from 'geojson';
 import type { FeatureCollection, Position } from 'geojson';
 import type mapboxgl from 'mapbox-gl';
 import type { BikeRoute } from '@/data/bike-routes';
-import { applyArrowDirectionOverrides, removeOverlappingSegments } from './map';
 
 const ARROW_SPACING_PX = 160;
 const MIN_ARROW_GAP_PX = 80;
@@ -242,6 +242,175 @@ function addArrows(segments: readonly ScreenSegment[], arrows: RouteArrow[]) {
     }
     offset -= segmentLength;
   }
+}
+
+// Remove line edges traversed by more than one path. Comparing edges instead of
+// individual coordinates preserves arrows where routes merely cross or meet.
+export function removeOverlappingSegments(
+  features: GeoJSON.Feature[],
+): GeoJSON.Feature<GeoJSON.LineString>[] {
+  interface Path {
+    coordinates: GeoJSON.Position[];
+    ownerId: string;
+  }
+
+  const paths: Path[] = [];
+  features.forEach((feature, featureIndex) => {
+    const geom = feature.geometry;
+    if (geom?.type === 'LineString') {
+      paths.push({
+        coordinates: geom.coordinates,
+        ownerId: pathOwnerId(feature, featureIndex, 0),
+      });
+    } else if (geom?.type === 'MultiLineString') {
+      geom.coordinates.forEach((coordinates, partIndex) => {
+        paths.push({
+          coordinates,
+          ownerId: pathOwnerId(feature, featureIndex, partIndex),
+        });
+      });
+    }
+  });
+
+  if (paths.length === 0) return [];
+
+  const cellSizeDegrees = 0.00003; // ~3 meters; absorbs vector-tile quantization.
+  const coordinateKey = (coordinate: GeoJSON.Position) =>
+    `${Math.round(coordinate[0] / cellSizeDegrees)},${Math.round(coordinate[1] / cellSizeDegrees)}`;
+  const edgeKey = (start: GeoJSON.Position, end: GeoJSON.Position): string => {
+    const startKey = coordinateKey(start);
+    const endKey = coordinateKey(end);
+    return startKey < endKey
+      ? `${startKey}|${endKey}`
+      : `${endKey}|${startKey}`;
+  };
+
+  const edgeOwners = new Map<string, Set<string>>();
+  for (const path of paths) {
+    for (let i = 0; i < path.coordinates.length - 1; i++) {
+      const key = edgeKey(path.coordinates[i], path.coordinates[i + 1]);
+      const owners = edgeOwners.get(key) ?? new Set<string>();
+      owners.add(path.ownerId);
+      edgeOwners.set(key, owners);
+    }
+  }
+
+  const result: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+
+  for (const path of paths) {
+    let currentRun: GeoJSON.Position[] = [];
+
+    for (let i = 0; i < path.coordinates.length - 1; i++) {
+      const start = path.coordinates[i];
+      const end = path.coordinates[i + 1];
+      const owners = edgeOwners.get(edgeKey(start, end));
+
+      if ((owners?.size ?? 0) > 1) {
+        pushLineString(result, currentRun);
+        currentRun = [];
+        continue;
+      }
+
+      if (currentRun.length === 0) currentRun.push(start);
+      currentRun.push(end);
+    }
+
+    pushLineString(result, currentRun);
+  }
+
+  return result;
+}
+
+export function applyArrowDirectionOverrides(
+  features: GeoJSON.Feature<GeoJSON.LineString>[],
+  reverseBounds: [number, number, number, number][] = [],
+): GeoJSON.Feature<GeoJSON.LineString>[] {
+  if (reverseBounds.length === 0) return features;
+
+  return features.flatMap((feature) => {
+    const coordinates = feature.geometry.coordinates;
+    if (coordinates.length < 2) return [];
+
+    const result: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+    let shouldReverse = edgeMatchesBounds(
+      coordinates[0],
+      coordinates[1],
+      reverseBounds,
+    );
+    let currentRun = [coordinates[0], coordinates[1]];
+
+    for (let i = 1; i < coordinates.length - 1; i++) {
+      const edgeShouldReverse = edgeMatchesBounds(
+        coordinates[i],
+        coordinates[i + 1],
+        reverseBounds,
+      );
+
+      if (edgeShouldReverse === shouldReverse) {
+        currentRun.push(coordinates[i + 1]);
+        continue;
+      }
+
+      pushDirectedLineString(result, currentRun, shouldReverse);
+      currentRun = [coordinates[i], coordinates[i + 1]];
+      shouldReverse = edgeShouldReverse;
+    }
+
+    pushDirectedLineString(result, currentRun, shouldReverse);
+    return result;
+  });
+}
+
+function edgeMatchesBounds(
+  start: GeoJSON.Position,
+  end: GeoJSON.Position,
+  bounds: [number, number, number, number][],
+): boolean {
+  const midpointLng = (start[0] + end[0]) / 2;
+  const midpointLat = (start[1] + end[1]) / 2;
+  return bounds.some(
+    ([swLng, swLat, neLng, neLat]) =>
+      midpointLng >= swLng &&
+      midpointLng <= neLng &&
+      midpointLat >= swLat &&
+      midpointLat <= neLat,
+  );
+}
+
+function pushDirectedLineString(
+  result: GeoJSON.Feature<GeoJSON.LineString>[],
+  coordinates: GeoJSON.Position[],
+  reverse: boolean,
+): void {
+  result.push({
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'LineString',
+      coordinates: reverse ? [...coordinates].reverse() : coordinates,
+    },
+  });
+}
+
+function pathOwnerId(
+  feature: GeoJSON.Feature,
+  featureIndex: number,
+  partIndex: number,
+): string {
+  const featureId = feature.id ?? `feature-${featureIndex}`;
+  return `${String(featureId)}:${partIndex}`;
+}
+
+function pushLineString(
+  result: GeoJSON.Feature<GeoJSON.LineString>[],
+  coordinates: GeoJSON.Position[],
+): void {
+  if (coordinates.length < 2) return;
+  result.push({
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'LineString', coordinates },
+  });
 }
 
 export interface RouteArrowOverlay {

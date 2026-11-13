@@ -20,14 +20,13 @@ import { slugify } from '@/utils/string';
 import { defaultVocabularyId } from './vocabulary-fields';
 
 /**
- * Mountain bike trails — the collection that currently lives as a ~3,200 line
- * array in src/data/mountain-bike-trails.data.ts.
+ * Published mountain bike trails. The checked-in summary fallback lives in
+ * src/data/mountain-bike-trails.data.ts.
  *
  * **By default a trail does not own its geometry.** It references the OSM ways
- * it rides on, and the line, distance, elevation, and bounds are rebuilt from
- * OSM on save by the `resolveTrailGeometry` hook. That is the path to prefer:
- * the geometry stays maintained upstream, where community fixes flow in for
- * free, and the derived numbers can't be edited into disagreeing with the line.
+ * it rides on. The curator refreshes and reviews an OSM preview, then
+ * `resolveTrailGeometry` validates and measures that line on save. Curators
+ * can incorporate upstream edits by refreshing the preview.
  *
  * When OSM is wrong or missing, the geometry editor lets a curator drag the
  * line into place. Doing so flips `geometrySource` to 'edited', which stops the
@@ -56,7 +55,7 @@ export const Trails: CollectionConfig = {
   ],
   admin: {
     useAsTitle: 'displayName',
-    defaultColumns: ['displayName', 'city', 'area', 'rating', 'distance'],
+    defaultColumns: ['displayName', 'city', 'recArea', 'rating', 'distance'],
     group: 'Map content',
     listSearchableFields: ['displayName', 'trailName'],
   },

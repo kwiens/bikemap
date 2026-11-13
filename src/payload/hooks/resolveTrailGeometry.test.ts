@@ -155,6 +155,31 @@ describe('edited geometry', () => {
     expect(result.rebuildGeometry).toBe(false);
   });
 
+  it('clears stale elevation and retries a failed edited measurement on the next save', async () => {
+    vi.mocked(measureParts).mockRejectedValueOnce(
+      new Error('terrain unavailable'),
+    );
+    const geom = multiLine([A, B, C]);
+    const first = await run({
+      data: { geom, geometrySource: 'edited' },
+      originalDoc: { geom: multiLine([A, B]), elevationGain: 300 },
+    });
+
+    expect(first).toMatchObject({
+      bounds: [-121.4, 44, -121.38, 44.02],
+      elevationGain: null,
+      elevationProfile: null,
+      geom,
+      rebuildGeometry: true,
+    });
+    const next = await run({
+      data: { displayName: 'Renamed' },
+      originalDoc: first,
+    });
+    expect(next.rebuildGeometry).toBe(false);
+    expect(next.distance).toBe(first.distance);
+  });
+
   it('rejects the save when the submitted line is invalid', async () => {
     // Payload runs collection beforeChange hooks *before* field validation, so
     // the field's `validate` never sees a bad value on the server — it only

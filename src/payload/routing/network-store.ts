@@ -106,6 +106,8 @@ export class RouteNetworkStore {
     const cacheKey = sorted.join(';');
     const cached = this.graphs.get(cacheKey);
     if (cached) {
+      this.graphs.delete(cacheKey);
+      this.graphs.set(cacheKey, cached);
       return cached;
     }
 
@@ -124,8 +126,9 @@ export class RouteNetworkStore {
 
     const graph = buildRouteGraph({ trails, ways: [...ways.values()] });
     this.graphs.set(cacheKey, graph);
-    while (this.graphs.size > MAX_CACHED_GRAPHS) {
-      this.graphs.delete(this.graphs.keys().next().value as string);
+    if (this.graphs.size > MAX_CACHED_GRAPHS) {
+      const oldest = this.graphs.keys().next().value;
+      if (oldest !== undefined) this.graphs.delete(oldest);
     }
     return graph;
   }
@@ -161,7 +164,8 @@ export class RouteNetworkStore {
     return new Promise<T>((resolve, reject) => {
       const run = () => {
         this.running++;
-        task()
+        Promise.resolve()
+          .then(task)
           .then(resolve, reject)
           .finally(() => {
             this.running--;

@@ -2,6 +2,19 @@ import {
   faRoute,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
+import { slugify } from '@/utils/string';
+
+/** Route ids survive renames. Accept the original name-based URLs on read. */
+export function routeFromLink(
+  routes: readonly BikeRoute[],
+  value: string | undefined,
+): BikeRoute | undefined {
+  if (!value) return undefined;
+  return (
+    routes.find((route) => route.id === value) ??
+    routes.find((route) => slugify(route.name) === value)
+  );
+}
 
 export interface BikeRoute {
   id: string; // Mapbox layer ID

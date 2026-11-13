@@ -10,11 +10,17 @@
  */
 import sharp from 'sharp';
 import { lengthMeters } from './assemble';
-import { decodeTerrainRgb } from '@/utils/osm-elevation';
+import {
+  decodeTerrainRgb,
+  lngLatToTilePixel,
+  TERRAIN_TILE_SIZE,
+  OSM_TERRAIN_ZOOM,
+} from '@/utils/terrain-rgb';
 import { haversineDistance } from '@/utils/ride-stats';
 
-const TERRAIN_ZOOM = 14;
-const TILE_SIZE = 256;
+const TILE_REQUEST_TIMEOUT_MS = 10_000;
+const MAX_CACHED_TILES = 128;
+const TILE_BATCH_SIZE = 8;
 /** Resample so climb isn't undercounted between sparse OSM nodes. */
 const SAMPLE_STEP_M = 20;
 /** Caps the work one save can trigger; longer trails are sampled coarsely. */
@@ -27,37 +33,13 @@ export interface TerrainPoint {
   lng: number;
 }
 
-interface TileRef {
-  px: number;
-  py: number;
-  x: number;
-  y: number;
-}
-
-function lngLatToTilePixel(lng: number, lat: number, z: number): TileRef {
-  const scale = TILE_SIZE * 2 ** z;
-  const worldX = ((lng + 180) / 360) * scale;
-  const sinLat = Math.sin((lat * Math.PI) / 180);
-  const worldY =
-    (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
-  const x = Math.floor(worldX / TILE_SIZE);
-  const y = Math.floor(worldY / TILE_SIZE);
-  const clamp = (v: number) => Math.min(TILE_SIZE - 1, Math.max(0, v));
-  return {
-    px: clamp(Math.floor(worldX) - x * TILE_SIZE),
-    py: clamp(Math.floor(worldY) - y * TILE_SIZE),
-    x,
-    y,
-  };
-}
-
 interface DecodedTile {
   channels: number;
   data: Buffer;
 }
 
 /**
- * Process-lifetime tile cache. Trails in one recreation area share tiles, so an
+ * Bounded cache of recently used tiles. Trails in one recreation area share tiles, so an
  * editor working through an area mostly hits this after the first save.
  *
  * Only *answers* belong in here. A cached null must mean "the DEM has nothing
@@ -78,15 +60,18 @@ async function loadTile(
   y: number,
   token: string,
 ): Promise<DecodedTile | null> {
-  const key = `${TERRAIN_ZOOM}/${x}/${y}`;
+  const key = `${OSM_TERRAIN_ZOOM}/${x}/${y}`;
   const cached = tileCache.get(key);
   if (cached) {
+    tileCache.delete(key);
+    tileCache.set(key, cached);
     return cached;
   }
 
   const request = (async (): Promise<DecodedTile | null> => {
     const response = await fetch(
-      `https://api.mapbox.com/v4/mapbox.terrain-rgb/${TERRAIN_ZOOM}/${x}/${y}.pngraw?access_token=${token}`,
+      `https://api.mapbox.com/v4/mapbox.terrain-rgb/${OSM_TERRAIN_ZOOM}/${x}/${y}.pngraw?access_token=${encodeURIComponent(token)}`,
+      { signal: AbortSignal.timeout(TILE_REQUEST_TIMEOUT_MS) },
     );
     if (!response.ok) {
       // 404 is the DEM saying there is nothing here — ocean, or outside
@@ -102,6 +87,13 @@ async function loadTile(
     )
       .raw()
       .toBuffer({ resolveWithObject: true });
+    if (
+      info.width !== TERRAIN_TILE_SIZE ||
+      info.height !== TERRAIN_TILE_SIZE ||
+      info.channels < 3
+    ) {
+      throw new Error(`Invalid RGB data for terrain tile ${key}`);
+    }
     return { channels: info.channels, data };
   })();
 
@@ -117,6 +109,10 @@ async function loadTile(
   });
 
   tileCache.set(key, settled);
+  if (tileCache.size > MAX_CACHED_TILES) {
+    const oldest = tileCache.keys().next().value;
+    if (oldest !== undefined) tileCache.delete(oldest);
+  }
   return settled;
 }
 
@@ -220,25 +216,32 @@ export async function sampleTerrain(
 
   const needed = new Map<string, { x: number; y: number }>();
   for (const [lng, lat] of sampled) {
-    const ref = lngLatToTilePixel(lng, lat, TERRAIN_ZOOM);
+    const ref = lngLatToTilePixel(lng, lat, OSM_TERRAIN_ZOOM);
     needed.set(`${ref.x}/${ref.y}`, { x: ref.x, y: ref.y });
   }
 
   const tiles = new Map<string, DecodedTile | null>();
-  await Promise.all(
-    [...needed].map(async ([key, { x, y }]) => {
-      tiles.set(key, await loadTile(x, y, token));
-    }),
-  );
+  const entries = [...needed];
+  // At most one tile per sample, fetched in batches so a long line does not
+  // open thousands of connections at once.
+  for (let index = 0; index < entries.length; index += TILE_BATCH_SIZE) {
+    await Promise.all(
+      entries
+        .slice(index, index + TILE_BATCH_SIZE)
+        .map(async ([key, { x, y }]) => {
+          tiles.set(key, await loadTile(x, y, token));
+        }),
+    );
+  }
 
   let read = 0;
   const points: TerrainPoint[] = sampled.map(([lng, lat]) => {
-    const ref = lngLatToTilePixel(lng, lat, TERRAIN_ZOOM);
+    const ref = lngLatToTilePixel(lng, lat, OSM_TERRAIN_ZOOM);
     const tile = tiles.get(`${ref.x}/${ref.y}`);
     if (!tile) {
       return { altitude: null, lat, lng };
     }
-    const offset = (ref.py * TILE_SIZE + ref.px) * tile.channels;
+    const offset = (ref.py * TERRAIN_TILE_SIZE + ref.px) * tile.channels;
     read += 1;
     return {
       altitude: decodeTerrainRgb(

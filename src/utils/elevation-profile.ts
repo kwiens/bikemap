@@ -29,11 +29,12 @@ export function parseElevationProfile(value: unknown): ElevationProfile | null {
   const profile = value as Partial<ElevationProfile>;
   if (
     typeof profile.trail !== 'string' ||
-    !isFiniteNumber(profile.distance) ||
-    !isFiniteNumber(profile.gain) ||
-    !isFiniteNumber(profile.loss) ||
+    !isNonnegative(profile.distance) ||
+    !isNonnegative(profile.gain) ||
+    !isNonnegative(profile.loss) ||
     !isFiniteNumber(profile.min) ||
     !isFiniteNumber(profile.max) ||
+    profile.min > profile.max ||
     !Array.isArray(profile.profile) ||
     profile.profile.length === 0 ||
     !profile.profile.every(isProfilePoint) ||
@@ -156,10 +157,10 @@ function isProfilePoint(value: unknown): boolean {
   return (
     Array.isArray(value) &&
     value.length >= 4 &&
-    isFiniteNumber(value[0]) &&
+    isNonnegative(value[0]) &&
     isFiniteNumber(value[1]) &&
-    isFiniteNumber(value[2]) &&
-    isFiniteNumber(value[3])
+    isLongitude(value[2]) &&
+    isLatitude(value[3])
   );
 }
 
@@ -169,7 +170,7 @@ function isGapDetail(value: unknown): value is ElevationProfileGapDetail {
   }
   const gap = value as Partial<ElevationProfileGapDetail>;
   return (
-    isFiniteNumber(gap.feet) && isCoordinate(gap.from) && isCoordinate(gap.to)
+    isNonnegative(gap.feet) && isCoordinate(gap.from) && isCoordinate(gap.to)
   );
 }
 
@@ -177,9 +178,21 @@ function isCoordinate(value: unknown): value is [number, number] {
   return (
     Array.isArray(value) &&
     value.length >= 2 &&
-    isFiniteNumber(value[0]) &&
-    isFiniteNumber(value[1])
+    isLongitude(value[0]) &&
+    isLatitude(value[1])
   );
+}
+
+function isLongitude(value: unknown): boolean {
+  return isFiniteNumber(value) && Math.abs(value) <= 180;
+}
+
+function isLatitude(value: unknown): boolean {
+  return isFiniteNumber(value) && Math.abs(value) <= 90;
+}
+
+function isNonnegative(value: unknown): boolean {
+  return isFiniteNumber(value) && value >= 0;
 }
 
 function isFiniteNumber(value: unknown): value is number {

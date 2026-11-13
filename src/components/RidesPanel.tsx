@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, memo } from 'react';
+import { useState, useRef, useCallback, useId, memo } from 'react';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
 import {
@@ -32,7 +32,8 @@ const PulseDot = memo(function PulseDot() {
 });
 
 export function RidesPanel() {
-  const { ridesPanelOpen: isOpen } = useLayout();
+  const { ridesPanelOpen: isOpen, sidebarOpen } = useLayout();
+  const panelId = useId();
   const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -114,14 +115,18 @@ export function RidesPanel() {
     setSelectedRideId(rideId);
     if (openPanel) setRidesPanelOpen(true);
   });
-  useMapEvent(MAP_EVENTS.RIDE_DESELECT, () => setSelectedRideId(null));
+  const clearRideSelection = () => setSelectedRideId(null);
+  useMapEvent(MAP_EVENTS.RIDE_DESELECT, clearRideSelection);
+  useMapEvent(MAP_EVENTS.ROUTE_SELECT, clearRideSelection);
+  useMapEvent(MAP_EVENTS.TRAIL_SELECT, clearRideSelection);
+  useMapEvent(MAP_EVENTS.AREA_SELECT, clearRideSelection);
+  useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, clearRideSelection);
 
   const handleRideSelect = useCallback(
     (rideId: string) => {
-      setSelectedRideId(rideId);
-      dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId });
       dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
       dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
+      dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId });
       closeOnMobile();
     },
     [closeOnMobile],
@@ -171,7 +176,7 @@ export function RidesPanel() {
       <div
         className={cn(
           'fixed right-4 top-[calc(1.25rem+env(safe-area-inset-top))]',
-          isOpen ? 'z-960' : 'z-900',
+          sidebarOpen ? 'z-900' : 'z-960',
           isRecording && !isOpen && 'animate-recording-pulse rounded-full',
         )}
       >
@@ -184,6 +189,8 @@ export function RidesPanel() {
           )}
           type="button"
           aria-label={isOpen ? 'Close rides panel' : 'Open rides panel'}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
         >
           <FontAwesomeIcon
             icon={isOpen ? faTimes : faStopwatch}
@@ -229,7 +236,9 @@ export function RidesPanel() {
 
       {/* Panel */}
       <div
+        id={panelId}
         ref={panelRef}
+        inert={!isOpen}
         className={cn(
           'fixed top-0 right-0 h-full w-[280px] bg-white shadow-[-2px_0_5px_rgba(0,0,0,0.1)] z-950 overflow-hidden transition-transform duration-300 ease-in-out flex flex-col',
           'max-md:w-full max-md:max-w-[320px]',

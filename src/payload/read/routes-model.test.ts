@@ -91,7 +91,7 @@ describe('routeFeatureCollection', () => {
 
     expect(
       routeFeatureCollection(routes, sourceTrails).features[0].geometry,
-    ).toBe(geom);
+    ).toEqual(geom);
     expect(publicBikeRoutes(routes, sourceTrails)[0]).toEqual(
       expect.objectContaining({
         defaultBounds: [-121.4, 44, -121.39, 44.01],

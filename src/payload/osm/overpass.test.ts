@@ -31,9 +31,14 @@ describe('readOverpassElements', () => {
     ).resolves.toEqual([WAY]);
   });
 
-  it('treats a missing elements array as empty', async () => {
-    await expect(readOverpassElements(Response.json({}))).resolves.toEqual([]);
-  });
+  it.each([{}, null, { elements: {} }])(
+    'rejects a malformed elements response %j',
+    async (body) => {
+      await expect(
+        readOverpassElements(Response.json(body)),
+      ).rejects.toBeInstanceOf(OverpassError);
+    },
+  );
 
   it.each([
     TIMED_OUT,

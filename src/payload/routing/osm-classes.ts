@@ -58,7 +58,9 @@ export function classifyWay(
   }
 
   const highway = tags.highway ?? '';
-  let wayClass: WayClass | undefined = HIGHWAY_CLASSES[highway];
+  let wayClass = Object.hasOwn(HIGHWAY_CLASSES, highway)
+    ? HIGHWAY_CLASSES[highway]
+    : undefined;
   if (
     /^(motorway|trunk)(_link)?$/.test(highway) ||
     (highway === 'service' &&

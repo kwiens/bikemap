@@ -34,8 +34,14 @@ export const previewTrailGeometry: PayloadHandler = async (req) => {
     return errorResponse('Sign in to refresh a trail line.', 401);
   }
 
+  let body: PreviewRequest | undefined;
   try {
-    const body = (await req.json?.()) as PreviewRequest | undefined;
+    body = (await req.json?.()) as PreviewRequest | undefined;
+  } catch {
+    return errorResponse('The preview request must contain valid JSON.', 400);
+  }
+
+  try {
     const parsedIds = parseOsmIds(body?.osmIds);
     if (!parsedIds.ok) {
       return errorResponse(parsedIds.error, 400);
@@ -53,6 +59,7 @@ export const previewTrailGeometry: PayloadHandler = async (req) => {
         : 'Trail';
     const built = await buildTrailFromOsm(parsedIds.ids, name, {
       mapboxToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
+      ...(req.signal ? { signal: req.signal } : {}),
     });
 
     if (!built.geometry) {

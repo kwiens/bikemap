@@ -208,16 +208,31 @@ const MapboxMap = memo(function MapboxMap({
     [bikeRoutes],
   );
 
+  const rideSelectionRef = useRef<symbol | null>(null);
+  const clearSavedRide = useCallback(() => {
+    if (!rideSelectionRef.current) return;
+    rideSelectionRef.current = null;
+    if (map.current) removeRideLayer(map.current);
+  }, []);
+
   // Handle ride select — show ride on map
   const handleRideSelect = useCallback(
     async ({ rideId }: MapEventDetails['ride-select']) => {
-      if (!map.current) return;
+      const selectedMap = map.current;
+      if (!selectedMap || isRecordingRef.current) return;
+      const selection = Symbol();
+      rideSelectionRef.current = selection;
       const ride = await loadRide(rideId).catch((error: unknown) => {
         console.error('Failed to load ride:', error);
         return null;
       });
-      // The map may have been torn down while IndexedDB was reading.
-      if (!ride || !map.current) return;
+      if (
+        !ride ||
+        rideSelectionRef.current !== selection ||
+        map.current !== selectedMap
+      ) {
+        return;
+      }
 
       const segments = splitRideSegments(ride.points).map((segment) =>
         segment.map((p) => [p.lng, p.lat] as [number, number]),
@@ -243,15 +258,19 @@ const MapboxMap = memo(function MapboxMap({
   // Handle ride deselect — remove ride from map
   const handleRideDeselect = useCallback(() => {
     if (!map.current) return;
-    removeRideLayer(map.current);
+    if (!rideSelectionRef.current) return;
+    clearSavedRide();
     updateRouteSelection(null, {
       selected: 1,
       unselected: 1,
     });
     updateMtnBikeOpacity(map.current, null);
-  }, [updateRouteSelection]);
+  }, [clearSavedRide, updateRouteSelection]);
 
-  // Set up ride select/deselect event listeners
+  useMapEvent(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
+  useMapEvent(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
+
+  // Accumulate the live track across recording updates.
   useEffect(() => {
     const liveSegments: [number, number][][] = [[]];
     let updateSkip = 0;
@@ -333,15 +352,13 @@ const MapboxMap = memo(function MapboxMap({
     };
 
     const unsubscribes = [
-      onMapEvent(MAP_EVENTS.RIDE_SELECT, handleRideSelect),
-      onMapEvent(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect),
       onMapEvent(MAP_EVENTS.RIDE_RECORDING_UPDATE, updateHandler),
       onMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, stopHandler),
     ];
     return () => {
       for (const unsubscribe of unsubscribes) unsubscribe();
     };
-  }, [handleRideSelect, handleRideDeselect]);
+  }, []);
 
   // Pause auto-centering (but keep tracking/compass mode active) when the
   // user interacts with the map via drag, pinch-zoom, or scroll-wheel.
@@ -363,6 +380,7 @@ const MapboxMap = memo(function MapboxMap({
         return;
       }
 
+      clearSavedRide();
       // Find the selected route to get its name
       const selectedRoute = bikeRoutes.find((route) => route.id === routeId);
 
@@ -387,13 +405,14 @@ const MapboxMap = memo(function MapboxMap({
         flyToBounds(map.current, bounds);
       }
     },
-    [bikeRoutes, showToast, updateRouteSelection],
+    [bikeRoutes, clearSavedRide, showToast, updateRouteSelection],
   );
 
   // Handle trail selection events
   const handleTrailSelect = useCallback(
     ({ trailName, autoDetected }: MapEventDetails['trail-select']) => {
       if (!map.current) return;
+      clearSavedRide();
       const trail = getMountainBikeTrails().find(
         (t) => t.trailName === trailName,
       );
@@ -432,7 +451,7 @@ const MapboxMap = memo(function MapboxMap({
         flyToBounds(map.current, bounds);
       }
     },
-    [showToast, updateRouteSelection],
+    [clearSavedRide, showToast, updateRouteSelection],
   );
 
   // Routes' resting opacity: dimmed while any marker layer is shown so the
@@ -471,6 +490,7 @@ const MapboxMap = memo(function MapboxMap({
   const handleAreaSelect = useCallback(
     ({ areaName }: MapEventDetails['area-select']) => {
       if (!map.current) return;
+      clearSavedRide();
       const bounds = getAreaBounds(getMountainBikeTrails(), areaName);
 
       showToast(areaName);
@@ -487,7 +507,7 @@ const MapboxMap = memo(function MapboxMap({
         flyToBounds(map.current, bounds);
       }
     },
-    [showToast, updateRouteSelection],
+    [clearSavedRide, showToast, updateRouteSelection],
   );
 
   // Handle layer toggle events
@@ -1115,6 +1135,9 @@ const MapboxMap = memo(function MapboxMap({
               }
             }
 
+            if (rideSelectionRef.current) {
+              dispatchMapEvent(MAP_EVENTS.RIDE_DESELECT);
+            }
             dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
             dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
           });
@@ -1252,6 +1275,7 @@ const MapboxMap = memo(function MapboxMap({
   // Enable location tracking when recording starts, disable when it stops
   // Also toggle CSS class on map container for Mapbox control positioning
   const handleRecordingStart = () => {
+    handleRideDeselect();
     recordingOwnsTrackingRef.current = !tracking.isTracking;
     setRecordingActive(true);
     tracking.setTracking(true);

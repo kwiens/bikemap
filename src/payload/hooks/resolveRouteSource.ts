@@ -6,6 +6,7 @@ import { METERS_TO_MILES } from '@/payload/osm/units';
 import { parseRoutePlan, planGeometry } from '@/payload/routing/plan';
 import { STYLE_OWNED_ROUTE_LAYER_IDS } from '@/data/mapbox-style';
 import { slugify } from '@/utils/string';
+import { readRelationshipId } from '@/payload/relationship-id';
 
 type RouteData = Record<string, unknown>;
 
@@ -17,15 +18,8 @@ function valueOf(
   return key in data ? data[key] : originalDoc?.[key];
 }
 
-function relationshipId(value: unknown): number | string | null {
-  if (typeof value === 'number' || typeof value === 'string') {
-    return value;
-  }
-  if (value && typeof value === 'object' && 'id' in value) {
-    const id = (value as { id?: unknown }).id;
-    return typeof id === 'number' || typeof id === 'string' ? id : null;
-  }
-  return null;
+function hasText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function error(
@@ -63,7 +57,9 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
 
   if (source === 'trail') {
     const city = valueOf(current, stored, 'city');
-    const sourceTrail = relationshipId(valueOf(current, stored, 'sourceTrail'));
+    const sourceTrail = readRelationshipId(
+      valueOf(current, stored, 'sourceTrail'),
+    );
 
     if (!sourceTrail) {
       if (isPublishing) {
@@ -75,6 +71,7 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
     const trail = await req.payload.findByID({
       collection: 'trails',
       depth: 0,
+      disableErrors: true,
       id: sourceTrail,
       req,
       select: {
@@ -87,6 +84,9 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
       },
     });
 
+    if (!trail) {
+      error(req, 'sourceTrail', 'The selected trail no longer exists.');
+    }
     if (
       !isCityId(city) ||
       trail.city !== city ||
@@ -109,10 +109,10 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
     }
 
     const name = trail.displayName || trail.trailName || 'Trail route';
-    if (!valueOf(current, stored, 'name')) {
+    if (!hasText(valueOf(current, stored, 'name'))) {
       current.name = name;
     }
-    if (!valueOf(current, stored, 'routeId')) {
+    if (!hasText(valueOf(current, stored, 'routeId'))) {
       current.routeId = await availableRouteId(
         req,
         city,
@@ -142,10 +142,10 @@ export const resolveRouteSource: CollectionBeforeValidateHook = async ({
     return current;
   }
 
-  if (!valueOf(current, stored, 'name')) {
+  if (!hasText(valueOf(current, stored, 'name'))) {
     error(req, 'name', 'Give this route a name.');
   }
-  if (!valueOf(current, stored, 'routeId')) {
+  if (!hasText(valueOf(current, stored, 'routeId'))) {
     error(req, 'routeId', 'Give this route a stable public identifier.');
   }
 
@@ -228,10 +228,10 @@ async function resolveAuthoredRoute(
   current.bounds = geom ? boundsOf(geom.coordinates) : null;
 
   const name = valueOf(current, stored, 'name');
+  const routeId = valueOf(current, stored, 'routeId');
   if (
-    !valueOf(current, stored, 'routeId') &&
-    typeof name === 'string' &&
-    name &&
+    !hasText(routeId) &&
+    hasText(name) &&
     isCityId(valueOf(current, stored, 'city'))
   ) {
     current.routeId = await availableRouteId(
@@ -245,8 +245,11 @@ async function resolveAuthoredRoute(
   if (!isPublishing) {
     return current;
   }
-  if (!name) {
+  if (!hasText(name)) {
     error(req, 'name', 'Give this route a name.');
+  }
+  if (!hasText(valueOf(current, stored, 'routeId'))) {
+    error(req, 'routeId', 'Give this route a stable public identifier.');
   }
   if (!geom) {
     error(
@@ -271,6 +274,7 @@ async function availableRouteId(
   base: string,
   selfId: unknown,
 ): Promise<string> {
+  base = base.trim() || 'route';
   if (!isCityId(city)) {
     return base;
   }

@@ -147,6 +147,12 @@ describe('native bridge protocol', () => {
       false,
     );
     expect(isCompatibleHost({ protocolVersion: PROTOCOL_VERSION })).toBe(false);
+    expect(
+      isCompatibleHost({
+        protocolVersion: PROTOCOL_VERSION,
+        capabilities: { geolocation: 'false', keepAwake: true, heading: true },
+      }),
+    ).toBe(false);
     expect(isCompatibleHost(undefined)).toBe(false);
   });
 });

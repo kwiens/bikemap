@@ -132,6 +132,14 @@ function parseFix(value: unknown): PositionFix | null {
   ) {
     return null;
   }
+  if (
+    Math.abs(value.lng) > 180 ||
+    Math.abs(value.lat) > 90 ||
+    value.accuracy < 0 ||
+    value.timestamp < 0
+  ) {
+    return null;
+  }
   return {
     lng: value.lng,
     lat: value.lat,
@@ -241,6 +249,14 @@ export function decodePageEvent(raw: unknown): PageEvent | null {
 
 /** True when the injected host info describes a protocol we can speak. */
 export function isCompatibleHost(info: unknown): info is NativeHostInfo {
-  if (!isDict(info)) return false;
-  return info.protocolVersion === PROTOCOL_VERSION && isDict(info.capabilities);
+  if (!isDict(info) || info.protocolVersion !== PROTOCOL_VERSION) return false;
+  const capabilities = info.capabilities;
+  return (
+    isDict(capabilities) &&
+    typeof capabilities.geolocation === 'boolean' &&
+    typeof capabilities.keepAwake === 'boolean' &&
+    typeof capabilities.heading === 'boolean' &&
+    (capabilities.share === undefined ||
+      typeof capabilities.share === 'boolean')
+  );
 }

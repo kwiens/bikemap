@@ -1,4 +1,5 @@
 import { haversineDistance } from '@/utils/ride-stats';
+import { isPosition as isGeoJsonPosition } from '@/payload/osm/geometry';
 
 export type Position = [number, number];
 export const METERS_PER_DEG_LAT = 111_320;
@@ -8,16 +9,7 @@ export function distance(a: Position, b: Position): number {
 }
 
 export function isPosition(value: unknown): value is Position {
-  return (
-    Array.isArray(value) &&
-    value.length === 2 &&
-    typeof value[0] === 'number' &&
-    typeof value[1] === 'number' &&
-    Number.isFinite(value[0]) &&
-    Number.isFinite(value[1]) &&
-    Math.abs(value[0]) <= 180 &&
-    Math.abs(value[1]) <= 90
-  );
+  return Array.isArray(value) && value.length === 2 && isGeoJsonPosition(value);
 }
 
 /** Project locally in meters; both editors snap onto the same segment geometry. */

@@ -178,6 +178,11 @@ describe('MapLegendProvider', () => {
 
     // Now select a route — should clear trail
     dispatch(MAP_EVENTS.ROUTE_SELECT, { routeId: 'route-1' });
+    expect(screen.getByTestId('bike-routes')).toHaveAttribute(
+      'data-selected-route',
+      'route-1',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'MTB' }));
     expect(screen.getByTestId('mountain-bike-trails')).toHaveAttribute(
       'data-selected-trail',
       '',
@@ -258,6 +263,50 @@ describe('MapLegendProvider', () => {
       'data-selected-route',
       '',
     );
+  });
+
+  it('clears the trail before selecting a route from the sidebar', () => {
+    render(
+      <MapLegendProvider attractions={[]}>
+        <div />
+      </MapLegendProvider>,
+    );
+    fireEvent.click(screen.getByText('Select Route'));
+    expect(events.map(({ type }) => type)).toEqual([
+      MAP_EVENTS.TRAIL_DESELECT,
+      MAP_EVENTS.ROUTE_SELECT,
+    ]);
+  });
+
+  it('clears the route before selecting a trail from the sidebar', () => {
+    mockRideStyle = 'mountain';
+    render(
+      <MapLegendProvider attractions={[]}>
+        <div />
+      </MapLegendProvider>,
+    );
+    fireEvent.click(screen.getByText('Select Trail'));
+    expect(events.map(({ type }) => type)).toEqual([
+      MAP_EVENTS.ROUTE_DESELECT,
+      MAP_EVENTS.TRAIL_SELECT,
+    ]);
+  });
+
+  it('exposes the sidebar state to assistive technology', () => {
+    render(
+      <MapLegendProvider attractions={[]}>
+        <div />
+      </MapLegendProvider>,
+    );
+    const toggle = screen.getByRole('button', { name: 'Close map menu' });
+    const sidebar = document.getElementById(
+      toggle.getAttribute('aria-controls') ?? '',
+    );
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAccessibleName('Open map menu');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(sidebar).toHaveAttribute('inert');
   });
 
   it('area select dispatches deselect events before area-select', () => {

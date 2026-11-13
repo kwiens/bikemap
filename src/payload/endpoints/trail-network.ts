@@ -1,5 +1,6 @@
 import { fetchTrailNetwork } from '@/payload/osm/overpass';
 import { NETWORK_CELL_DEG, type NetworkWay } from '@/payload/osm/trail-network';
+import { parseDecimal } from '@/utils/parse-decimal';
 import { createNetworkEndpoint } from './network-endpoint';
 
 export interface TrailNetworkResponse {
@@ -25,11 +26,17 @@ export const clearTrailNetworkCache = endpoint.clearCache;
 function parseBbox(
   value: string | null,
 ): [number, number, number, number] | null {
-  const numbers = (value ?? '').split(',').map(Number);
-  if (numbers.length !== 4 || !numbers.every(Number.isFinite)) {
+  const fields = (value ?? '').split(',');
+  if (fields.length !== 4) return null;
+  const [west, south, east, north] = fields.map(parseDecimal);
+  if (
+    west === undefined ||
+    south === undefined ||
+    east === undefined ||
+    north === undefined
+  ) {
     return null;
   }
-  const [west, south, east, north] = numbers;
   const valid =
     west >= -180 &&
     east <= 180 &&

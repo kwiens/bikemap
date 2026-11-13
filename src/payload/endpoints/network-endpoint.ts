@@ -32,25 +32,34 @@ export function createNetworkEndpoint<Way>({
   function load(bounds: Bounds): Promise<Way[]> {
     const key = bounds.join(',');
     const hit = cache.get(key);
-    if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
-      return Promise.resolve(hit.ways);
+    if (hit) {
+      cache.delete(key);
+      if (Date.now() - hit.at < CACHE_TTL_MS) {
+        cache.set(key, hit);
+        return Promise.resolve(hit.ways);
+      }
     }
     const pending = inFlight.get(key);
     if (pending) return pending;
 
     // A shared fetch must not inherit one caller's abort signal: closing one
     // editor must not cancel a cell another editor is still waiting for.
-    const request = fetchWays(bounds)
+    const request = Promise.resolve()
+      .then(() => fetchWays(bounds))
       .then((ways) => {
+        if (inFlight.get(key) !== request) return ways;
         cache.delete(key);
         cache.set(key, { at: Date.now(), ways });
         // Each insertion exceeds the configured capacity by at most one.
         if (cache.size > maxCachedCells) {
-          cache.delete(cache.keys().next().value as string);
+          const oldest = cache.keys().next().value;
+          if (oldest !== undefined) cache.delete(oldest);
         }
         return ways;
       })
-      .finally(() => inFlight.delete(key));
+      .finally(() => {
+        if (inFlight.get(key) === request) inFlight.delete(key);
+      });
     inFlight.set(key, request);
     return request;
   }

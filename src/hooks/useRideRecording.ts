@@ -180,7 +180,7 @@ export function useRideRecording(
       (fix) => {
         if (session !== gpsSessionRef.current) return;
         isSignalLost = false;
-        const speed = fix.speed ?? 0;
+        const speed = fix.speed;
         const AUTO_PAUSE_SPEED = 0.5; // m/s (~1.1 mph)
         const AUTO_PAUSE_COUNT = 3; // consecutive low-speed readings
 
@@ -190,16 +190,18 @@ export function useRideRecording(
         // Auto-pause logic (silent — doesn't update UI isPaused state)
         if (pausedRef.current) {
           // Currently auto-paused — check if moving again
-          if (speed >= AUTO_PAUSE_SPEED) {
+          if (speed === null || speed >= AUTO_PAUSE_SPEED) {
             pausedTimeRef.current += Date.now() - pauseStartRef.current;
             pausedRef.current = false;
             lowSpeedCountRef.current = 0;
+            segmentBreakRef.current = true;
+          } else {
+            return;
           }
-          return;
         }
 
         // Not paused — check if we should auto-pause
-        if (speed < AUTO_PAUSE_SPEED) {
+        if (speed !== null && speed < AUTO_PAUSE_SPEED) {
           lowSpeedCountRef.current++;
           if (lowSpeedCountRef.current >= AUTO_PAUSE_COUNT) {
             pausedRef.current = true;
@@ -211,7 +213,11 @@ export function useRideRecording(
         }
 
         const prev = pointsRef.current[pointsRef.current.length - 1];
-        const startsNewSegment = Boolean(prev && segmentBreakRef.current);
+        const startsNewSegment = Boolean(
+          prev &&
+            (segmentBreakRef.current ||
+              fix.timestamp - prev.timestamp > BACKGROUND_GAP_THRESHOLD_MS),
+        );
         segmentBreakRef.current = false;
 
         const point: RidePoint = {
@@ -265,6 +271,7 @@ export function useRideRecording(
           // next fix resumes the track, so the ride carries on.
           if (!isSignalLost) onNotify?.('GPS signal lost — still recording');
           isSignalLost = true;
+          segmentBreakRef.current = true;
           return;
         }
         // Permission denied or no provider: the ride cannot continue.

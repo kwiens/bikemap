@@ -100,4 +100,16 @@ describe('useUrlDeepLink', () => {
       },
     ]);
   });
+
+  it('uses the stable route id when a stale trail link cannot be resolved', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?trail=removed&route=riverwalk-layer',
+    );
+    renderHook(() => useUrlDeepLink());
+    expect(selections).toEqual([
+      { type: MAP_EVENTS.ROUTE_SELECT, detail: { routeId: 'riverwalk-layer' } },
+    ]);
+  });
 });

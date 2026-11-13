@@ -1,16 +1,19 @@
-// Register service worker only in production, if browser supports it, if not inside a frame,
-// and not inside the native shell (which has no use for an offline web app cache)
-if ('serviceWorker' in navigator && window.location.hostname !== 'localhost' && window.self === window.top && !window.ReactNativeWebView) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/sw.js').then(
-      function(registration) {
-        // Registration was successful
-        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-      },
-      function(err) {
-        // Registration failed
-        console.log('ServiceWorker registration failed: ', err);
-      }
-    );
-  });
+// Next's lazyOnload strategy can run this script after the load event.
+if (
+  'serviceWorker' in navigator &&
+  !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname) &&
+  window.self === window.top &&
+  !window.ReactNativeWebView
+) {
+  function registerServiceWorker() {
+    navigator.serviceWorker.register('/sw.js').catch(function (error) {
+      console.error('Service worker registration failed', error);
+    });
+  }
+
+  if (document.readyState === 'complete') {
+    registerServiceWorker();
+  } else {
+    window.addEventListener('load', registerServiceWorker, { once: true });
+  }
 }

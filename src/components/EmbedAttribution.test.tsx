@@ -29,7 +29,7 @@ describe('EmbedAttribution', () => {
       </EmbedProvider>,
     );
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', `${siteConfig.url}?trail=initial`);
+    expect(link).toHaveAttribute('href', siteConfig.url);
     act(() => {
       window.dispatchEvent(
         new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
@@ -39,7 +39,7 @@ describe('EmbedAttribution', () => {
     });
     expect(link).toHaveAttribute(
       'href',
-      `${siteConfig.url}?trail=saved-trail-slug`,
+      new URL('?trail=saved-trail-slug', siteConfig.url).toString(),
     );
     act(() => {
       window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
@@ -61,7 +61,10 @@ describe('EmbedAttribution', () => {
         }),
       );
     });
-    expect(link).toHaveAttribute('href', `${siteConfig.url}?route=new-route`);
+    expect(link).toHaveAttribute(
+      'href',
+      new URL('?route=route-layer', siteConfig.url).toString(),
+    );
     act(() => {
       window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
     });

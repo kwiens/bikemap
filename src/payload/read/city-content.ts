@@ -8,12 +8,9 @@ import { getCityTrailSummaries } from './trails';
 
 /**
  * Everything the public map needs from Payload for one city, read in
- * parallel. Each reader never throws — no database, an unreachable one, or an
- * empty result all come back as an empty list and the client keeps its
- * checked-in fallback — so neither does this.
- *
- * A new Payload object type joins here (and in `CityContentData`), not in the
- * page.
+ * parallel. Readers handle unavailable data according to their content type:
+ * routes return an empty list, the client retains its static trail summaries,
+ * and the attractions reader returns its seed data when Payload is unavailable.
  */
 export async function getCityContent(cityId: CityId): Promise<FullCityContent> {
   const [{ trails }, { routes }, attractions] = await Promise.all([

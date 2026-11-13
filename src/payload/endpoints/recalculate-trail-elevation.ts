@@ -41,6 +41,13 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
     return errorResponse('A trail id is required.', 400);
   }
 
+  let body: PreviewRequest | undefined;
+  try {
+    body = (await req.json?.()) as PreviewRequest | undefined;
+  } catch {
+    return errorResponse('The elevation request must contain valid JSON.', 400);
+  }
+
   try {
     const trail = await req.payload.findByID({
       collection: 'trails',
@@ -50,7 +57,6 @@ export const recalculateTrailElevation: PayloadHandler = async (req) => {
       overrideAccess: false,
       req,
     });
-    const body = (await req.json?.()) as PreviewRequest | undefined;
     const geometry =
       body && Object.hasOwn(body, 'geometry') ? body.geometry : trail.geom;
     const parsed = parseTrailGeometry(geometry);

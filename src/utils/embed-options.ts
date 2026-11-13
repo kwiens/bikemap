@@ -16,7 +16,6 @@ import {
   type MountainBikeTrail,
 } from '@/data/mountain-bike-trails';
 import { cityConfigs } from '@/config/map.config';
-import { slugify } from '@/utils/string';
 import { MARKER_LAYERS, type EmbedLayer } from '@/utils/embed';
 
 export interface EmbedRouteOption {
@@ -35,7 +34,7 @@ export interface EmbedBuilderConfig {
   cityId: CityId;
   routes: EmbedRouteOption[];
   trails: EmbedTrailOption[];
-  /** Layers this city can actually render, in `MARKER_LAYERS` order. */
+  /** Layers this city can render, with the independent bike network last. */
   availableLayers: EmbedLayer[];
 }
 
@@ -67,7 +66,7 @@ export function embedBuilderConfig(
     routes: routes.map((route) => ({
       id: route.id,
       name: route.name,
-      slug: slugify(route.name),
+      slug: route.id,
     })),
     trails: trailOptions(availableTrails),
     availableLayers: [...MARKER_LAYERS, 'bikeNetwork' as const].filter(

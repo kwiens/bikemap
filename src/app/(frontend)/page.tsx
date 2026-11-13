@@ -6,9 +6,8 @@
  * map as props. An editor's change is live on the next request, with no
  * rebuild and no client-side fetch waterfall.
  *
- * If there is no database — or it's unreachable — `getCityContent` returns
- * empty lists and the client falls back to the checked-in data in `src/data/`.
- * The public map keeps working either way.
+ * If the database is unavailable, the map still has static trail and
+ * attraction data. Casual route summaries depend on published Payload routes.
  */
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';

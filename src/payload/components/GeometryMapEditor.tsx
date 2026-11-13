@@ -90,6 +90,7 @@ import {
 import { TerraDrawMapboxGLAdapter } from 'terra-draw-mapbox-gl-adapter';
 import { mapConfig } from '@/config/map.config';
 import {
+  OSM_BIKE_TRAIL_FILTER,
   OSM_TRAILS_SOURCE_ID,
   OSM_TRAILS_SOURCE_LAYER,
   OSM_TRAILS_TILEJSON_URL,
@@ -112,7 +113,11 @@ import {
   toTrailGeometry,
   type TrailGeometry,
 } from '@/payload/osm/geometry';
-import { MAX_GPX_BYTES, parseGpx } from '@/payload/osm/gpx';
+import {
+  GPX_SIMPLIFY_TOLERANCE_M,
+  MAX_GPX_BYTES,
+  parseGpx,
+} from '@/payload/osm/gpx';
 import { parseOsmIds } from '@/payload/osm/ids';
 import {
   deletePoints,
@@ -127,8 +132,12 @@ import {
 import { cellBounds as trailCellBounds } from '@/payload/osm/trail-network';
 import { METERS_TO_MILES } from '@/payload/osm/units';
 import { cellBounds as routeCellBounds } from '@/payload/routing/cells';
-import { OSM_BIKE_TRAIL_FILTER } from '@/utils/map';
-import { cn } from '@/lib/utils';
+import {
+  ModeButton,
+  plural,
+  RouteBar,
+  SelectBar,
+} from './geometry-editor-controls';
 import { Banner, type Tone } from './admin-ui';
 import {
   createPointSelectionTool,
@@ -173,9 +182,6 @@ const POINTER_DISTANCE = 20;
  * on its neighbour, and doing that by eye is precisely the fiddly part.
  */
 const SNAPPING = { toCoordinate: true, toLine: true } as const;
-
-/** Simplify tolerances offered, in meters. 3 m matches the GPX import's. */
-const SIMPLIFY_TOLERANCES_M = [1, 3, 5, 10, 20] as const;
 
 /**
  * Who a line belongs to, as the form records it. An undo step restores this
@@ -295,6 +301,7 @@ export function GeometryMapEditor({
   const historyRef = useRef(createEditHistory(cloneSnapshot));
   const historyPointRef = useRef<LineSnapshot['point']>(undefined);
   const refreshRequestRef = useRef<AbortController | null>(null);
+  const gpxImportRef = useRef(0);
 
   const [ready, setReady] = useState(false);
   const [drawFailed, setDrawFailed] = useState(false);
@@ -323,7 +330,9 @@ export function GeometryMapEditor({
   const [routeStatus, setRouteStatus] = useState<RouteStatus>(IDLE_ROUTE);
   const [selection, setSelection] = useState<PointRef[]>([]);
   const [editNote, setEditNote] = useState<string | null>(null);
-  const [toleranceMeters, setToleranceMeters] = useState<number>(3);
+  const [toleranceMeters, setToleranceMeters] = useState(
+    GPX_SIMPLIFY_TOLERANCE_M,
+  );
   /**
    * The ways the line currently on screen was built from.
    *
@@ -390,6 +399,7 @@ export function GeometryMapEditor({
     setHasUnsavedPreview(false);
 
     return () => {
+      gpxImportRef.current += 1;
       refreshRequestRef.current?.abort();
       refreshRequestRef.current = null;
     };
@@ -1482,6 +1492,7 @@ export function GeometryMapEditor({
    */
   const importGpx = useCallback(
     async (file: File) => {
+      const importId = ++gpxImportRef.current;
       setImportNote(null);
       if (file.size > MAX_GPX_BYTES) {
         setImportNote({
@@ -1494,12 +1505,14 @@ export function GeometryMapEditor({
       try {
         text = await file.text();
       } catch {
+        if (importId !== gpxImportRef.current) return;
         setImportNote({
           text: `${file.name} could not be read.`,
           tone: 'error',
         });
         return;
       }
+      if (importId !== gpxImportRef.current || readOnlyRef.current) return;
       const parsed = parseGpx(text);
       if (!parsed.ok) {
         setImportNote({ text: `${file.name}: ${parsed.error}`, tone: 'error' });
@@ -1541,7 +1554,7 @@ export function GeometryMapEditor({
     return (
       <div className="field-type">
         <p>
-          Set <code>NEXT_PUBLIC_MAPBOX_TOKEN</code> to edit trails on the map.
+          Set <code>NEXT_PUBLIC_MAPBOX_TOKEN</code> to use the geometry editor.
         </p>
       </div>
     );
@@ -2046,216 +2059,6 @@ function messageFrom(value: unknown): string {
   return 'The trail line could not be refreshed.';
 }
 
-/** Follow trails' controls, and what the network is doing. */
-function RouteBar({
-  isManual,
-  onCancel,
-  onFinish,
-  onToggleManual,
-  status,
-}: {
-  isManual: boolean;
-  onCancel: () => void;
-  onFinish: () => void;
-  onToggleManual?: () => void;
-  status: RouteStatus;
-}) {
-  const networkText =
-    status.networkMessage ??
-    (status.network === 'ready' ? 'Network loaded for this area.' : null);
-  return (
-    <div
-      aria-label={onToggleManual ? 'Route construction' : 'Follow trails'}
-      className="mb-2 flex flex-wrap items-center gap-1.5"
-      role="group"
-    >
-      {onToggleManual && (
-        <ModeButton
-          active={isManual}
-          disabled={false}
-          label="Manual points"
-          onClick={onToggleManual}
-        />
-      )}
-      <ModeButton
-        active={false}
-        disabled={status.waypoints < 2}
-        isToggle={false}
-        label="Finish route"
-        onClick={onFinish}
-      />
-      <ModeButton
-        active={false}
-        disabled={status.waypoints === 0}
-        isToggle={false}
-        label="Cancel route"
-        onClick={onCancel}
-      />
-      {networkText && (
-        <span
-          aria-live="polite"
-          className={cn(
-            'text-[0.8rem]',
-            status.network === 'error'
-              ? 'text-[color:var(--theme-error-500,#c00)]'
-              : 'text-[color:var(--theme-elevation-600)]',
-          )}
-        >
-          {networkText}
-        </span>
-      )}
-      {status.note && (
-        <span
-          aria-live="polite"
-          className="basis-full text-[0.8rem] text-[color:var(--theme-warning-600,#b45309)]"
-        >
-          {status.note}
-        </span>
-      )}
-    </div>
-  );
-}
-
-/** Select points' operations, with the selection they will act on. */
-function SelectBar({
-  onClear,
-  onDelete,
-  onJoin,
-  onReverse,
-  onSelectAll,
-  onSimplify,
-  onSplit,
-  onTolerance,
-  pieces,
-  selection,
-  toleranceMeters,
-}: {
-  onClear: () => void;
-  onDelete: () => void;
-  onJoin: () => void;
-  onReverse: () => void;
-  onSelectAll: () => void;
-  onSimplify: () => void;
-  onSplit: () => void;
-  onTolerance: (meters: number) => void;
-  pieces: number;
-  selection: PointRef[];
-  toleranceMeters: number;
-}) {
-  const selectedPieces = partsOf(selection).length;
-  const hasSelection = selection.length > 0;
-  const summary = hasSelection
-    ? `${plural(selection.length, 'point')} selected${pieces > 1 ? ` on ${plural(selectedPieces, 'piece')}` : ''}`
-    : 'Nothing selected — tools act on the whole line';
-
-  return (
-    <div
-      aria-label="Point tools"
-      className="mb-2 flex flex-wrap items-center gap-1.5"
-      role="group"
-    >
-      <span className="mr-1 text-[0.8rem] text-[color:var(--theme-elevation-600)]">
-        {summary}
-      </span>
-      <ModeButton
-        active={false}
-        isToggle={false}
-        label="Select all"
-        onClick={onSelectAll}
-      />
-      <ModeButton
-        active={false}
-        disabled={!hasSelection}
-        isToggle={false}
-        label="Clear"
-        onClick={onClear}
-      />
-      <span
-        aria-hidden
-        className="mx-1 h-4 w-px bg-[var(--theme-elevation-150)]"
-      />
-      <ModeButton
-        active={false}
-        disabled={!hasSelection}
-        isToggle={false}
-        label="Delete points"
-        onClick={onDelete}
-      />
-      <ModeButton
-        active={false}
-        disabled={!hasSelection}
-        isToggle={false}
-        label="Split at points"
-        onClick={onSplit}
-      />
-      <ModeButton
-        active={false}
-        disabled={hasSelection ? selectedPieces < 2 : pieces < 2}
-        isToggle={false}
-        label="Join pieces"
-        onClick={onJoin}
-      />
-      <ModeButton
-        active={false}
-        isToggle={false}
-        label="Reverse"
-        onClick={onReverse}
-      />
-      <span className="inline-flex items-center gap-1">
-        <ModeButton
-          active={false}
-          isToggle={false}
-          label="Simplify"
-          onClick={onSimplify}
-        />
-        <select
-          aria-label="Simplify tolerance"
-          className="rounded-[var(--style-radius-s,4px)] border border-solid border-[color:var(--theme-elevation-150)] bg-[var(--theme-elevation-50)] px-1 py-1 text-[0.8rem] text-[color:var(--theme-elevation-800)]"
-          onChange={(event) => onTolerance(Number(event.target.value))}
-          value={toleranceMeters}
-        >
-          {SIMPLIFY_TOLERANCES_M.map((meters) => (
-            <option key={meters} value={meters}>
-              {meters} m
-            </option>
-          ))}
-        </select>
-      </span>
-    </div>
-  );
-}
-
-function ModeButton({
-  active,
-  disabled,
-  isToggle = true,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  disabled?: boolean;
-  isToggle?: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      aria-pressed={isToggle ? active : undefined}
-      className={cn(
-        'rounded-[var(--style-radius-s,4px)] border border-solid border-[color:var(--theme-elevation-150)] px-2.5 py-1 text-[0.8rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--theme-elevation-800)] disabled:cursor-not-allowed disabled:opacity-50',
-        active
-          ? 'bg-[var(--theme-elevation-800)] text-[color:var(--theme-elevation-0)]'
-          : 'bg-[var(--theme-elevation-50)] text-[color:var(--theme-elevation-800)] hover:bg-[var(--theme-elevation-100)]',
-      )}
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      {label}
-    </button>
-  );
-}
-
 /**
  * The nationwide OSM trails, and a transparent hit layer over them.
  *
@@ -2343,10 +2146,6 @@ function applyWayStyle(map: mapboxgl.Map, ids: number[], mode: Mode) {
       picking ? 'visible' : 'none',
     );
   }
-}
-
-function plural(count: number, noun: string): string {
-  return `${count.toLocaleString()} ${noun}${count === 1 ? '' : 's'}`;
 }
 
 function ignoreChange() {}

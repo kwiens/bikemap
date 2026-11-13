@@ -102,4 +102,25 @@ describe('network endpoint caching', () => {
     expect((await handler(request())).status).toBe(200);
     expect(fetchWays).toHaveBeenCalledTimes(2);
   });
+
+  it('does not refill a cleared cache with a pending request', async () => {
+    const { clearCache, handler, fetchWays } = endpoint();
+    let finish = (_ways: { id: number }[]) => {};
+    fetchWays.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const oldRequest = handler(request());
+    await Promise.resolve();
+    clearCache();
+    const newRequest = handler(request());
+    await newRequest;
+    finish([{ id: 2 }]);
+    await oldRequest;
+    expect(await (await handler(request())).json()).toEqual({
+      ways: [{ id: 1 }],
+    });
+    expect(fetchWays).toHaveBeenCalledTimes(2);
+  });
 });

@@ -120,6 +120,7 @@ const MANUAL_APPROACH_METERS = 250;
  * blip clears on its own.
  */
 const RETRY_AFTER_MS = 30_000;
+const MAX_VISIBLE_CELLS = 16;
 
 const EMPTY: GeoJSON.FeatureCollection = {
   features: [],
@@ -176,6 +177,7 @@ export function createRouteTool(
       return;
     }
     if (map.getZoom() < minZoom) {
+      queue = [];
       report({
         network: 'zoom',
         networkMessage: `Zoom in to load ${networkLabel} to follow.`,
@@ -187,12 +189,24 @@ export function createRouteTool(
       return;
     }
     const now = Date.now();
-    const missing = cellsCovering([
-      bounds.getWest(),
-      bounds.getSouth(),
-      bounds.getEast(),
-      bounds.getNorth(),
-    ]).filter((key) => !loaded.has(key));
+    const viewCells = cellsCovering(
+      [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth(),
+      ],
+      MAX_VISIBLE_CELLS + 1,
+    );
+    if (viewCells.length > MAX_VISIBLE_CELLS) {
+      queue = [];
+      report({
+        network: 'zoom',
+        networkMessage: `Zoom in to load ${networkLabel} to follow.`,
+      });
+      return;
+    }
+    const missing = viewCells.filter((key) => !loaded.has(key));
     const cooling = missing.filter(
       (key) => now - (failed.get(key) ?? -Infinity) < RETRY_AFTER_MS,
     );

@@ -35,8 +35,10 @@ export function isPosition(value: unknown): value is [number, number] {
   if (!Array.isArray(value) || value.length < 2) {
     return false;
   }
-  const [lng, lat] = value.map(Number);
+  const [lng, lat] = value;
   return (
+    typeof lng === 'number' &&
+    typeof lat === 'number' &&
     Number.isFinite(lng) &&
     Number.isFinite(lat) &&
     lng >= -180 &&
@@ -115,7 +117,7 @@ export function parseTrailGeometry(value: unknown): GeometryParse {
     // vertex down to one point is a normal thing to do mid-edit, and the part
     // simply stops existing.
     if (run.length >= MIN_POINTS_PER_PART) {
-      parts.push(run.map(([lng, lat]) => [Number(lng), Number(lat)]));
+      parts.push(run.map(([lng, lat]) => [lng, lat]));
     }
   }
 
@@ -210,7 +212,7 @@ export function featuresToParts(features: unknown[]): [number, number][][] {
     }
     const points = geometry.coordinates.filter(isPosition);
     if (points.length >= MIN_POINTS_PER_PART) {
-      parts.push(points.map(([lng, lat]) => [Number(lng), Number(lat)]));
+      parts.push(points.map(([lng, lat]) => [lng, lat]));
     }
   }
 

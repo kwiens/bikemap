@@ -16,6 +16,7 @@ import { slugify } from '@/utils/string';
 import {
   elevationProfileBreaks,
   layoutElevationChart,
+  parseElevationProfile,
   type ElevationChartLayout,
 } from '@/utils/elevation-profile';
 import { buildProfileGpx } from '@/utils/gpx';
@@ -24,7 +25,6 @@ import { useMapEvent } from '@/hooks/useMapEvent';
 import { useLayout } from '@/hooks/useLayout';
 import { usePlatform } from '@/platform/context';
 import type { ExportFile } from '@/platform/types';
-import { useEmbed } from '@/components/EmbedContext';
 import { loadRide } from '@/utils/ride-storage';
 import { rideToElevationProfile } from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -59,7 +59,9 @@ async function fetchProfile(
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }
-  return response.json();
+  const profile = parseElevationProfile(await response.json());
+  if (!profile) throw new Error('Invalid elevation profile');
+  return profile;
 }
 
 /**
@@ -83,16 +85,20 @@ export async function loadProfile(
   city: CityId,
   signal: AbortSignal,
 ): Promise<ElevationProfileData> {
+  const encodedSlug = encodeURIComponent(slug);
   try {
     return await fetchProfile(
-      `/api/map/elevation/${slug}?city=${encodeURIComponent(city)}`,
+      `/api/map/elevation/${encodedSlug}?city=${encodeURIComponent(city)}`,
       signal,
     );
   } catch (error) {
-    if ((error as Error).name === 'AbortError') {
+    if (
+      signal.aborted ||
+      (error instanceof Error && error.name === 'AbortError')
+    ) {
       throw error;
     }
-    return fetchProfile(`/data/elevation/${city}/${slug}.json`, signal);
+    return fetchProfile(`/data/elevation/${city}/${encodedSlug}.json`, signal);
   }
 }
 
@@ -287,23 +293,15 @@ export function findClosestProfileIndex(
   return bestIdx;
 }
 
-function trailSelectionUrl(isEmbed: boolean, name?: string): string {
-  if (!isEmbed) {
-    return name
-      ? `?trail=${encodeURIComponent(profileSlug(name))}`
-      : window.location.pathname;
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  params.delete('route');
-  params.delete('trail');
-  if (name) params.set('trail', profileSlug(name));
-  const search = params.toString();
-  return `${window.location.pathname}${search ? `?${search}` : ''}`;
+function trailSelectionUrl(name?: string): string {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('route');
+  url.searchParams.delete('trail');
+  if (name) url.searchParams.set('trail', profileSlug(name));
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 export function ElevationProfile() {
-  const { isEmbed } = useEmbed();
   // Which side panels are open decides where the pane sits (and, on a
   // phone, whether it shows at all).
   const { sidebarOpen, ridesPanelOpen } = useLayout();
@@ -326,13 +324,12 @@ export function ElevationProfile() {
   const [collapsed, setCollapsed] = useState(false);
   const [isShowingActions, setIsShowingActions] = useState(false);
 
-  // The ride whose loadRide() is in flight. Any other selection, deselect or
-  // a recording start nulls it, so a slow IndexedDB read can't paint a ride
-  // over whatever came next.
-  const latestRideIdRef = useRef<string | null>(null);
+  // Compare individual requests so reselecting the same ride still supersedes
+  // an earlier IndexedDB read.
+  const rideSelectionRef = useRef<symbol | null>(null);
 
   const clearProfile = () => {
-    latestRideIdRef.current = null;
+    rideSelectionRef.current = null;
     setIsShowingActions(false);
     sourceRef.current = null;
     setProfileSource(null);
@@ -341,11 +338,11 @@ export function ElevationProfile() {
     profileRef.current = null;
   };
   const clearUrlState = () => {
-    window.history.replaceState(null, '', trailSelectionUrl(isEmbed));
+    window.history.replaceState(window.history.state, '', trailSelectionUrl());
   };
 
   useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName: name }) => {
-    latestRideIdRef.current = null;
+    rideSelectionRef.current = null;
     if (sourceRef.current !== 'trail' || trailName !== name) {
       setIsShowingActions(false);
     }
@@ -353,7 +350,11 @@ export function ElevationProfile() {
     setProfileSource('trail');
     rideIdRef.current = null;
     setTrailName(name);
-    window.history.replaceState(null, '', trailSelectionUrl(isEmbed, name));
+    window.history.replaceState(
+      window.history.state,
+      '',
+      trailSelectionUrl(name),
+    );
   });
 
   // OSM trails ship a ready-built profile (no curated JSON to load by name),
@@ -361,7 +362,7 @@ export function ElevationProfile() {
   // Seed the cache so the trailName effect takes its cache-hit path instead of
   // fetching a non-existent /data/elevation/<city>/<slug>.json and clearing us.
   useMapEvent(MAP_EVENTS.OSM_TRAIL_SELECT, ({ profile: osmProfile }) => {
-    latestRideIdRef.current = null;
+    rideSelectionRef.current = null;
     setIsShowingActions(false);
     sourceRef.current = 'osm';
     setProfileSource('osm');
@@ -382,11 +383,15 @@ export function ElevationProfile() {
   // route-click leaves the previous trail's chart visible.
   useMapEvent(MAP_EVENTS.ROUTE_SELECT, () => {
     // Also supersedes a ride still loading when nothing is showing yet.
-    latestRideIdRef.current = null;
+    rideSelectionRef.current = null;
     if (sourceRef.current !== null) {
       clearProfile();
       clearUrlState();
     }
+  });
+
+  useMapEvent(MAP_EVENTS.AREA_SELECT, () => {
+    if (rideSelectionRef.current) clearProfile();
   });
 
   useMapEvent(MAP_EVENTS.TRAIL_DESELECT, () => {
@@ -400,14 +405,15 @@ export function ElevationProfile() {
   });
 
   useMapEvent(MAP_EVENTS.RIDE_SELECT, async ({ rideId }) => {
-    latestRideIdRef.current = rideId;
+    const selection = Symbol();
+    rideSelectionRef.current = selection;
     // Ride storage is IndexedDB, which some private windows block; a failed
     // read just leaves the pane as it was.
     const ride = await loadRide(rideId).catch((error: unknown) => {
       console.error('Failed to load ride:', error);
       return null;
     });
-    if (!ride || latestRideIdRef.current !== rideId) return;
+    if (!ride || rideSelectionRef.current !== selection) return;
     const elevProfile = rideToElevationProfile(ride);
     setIsShowingActions(false);
     sourceRef.current = 'ride';
@@ -415,7 +421,6 @@ export function ElevationProfile() {
     rideIdRef.current = rideId;
     if (elevProfile) {
       setTrailName(ride.name);
-      profileCache.set(`ride:${ride.name}`, elevProfile);
       setProfile(elevProfile);
       profileRef.current = elevProfile;
       setHover(null);
@@ -429,7 +434,7 @@ export function ElevationProfile() {
   });
 
   useMapEvent(MAP_EVENTS.RIDE_DESELECT, () => {
-    latestRideIdRef.current = null;
+    rideSelectionRef.current = null;
     if (sourceRef.current === 'ride') {
       clearProfile();
       clearUrlState();
@@ -455,6 +460,7 @@ export function ElevationProfile() {
 
   useEffect(() => {
     if (!trailName) {
+      setLoading(false);
       setProfile(null);
       profileRef.current = null;
       setLocationIndex(null);
@@ -467,6 +473,7 @@ export function ElevationProfile() {
     const cacheKey = `${profileSource ?? 'trail'}:${trailName}`;
     const cached = profileCache.get(cacheKey);
     if (cached) {
+      setLoading(false);
       setProfile(cached);
       profileRef.current = cached;
       setHover(null);
@@ -485,20 +492,21 @@ export function ElevationProfile() {
     setLocationIndex(null);
 
     const controller = new AbortController();
-    const slug = encodeURIComponent(profileSlug(trailName));
+    const slug = profileSlug(trailName);
 
     // `activeCityId` is the browser's own resolution (this runs on the client,
     // so it sees window.location) — the API needs it because slugs are unique
     // per city, not globally.
     loadProfile(slug, activeCityId, controller.signal)
       .then((data: ElevationProfileData) => {
+        if (controller.signal.aborted) return;
         profileCache.set(`trail:${trailName}`, data);
         setProfile(data);
         profileRef.current = data;
         setLoading(false);
       })
-      .catch((err) => {
-        if (err.name !== 'AbortError') setLoading(false);
+      .catch(() => {
+        if (!controller.signal.aborted) setLoading(false);
       });
 
     return () => controller.abort();

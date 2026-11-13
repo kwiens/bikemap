@@ -54,13 +54,16 @@ export function RideHistory({
   useMapEvent(MAP_EVENTS.RIDE_DESELECT, refreshSummaries);
 
   useEffect(() => {
-    if (selectedRideId) {
-      loadRide(selectedRideId)
-        .then(setSelectedRide)
-        .catch(() => {});
-    } else {
-      setSelectedRide(null);
-    }
+    if (!selectedRideId) return;
+    let isCurrent = true;
+    loadRide(selectedRideId)
+      .then((ride) => {
+        if (isCurrent) setSelectedRide(ride);
+      })
+      .catch(() => {});
+    return () => {
+      isCurrent = false;
+    };
   }, [selectedRideId]);
 
   const handleDetailClose = () => {
@@ -71,7 +74,7 @@ export function RideHistory({
     dispatchMapEvent(MAP_EVENTS.RIDE_DESELECT);
   };
 
-  if (selectedRide) {
+  if (selectedRide && selectedRide.id === selectedRideId) {
     return (
       <RideDetail
         ride={selectedRide}

@@ -45,10 +45,23 @@ function createNativeGeolocation(
           onError(event.error);
         }
       });
-      transport.send({ type: 'geolocation/watch', watchId, options });
+      try {
+        transport.send({ type: 'geolocation/watch', watchId, options });
+      } catch {
+        stop();
+        onError({
+          code: 'unavailable',
+          message: 'The native host could not start GPS.',
+        });
+        return () => {};
+      }
       return () => {
         stop();
-        transport.send({ type: 'geolocation/clearWatch', watchId });
+        try {
+          transport.send({ type: 'geolocation/clearWatch', watchId });
+        } catch {
+          // The local watch is already detached when the host goes away.
+        }
       };
     },
 
@@ -86,7 +99,20 @@ function createNativeGeolocation(
             reject(event.error);
           }
         });
-        transport.send({ type: 'geolocation/getCurrent', requestId, options });
+        try {
+          transport.send({
+            type: 'geolocation/getCurrent',
+            requestId,
+            options,
+          });
+        } catch {
+          clearTimeout(timer);
+          stop();
+          reject({
+            code: 'unavailable',
+            message: 'The native host could not request a GPS fix.',
+          } satisfies PositionError);
+        }
       });
     },
   };
@@ -97,14 +123,26 @@ function createNativeKeepAwake(transport: BridgeTransport): KeepAwakeService {
   return {
     isSupported: () => true,
     acquire() {
+      if (holders === 0) {
+        try {
+          transport.send({ type: 'keepAwake/acquire' });
+        } catch {
+          return () => {};
+        }
+      }
       holders += 1;
-      if (holders === 1) transport.send({ type: 'keepAwake/acquire' });
       let isReleased = false;
       return () => {
         if (isReleased) return;
         isReleased = true;
         holders -= 1;
-        if (holders === 0) transport.send({ type: 'keepAwake/release' });
+        if (holders === 0) {
+          try {
+            transport.send({ type: 'keepAwake/release' });
+          } catch {
+            // The next holder can acquire a new lock.
+          }
+        }
       };
     },
   };
@@ -134,7 +172,13 @@ function createNativeHeading(transport: BridgeTransport): HeadingService {
             resolve(event.granted);
           }
         });
-        transport.send({ type: 'heading/requestPermission', requestId });
+        try {
+          transport.send({ type: 'heading/requestPermission', requestId });
+        } catch {
+          clearTimeout(timer);
+          stop();
+          resolve(false);
+        }
       });
     },
 
@@ -142,15 +186,28 @@ function createNativeHeading(transport: BridgeTransport): HeadingService {
       const stop = transport.onEvent((event) => {
         if (event.type === 'heading/reading') onHeading(event.headingDegrees);
       });
+      if (watchers === 0) {
+        try {
+          transport.send({ type: 'heading/watch' });
+        } catch {
+          stop();
+          return () => {};
+        }
+      }
       watchers += 1;
-      if (watchers === 1) transport.send({ type: 'heading/watch' });
       let isStopped = false;
       return () => {
         if (isStopped) return;
         isStopped = true;
         stop();
         watchers -= 1;
-        if (watchers === 0) transport.send({ type: 'heading/clearWatch' });
+        if (watchers === 0) {
+          try {
+            transport.send({ type: 'heading/clearWatch' });
+          } catch {
+            // The local listener has already been removed.
+          }
+        }
       };
     },
   };

@@ -19,7 +19,7 @@
  */
 import { ValidationError, type CollectionBeforeChangeHook } from 'payload';
 import { isCityId } from '@/config/map.config';
-import { NOTABLE_GAP_M } from '@/payload/osm/assemble';
+import { boundsOf, lengthMeters, NOTABLE_GAP_M } from '@/payload/osm/assemble';
 import { osmWayWarnings } from '@/payload/osm/build';
 import {
   parseTrailGeometry,
@@ -31,6 +31,7 @@ import { measureParts } from '@/payload/osm/measure';
 import { trailFieldsFromMeasurements } from '@/payload/osm/measurement-fields';
 import { getBundledElevationProfile } from '@/payload/read/bundled-elevation';
 import { measurementsFromElevationProfile } from '@/utils/elevation-profile';
+import { METERS_TO_MILES } from '@/payload/osm/units';
 
 /** Reads an osmIds value that may arrive as an array, a JSON string, or null. */
 function readOsmIds(value: unknown): number[] {
@@ -189,6 +190,7 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
   if (
     samePartsAs(parts, previous) &&
     typeof originalDoc?.distance === 'number' &&
+    originalDoc.rebuildGeometry !== true &&
     data.rebuildGeometry !== true &&
     data.rebuildElevation !== true
   ) {
@@ -218,10 +220,10 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
     // pieces form one continuous section.
     const gaps = measured.gaps;
     const warnings = [...measured.warnings];
-    const notable = gaps.filter((gap) => gap.distanceMeters > NOTABLE_GAP_M);
-    if (notable.length > 0) {
+    const largestGap = gaps[0];
+    if (largestGap && largestGap.distanceMeters > NOTABLE_GAP_M) {
       warnings.push(
-        `The elevation profile has a ${notable[0].distanceMeters} m break between sections. Verify the connection before joining the pieces.`,
+        `The elevation profile has a ${largestGap.distanceMeters} m break between sections. Verify the connection before joining the pieces.`,
       );
     }
 
@@ -254,18 +256,27 @@ async function measureEditedGeometry({ data, originalDoc, req }: HookArgs) {
     );
     return {
       ...data,
+      ...trailFieldsFromMeasurements({
+        bounds: boundsOf(parts),
+        distance: Number((lengthMeters(parts) * METERS_TO_MILES).toFixed(2)),
+        elevationGain: null,
+        elevationLoss: null,
+        elevationMax: null,
+        elevationMin: null,
+        profile: null,
+      }),
       geom,
       osmReport: {
-        ...(typeof originalDoc?.osmReport === 'object'
-          ? originalDoc.osmReport
-          : {}),
+        gaps: [],
+        missingIds: [],
+        resolvedIds: readOsmIds(data.osmIds ?? originalDoc?.osmIds),
         source: 'edited',
         warnings: [
           `The line was saved, but it could not be measured: ${message}. Save again to retry.`,
         ],
       },
       rebuildElevation: false,
-      rebuildGeometry: false,
+      rebuildGeometry: true,
     };
   }
 }

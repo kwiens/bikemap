@@ -10,6 +10,7 @@
  * `DOMParser`, and has no Node-only imports.
  */
 import { dropRepeatedPoints, MIN_POINTS_PER_PART } from './geometry';
+import { parseDecimal } from '@/utils/parse-decimal';
 
 /**
  * How far, in meters, a simplified line may stray from the recording.
@@ -76,10 +77,10 @@ export function parseGpx(
   }
 
   const segments = byLocalName(doc, 'trkseg');
-  const runs =
-    segments.length > 0
-      ? segments.map((segment) => byLocalName(segment, 'trkpt'))
-      : byLocalName(doc, 'rte').map((route) => byLocalName(route, 'rtept'));
+  const trackRuns = segments.map((segment) => byLocalName(segment, 'trkpt'));
+  const runs = trackRuns.some((run) => run.length >= MIN_POINTS_PER_PART)
+    ? trackRuns
+    : byLocalName(doc, 'rte').map((route) => byLocalName(route, 'rtept'));
 
   const pointCount = runs.reduce((total, run) => total + run.length, 0);
   if (pointCount > maxPoints) {
@@ -213,8 +214,7 @@ function positionOf(point: Element): [number, number][] {
  * is 0, so without the blank check an empty `lat=""` would plot at the equator.
  */
 function coordinateOf(point: Element, name: 'lat' | 'lon'): number {
-  const raw = point.getAttribute(name)?.trim();
-  return raw ? Number(raw) : Number.NaN;
+  return parseDecimal(point.getAttribute(name) ?? '') ?? NaN;
 }
 
 /**

@@ -305,7 +305,11 @@ export function useLocationTracking({
       stopPositions.current?.();
       stopPositions.current = null;
       if (recenterTimer.current) clearInterval(recenterTimer.current);
+      recenterTimer.current = null;
       stopHeading.current?.();
+      stopHeading.current = null;
+      compassHeading.current = null;
+      gpsHeading.current = null;
       marker.current?.remove();
       marker.current = null;
     };

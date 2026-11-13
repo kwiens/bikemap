@@ -22,7 +22,10 @@ import { M_TO_FT } from './units';
 vi.mock('sharp', () => ({
   default: (buffer: Buffer) => ({
     raw: () => ({
-      toBuffer: async () => ({ data: buffer, info: { channels: 3 } }),
+      toBuffer: async () => ({
+        data: buffer,
+        info: { channels: 3, width: TILE_SIZE, height: TILE_SIZE },
+      }),
     }),
   }),
 }));

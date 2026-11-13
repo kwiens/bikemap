@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { getBikeRoutes } from '@/data/route-source';
+import { routeFromLink } from '@/data/bike-routes';
 import { MAP_EVENTS } from '@/events';
-import { slugify } from '@/utils/string';
+import { useMapEvent } from '@/hooks/useMapEvent';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 import { useEmbed } from '@/components/EmbedContext';
 import { siteConfig } from '@/config/site.config';
+import { cityIdForQuery } from '@/config/map.config';
 
 // Small "open the real site" pill shown only inside `/embed` — third-party
 // hosts frame the map via <iframe>, so this is the only way a viewer gets to
@@ -18,55 +20,44 @@ import { siteConfig } from '@/config/site.config';
 export function EmbedAttribution() {
   const { isEmbed, options } = useEmbed();
 
-  const [selection, setSelection] = useState(() => {
-    const slug = options.mode === 'mtb' ? options.trail : options.route;
-    return slug
-      ? `${options.mode === 'mtb' ? 'trail' : 'route'}=${encodeURIComponent(slug)}`
-      : '';
-  });
+  const isMtb = options.mode === 'mtb';
+  const [slug, setSlug] = useState(() =>
+    isMtb
+      ? getMountainBikeTrails().some(
+          (trail) => slugForTrail(trail) === options.trail,
+        )
+        ? options.trail
+        : undefined
+      : routeFromLink(getBikeRoutes(), options.route)?.id,
+  );
 
-  useEffect(() => {
-    if (!isEmbed) return;
-    const selectEvent =
-      options.mode === 'mtb'
-        ? MAP_EVENTS.TRAIL_SELECT
-        : MAP_EVENTS.ROUTE_SELECT;
-    const deselectEvent =
-      options.mode === 'mtb'
-        ? MAP_EVENTS.TRAIL_DESELECT
-        : MAP_EVENTS.ROUTE_DESELECT;
-    function handleSelect(event: Event) {
-      if (options.mode === 'mtb') {
-        const { trailName } = (event as CustomEvent<{ trailName: string }>)
-          .detail;
-        const trail = getMountainBikeTrails().find(
-          (item) => item.trailName === trailName,
-        );
-        setSelection(
-          `trail=${encodeURIComponent(trail ? slugForTrail(trail) : slugify(trailName))}`,
-        );
-      } else {
-        const { routeId } = (event as CustomEvent<{ routeId: string }>).detail;
-        const route = getBikeRoutes().find((item) => item.id === routeId);
-        setSelection(
-          route ? `route=${encodeURIComponent(slugify(route.name))}` : '',
-        );
-      }
-    }
-    function handleDeselect() {
-      setSelection('');
-    }
-    window.addEventListener(selectEvent, handleSelect);
-    window.addEventListener(deselectEvent, handleDeselect);
-    return () => {
-      window.removeEventListener(selectEvent, handleSelect);
-      window.removeEventListener(deselectEvent, handleDeselect);
-    };
-  }, [isEmbed, options.mode]);
+  useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName }) => {
+    if (!isEmbed || !isMtb) return;
+    const trail = getMountainBikeTrails().find(
+      (item) => item.trailName === trailName,
+    );
+    setSlug(trail ? slugForTrail(trail) : undefined);
+  });
+  useMapEvent(MAP_EVENTS.ROUTE_SELECT, ({ routeId }) => {
+    if (!isEmbed || isMtb) return;
+    setSlug(getBikeRoutes().find((route) => route.id === routeId)?.id);
+  });
+  useMapEvent(MAP_EVENTS.TRAIL_DESELECT, () => {
+    if (isEmbed && isMtb) setSlug(undefined);
+  });
+  useMapEvent(MAP_EVENTS.ROUTE_DESELECT, () => {
+    if (isEmbed && !isMtb) setSlug(undefined);
+  });
 
   if (!isEmbed) return null;
 
-  const href = selection ? `${siteConfig.url}?${selection}` : siteConfig.url;
+  const url = new URL(siteConfig.url);
+  if (slug) url.searchParams.set(isMtb ? 'trail' : 'route', slug);
+  const city = cityIdForQuery(
+    new URLSearchParams(window.location.search).get('city'),
+  );
+  if (city) url.searchParams.set('city', city);
+  const href = url.search ? url.toString() : siteConfig.url;
 
   return (
     <a

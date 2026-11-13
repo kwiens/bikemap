@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
 import {
@@ -109,6 +109,7 @@ export function MapLegendProvider({
   const [showBikeNetwork, setShowBikeNetwork] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
+  const sidebarId = useId();
 
   // Third-party frames drop the settings cookie anyway (no SameSite=None).
   const toggle = useCallback(
@@ -132,6 +133,7 @@ export function MapLegendProvider({
   useMapEvent(MAP_EVENTS.ROUTE_SELECT, ({ routeId }) => {
     setSelectedRoute(routeId);
     setSelectedTrail(null);
+    setActiveSection('routes');
   });
   useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName }) => {
     setSelectedTrail(trailName);
@@ -149,12 +151,8 @@ export function MapLegendProvider({
   // Function to handle route selection
   const handleRouteSelect = useCallback(
     (routeId: string) => {
-      setSelectedRoute(routeId);
-      setSelectedTrail(null);
-
-      // Dispatch event for map to update route opacity
-      dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId });
       dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
+      dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId });
       closeOnMobile();
     },
     [closeOnMobile],
@@ -163,11 +161,8 @@ export function MapLegendProvider({
   // Function to handle trail selection
   const handleTrailSelect = useCallback(
     (trailName: string) => {
-      setSelectedTrail(trailName);
-      setSelectedRoute(null);
-
-      dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, { trailName });
       dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
+      dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, { trailName });
       closeOnMobile();
     },
     [closeOnMobile],
@@ -175,9 +170,6 @@ export function MapLegendProvider({
 
   // Function to handle area (rec area heading) selection
   const handleAreaSelect = useCallback((areaName: string) => {
-    setSelectedTrail(null);
-    setSelectedRoute(null);
-
     // Deselect first — trail-deselect resets mountain bike opacity,
     // so it must fire before area-select sets the highlight
     dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
@@ -347,6 +339,9 @@ export function MapLegendProvider({
           onClick={toggle}
           className={TOGGLE_BTN_CLASS}
           type="button"
+          aria-label={isOpen ? 'Close map menu' : 'Open map menu'}
+          aria-expanded={isOpen}
+          aria-controls={sidebarId}
         >
           <FontAwesomeIcon
             icon={isOpen ? faTimes : faLayerGroup}
@@ -357,7 +352,9 @@ export function MapLegendProvider({
 
       {/* Sidebar - always in DOM but transforms off-screen when closed */}
       <div
+        id={sidebarId}
         ref={sidebarRef}
+        inert={!isOpen}
         className={cn(
           SIDEBAR_THEME_CLASS,
           isOpen ? 'translate-x-0' : '-translate-x-full',
@@ -383,6 +380,7 @@ export function MapLegendProvider({
               {hasRoutesSection && (
                 <button
                   type="button"
+                  aria-pressed={activeSection === 'routes'}
                   className={cn(
                     'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                     activeSection === 'routes'
@@ -396,6 +394,7 @@ export function MapLegendProvider({
               )}
               <button
                 type="button"
+                aria-pressed={activeSection === 'trails'}
                 className={cn(
                   'flex-1 py-1.5 px-4 text-sm font-medium rounded-full transition-colors',
                   activeSection === 'trails'

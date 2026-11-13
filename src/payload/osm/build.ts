@@ -2,12 +2,11 @@
  * Builds a curated trail from the OSM ways it rides on.
  *
  * This is the TypeScript equivalent of what scripts/build_bend_trails.py does
- * offline, reduced to the part an editor needs when they press save: given a
+ * offline, reduced to the part an editor needs for a preview: given a
  * list of OSM way ids, fetch the ways, join them into a line, measure it, and
  * sample its elevation.
  *
- * The trail's geometry is *derived*, never authored. Re-running this against a
- * refreshed OSM extract is how a rerouted trail updates itself.
+ * Refreshing the OSM preview lets a curator review an upstream reroute.
  */
 import { assembleWays, NOTABLE_GAP_M, type AssemblyGap } from './assemble';
 import { measureParts, type MeasureOptions } from './measure';
@@ -53,7 +52,7 @@ export async function buildTrailFromOsm(
   options: BuildOptions = {},
 ): Promise<BuiltTrail> {
   const requested = [...new Set(osmIds)].filter(
-    (id) => Number.isInteger(id) && id > 0,
+    (id) => Number.isSafeInteger(id) && id > 0,
   );
 
   const empty: BuiltTrail = {

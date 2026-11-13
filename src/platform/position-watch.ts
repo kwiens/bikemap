@@ -41,66 +41,49 @@ export function createPositionWatch(
   options: PositionOptions = LIVE_FIX_OPTIONS,
 ): PositionWatch {
   const subscribers = new Set<Subscriber>();
-  let stopWatch: Unsubscribe | null = null;
-
-  // Bumped on every start and stop. A browser can still deliver a callback
-  // for a watch that has been cleared (one already queued, or a provider
-  // that fires late), and a fatal error's fan-out can unsubscribe and
-  // re-subscribe synchronously. Without the generation check either one
-  // reaches the current subscribers or stops the hardware they now own.
-  let generation = 0;
+  let activeWatch: { stop?: Unsubscribe } | null = null;
 
   function stop() {
-    generation += 1;
-    stopWatch?.();
-    stopWatch = null;
+    const watch = activeWatch;
+    activeWatch = null;
+    watch?.stop?.();
   }
 
   function start() {
-    const startedGeneration = ++generation;
-    const isCurrent = () => startedGeneration === generation;
+    const watch: NonNullable<typeof activeWatch> = {};
+    activeWatch = watch;
     let hasHadFix = false;
-    // A provider may fail synchronously, inside watchPosition, before it has
-    // handed back its stop function. Note that and discard the handle.
-    let hasDiedWhileStarting = false;
-    let isStarting = true;
     const handle = geolocation.watchPosition(
       (fix) => {
-        if (!isCurrent()) return;
+        if (activeWatch !== watch) return;
         hasHadFix = true;
-        for (const subscriber of subscribers) subscriber.onFix(fix);
+        for (const subscriber of [...subscribers]) {
+          if (activeWatch !== watch) break;
+          if (subscribers.has(subscriber)) subscriber.onFix(fix);
+        }
       },
       (error) => {
-        if (!isCurrent()) return;
+        if (activeWatch !== watch) return;
         const isFatal = isFatalPositionError(error, hasHadFix);
-        for (const subscriber of subscribers) {
-          subscriber.onError?.(error, isFatal);
-        }
-        if (!isFatal) return;
-        // Drop the dead watch so the next subscriber starts the hardware
-        // afresh instead of joining a stream that will never speak again.
-        if (isStarting) {
-          hasDiedWhileStarting = true;
-          generation += 1;
-        } else if (isCurrent()) {
-          stop();
+        const recipients = [...subscribers];
+        // A subscriber can restart the watch in its error callback. Stop
+        // this watch first and deliver the error only to its original listeners.
+        if (isFatal) stop();
+        for (const subscriber of recipients) {
+          if (subscribers.has(subscriber)) subscriber.onError?.(error, isFatal);
         }
       },
       options,
     );
-    isStarting = false;
-    if (hasDiedWhileStarting) {
-      handle();
-    } else {
-      stopWatch = handle;
-    }
+    if (activeWatch === watch) watch.stop = handle;
+    else handle();
   }
 
   return {
     subscribe(onFix, onError) {
       const subscriber: Subscriber = { onFix, onError };
       subscribers.add(subscriber);
-      if (!stopWatch) start();
+      if (!activeWatch) start();
       let isActive = true;
       return () => {
         if (!isActive) return;
