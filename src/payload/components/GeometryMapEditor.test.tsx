@@ -32,6 +32,8 @@ const ui = vi.hoisted(() => ({
   removeMap: vi.fn(),
   selectFeature: vi.fn(),
   drawLifecycle: [] as string[],
+  mapOptions: vi.fn(),
+  setPaintProperty: vi.fn(),
 }));
 
 vi.mock('@payloadcms/ui', () => ({
@@ -66,7 +68,8 @@ vi.mock('mapbox-gl', () => ({
     Map: class {
       private handlers = new Map<string, Set<(event?: unknown) => void>>();
 
-      constructor() {
+      constructor(options: unknown) {
+        ui.mapOptions(options);
         ui.clickMap = ([lng, lat], altKey) => {
           const lngLat = { lng, lat };
           for (const handle of this.handlers.get('click') ?? []) {
@@ -97,9 +100,10 @@ vi.mock('mapbox-gl', () => ({
           ? { setData: (data: unknown) => ui.sourceData.set(id, data) }
           : undefined;
       }
-      getLayer() {
-        return null;
+      getLayer(id: string) {
+        return id === 'editor-draw-linestring' ? { id } : undefined;
       }
+      setPaintProperty = ui.setPaintProperty;
       addSource(id: string, source: { data?: unknown }) {
         ui.sourceData.set(id, source.data);
       }
@@ -239,6 +243,8 @@ beforeEach(() => {
   ui.writes = {};
   ui.features = [];
   ui.drawLifecycle = [];
+  ui.mapOptions.mockClear();
+  ui.setPaintProperty.mockClear();
   ui.sourceData.clear();
   ui.zoom = 10;
   ui.removeMap.mockClear();
@@ -273,6 +279,9 @@ async function upload(container: HTMLElement, text = GPX) {
 describe('shared geometry editor', () => {
   it('restores a directly edited route and its undo history across basemap switches', async () => {
     render(<RouteMapEditor path="plan" />);
+    expect(ui.mapOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ projection: 'mercator' }),
+    );
     await act(async () => ui.loadStyle());
     const newEnd: [number, number] = [-85.02, 35.01];
     dragLastPoint(newEnd);
@@ -297,6 +306,14 @@ describe('shared geometry editor', () => {
       coordinates: [[-85, 35], newEnd],
     });
     expect(ui.selectFeature).toHaveBeenCalledTimes(2);
+    expect(
+      ui.setPaintProperty.mock.calls.filter(
+        ([id, property]) =>
+          id === 'editor-draw-linestring' && property === 'line-dasharray',
+      ),
+    ).toEqual(
+      Array(3).fill(['editor-draw-linestring', 'line-dasharray', undefined]),
+    );
     expect(ui.writes.plan).toBe(edited);
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(ui.writes.plan).toEqual(geometryPlan(ORIGINAL));

@@ -152,6 +152,7 @@ const HISTORY_POINT_LAYER = 'editor-history-point';
 const PICKED_COLOR = '#2563EB';
 const UNPICKED_COLOR = '#9CA3AF';
 const LINE_COLOR = '#2563EB';
+const DRAW_LAYER_PREFIX = 'editor-draw';
 
 /** Terra Draw mode names. `static` is its own name for "registered but inert". */
 const SELECT = 'select';
@@ -892,6 +893,7 @@ export function GeometryMapEditor({
       adapter: new TerraDrawMapboxGLAdapter({
         coordinatePrecision: COORDINATE_DECIMALS,
         map,
+        prefixId: DRAW_LAYER_PREFIX,
       }),
       modes: [
         new TerraDrawSelectMode({
@@ -1005,6 +1007,13 @@ export function GeometryMapEditor({
       installWayLayers(map);
       applyWayStyle(map, idsRef.current, modeRef.current);
       mountDraw();
+      // The adapter uses an empty dash array for solid lines. Mapbox can
+      // drop those strokes when it rebuilds line tiles at a different zoom.
+      // The geometry editor uses solid strokes in every Terra Draw mode.
+      const drawLineLayer = `${DRAW_LAYER_PREFIX}-linestring`;
+      if (map.getLayer(drawLineLayer)) {
+        map.setPaintProperty(drawLineLayer, 'line-dasharray', undefined);
+      }
       map.addSource(HISTORY_POINT_LAYER, {
         type: 'geojson',
         data: historyPointData(historyPointRef.current),

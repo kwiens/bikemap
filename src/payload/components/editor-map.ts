@@ -23,6 +23,9 @@ export function createEditorMap(
     ...view,
     boxZoom,
     container,
+    // Both basemaps default to globe, which reorders draped layers at low zoom.
+    // A fixed projection keeps editor overlays in the same draw order.
+    projection: 'mercator',
     style: STYLES.streets,
   });
   map.addControl(new mapboxgl.NavigationControl(), 'top-right');
