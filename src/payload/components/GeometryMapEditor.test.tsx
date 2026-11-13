@@ -31,6 +31,7 @@ const ui = vi.hoisted(() => ({
   zoom: 10,
   removeMap: vi.fn(),
   selectFeature: vi.fn(),
+  drawLifecycle: [] as string[],
 }));
 
 vi.mock('@payloadcms/ui', () => ({
@@ -103,6 +104,11 @@ vi.mock('mapbox-gl', () => ({
         ui.sourceData.set(id, source.data);
       }
       addLayer() {}
+      setStyle(_style: string, options?: { diff: boolean }) {
+        ui.drawLifecycle.push('setStyle');
+        ui.sourceData.clear();
+        if (options?.diff === false) ui.loadStyle();
+      }
       getCanvas() {
         return { style: {} };
       }
@@ -153,8 +159,12 @@ vi.mock('terra-draw', () => ({
           callback(id, context);
       }
     }
-    start() {}
-    stop() {}
+    start() {
+      ui.drawLifecycle.push('start');
+    }
+    stop() {
+      ui.drawLifecycle.push('stop');
+    }
     getMode() {
       return this.mode;
     }
@@ -228,6 +238,7 @@ beforeEach(() => {
   };
   ui.writes = {};
   ui.features = [];
+  ui.drawLifecycle = [];
   ui.sourceData.clear();
   ui.zoom = 10;
   ui.removeMap.mockClear();
@@ -260,6 +271,37 @@ async function upload(container: HTMLElement, text = GPX) {
 }
 
 describe('shared geometry editor', () => {
+  it('restores a directly edited route and its undo history across basemap switches', async () => {
+    render(<RouteMapEditor path="plan" />);
+    await act(async () => ui.loadStyle());
+    const newEnd: [number, number] = [-85.02, 35.01];
+    dragLastPoint(newEnd);
+    const edited = ui.writes.plan;
+    ui.selectFeature.mockClear();
+    ui.drawLifecycle = [];
+
+    const satellite = screen.getByRole('button', { name: 'Satellite' });
+    await act(async () => fireEvent.click(satellite));
+    await act(async () => fireEvent.click(satellite));
+
+    expect(ui.drawLifecycle).toEqual([
+      'stop',
+      'setStyle',
+      'start',
+      'stop',
+      'setStyle',
+      'start',
+    ]);
+    expect(ui.features[0]?.geometry).toEqual({
+      type: 'LineString',
+      coordinates: [[-85, 35], newEnd],
+    });
+    expect(ui.selectFeature).toHaveBeenCalledTimes(2);
+    expect(ui.writes.plan).toBe(edited);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(ui.writes.plan).toEqual(geometryPlan(ORIGINAL));
+  });
+
   it('edits a legacy snapped route with the trail point engine and restores its snapping baseline explicitly', async () => {
     const baseline = {
       version: 1 as const,

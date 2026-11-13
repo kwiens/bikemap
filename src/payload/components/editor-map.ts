@@ -32,11 +32,27 @@ export function createEditorMap(
 export function useEditorBasemap(
   map: RefObject<mapboxgl.Map | null>,
   basemap: EditorBasemap,
+  beforeSwitch?: () => void,
 ): void {
-  const previous = useRef<EditorBasemap>('streets');
+  const applied = useRef<{ map: mapboxgl.Map; basemap: EditorBasemap } | null>(
+    null,
+  );
   useEffect(() => {
-    if (!map.current || previous.current === basemap) return;
-    previous.current = basemap;
-    map.current.setStyle(STYLES[basemap]);
-  }, [basemap, map]);
+    const current = map.current;
+    if (!current) return;
+    const previous =
+      applied.current?.map === current ? applied.current.basemap : 'streets';
+    applied.current = { map: current, basemap };
+    if (previous === basemap) return;
+
+    beforeSwitch?.();
+    // A style diff can remove runtime layers without firing style.load. Load
+    // a fresh style so both editors rebuild their overlays above the basemap.
+    current.setStyle(STYLES[basemap], {
+      diff: false,
+      // Mapbox's types require these values even when using its defaults.
+      localFontFamily: null,
+      localIdeographFontFamily: 'sans-serif',
+    });
+  }, [basemap, beforeSwitch, map]);
 }
