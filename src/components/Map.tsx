@@ -49,6 +49,7 @@ import {
   highlightMtnBikeArea,
   initMtnBikeColors,
   initMtnBikeLayers,
+  setClosedTrails,
   ensureMtnBikeSource,
   ensureOsmTrailsSource,
   setOsmTrailsVisible,
@@ -82,7 +83,9 @@ import {
   onMapEvent,
 } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
-import { clearMapReady, setMapReady } from '@/utils/map-ready';
+import { clearMapReady, onMapReady, setMapReady } from '@/utils/map-ready';
+import { useTrailConditions } from '@/components/TrailConditionsProvider';
+import { closedTrails } from '@/data/trail-conditions';
 import { fetchRouteCollection, runtimeRouteIds } from '@/utils/route-source';
 
 // Ride recording is unreachable in embed mode, and its subtree (history, GPX,
@@ -129,6 +132,7 @@ const MapboxMap = memo(function MapboxMap() {
   isEmbedRef.current = isEmbed;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const { latest: latestConditions } = useTrailConditions();
   // Removes the OSM trail selection's window listeners on teardown/restyle.
   const osmSelectionCleanup = useRef<(() => void) | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
@@ -1276,6 +1280,21 @@ const MapboxMap = memo(function MapboxMap() {
 
   useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, handleRecordingStart);
   useMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, handleRecordingStop);
+
+  // Draw a red dashed line over any trail whose newest report says it is shut.
+  // Keyed on the conditions, not just the map, so a closure filed while the
+  // page is open appears without a reload. An MTB embed draws trails, so it
+  // shows closures too; a routes embed has none to mark.
+  useEffect(() => {
+    if (isEmbed && !isMtbEmbed) return;
+    return onMapReady(() => {
+      if (!map.current) return;
+      setClosedTrails(
+        map.current,
+        closedTrails({ latest: latestConditions }, getMountainBikeTrails()),
+      );
+    });
+  }, [isEmbed, isMtbEmbed, latestConditions]);
 
   return (
     <>

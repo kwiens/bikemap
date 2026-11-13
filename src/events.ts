@@ -34,6 +34,10 @@ export const MAP_EVENTS = {
   RIDE_SELECT: 'ride-select',
   RIDE_DESELECT: 'ride-deselect',
   RIDES_PANEL_TOGGLE: 'rides-panel-toggle',
+  // Asks for the "report conditions" form, carrying { trailName }. The form is
+  // an event rather than a prop so the one modal at the page root serves every
+  // place that might offer it — today the elevation pane, tomorrow wherever.
+  CONDITION_REPORT_OPEN: 'condition-report-open',
   TOAST: 'toast',
   MAP_READY: 'map-ready',
 } as const;
@@ -86,6 +90,7 @@ export interface MapEventDetails {
   'rides-panel-toggle': { isOpen: boolean };
   toast: { message: string };
   'map-ready': undefined;
+  'condition-report-open': { slug: string; trailName: string };
 }
 
 type DetailArgs<K extends MapEventName> = MapEventDetails[K] extends undefined

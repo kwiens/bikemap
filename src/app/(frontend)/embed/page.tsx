@@ -25,5 +25,5 @@ export default async function EmbedPage({
     mode === 'mtb'
       ? { cityId, trails: (await getCityTrailSummaries(cityId)).trails }
       : { cityId, routes: (await getCityRoutes(cityId)).routes };
-  return <EmbedClient content={content} />;
+  return <EmbedClient content={content} mode={mode} />;
 }
