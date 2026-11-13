@@ -229,8 +229,6 @@ export async function loadOptimizedMapStyle(
 }
 
 // Route utilities
-export const ROUTE_DIRECTION_ARROW_IMAGE_ID = 'route-direction-arrow';
-
 /** The Studio style interleaves road geometry with symbols such as tunnel arrows. */
 export function routeLabelLayerId(
   layers: readonly mapboxgl.LayerSpecification[],
@@ -244,113 +242,6 @@ export function routeLabelLayerId(
   return layers.find(
     (layer, index) => index > lastRoadIndex && layer.type === 'symbol',
   )?.id;
-}
-
-export function createArrowSdfImage(size: number = 20): ImageData {
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas 2D context not available');
-  ctx.clearRect(0, 0, size, size);
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = size * 0.25;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  const px = size * 0.25;
-  const py = size * 0.1;
-  ctx.moveTo(px, py);
-  ctx.lineTo(size - px, size / 2);
-  ctx.lineTo(px, size - py);
-  ctx.stroke();
-  return ctx.getImageData(0, 0, size, size);
-}
-
-export function syncRouteArrowLayer(
-  map: mapboxgl.Map,
-  route: BikeRoute,
-  layer: mapboxgl.AnyLayer,
-  beforeId?: string,
-): void {
-  if (route.hideArrows || !('source' in layer)) return;
-
-  const sourceId = layer.source;
-  if (typeof sourceId !== 'string') return;
-
-  const sourceLayer = layer['source-layer'];
-  const layerFilter = 'filter' in layer ? layer.filter : undefined;
-  const routeFilter: mapboxgl.FilterSpecification | undefined =
-    layer.id === BIKE_ROUTE_LAYER_ID
-      ? ['==', ['get', 'id'], route.id]
-      : undefined;
-  const filter: mapboxgl.FilterSpecification | undefined =
-    layerFilter && routeFilter
-      ? ['all', layerFilter, routeFilter]
-      : (layerFilter ?? routeFilter);
-  const features = map.querySourceFeatures(sourceId, {
-    ...(sourceLayer ? { sourceLayer } : {}),
-    ...(filter ? { filter } : {}),
-  });
-  const arrowData: GeoJSON.FeatureCollection<GeoJSON.LineString> = {
-    type: 'FeatureCollection',
-    features: applyArrowDirectionOverrides(
-      removeOverlappingSegments(features),
-      // The database importer has already normalized multipart directions.
-      // Studio-owned geometry still needs its legacy bounds repair.
-      layer.id === BIKE_ROUTE_LAYER_ID ? [] : route.reverseArrowBounds,
-    ),
-  };
-  const arrowSourceId = `${route.id}-arrows-source`;
-  const arrowLayerId = `${route.id}-arrows`;
-  const arrowSource = map.getSource(arrowSourceId) as
-    | mapboxgl.GeoJSONSource
-    | undefined;
-
-  if (arrowSource) {
-    arrowSource.setData(arrowData);
-  } else {
-    map.addSource(arrowSourceId, { type: 'geojson', data: arrowData });
-  }
-
-  if (map.getLayer(arrowLayerId)) return;
-
-  map.addLayer(
-    {
-      id: arrowLayerId,
-      type: 'symbol',
-      source: arrowSourceId,
-      layout: {
-        'symbol-placement': 'line',
-        'symbol-spacing': 160,
-        'icon-image': ROUTE_DIRECTION_ARROW_IMAGE_ID,
-        'icon-size': 1.2,
-        'icon-rotate': route.reverseDirection ? 180 : 0,
-        'icon-rotation-alignment': 'map',
-        'icon-allow-overlap': true,
-        'icon-ignore-placement': true,
-      },
-      paint: {
-        'icon-color': route.color,
-        'icon-opacity': 0,
-      },
-    },
-    beforeId,
-  );
-}
-
-export function setRouteArrowsVisible(
-  map: mapboxgl.Map,
-  routes: readonly BikeRoute[],
-  visible: boolean,
-): void {
-  setLayersVisibility(
-    map,
-    routes
-      .filter((route) => !route.hideArrows)
-      .map((route) => `${route.id}-arrows`),
-    visible,
-  );
 }
 
 export function updateRouteOpacity(
@@ -422,15 +313,6 @@ export function updateRouteOpacity(
       } catch (error) {
         console.error(`Error setting opacity for route ${route.id}:`, error);
       }
-    }
-
-    const arrowLayerId = `${route.id}-arrows`;
-    if (map.getLayer(arrowLayerId)) {
-      map.setPaintProperty(
-        arrowLayerId,
-        'icon-opacity',
-        isSelected ? opacity.selected : 0,
-      );
     }
   });
 }

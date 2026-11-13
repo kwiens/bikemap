@@ -7,8 +7,6 @@ import {
   updateRouteOpacity,
   calculateRouteBounds,
   findLocationInArray,
-  createArrowSdfImage,
-  syncRouteArrowLayer,
   removeOverlappingSegments,
   applyArrowDirectionOverrides,
   flyToBounds,
@@ -54,82 +52,6 @@ import type mapboxgl from 'mapbox-gl';
 describe('Mapbox Geo Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe('createArrowSdfImage', () => {
-    it('should return ImageData with correct dimensions', () => {
-      const mockImageData = {
-        width: 20,
-        height: 20,
-        data: new Uint8ClampedArray(20 * 20 * 4),
-      };
-      const mockCtx = {
-        clearRect: vi.fn(),
-        strokeStyle: '',
-        lineWidth: 0,
-        lineCap: '',
-        lineJoin: '',
-        beginPath: vi.fn(),
-        moveTo: vi.fn(),
-        lineTo: vi.fn(),
-        stroke: vi.fn(),
-        getImageData: vi.fn().mockReturnValue(mockImageData),
-      };
-      const mockCanvas = {
-        width: 0,
-        height: 0,
-        getContext: vi.fn().mockReturnValue(mockCtx),
-      };
-      vi.spyOn(document, 'createElement').mockReturnValue(
-        mockCanvas as unknown as HTMLElement,
-      );
-
-      const result = createArrowSdfImage(20);
-
-      expect(result.width).toBe(20);
-      expect(result.height).toBe(20);
-      expect(mockCanvas.getContext).toHaveBeenCalledWith('2d');
-      expect(mockCtx.stroke).toHaveBeenCalled();
-
-      vi.restoreAllMocks();
-    });
-
-    it('should use custom size parameter', () => {
-      const mockImageData = {
-        width: 32,
-        height: 32,
-        data: new Uint8ClampedArray(32 * 32 * 4),
-      };
-      const mockCtx = {
-        clearRect: vi.fn(),
-        strokeStyle: '',
-        lineWidth: 0,
-        lineCap: '',
-        lineJoin: '',
-        beginPath: vi.fn(),
-        moveTo: vi.fn(),
-        lineTo: vi.fn(),
-        stroke: vi.fn(),
-        getImageData: vi.fn().mockReturnValue(mockImageData),
-      };
-      const mockCanvas = {
-        width: 0,
-        height: 0,
-        getContext: vi.fn().mockReturnValue(mockCtx),
-      };
-      vi.spyOn(document, 'createElement').mockReturnValue(
-        mockCanvas as unknown as HTMLElement,
-      );
-
-      const result = createArrowSdfImage(32);
-
-      expect(result.width).toBe(32);
-      expect(result.height).toBe(32);
-      expect(mockCanvas.width).toBe(32);
-      expect(mockCanvas.height).toBe(32);
-
-      vi.restoreAllMocks();
-    });
   });
 
   describe('removeOverlappingSegments', () => {
@@ -337,195 +259,6 @@ describe('Mapbox Geo Integration', () => {
     });
   });
 
-  describe('syncRouteArrowLayer', () => {
-    const route: BikeRoute = {
-      id: 'route1',
-      name: 'Route 1',
-      color: '#FF0000',
-      description: 'Test route',
-      icon: {} as IconDefinition,
-      defaultWidth: 8,
-      opacity: 1,
-      distance: 5,
-    };
-
-    it('should build a filtered GeoJSON source for vector route arrows', () => {
-      const filter: mapboxgl.FilterSpecification = [
-        '==',
-        ['get', 'route'],
-        'route1',
-      ];
-      const features: GeoJSON.Feature[] = [
-        {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'LineString',
-            coordinates: [
-              [-85.3, 35.0],
-              [-85.31, 35.01],
-            ],
-          },
-        },
-      ];
-      const mockMap = {
-        querySourceFeatures: vi.fn().mockReturnValue(features),
-        getSource: vi.fn().mockReturnValue(undefined),
-        addSource: vi.fn(),
-        getLayer: vi.fn().mockReturnValue(undefined),
-        addLayer: vi.fn(),
-      } as unknown as mapboxgl.Map;
-      const layer = {
-        id: route.id,
-        type: 'line',
-        source: 'composite',
-        'source-layer': 'routes',
-        filter,
-      } as mapboxgl.AnyLayer;
-
-      syncRouteArrowLayer(mockMap, route, layer, 'road-label');
-
-      expect(mockMap.querySourceFeatures).toHaveBeenCalledWith('composite', {
-        sourceLayer: 'routes',
-        filter,
-      });
-      expect(mockMap.addSource).toHaveBeenCalledWith('route1-arrows-source', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features,
-        },
-      });
-      expect(mockMap.addLayer).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'route1-arrows',
-          source: 'route1-arrows-source',
-          paint: {
-            'icon-color': route.color,
-            'icon-opacity': 0,
-          },
-        }),
-        'road-label',
-      );
-    });
-
-    it('should refresh an existing arrow source for GeoJSON routes', () => {
-      const setData = vi.fn();
-      const filter: mapboxgl.FilterSpecification = [
-        '==',
-        ['get', 'id'],
-        route.id,
-      ];
-      const mockMap = {
-        querySourceFeatures: vi.fn().mockReturnValue([]),
-        getSource: vi.fn().mockReturnValue({ setData }),
-        addSource: vi.fn(),
-        getLayer: vi.fn().mockReturnValue(true),
-        addLayer: vi.fn(),
-      } as unknown as mapboxgl.Map;
-      const layer = {
-        id: route.id,
-        type: 'line',
-        source: 'inline-routes-source',
-        filter,
-      } as mapboxgl.AnyLayer;
-
-      syncRouteArrowLayer(mockMap, route, layer);
-
-      expect(mockMap.querySourceFeatures).toHaveBeenCalledWith(
-        'inline-routes-source',
-        { filter },
-      );
-      expect(setData).toHaveBeenCalledWith({
-        type: 'FeatureCollection',
-        features: [],
-      });
-      expect(mockMap.addSource).not.toHaveBeenCalled();
-      expect(mockMap.addLayer).not.toHaveBeenCalled();
-    });
-
-    it('filters the shared route source to the requested route', () => {
-      const mockMap = {
-        querySourceFeatures: vi.fn().mockReturnValue([]),
-        getSource: vi.fn().mockReturnValue(undefined),
-        addSource: vi.fn(),
-        getLayer: vi.fn().mockReturnValue(undefined),
-        addLayer: vi.fn(),
-      } as unknown as mapboxgl.Map;
-      const layer = {
-        id: BIKE_ROUTE_LAYER_ID,
-        type: 'line',
-        source: 'bike-routes-source',
-      } as mapboxgl.AnyLayer;
-
-      syncRouteArrowLayer(mockMap, route, layer);
-
-      expect(mockMap.querySourceFeatures).toHaveBeenCalledWith(
-        'bike-routes-source',
-        { filter: ['==', ['get', 'id'], route.id] },
-      );
-    });
-
-    it('does not reapply Studio direction fixes to normalized database geometry', () => {
-      const coordinates = [
-        [-85.3, 35],
-        [-85.31, 35.01],
-      ];
-      const mockMap = {
-        querySourceFeatures: vi.fn().mockReturnValue([
-          {
-            type: 'Feature',
-            properties: { id: route.id },
-            geometry: { type: 'LineString', coordinates },
-          },
-        ]),
-        getSource: vi.fn().mockReturnValue(undefined),
-        addSource: vi.fn(),
-        getLayer: vi.fn().mockReturnValue(undefined),
-        addLayer: vi.fn(),
-      } as unknown as mapboxgl.Map;
-
-      syncRouteArrowLayer(
-        mockMap,
-        {
-          ...route,
-          reverseArrowBounds: [[-86, 34, -85, 36]],
-        },
-        {
-          id: BIKE_ROUTE_LAYER_ID,
-          type: 'line',
-          source: 'bike-routes-source',
-        } as mapboxgl.AnyLayer,
-      );
-
-      expect(mockMap.addSource).toHaveBeenCalledWith('route1-arrows-source', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: [
-            expect.objectContaining({
-              geometry: { type: 'LineString', coordinates },
-            }),
-          ],
-        },
-      });
-    });
-
-    it('should skip routes configured to hide arrows', () => {
-      const mockMap = {
-        querySourceFeatures: vi.fn(),
-      } as unknown as mapboxgl.Map;
-
-      syncRouteArrowLayer(mockMap, { ...route, hideArrows: true }, {
-        id: route.id,
-        type: 'line',
-        source: 'composite',
-      } as mapboxgl.AnyLayer);
-
-      expect(mockMap.querySourceFeatures).not.toHaveBeenCalled();
-    });
-  });
-
   describe('geocodeAddress', () => {
     it('should successfully geocode an address', async () => {
       const mockResponse = {
@@ -643,15 +376,11 @@ describe('Mapbox Geo Integration', () => {
   });
 
   describe('updateRouteOpacity', () => {
-    it('updates shared route layers and preserves selected-route arrows', () => {
+    it('updates the shared route layers for the selected route', () => {
       const mockMap = {
         setPaintProperty: vi.fn(),
         getLayer: vi.fn((id: string) =>
-          [
-            BIKE_ROUTE_LAYER_ID,
-            BIKE_ROUTE_CASING_LAYER_ID,
-            'route2-arrows',
-          ].includes(id)
+          [BIKE_ROUTE_LAYER_ID, BIKE_ROUTE_CASING_LAYER_ID].includes(id)
             ? { id }
             : undefined,
         ),
@@ -689,12 +418,7 @@ describe('Mapbox Geo Integration', () => {
         'line-opacity',
         ['case', ['==', ['get', 'id'], 'route2'], 0.8, 0.2],
       );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-        'route2-arrows',
-        'icon-opacity',
-        0.8,
-      );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(4);
+      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(3);
     });
 
     it('should update opacity for selected and unselected routes', () => {
@@ -759,11 +483,6 @@ describe('Mapbox Geo Integration', () => {
         10,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-        'route1-arrows',
-        'icon-opacity',
-        0,
-      );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route2',
         'line-opacity',
         0.8,
@@ -777,11 +496,6 @@ describe('Mapbox Geo Integration', () => {
         'route2-casing',
         'line-width',
         12,
-      );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-        'route2-arrows',
-        'icon-opacity',
-        0.8,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route3',
@@ -798,49 +512,7 @@ describe('Mapbox Geo Integration', () => {
         'line-width',
         10,
       );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-        'route3-arrows',
-        'icon-opacity',
-        0,
-      );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(12);
-    });
-
-    it('should skip arrow layers that do not exist', () => {
-      const mockMap = {
-        setPaintProperty: vi.fn(),
-        getLayer: vi.fn((id: string) => (id === 'route1' ? { id } : undefined)),
-      } as unknown as mapboxgl.Map;
-
-      const routes: BikeRoute[] = [
-        {
-          id: 'route1',
-          name: 'Route 1',
-          color: '#FF0000',
-          description: 'Test route 1',
-          icon: {} as IconDefinition,
-          defaultWidth: 8,
-          opacity: 1.0,
-          distance: 5.0,
-        },
-      ];
-
-      updateRouteOpacity(mockMap, routes, 'route1', {
-        selected: 0.8,
-        unselected: 0.2,
-      });
-
-      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-        'route1',
-        'line-opacity',
-        0.8,
-      );
-      expect(mockMap.setPaintProperty).not.toHaveBeenCalledWith(
-        'route1-arrows',
-        expect.anything(),
-        expect.anything(),
-      );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(1);
+      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(9);
     });
 
     it('should set all routes to unselected when selectedId is null', () => {
@@ -890,11 +562,6 @@ describe('Mapbox Geo Integration', () => {
         0.08000000000000002,
       );
       expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-        'route1-arrows',
-        'icon-opacity',
-        0,
-      );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
         'route2',
         'line-opacity',
         0.1,
@@ -904,12 +571,7 @@ describe('Mapbox Geo Integration', () => {
         'line-opacity',
         0.08000000000000002,
       );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledWith(
-        'route2-arrows',
-        'icon-opacity',
-        0,
-      );
-      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(8);
+      expect(mockMap.setPaintProperty).toHaveBeenCalledTimes(6);
     });
 
     it('should handle errors when setting paint property', () => {

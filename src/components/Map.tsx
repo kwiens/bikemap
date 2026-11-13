@@ -32,16 +32,16 @@ import { ElevationProfile } from '@/components/sidebar/ElevationProfile';
 import { cn } from '@/lib/utils';
 import { useToast, useMapResize, useKeepAwake } from '@/hooks';
 import { useLocationTracking } from '@/hooks/useLocationTracking';
+import {
+  attachRouteArrows,
+  type RouteArrowOverlay,
+} from '@/utils/route-arrows';
 import { fetchBikeRentalLocations } from '@/data/gbfs';
 import {
   geocodeAddress,
   updateRouteOpacity,
   flyToBounds,
   findLocationInArray,
-  createArrowSdfImage,
-  ROUTE_DIRECTION_ARROW_IMAGE_ID,
-  syncRouteArrowLayer,
-  setRouteArrowsVisible,
   calculateTrailBounds,
   initTrailBoundsFromDefaults,
   initRouteBoundsFromDefaults,
@@ -134,6 +134,7 @@ const MapboxMap = memo(function MapboxMap({
   isEmbedRef.current = isEmbed;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const routeArrows = useRef<RouteArrowOverlay | null>(null);
   // Removes the OSM trail selection's window listeners on teardown/restyle.
   const osmSelectionCleanup = useRef<(() => void) | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
@@ -195,6 +196,18 @@ const MapboxMap = memo(function MapboxMap({
     return tracking.cycleMode();
   };
 
+  const updateRouteSelection = useCallback(
+    (
+      routeId: string | null,
+      opacity: { selected: number; unselected: number },
+    ) => {
+      if (!map.current) return;
+      updateRouteOpacity(map.current, bikeRoutes, routeId, opacity);
+      routeArrows.current?.select(routeId, opacity.selected);
+    },
+    [bikeRoutes],
+  );
+
   // Handle ride select — show ride on map
   const handleRideSelect = useCallback(
     async ({ rideId }: MapEventDetails['ride-select']) => {
@@ -212,7 +225,7 @@ const MapboxMap = memo(function MapboxMap({
       addRideLayer(map.current, segments);
 
       // Dim other routes/trails
-      updateRouteOpacity(map.current, bikeRoutes, null, {
+      updateRouteSelection(null, {
         selected: 0.1,
         unselected: 0.1,
       });
@@ -224,19 +237,19 @@ const MapboxMap = memo(function MapboxMap({
       pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
       flyToBounds(map.current, bounds);
     },
-    [bikeRoutes],
+    [updateRouteSelection],
   );
 
   // Handle ride deselect — remove ride from map
   const handleRideDeselect = useCallback(() => {
     if (!map.current) return;
     removeRideLayer(map.current);
-    updateRouteOpacity(map.current, bikeRoutes, null, {
+    updateRouteSelection(null, {
       selected: 1,
       unselected: 1,
     });
     updateMtnBikeOpacity(map.current, null);
-  }, [bikeRoutes]);
+  }, [updateRouteSelection]);
 
   // Set up ride select/deselect event listeners
   useEffect(() => {
@@ -359,7 +372,7 @@ const MapboxMap = memo(function MapboxMap({
       }
 
       // Update opacities for all routes and reset mountain bike trails
-      updateRouteOpacity(map.current, bikeRoutes, routeId, {
+      updateRouteSelection(routeId, {
         selected: 0.8,
         unselected: 0.2,
       });
@@ -374,7 +387,7 @@ const MapboxMap = memo(function MapboxMap({
         flyToBounds(map.current, bounds);
       }
     },
-    [bikeRoutes, showToast],
+    [bikeRoutes, showToast, updateRouteSelection],
   );
 
   // Handle trail selection events
@@ -397,7 +410,7 @@ const MapboxMap = memo(function MapboxMap({
       }
 
       // Dim bike routes and highlight the selected trail
-      updateRouteOpacity(map.current, bikeRoutes, null, {
+      updateRouteSelection(null, {
         selected: 0.1,
         unselected: 0.1,
       });
@@ -419,7 +432,7 @@ const MapboxMap = memo(function MapboxMap({
         flyToBounds(map.current, bounds);
       }
     },
-    [bikeRoutes, showToast],
+    [showToast, updateRouteSelection],
   );
 
   // Routes' resting opacity: dimmed while any marker layer is shown so the
@@ -436,14 +449,14 @@ const MapboxMap = memo(function MapboxMap({
   // sidebar trail selection, OSM trail selection, ...).
   const handleRouteDeselect = useCallback(() => {
     if (!map.current) return;
-    updateRouteOpacity(map.current, bikeRoutes, null, restingRouteOpacity());
-  }, [bikeRoutes, restingRouteOpacity]);
+    updateRouteSelection(null, restingRouteOpacity());
+  }, [restingRouteOpacity, updateRouteSelection]);
 
   const handleTrailDeselect = useCallback(() => {
     if (!map.current) return;
     updateMtnBikeOpacity(map.current, null);
     // Trail selection dims the bike routes — restore them on deselect.
-    updateRouteOpacity(map.current, bikeRoutes, null, restingRouteOpacity());
+    updateRouteSelection(null, restingRouteOpacity());
 
     // Re-enable auto-detect if recording is active
     if (isRecordingRef.current) {
@@ -452,7 +465,7 @@ const MapboxMap = memo(function MapboxMap({
       detectCandidateRef.current = null;
       detectConfirmCountRef.current = 0;
     }
-  }, [bikeRoutes, restingRouteOpacity]);
+  }, [restingRouteOpacity, updateRouteSelection]);
 
   // Handle area (rec area heading) selection — zoom to area bounds
   const handleAreaSelect = useCallback(
@@ -463,7 +476,7 @@ const MapboxMap = memo(function MapboxMap({
       showToast(areaName);
 
       // Dim bike routes, highlight trails in selected area
-      updateRouteOpacity(map.current, bikeRoutes, null, {
+      updateRouteSelection(null, {
         selected: 0.1,
         unselected: 0.1,
       });
@@ -474,7 +487,7 @@ const MapboxMap = memo(function MapboxMap({
         flyToBounds(map.current, bounds);
       }
     },
-    [bikeRoutes, showToast],
+    [showToast, updateRouteSelection],
   );
 
   // Handle layer toggle events
@@ -525,7 +538,7 @@ const MapboxMap = memo(function MapboxMap({
       // This runs before the bikeRentals GBFS await below on purpose: doing it
       // afterwards would deselect a route the user (or an embed's `?route=`
       // deep link) selected while that request was still in flight.
-      updateRouteOpacity(map.current, bikeRoutes, null, restingRouteOpacity());
+      updateRouteSelection(null, restingRouteOpacity());
       if (visible) {
         dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
       }
@@ -584,7 +597,7 @@ const MapboxMap = memo(function MapboxMap({
         }
       }
     },
-    [bikeRoutes, restingRouteOpacity],
+    [restingRouteOpacity, updateRouteSelection],
   );
 
   // Handler for centering on a specific location
@@ -910,14 +923,6 @@ const MapboxMap = memo(function MapboxMap({
 
           const routeBeforeId = routeLabelLayerId(newMap.getStyle().layers);
 
-          // Register SDF arrow image for route direction indicators
-          if (!newMap.hasImage(ROUTE_DIRECTION_ARROW_IMAGE_ID)) {
-            const arrowImage = createArrowSdfImage(20);
-            newMap.addImage(ROUTE_DIRECTION_ARROW_IMAGE_ID, arrowImage, {
-              sdf: true,
-            });
-          }
-
           hideStyleLayers(newMap, [
             ...hiddenStyleLayerIds,
             ...inactiveStyleRouteLayerIds(bikeRoutes, configuredInlineRouteIds),
@@ -996,49 +1001,12 @@ const MapboxMap = memo(function MapboxMap({
               .filter((layerId) => newMap.getLayer(layerId)),
           ];
 
-          const syncRouteArrows = () => {
-            const currentLayers = newMap.getStyle().layers;
-            const sharedLayer = currentLayers?.find(
-              (candidate) => candidate.id === BIKE_ROUTE_LAYER_ID,
-            );
-            for (const route of bikeRoutes) {
-              const layer = inlineRouteIds.has(route.id)
-                ? sharedLayer
-                : currentLayers?.find((candidate) => candidate.id === route.id);
-              if (layer?.type === 'line') {
-                syncRouteArrowLayer(newMap, route, layer, routeBeforeId);
-              }
-            }
-          };
-
-          // Source queries only include loaded tiles. Refresh after the map
-          // settles following a pan/zoom so arrows cover the new viewport.
-          syncRouteArrows();
-          let areRouteArrowsHidden = false;
-          const hideRouteArrowsDuringZoom = () => {
-            if (areRouteArrowsHidden) return;
-            // The old symbol tiles can pack arrows too tightly as they scale.
-            setRouteArrowsVisible(newMap, bikeRoutes, false);
-            areRouteArrowsHidden = true;
-          };
-          newMap.on('zoomstart', hideRouteArrowsDuringZoom);
-          if (newMap.isZooming()) hideRouteArrowsDuringZoom();
-
-          let routeArrowSyncScheduled = false;
-          const scheduleRouteArrowSync = () => {
-            if (routeArrowSyncScheduled) return;
-            routeArrowSyncScheduled = true;
-            newMap.once('idle', () => {
-              routeArrowSyncScheduled = false;
-              syncRouteArrows();
-              if (areRouteArrowsHidden) {
-                setRouteArrowsVisible(newMap, bikeRoutes, true);
-                areRouteArrowsHidden = false;
-              }
-            });
-          };
-          scheduleRouteArrowSync();
-          newMap.on('moveend', scheduleRouteArrowSync);
+          routeArrows.current = attachRouteArrows(
+            newMap,
+            bikeRoutes,
+            inlineRouteIds,
+            combinedRouteLayer ? routeCollection : null,
+          );
 
           // Route geometry ships with precalculated bounds, avoiding source
           // scans during initialization and keeping the interaction path fast.
@@ -1245,6 +1213,9 @@ const MapboxMap = memo(function MapboxMap({
         osmSelectionCleanup.current();
         osmSelectionCleanup.current = null;
       }
+
+      routeArrows.current?.remove();
+      routeArrows.current = null;
 
       if (map.current) {
         map.current.remove();
