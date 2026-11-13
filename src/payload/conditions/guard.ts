@@ -20,15 +20,8 @@ export const RATE_LIMIT = {
   perTrailMinutes: 30,
 };
 
-/** How far back an observation may be dated, and how far forward. */
-export const OBSERVED_WINDOW = {
-  maxFutureHours: 24,
-  maxPastDays: 30,
-};
-
 export interface ReportBody {
   condition?: unknown;
-  observedAt?: unknown;
   slug?: unknown;
   [HONEYPOT_FIELD]?: unknown;
 }
@@ -133,62 +126,6 @@ export function reporterSalt(
   env: Record<string, string | undefined> = process.env,
 ): string {
   return env.CONDITION_REPORT_SALT || env.PAYLOAD_SECRET || 'bikemap';
-}
-
-export type ParsedObservedAt =
-  | { error: string; ok: false }
-  | { ok: true; value: Date };
-
-/**
- * Validates the "when did you ride it" date. Bounded both ways: a future date
- * would sit at the top of the feed until it arrived, and an old one is not a
- * condition. The day of forward slack is for riders ahead of the server.
- */
-export function parseObservedAt(
-  value: unknown,
-  now: Date = new Date(),
-): ParsedObservedAt {
-  if (typeof value !== 'string' && !(value instanceof Date)) {
-    return { error: 'A date is required.', ok: false };
-  }
-
-  const parsed = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return { error: 'That date could not be read.', ok: false };
-  }
-
-  const future = new Date(now);
-  future.setHours(future.getHours() + OBSERVED_WINDOW.maxFutureHours);
-  if (parsed > future) {
-    return { error: 'That date is in the future.', ok: false };
-  }
-
-  // Whole calendar days, not instants: a bare `YYYY-MM-DD` is 00:00Z, so
-  // comparing it to "now minus 30 days" at the current time of day rejected the
-  // 30th day back every time. The extra day is the forward slack mirrored —
-  // riders west of UTC are a calendar day behind the server every evening.
-  const earliestDayMs =
-    utcDayMs(now) - (OBSERVED_WINDOW.maxPastDays + 1) * DAY_MS;
-  if (utcDayMs(parsed) < earliestDayMs) {
-    return {
-      error: `Reports older than ${OBSERVED_WINDOW.maxPastDays} days are not much use to anyone — please leave this one out.`,
-      ok: false,
-    };
-  }
-
-  // Store the day at noon UTC, not the 00:00Z a bare `YYYY-MM-DD` parses to:
-  // midnight UTC reads as the day before west of UTC, aging every fresh report a
-  // day early. Never later than now, though — reads order by this value, so a
-  // report dated tomorrow would outrank everything filed after it until then.
-  const atNoonMs = utcDayMs(parsed) + DAY_MS / 2;
-  return { ok: true, value: new Date(Math.min(atNoonMs, now.getTime())) };
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Midnight UTC of the instant's UTC calendar day, in epoch milliseconds. */
-function utcDayMs(date: Date): number {
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 /** Rejects anything that isn't a plausible slug before it becomes a query. */

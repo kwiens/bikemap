@@ -21,7 +21,6 @@ import {
   isHoneypotTripped,
   isJsonContentType,
   parseIdentifier,
-  parseObservedAt,
   reporterSalt,
   type ReportBody,
 } from '@/payload/conditions/guard';
@@ -111,15 +110,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const observedAt = parseObservedAt(body.observedAt);
-  if (!observedAt.ok) {
-    return NextResponse.json({ error: observedAt.error }, { status: 400 });
-  }
-
   const result = await submitConditionReport({
     city,
     condition,
-    observedAt: observedAt.value,
+    observedAt: new Date(),
     reporterHash: hashReporter(clientAddress(request.headers), reporterSalt()),
     slug,
   });

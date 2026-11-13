@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The report form: what it was like, and when. No account.
+ * The report form asks for the current trail condition. No account.
  *
  * Listens for `CONDITION_REPORT_OPEN` rather than taking props, so one copy at
  * the page root serves every place that opens it.
@@ -18,13 +18,6 @@ import type { ConditionReport } from '@/data/trail-conditions';
 import { MAP_EVENTS } from '@/events';
 import { cn } from '@/lib/utils';
 
-/** `<input type="date">` wants `YYYY-MM-DD` in the *viewer's* timezone. */
-function toDateInputValue(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
 interface OpenDetail {
   slug: string;
   trailName: string;
@@ -34,9 +27,6 @@ export function ConditionReportModal() {
   const { options, recordLocal, refresh } = useTrailConditions();
   const [target, setTarget] = useState<OpenDetail | null>(null);
   const [condition, setCondition] = useState('');
-  const [observedAt, setObservedAt] = useState(() =>
-    toDateInputValue(new Date()),
-  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const honeypotRef = useRef<HTMLInputElement>(null);
@@ -56,9 +46,6 @@ export function ConditionReportModal() {
       // Clear the previous trail's choice, or one click files it against this
       // trail — the select is pre-filled, so the required check wouldn't stop it.
       setCondition('');
-      // Reset on every open, or a page left open past midnight offers
-      // yesterday as today.
-      setObservedAt(toDateInputValue(new Date()));
     };
     window.addEventListener(MAP_EVENTS.CONDITION_REPORT_OPEN, handleOpen);
     return () =>
@@ -103,7 +90,6 @@ export function ConditionReportModal() {
       const response = await fetch(`/api/map/conditions?city=${activeCityId}`, {
         body: JSON.stringify({
           condition,
-          observedAt,
           slug: target.slug,
           // Off the DOM: nothing types into this, so there's no onChange.
           website: honeypotRef.current?.value ?? '',
@@ -236,21 +222,6 @@ export function ConditionReportModal() {
             </p>
           )}
 
-          <label
-            className="block text-[13px] font-semibold text-app-secondary mt-4 mb-1"
-            htmlFor="condition-report-date"
-          >
-            When did you ride it?
-          </label>
-          <input
-            className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm text-app-secondary bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30"
-            id="condition-report-date"
-            max={toDateInputValue(new Date())}
-            onChange={(event) => setObservedAt(event.target.value)}
-            type="date"
-            value={observedAt}
-          />
-
           {error && (
             <p className="text-[12px] text-red-600 mt-3" role="alert">
               {error}
@@ -259,10 +230,10 @@ export function ConditionReportModal() {
 
           <button
             className={cn(
-              'w-full mt-5 py-2.5 rounded-xl border-none text-app-secondary font-semibold text-[15px] transition-opacity',
+              'w-full mt-5 py-2.5 rounded-xl border-none font-semibold text-[15px] transition-colors',
               submitting
-                ? 'bg-gray-200 cursor-wait opacity-70'
-                : 'bg-app-primary cursor-pointer hover:opacity-90',
+                ? 'bg-gray-200 text-gray-700 cursor-wait'
+                : 'bg-emerald-600 text-white cursor-pointer hover:bg-emerald-700',
             )}
             disabled={submitting}
             type="submit"

@@ -6,21 +6,11 @@ import {
   isCrossSiteRequest,
   isHoneypotTripped,
   isJsonContentType,
-  OBSERVED_WINDOW,
   parseIdentifier,
-  parseObservedAt,
   reporterSalt,
 } from './guard';
 
 /** A fixed "now" so the date-window tests don't drift with the clock. */
-const NOW = new Date('2026-08-07T12:00:00.000Z');
-
-function daysBefore(days: number): string {
-  const date = new Date(NOW);
-  date.setDate(date.getDate() - days);
-  return date.toISOString();
-}
-
 describe('isHoneypotTripped', () => {
   it('is not tripped by an absent or empty field', () => {
     expect(isHoneypotTripped({})).toBe(false);
@@ -185,90 +175,6 @@ describe('reporterSalt', () => {
     // A weak salt is bad; an empty one that makes every hash identical, and so
     // rate-limits the whole internet as one person, is worse.
     expect(reporterSalt({})).toBeTruthy();
-  });
-});
-
-describe('parseObservedAt', () => {
-  it('accepts today and yesterday', () => {
-    expect(parseObservedAt(NOW.toISOString(), NOW).ok).toBe(true);
-    expect(parseObservedAt(daysBefore(1), NOW).ok).toBe(true);
-  });
-
-  it('accepts a date at the far edge of the window', () => {
-    expect(
-      parseObservedAt(daysBefore(OBSERVED_WINDOW.maxPastDays - 1), NOW).ok,
-    ).toBe(true);
-  });
-
-  it('accepts a bare date exactly the window back, at any time of day', () => {
-    // 30 days before 2026-08-07. As 00:00Z it used to lose to "now minus 30
-    // days" at the current time of day.
-    const lateEvening = new Date('2026-08-07T23:59:00.000Z');
-    expect(parseObservedAt('2026-07-08', NOW).ok).toBe(true);
-    expect(parseObservedAt('2026-07-08', lateEvening).ok).toBe(true);
-  });
-
-  it('gives riders west of UTC their 30th day back too', () => {
-    // 21:00 on Aug 6 in Oregon is already Aug 7 UTC; their 30 days back is
-    // July 7.
-    const oregonEvening = new Date('2026-08-07T04:00:00.000Z');
-    expect(parseObservedAt('2026-07-07', oregonEvening).ok).toBe(true);
-    expect(parseObservedAt('2026-07-05', oregonEvening).ok).toBe(false);
-  });
-
-  it('rejects a date beyond the past window', () => {
-    const result = parseObservedAt(daysBefore(60), NOW);
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.error).toMatch(/older than/);
-  });
-
-  it('rejects next week', () => {
-    const nextWeek = new Date(NOW);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const result = parseObservedAt(nextWeek.toISOString(), NOW);
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.error).toMatch(/future/);
-  });
-
-  it('allows a day of slack forward, for riders ahead of the server', () => {
-    const soon = new Date(NOW);
-    soon.setHours(soon.getHours() + 12);
-    expect(parseObservedAt(soon.toISOString(), NOW).ok).toBe(true);
-  });
-
-  it('never stores a moment later than now', () => {
-    // Reads order by this value, so a report pinned to tomorrow's noon would
-    // outrank every report filed after it until then.
-    const tomorrow = parseObservedAt('2026-08-08', NOW);
-    expect(tomorrow.ok === true && tomorrow.value.toISOString()).toBe(
-      NOW.toISOString(),
-    );
-
-    const morning = new Date('2026-08-07T08:30:00.000Z');
-    const today = parseObservedAt('2026-08-07', morning);
-    expect(today.ok === true && today.value.toISOString()).toBe(
-      morning.toISOString(),
-    );
-  });
-
-  it('rejects unparseable and non-date input', () => {
-    expect(parseObservedAt('last tuesday', NOW).ok).toBe(false);
-    expect(parseObservedAt(undefined, NOW).ok).toBe(false);
-    expect(parseObservedAt(1_754_000_000_000, NOW).ok).toBe(false);
-  });
-
-  it('accepts a Date as well as a string', () => {
-    expect(parseObservedAt(new Date(NOW), NOW).ok).toBe(true);
-  });
-
-  it('normalizes a day-only value to noon UTC, not midnight', () => {
-    // A bare YYYY-MM-DD parses to 00:00Z, which reads as the day before west of
-    // UTC; noon keeps it on the intended calendar day everywhere in the US.
-    const result = parseObservedAt('2026-08-07', NOW);
-    expect(result.ok).toBe(true);
-    expect(result.ok === true && result.value.toISOString()).toBe(
-      '2026-08-07T12:00:00.000Z',
-    );
   });
 });
 

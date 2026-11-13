@@ -11,7 +11,6 @@ const JSON_HEADERS = { 'content-type': 'application/json' };
 const URL_BEND = 'https://ridebend.org/api/map/conditions?city=bend';
 const REPORT = JSON.stringify({
   condition: 'dry',
-  observedAt: new Date().toISOString(),
   slug: 'phils',
 });
 
@@ -97,20 +96,40 @@ describe('POST conditions cross-site protection', () => {
     expect(submitConditionReport).not.toHaveBeenCalled();
   });
 
-  it('files a same-origin report', async () => {
-    const response = await POST(
-      new Request(URL_BEND, {
-        body: REPORT,
-        headers: {
-          ...JSON_HEADERS,
-          host: 'ridebend.org',
-          origin: 'https://ridebend.org',
-          'sec-fetch-site': 'same-origin',
-        },
-        method: 'POST',
-      }),
-    );
-    expect(response.status).toBe(200);
-    expect(submitConditionReport).toHaveBeenCalledOnce();
-  });
+  it.each([undefined, '2026-01-01'])(
+    'timestamps a same-origin report on the server (supplied date: %s)',
+    async (observedAt) => {
+      const now = new Date('2026-11-12T23:45:00.000Z');
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(now);
+      try {
+        const response = await POST(
+          new Request(URL_BEND, {
+            body: JSON.stringify({
+              condition: 'dry',
+              slug: 'phils',
+              observedAt,
+            }),
+            headers: {
+              ...JSON_HEADERS,
+              host: 'ridebend.org',
+              origin: 'https://ridebend.org',
+              'sec-fetch-site': 'same-origin',
+            },
+            method: 'POST',
+          }),
+        );
+        expect(response.status).toBe(200);
+        expect(submitConditionReport).toHaveBeenCalledExactlyOnceWith({
+          city: 'bend',
+          condition: 'dry',
+          observedAt: now,
+          reporterHash: expect.any(String),
+          slug: 'phils',
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
 });

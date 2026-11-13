@@ -90,7 +90,8 @@ export const TrailConditions: CollectionConfig = {
           label: 'Observed',
           admin: {
             date: { pickerAppearance: 'dayOnly' },
-            description: 'When it was ridden, not when this was typed.',
+            description:
+              'When the condition was observed. Rider reports use the submission time.',
             width: '50%',
           },
         },

@@ -70,9 +70,10 @@ describe('ConditionReportModal', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('Pondo')).toBeInTheDocument();
+    expect(screen.queryByLabelText('When did you ride it?')).toBeNull();
   });
 
-  it('posts the slug, condition and date, then records the report locally', async () => {
+  it('posts the slug and condition, then records the report locally', async () => {
     const report = {
       color: '#b45309',
       marksClosed: false,
@@ -102,7 +103,7 @@ describe('ConditionReportModal', () => {
     const body = JSON.parse(init.body as string);
     expect(body.slug).toBe('pondo');
     expect(body.condition).toBe('muddy');
-    expect(body.observedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(body).not.toHaveProperty('observedAt');
     // The honeypot must go out empty — a bot filling it is the only way it is
     // ever anything else.
     expect(body.website).toBe('');

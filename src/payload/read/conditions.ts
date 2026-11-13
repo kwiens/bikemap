@@ -331,8 +331,8 @@ export async function getTrailConditionHistory(
       pagination: false,
       select: REPORT_SELECT,
       populate: REPORT_POPULATE,
-      // `-createdAt` breaks day-only `observedAt` ties, so same-day reports list
-      // in the order they were filed rather than an arbitrary one.
+      // `-createdAt` keeps reports with the same observation time in submission
+      // order, including reports saved with only an observation date.
       sort: ['-observedAt', '-createdAt', '-id'],
       where: {
         and: [
