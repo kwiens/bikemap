@@ -16,6 +16,7 @@ import { getRequestHostname } from '@/utils/request-hostname';
 import { resolveActiveCityId } from '@/config/map.config';
 import { siteConfigForHostname } from '@/config/site.config';
 import { getCityTrailSummaries } from '@/payload/read/trails';
+import { getCityAttractions } from '@/payload/read/attractions';
 import { getCityRoutes } from '@/payload/read/routes';
 import HomeClient from './HomeClient';
 
@@ -53,10 +54,18 @@ export default async function Home({
     searchParams,
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
-  const [{ trails }, { routes }] = await Promise.all([
+  const [{ trails }, { routes }, attractions] = await Promise.all([
     getCityTrailSummaries(cityId),
     getCityRoutes(cityId),
+    getCityAttractions(cityId),
   ]);
 
-  return <HomeClient cityId={cityId} routes={routes} trails={trails} />;
+  return (
+    <HomeClient
+      cityId={cityId}
+      routes={routes}
+      trails={trails}
+      attractions={attractions}
+    />
+  );
 }

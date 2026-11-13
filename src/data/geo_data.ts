@@ -16,8 +16,6 @@ export const regionFor = activeCityData.regionFor;
 export const bikeNetworkUrl = activeCityData.bikeNetworkUrl;
 export const bikeRoutesUrl = activeCityData.bikeRoutesUrl;
 export const inlineBikeRouteIds = activeCityData.inlineBikeRouteIds;
-export type { MapFeature } from './map-features';
-export const mapFeatures = activeCityData.mapFeatures;
 
 export type { BikeResource } from './bike-resources';
 export const bikeResources = activeCityData.bikeResources;

@@ -29,6 +29,7 @@
     "db:up": "docker compose up -d",
     "db:migrate": "cross-env PAYLOAD_MIGRATING=true payload migrate",
     "db:migrate:create": "payload migrate:create",
+    "db:seed:attractions": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/attractions.ts",
     "db:seed:bend": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/bend.ts",
     "db:seed:bend-routes": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/bend-routes.ts",
     "db:seed:chattanooga": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed/chattanooga.ts",

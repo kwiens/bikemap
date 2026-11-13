@@ -4,7 +4,7 @@ import {
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { mapConfig } from '@/config/map.config';
-import { bikeResources, mapFeatures } from '@/data/geo_data';
+import { bikeResources } from '@/data/geo_data';
 import { MapLayersSection, ToggleRow } from './MapLayersSection';
 import type { MapLayersProps } from './types';
 
@@ -12,29 +12,26 @@ const layers: {
   key: 'attractions' | 'bikeResources' | 'bikeRentals';
   icon: IconDefinition;
   label: string;
-  enabled: boolean;
 }[] = [
   {
     key: 'attractions',
     icon: faMapMarkerAlt,
     label: 'Attractions',
-    enabled: mapFeatures.length > 0,
   },
   {
     key: 'bikeResources',
     icon: faBicycle,
     label: 'Bike Resources',
-    enabled: bikeResources.length > 0,
   },
   {
     key: 'bikeRentals',
     icon: faBicycle,
     label: 'Bike Rentals',
-    enabled: Boolean(mapConfig.gbfs),
   },
 ];
 
 export function MapLayers({
+  hasAttractions,
   showAttractions,
   showBikeResources,
   showBikeRentals,
@@ -52,7 +49,12 @@ export function MapLayers({
     bikeResources: onToggleBikeResources,
     bikeRentals: onToggleBikeRentals,
   };
-  const visibleLayers = layers.filter((layer) => layer.enabled);
+  const enabled = {
+    attractions: hasAttractions,
+    bikeResources: bikeResources.length > 0,
+    bikeRentals: Boolean(mapConfig.gbfs),
+  };
+  const visibleLayers = layers.filter(({ key }) => enabled[key]);
 
   if (visibleLayers.length === 0) {
     return null;

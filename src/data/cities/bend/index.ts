@@ -2,7 +2,6 @@ import { faBicycle, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import type { CityData } from '@/data/cities/types';
 import { bendBikeResources } from './bike-resources';
 import { bendBikeRoutes } from './bike-routes.data';
-import { bendMapFeatures } from './map-features';
 import { bendMountainBikeTrails } from './mountain-bike-trails.data';
 
 // Bend's curated MTB trails render from generated GeoJSON so the map uses the
@@ -34,7 +33,6 @@ const REGION_MAP: Record<string, string> = {
 export const bendData: CityData = {
   cityId: 'bend',
   bikeRoutes: bendBikeRoutes,
-  mapFeatures: bendMapFeatures,
   bikeResources: bendBikeResources,
   localResources: [
     {

@@ -1,0 +1,245 @@
+[
+  {
+    "city": "chattanooga",
+    "name": "Tennessee Aquarium",
+    "description": "Immerse yourself in Chattanooga's underwater world—perfect for families and nature lovers!",
+    "address": "1 Broad Street, Chattanooga, TN 37402",
+    "latitude": 35.0558333,
+    "longitude": -85.3111111,
+    "icon": "aquarium"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Chattanooga Zoo at Warner Park",
+    "description": "Meet furry, feathered, and scaly friends at the Chattanooga Zoo—an easy, fun stop for all ages.",
+    "address": "301 N Holtzclaw Avenue, Chattanooga, TN 37404",
+    "latitude": 35.0431,
+    "longitude": -85.2837,
+    "icon": "zoo"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Tennessee Valley Railroad Museum",
+    "description": "Step back in time on nostalgic train rides and explore vintage locomotives at the Railroad Museum.",
+    "address": "4119 Cromwell Road, Chattanooga, TN 37421",
+    "latitude": 35.0671239,
+    "longitude": -85.2062965,
+    "icon": "railroad"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Chattanooga Pinball Museum",
+    "description": "Score big with classic and modern pinball games—get your flippers ready for family-friendly fun!",
+    "address": "409 Broad Street, Chattanooga, TN 37402",
+    "latitude": 35.0539,
+    "longitude": -85.3121,
+    "icon": "games"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Outdoor Chattanooga",
+    "description": "Your go-to resource for outdoor adventure and recreation in Chattanooga.",
+    "address": "200 River Street, Chattanooga, TN 37405",
+    "latitude": 35.0611726,
+    "longitude": -85.3069177,
+    "icon": "hiking"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Coolidge Carousel",
+    "description": "A classic carousel in a historic carousel house. Perfect for families.",
+    "address": "150 River Street, Chattanooga, TN 37405",
+    "latitude": 35.061099,
+    "longitude": -85.3072955,
+    "icon": "carousel"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Stringer's Ridge",
+    "description": "Explore 92 acres of urban wilderness with multi-use trails offering panoramic views of Chattanooga.",
+    "address": "787 W Bell Avenue, Chattanooga, TN 37405",
+    "latitude": 35.0735,
+    "longitude": -85.3188,
+    "icon": "park"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Reflection Riding Arboretum & Nature Center",
+    "description": "Discover over 300 acres of natural beauty featuring walking trails, native plants, and wildlife exhibits.",
+    "address": "400 Garden Road, Chattanooga, TN 37419",
+    "latitude": 35.0110238,
+    "longitude": -85.3666888,
+    "icon": "nature"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Hunter Museum of American Art",
+    "description": "Art museum featuring works from the Hudson River School, American Impressionism, early modernism, and contemporary art. Offers tours and live performances.",
+    "address": "10 Bluff View Ave, Chattanooga, TN 37403",
+    "latitude": 35.0558333,
+    "longitude": -85.3061111,
+    "icon": "art"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Red Bank Bicycle Traffic Garden",
+    "description": "A miniature streetscape where kids and families can practice cycling skills and learn road safety in a fun, car-free environment.",
+    "address": "4839 Dayton Blvd, Red Bank",
+    "latitude": 35.1402265,
+    "longitude": -85.2792273,
+    "icon": "bicycle"
+  },
+  {
+    "city": "chattanooga",
+    "name": "South Chattanooga Community Center Bicycle Traffic Garden",
+    "description": "Practice cycling skills at a community center offering recreational programs, sports facilities, and gathering spaces.",
+    "address": "1151 W 40th St, Chattanooga",
+    "latitude": 35.0093301,
+    "longitude": -85.3224917,
+    "icon": "community"
+  },
+  {
+    "city": "chattanooga",
+    "name": "Pioneer Frontier Park Traffic Garden",
+    "description": "A scenic park with a traffic garden, open green spaces, playgrounds, and trails perfect for a family bike ride.",
+    "address": "1509 Tombras Ave, East Ridge, TN",
+    "latitude": 34.9957601,
+    "longitude": -85.2424457,
+    "icon": "park"
+  },
+  {
+    "city": "bend",
+    "name": "High Desert Museum",
+    "description": "Wildlife, history, and art museum set on 135 acres south of Bend.",
+    "address": "59800 US-97, Bend, OR 97702",
+    "latitude": 43.9659212,
+    "longitude": -121.3415245,
+    "icon": "art"
+  },
+  {
+    "city": "bend",
+    "name": "Pilot Butte State Scenic Viewpoint",
+    "description": "Dormant cinder-cone viewpoint with summit trails and panoramic Cascade and high desert views.",
+    "address": "Pilot Butte State Scenic Viewpoint, Bend, OR 97701",
+    "latitude": 44.0596064,
+    "longitude": -121.2825363,
+    "icon": "hiking"
+  },
+  {
+    "city": "bend",
+    "name": "Old Mill District",
+    "description": "Riverfront shopping, dining, events, and trail district along the Deschutes River.",
+    "address": "520 SW Powerhouse Dr #624, Bend, OR 97702",
+    "latitude": 44.0455247,
+    "longitude": -121.3147348,
+    "icon": "shopping"
+  },
+  {
+    "city": "bend",
+    "name": "Drake Park and Mirror Pond",
+    "description": "Downtown riverfront park with paths, historic markers, events, and Deschutes River views.",
+    "address": "777 NW Riverside Blvd, Bend, OR 97703",
+    "latitude": 44.0584771,
+    "longitude": -121.3222223,
+    "icon": "park"
+  },
+  {
+    "city": "bend",
+    "name": "Riverbend Park",
+    "description": "Deschutes River park in the Old Mill area with river access, lawns, and paved and unpaved paths.",
+    "address": "799 SW Columbia St, Bend, OR 97702",
+    "latitude": 44.0420798,
+    "longitude": -121.3221103,
+    "icon": "park"
+  },
+  {
+    "city": "bend",
+    "name": "Bend Whitewater Park",
+    "description": "Deschutes River whitewater and floating feature near the Old Mill corridor.",
+    "address": "Bend Whitewater Park, Southwest Colorado Avenue, Bend, OR 97702",
+    "latitude": 44.0500883,
+    "longitude": -121.321275,
+    "icon": "water"
+  },
+  {
+    "city": "bend",
+    "name": "Shevlin Park",
+    "description": "Large regional park with Tumalo Creek, old-growth forest, high desert terrain, and multi-use trails.",
+    "address": "18920 Northwest Shevlin Park Road, Bend, OR 97701",
+    "latitude": 44.0886354,
+    "longitude": -121.3677594,
+    "icon": "park"
+  },
+  {
+    "city": "bend",
+    "name": "Riley Ranch Nature Reserve",
+    "description": "Nature reserve with Deschutes River canyon, rimrock cliffs, Cascade views, wildlife, and walking trails.",
+    "address": "19975 Glen Vista Rd, Bend, OR 97703",
+    "latitude": 44.1011036,
+    "longitude": -121.3370861,
+    "icon": "park"
+  },
+  {
+    "city": "bend",
+    "name": "The Last Blockbuster",
+    "description": "Offbeat Bend landmark known as the last remaining Blockbuster video rental store.",
+    "address": "211 NE Revere Ave, Bend, OR 97701",
+    "latitude": 44.0673282,
+    "longitude": -121.3036849,
+    "icon": "film"
+  },
+  {
+    "city": "bend",
+    "name": "Tumalo Falls",
+    "description": "Major waterfall and trail destination west of Bend in the Deschutes National Forest.",
+    "address": "Tumalo Falls, Deschutes County, OR",
+    "latitude": 44.0339295,
+    "longitude": -121.5668047,
+    "icon": "water"
+  },
+  {
+    "city": "bend",
+    "name": "Smith Rock State Park",
+    "description": "Regional state park and scenic rock landmark north of Bend near Terrebonne.",
+    "address": "Smith Rock State Park, Terrebonne, OR 97760",
+    "latitude": 44.3670405,
+    "longitude": -121.141421,
+    "icon": "mountain"
+  },
+  {
+    "city": "bend",
+    "name": "Newberry National Volcanic Monument",
+    "description": "Regional volcanic landscape with lava flows, lakes, trails, and high desert viewpoints south of Bend.",
+    "address": "Newberry National Volcanic Monument, OR",
+    "latitude": 43.8121394,
+    "longitude": -121.2816712,
+    "icon": "volcano"
+  },
+  {
+    "city": "chattanooga",
+    "icon": "bicycle",
+    "name": "Soddy Elementary School Traffic Garden (Planned)",
+    "description": "White Oak Bicycle Co-op lists this school traffic garden as an upcoming project.",
+    "address": "260 School St, Soddy-Daisy, TN 37379",
+    "latitude": 35.2917,
+    "longitude": -85.1627
+  },
+  {
+    "city": "chattanooga",
+    "icon": "bicycle",
+    "name": "Lookout Valley Elementary School Traffic Garden (Planned)",
+    "description": "White Oak Bicycle Co-op lists this school traffic garden as an upcoming project.",
+    "address": "701 Browns Ferry Rd, Chattanooga, TN 37419",
+    "latitude": 35.0445,
+    "longitude": -85.357
+  },
+  {
+    "city": "chattanooga",
+    "icon": "bicycle",
+    "name": "Calvin Donaldson Elementary School Traffic Garden",
+    "description": "A school traffic garden where students practice biking and road safety. Check with the school about visitor access.",
+    "address": "927 W. 37th Street, Chattanooga, TN 37410",
+    "latitude": 35.0109,
+    "longitude": -85.3182
+  }
+]

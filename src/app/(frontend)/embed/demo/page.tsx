@@ -4,6 +4,7 @@ import { siteConfigForHostname } from '@/config/site.config';
 import { getRequestHostname } from '@/utils/request-hostname';
 import { EmbedSnippetBuilder } from '@/components/embed/EmbedSnippetBuilder';
 import { embedBuilderConfig } from '@/utils/embed-options';
+import { getCityAttractions } from '@/payload/read/attractions';
 import { getCityRoutes } from '@/payload/read/routes';
 import { resolveActiveCityId } from '@/config/map.config';
 
@@ -24,8 +25,15 @@ export default async function EmbedDemoPage({
   ]);
   const cityId = resolveActiveCityId(hostname, query.city);
   const config = siteConfigForHostname(hostname, query.city);
-  const { routes } = await getCityRoutes(cityId);
-  const builderConfig = embedBuilderConfig(hostname, routes, query.city);
+  const [{ routes }, attractions] = await Promise.all([
+    getCityRoutes(cityId),
+    getCityAttractions(cityId),
+  ]);
+  const builderConfig = embedBuilderConfig(
+    cityId,
+    routes,
+    attractions.length > 0,
+  );
 
   return (
     <div className="min-h-screen bg-white text-gray-800">

@@ -76,10 +76,10 @@ Brand colors also live in the `@theme` block of `src/app/(frontend)/globals.css`
 
 ## 5. Content data — `src/data/`
 
-Replace the routes, trails, shops, and points of interest with your own. Each
-file is a typed array — see **[DATA.md](DATA.md)** for the full field-by-field
-contract of `BikeRoute`, `MountainBikeTrail`, `BikeResource`, `MapFeature`, and
-`LocalResource`.
+Replace the route and trail seed data, bike shops, and local resources with
+your own. See [Data files](DATA.md) for their fields. Add points of interest
+under **Map content → Attractions** in Payload and select the city when
+publishing each listing.
 
 ## 6. Routes and curated trails
 
@@ -226,16 +226,19 @@ global database.
 A database-free fork skips migrations and still builds the checked-in fallback
 map.
 
-Seed every city into the same fresh database after the initial migration. Both
-commands are idempotent; Bend's command also seeds its eight Casual routes:
+Seed the bundled cities into the same fresh database after the initial migration.
+The commands are idempotent. Bend's command also seeds its eight Casual routes.
 
 ```bash
 pnpm db:migrate
+pnpm db:seed:attractions
 pnpm db:seed:chattanooga
 pnpm db:seed:bend
 ```
 
-Production builds also run `pnpm db:seed:bend-routes` and
+Production builds run `pnpm db:seed:attractions` after migrations. The seed
+imports the bundled attractions once and preserves later edits and deletions.
+They also run `pnpm db:seed:bend-routes` and
 `pnpm db:seed:chattanooga-routes` after migrations. The former derives Bend's
 eight rows from the committed bike network. The latter ensures Chattanooga's
 five not-yet-migrated Studio routes have Payload records. Both preserve a row

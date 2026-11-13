@@ -1,7 +1,7 @@
 # Data files
 
 Seed metadata and checked-in trail fallbacks live in `src/data/` as typed
-TypeScript arrays. Published trail and route content comes from Payload,
+TypeScript arrays. Published trails, routes, and attractions come from Payload,
 while other content can remain explicitly configured to use static files or
 Mapbox Studio layers. Payload-owned route geometry has no implicit Studio
 fallback.
@@ -17,7 +17,7 @@ library.
 | `mountain-bike-trails.data.ts` | `mountainBikeTrails: MountainBikeTrail[]` | MTB trail manifest — the array you edit |
 | `mountain-bike-trails.ts` | types, `REGION_MAP`, `regionFor` | Trail types & region logic; re-exports the array |
 | `bike-resources.ts` | `bikeResources: BikeResource[]` | Bike shops & repair stations |
-| `map-features.ts` | `mapFeatures: MapFeature[]` | Attractions / points of interest |
+| `map-features.ts` | `MapFeature`, icon options | Attractions display type and icons |
 | `local-resources.ts` | `localResources: LocalResource[]` | Community resource links |
 | `gbfs.ts` | — | Live bike-share API client (no static data) |
 
@@ -68,10 +68,23 @@ existing Studio layers; their cards still come from Payload.
 region for the sidebar grouping — add an entry when you introduce a new
 `recArea`.
 
-## BikeResource (`bike-resources.ts`) & MapFeature (`map-features.ts`)
+## Attractions
 
-Point markers. `BikeResource` is `name`, `description`, `address`, `latitude`,
-`longitude`. `MapFeature` is the same plus an `icon`.
+Open **Map content → Attractions** in Payload to add or edit an attraction.
+Choose its city, fill in its name, description, and address, set its latitude
+and longitude, then choose an icon and publish. The public map and embeds read
+the published attractions for their city.
+
+Run `pnpm db:seed:attractions` after migrating to import the bundled cities and
+the three Chattanooga school traffic gardens once. Make subsequent changes
+in Payload. The map uses `src/data/attraction-seed.json` when Payload is
+unavailable. An empty list from Payload means the city has no published
+attractions. The school traffic garden pins use campus coordinates from the
+[NCES school location dataset](https://catalog.data.gov/dataset/public-school-locations-2024-25).
+
+## BikeResource (`bike-resources.ts`)
+
+Point markers with a name, description, address, latitude, and longitude.
 
 ## LocalResource (`local-resources.ts`)
 

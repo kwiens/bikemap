@@ -10,13 +10,13 @@ import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { useEmbed } from '@/components/EmbedContext';
 
 import {
-  mapFeatures,
   bikeResources,
   hiddenStyleLayerIds,
   bikeNetworkUrl,
   bikeRoutesUrl,
   inlineBikeRouteIds,
 } from '@/data/geo_data';
+import type { MapFeature } from '@/data/map-features';
 import { getBikeRoutes } from '@/data/route-source';
 import { inactiveStyleRouteLayerIds } from '@/data/mapbox-style';
 import { getMountainBikeTrails } from '@/data/trail-source';
@@ -75,7 +75,7 @@ import { loadRide } from '@/utils/ride-storage';
 import { splitRideSegments } from '@/data/ride';
 import { mapConfig } from '@/config/map.config';
 import { MAP_EVENTS } from '@/events';
-import { clearMapReady, setMapReady } from '@/utils/map-ready';
+import { clearMapReady, onMapReady, setMapReady } from '@/utils/map-ready';
 import { HeadingSmoother } from '@/utils/compass';
 import { fetchRouteCollection, runtimeRouteIds } from '@/utils/route-source';
 
@@ -110,7 +110,11 @@ if (!hasMapboxToken) {
 }
 
 // MapboxMap component - isolated from UI state changes
-const MapboxMap = memo(function MapboxMap() {
+const MapboxMap = memo(function MapboxMap({
+  attractions,
+}: {
+  attractions: MapFeature[];
+}) {
   const bikeRoutes = getBikeRoutes();
   const { isEmbed, options: embedOptions } = useEmbed();
   // Embed mode is fixed for the lifetime of the tree, but the init effect runs
@@ -651,13 +655,6 @@ const MapboxMap = memo(function MapboxMap() {
         if (visible) {
           bikeResourceMarkers.current.hide();
 
-          if (attractionMarkers.current.length === 0) {
-            const markers = mapFeatures.map((feature) =>
-              createAttractionMarker(feature),
-            );
-            attractionMarkers.current.setMarkers(markers);
-          }
-
           attractionMarkers.current.show(map.current);
         } else {
           attractionMarkers.current.hide();
@@ -685,145 +682,168 @@ const MapboxMap = memo(function MapboxMap() {
   );
 
   // Handler for centering on a specific location
-  const handleCenterLocation = useCallback(async (event: CustomEvent) => {
-    if (!map.current) {
-      return;
-    }
+  const handleCenterLocation = useCallback(
+    async (event: CustomEvent) => {
+      if (!map.current) {
+        return;
+      }
 
-    const { location } = event.detail;
+      const { location } = event.detail;
 
-    // A bounds payload (e.g. the dockless fleet summary) fits the whole extent
-    // rather than flying to a single point. maxZoom keeps a tight/one-vehicle
-    // fleet from zooming all the way in.
-    if (location.bounds) {
-      const corners = (
-        location.bounds as [[number, number], [number, number]]
-      ).flat();
-      // A non-finite corner (malformed feed coord) would make fitBounds throw.
-      if (corners.every((n) => Number.isFinite(n))) {
+      // A bounds payload (e.g. the dockless fleet summary) fits the whole extent
+      // rather than flying to a single point. maxZoom keeps a tight/one-vehicle
+      // fleet from zooming all the way in.
+      if (location.bounds) {
+        const corners = (
+          location.bounds as [[number, number], [number, number]]
+        ).flat();
+        // A non-finite corner (malformed feed coord) would make fitBounds throw.
+        if (corners.every((n) => Number.isFinite(n))) {
+          pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
+          map.current.fitBounds(location.bounds, {
+            padding: 60,
+            maxZoom: 16,
+            duration: 1000,
+            essential: true,
+          });
+        }
+        return;
+      }
+
+      let coordinates: [number, number] | null = null;
+
+      // If we have latitude and longitude, use them directly
+      if (
+        Number.isFinite(location.latitude) &&
+        Number.isFinite(location.longitude)
+      ) {
+        coordinates = [location.longitude, location.latitude];
+      }
+      // If we have an address, geocode it
+      else if (location.address && mapboxgl.accessToken) {
+        coordinates = await geocodeAddress(
+          location.address,
+          mapboxgl.accessToken,
+        );
+      }
+
+      if (coordinates && map.current) {
         pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-        map.current.fitBounds(location.bounds, {
-          padding: 60,
-          maxZoom: 16,
-          duration: 1000,
+        map.current.flyTo({
+          center: coordinates,
+          zoom: 17,
           essential: true,
+          duration: 1000,
         });
-      }
-      return;
-    }
 
-    let coordinates: [number, number] | null = null;
+        // Create a temporary highlight marker using React component
+        const marker = createHighlightMarker(coordinates[0], coordinates[1]);
 
-    // If we have latitude and longitude, use them directly
-    if (location.latitude && location.longitude) {
-      coordinates = [location.longitude, location.latitude];
-    }
-    // If we have an address, geocode it
-    else if (location.address && mapboxgl.accessToken) {
-      coordinates = await geocodeAddress(
-        location.address,
-        mapboxgl.accessToken,
-      );
-    }
+        // Only add to map if it exists
+        if (map.current) {
+          marker.addTo(map.current);
+        }
 
-    if (coordinates) {
-      pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-      map.current.flyTo({
-        center: coordinates,
-        zoom: 17,
-        essential: true,
-        duration: 1000,
-      });
+        // Remove the highlight marker after animation
+        setTimeout(() => {
+          marker.remove();
+        }, 3000);
 
-      // Create a temporary highlight marker using React component
-      const marker = createHighlightMarker(coordinates[0], coordinates[1]);
+        // Read marker-layer visibility from the ref, not state: the LAYER_TOGGLE
+        // dispatches below run their handler synchronously, so the ref reflects
+        // the just-enabled layer while this closure's state is still stale.
+        const markersVisible = markerLayersVisibleRef.current;
 
-      // Only add to map if it exists
-      if (map.current) {
-        marker.addTo(map.current);
-      }
+        // Attraction cards carry the Payload id. Coordinates can be shared
+        // by several listings or by an attraction and a bike resource.
+        if (typeof location.id === 'number') {
+          if (!markersVisible.attractions) {
+            window.dispatchEvent(
+              new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+                detail: { layer: 'attractions', visible: true },
+              }),
+            );
+          }
+          const marker = attractionMarkers.current.findAttractionById(
+            location.id,
+          );
+          if (marker) attractionMarkers.current.openPopupFor(marker);
+          return;
+        }
 
-      // Remove the highlight marker after animation
-      setTimeout(() => {
-        marker.remove();
-      }, 3000);
+        // Check if this location is an attraction - show the markers if they're not already shown
+        const isAttraction = findLocationInArray(attractions, coordinates);
 
-      // Read marker-layer visibility from the ref, not state: the LAYER_TOGGLE
-      // dispatches below run their handler synchronously, so the ref reflects
-      // the just-enabled layer while this closure's state is still stale.
-      const markersVisible = markerLayersVisibleRef.current;
+        if (isAttraction && !markersVisible.attractions) {
+          // Toggle attractions layer on
+          window.dispatchEvent(
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+              detail: { layer: 'attractions', visible: true },
+            }),
+          );
+        }
 
-      // Check if this location is an attraction - show the markers if they're not already shown
-      const isAttraction = findLocationInArray(mapFeatures, coordinates);
+        // Check if this location is a bike resource - show the markers if they're not already shown
+        const isBikeResource = findLocationInArray(bikeResources, coordinates);
 
-      if (isAttraction && !markersVisible.attractions) {
-        // Toggle attractions layer on
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-            detail: { layer: 'attractions', visible: true },
-          }),
-        );
-      }
+        if (isBikeResource && !markersVisible.bikeResources) {
+          // Toggle bike resources layer on
+          window.dispatchEvent(
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+              detail: { layer: 'bikeResources', visible: true },
+            }),
+          );
+        }
 
-      // Check if this location is a bike resource - show the markers if they're not already shown
-      const isBikeResource = findLocationInArray(bikeResources, coordinates);
-
-      if (isBikeResource && !markersVisible.bikeResources) {
-        // Toggle bike resources layer on
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-            detail: { layer: 'bikeResources', visible: true },
-          }),
-        );
-      }
-
-      // Check if this location is a bike rental - show the markers if they're not already shown
-      const isBikeRental = bikeRentalMarkers.current.findByCoordinates(
-        coordinates[0],
-        coordinates[1],
-      );
-
-      if (isBikeRental && !markersVisible.bikeRentals) {
-        // Toggle bike rentals layer on
-        window.dispatchEvent(
-          new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
-            detail: { layer: 'bikeRentals', visible: true },
-          }),
-        );
-      }
-
-      // Check if this is an attraction, bike resource, or bike rental and show the popup
-      if (markerLayersVisibleRef.current.attractions) {
-        const attractionMarker = attractionMarkers.current.findByCoordinates(
+        // Check if this location is a bike rental - show the markers if they're not already shown
+        const isBikeRental = bikeRentalMarkers.current.findByCoordinates(
           coordinates[0],
           coordinates[1],
         );
-        if (attractionMarker) {
-          attractionMarkers.current.openPopupFor(attractionMarker);
-        }
-      }
 
-      if (markerLayersVisibleRef.current.bikeResources) {
-        const bikeMarker = bikeResourceMarkers.current.findByCoordinates(
-          coordinates[0],
-          coordinates[1],
-        );
-        if (bikeMarker) {
-          bikeResourceMarkers.current.openPopupFor(bikeMarker);
+        if (isBikeRental && !markersVisible.bikeRentals) {
+          // Toggle bike rentals layer on
+          window.dispatchEvent(
+            new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+              detail: { layer: 'bikeRentals', visible: true },
+            }),
+          );
         }
-      }
 
-      if (markerLayersVisibleRef.current.bikeRentals) {
-        const rentalMarker = bikeRentalMarkers.current.findByCoordinates(
-          coordinates[0],
-          coordinates[1],
-        );
-        if (rentalMarker) {
-          bikeRentalMarkers.current.openPopupFor(rentalMarker);
+        // Check if this is an attraction, bike resource, or bike rental and show the popup
+        if (markerLayersVisibleRef.current.attractions) {
+          const attractionMarker = attractionMarkers.current.findByCoordinates(
+            coordinates[0],
+            coordinates[1],
+          );
+          if (attractionMarker) {
+            attractionMarkers.current.openPopupFor(attractionMarker);
+          }
+        }
+
+        if (markerLayersVisibleRef.current.bikeResources) {
+          const bikeMarker = bikeResourceMarkers.current.findByCoordinates(
+            coordinates[0],
+            coordinates[1],
+          );
+          if (bikeMarker) {
+            bikeResourceMarkers.current.openPopupFor(bikeMarker);
+          }
+        }
+
+        if (markerLayersVisibleRef.current.bikeRentals) {
+          const rentalMarker = bikeRentalMarkers.current.findByCoordinates(
+            coordinates[0],
+            coordinates[1],
+          );
+          if (rentalMarker) {
+            bikeRentalMarkers.current.openPopupFor(rentalMarker);
+          }
         }
       }
-    }
-  }, []);
+    },
+    [attractions],
+  );
 
   // Set up event listeners for map layers and location centering
   useEffect(() => {
@@ -947,6 +967,19 @@ const MapboxMap = memo(function MapboxMap() {
       if (marker) marker.remove();
     };
   }, []);
+
+  useEffect(
+    () =>
+      onMapReady(() => {
+        attractionMarkers.current.setMarkers(
+          attractions.map(createAttractionMarker),
+        );
+        if (map.current && markerLayersVisibleRef.current.attractions) {
+          attractionMarkers.current.show(map.current);
+        }
+      }),
+    [attractions],
+  );
 
   // Initialize map on component mount
   useEffect(() => {
@@ -1338,15 +1371,8 @@ const MapboxMap = memo(function MapboxMap() {
           }
 
           // Clear existing marker managers before initialization
-          attractionMarkers.current.clear();
           bikeResourceMarkers.current.clear();
           bikeRentalMarkers.current.clear();
-
-          // Pre-create attraction markers (they will be added to map only when toggled on)
-          const attractionMarkerList = mapFeatures.map((feature) =>
-            createAttractionMarker(feature),
-          );
-          attractionMarkers.current.setMarkers(attractionMarkerList);
 
           // Pre-create bike resource markers
           const bikeResourceMarkerList = bikeResources.map((resource) =>
@@ -1826,12 +1852,16 @@ function MapUnavailable() {
 }
 
 // Main Map component - manages layout and UI chrome
-export default function BikeMap() {
+export default function BikeMap({
+  attractions,
+}: {
+  attractions: MapFeature[];
+}) {
   const { isEmbed } = useEmbed();
   return (
-    <MapLegendProvider>
+    <MapLegendProvider attractions={attractions}>
       <div className="w-screen h-full relative overflow-visible">
-        <MapboxMap />
+        <MapboxMap attractions={attractions} />
         {/* Ride recording needs geolocation + persistent storage — not for embeds */}
         {!isEmbed && <RidesPanel />}
       </div>

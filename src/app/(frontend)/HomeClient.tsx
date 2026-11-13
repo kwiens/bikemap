@@ -7,6 +7,7 @@ import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
 import { WelcomeModal } from '@/components/WelcomeModal';
 import { activeCityId } from '@/config/map.config';
 import type { CityId } from '@/data/cities/types';
+import type { MapFeature } from '@/data/map-features';
 import type { BikeRoute } from '@/data/bike-routes';
 import type { MountainBikeTrail } from '@/data/mountain-bike-trails';
 import { setBikeRoutes } from '@/data/route-source';
@@ -27,6 +28,7 @@ export default function HomeClient({
   cityId,
   routes,
   trails,
+  attractions,
 }: {
   /** The city the server resolved from the request host. */
   cityId: CityId;
@@ -35,6 +37,7 @@ export default function HomeClient({
   /** Trails read from Payload on the server. Empty means "use the checked-in
    *  data", which is what happens with no database configured. */
   trails: MountainBikeTrail[];
+  attractions: MapFeature[];
 }): ReactElement {
   // Publish the server's trails into the module store *during render*, before
   // the map or sidebar read them. They don't change for the life of the page,
@@ -43,7 +46,8 @@ export default function HomeClient({
   // Server and browser resolve the city independently — the server from the
   // request host, this module from `window.location`. A response served for
   // another host must not replace this city's trails, so they have to agree.
-  if (cityId === activeCityId) {
+  const isActiveCity = cityId === activeCityId;
+  if (isActiveCity) {
     setBikeRoutes(routes);
     setMountainBikeTrails(trails);
   }
@@ -53,7 +57,7 @@ export default function HomeClient({
 
   return (
     <main className="overflow-hidden fixed inset-0 m-0 p-0">
-      <BikeMap />
+      <BikeMap attractions={isActiveCity ? attractions : []} />
       <PwaInstallPrompt />
       <WelcomeModal />
     </main>
