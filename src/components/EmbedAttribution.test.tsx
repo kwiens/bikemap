@@ -1,11 +1,11 @@
 /** @vitest-environment jsdom */
 import React from 'react';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EmbedProvider } from './EmbedContext';
 import { EmbedAttribution } from './EmbedAttribution';
 import { DEFAULT_EMBED_OPTIONS } from '@/utils/embed';
-import { MAP_EVENTS } from '@/events';
+import { mapSelectionHarness } from '@/test/map-selection';
 import { siteConfig } from '@/config/site.config';
 
 vi.mock('@/data/trail-source', () => ({
@@ -17,6 +17,8 @@ vi.mock('@/data/route-source', () => ({
   getBikeRoutes: () => [{ id: 'route-layer', name: 'New Route' }],
 }));
 
+const selection = mapSelectionHarness();
+
 afterEach(cleanup);
 
 describe('EmbedAttribution', () => {
@@ -27,23 +29,16 @@ describe('EmbedAttribution', () => {
       >
         <EmbedAttribution />
       </EmbedProvider>,
+      { wrapper: selection.Wrapper },
     );
     const link = screen.getByRole('link');
     expect(link).toHaveAttribute('href', siteConfig.url);
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.TRAIL_SELECT, {
-          detail: { trailName: 'New Trail' },
-        }),
-      );
-    });
+    selection.select({ kind: 'trail', trailName: 'New Trail' });
     expect(link).toHaveAttribute(
       'href',
       new URL('?trail=saved-trail-slug', siteConfig.url).toString(),
     );
-    act(() => {
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.TRAIL_DESELECT));
-    });
+    selection.select(null);
     expect(link).toHaveAttribute('href', siteConfig.url);
   });
 
@@ -52,22 +47,15 @@ describe('EmbedAttribution', () => {
       <EmbedProvider options={DEFAULT_EMBED_OPTIONS}>
         <EmbedAttribution />
       </EmbedProvider>,
+      { wrapper: selection.Wrapper },
     );
     const link = screen.getByRole('link');
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.ROUTE_SELECT, {
-          detail: { routeId: 'route-layer' },
-        }),
-      );
-    });
+    selection.select({ kind: 'route', routeId: 'route-layer' });
     expect(link).toHaveAttribute(
       'href',
       new URL('?route=route-layer', siteConfig.url).toString(),
     );
-    act(() => {
-      window.dispatchEvent(new CustomEvent(MAP_EVENTS.ROUTE_DESELECT));
-    });
+    selection.select(null);
     expect(link).toHaveAttribute('href', siteConfig.url);
   });
 });

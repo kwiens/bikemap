@@ -2,10 +2,20 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import {
+  render as renderReact,
+  screen,
+  fireEvent,
+  act,
+} from '@testing-library/react';
 import { RidesPanel } from './RidesPanel';
+import { mapSelectionHarness } from '@/test/map-selection';
 import { MAP_EVENTS } from '@/events';
-import { initLayout, setSidebarOpen } from '@/hooks/useLayout';
+import {
+  initLayout,
+  setSidebarOpen,
+  setRidesPanelOpen,
+} from '@/hooks/useLayout';
 
 // Mock useRideRecording hook — rebuilt each test via beforeEach
 function createMockHook() {
@@ -43,6 +53,16 @@ vi.mock('./styles', () => ({
 function openPanel() {
   fireEvent.click(screen.getByLabelText('Open rides panel'));
 }
+
+const selection = mapSelectionHarness();
+
+function render(ui: React.ReactElement) {
+  return renderReact(ui, { wrapper: selection.Wrapper });
+}
+
+vi.mock('@/utils/ride-storage', () => ({
+  loadRide: async (id: string) => ({ id }),
+}));
 
 describe('RidesPanel', () => {
   beforeEach(() => {
@@ -164,13 +184,9 @@ describe('RidesPanel', () => {
   it('selects the saved ride after Finish and leaves the message to the recorder', async () => {
     mockHook.isRecording = true;
     mockHook.stopRecording = vi.fn().mockResolvedValue({ id: 'ride-2' });
-    const selected: string[] = [];
     const toasts: string[] = [];
-    const onSelect = (e: Event) =>
-      selected.push((e as CustomEvent).detail.rideId);
     const onToast = (e: Event) =>
       toasts.push((e as CustomEvent).detail.message);
-    window.addEventListener(MAP_EVENTS.RIDE_SELECT, onSelect);
     window.addEventListener(MAP_EVENTS.TOAST, onToast);
 
     try {
@@ -179,10 +195,9 @@ describe('RidesPanel', () => {
       await act(async () => {
         fireEvent.click(screen.getByText('Finish'));
       });
-      expect(selected).toEqual(['ride-2']);
+      expect(selection.get()).toMatchObject({ kind: 'ride', rideId: 'ride-2' });
       expect(toasts).toEqual([]);
     } finally {
-      window.removeEventListener(MAP_EVENTS.RIDE_SELECT, onSelect);
       window.removeEventListener(MAP_EVENTS.TOAST, onToast);
     }
   });
@@ -308,15 +323,9 @@ describe('RidesPanel', () => {
     }
   });
 
-  it('opens itself when a ride is selected with openPanel', () => {
+  it('can open directly from another map control', () => {
     render(<RidesPanel />);
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(MAP_EVENTS.RIDE_SELECT, {
-          detail: { rideId: 'ride-1', openPanel: true },
-        }),
-      );
-    });
+    act(() => setRidesPanelOpen(true));
     expect(screen.getByLabelText('Close rides panel')).toBeInTheDocument();
   });
 });

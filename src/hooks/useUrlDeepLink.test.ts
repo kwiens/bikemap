@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MAP_EVENTS } from '@/events';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mapSelectionHarness } from '@/test/map-selection';
 import { useUrlDeepLink } from './useUrlDeepLink';
 
 vi.mock('@/data/route-source', () => ({
@@ -23,34 +23,22 @@ vi.mock('@/utils/map-ready', () => ({
 }));
 
 describe('useUrlDeepLink', () => {
-  const selections: Array<{ type: string; detail: unknown }> = [];
-  function record(e: Event) {
-    selections.push({ type: e.type, detail: (e as CustomEvent).detail });
-  }
-
-  beforeEach(() => {
-    selections.length = 0;
-    window.addEventListener(MAP_EVENTS.TRAIL_SELECT, record);
-    window.addEventListener(MAP_EVENTS.ROUTE_SELECT, record);
-  });
+  const selection = mapSelectionHarness();
+  const wrapper = selection.Wrapper;
 
   afterEach(() => {
-    window.removeEventListener(MAP_EVENTS.TRAIL_SELECT, record);
-    window.removeEventListener(MAP_EVENTS.ROUTE_SELECT, record);
     window.history.replaceState(null, '', '/');
   });
 
   it('selects a trail from the query string by default', () => {
     window.history.replaceState(null, '', '/?trail=cherokee-trail');
 
-    renderHook(() => useUrlDeepLink());
+    renderHook(() => useUrlDeepLink(), { wrapper });
 
-    expect(selections).toEqual([
-      {
-        type: MAP_EVENTS.TRAIL_SELECT,
-        detail: { trailName: 'Cherokee Trail' },
-      },
-    ]);
+    expect(selection.get()).toEqual({
+      kind: 'trail',
+      trailName: 'Cherokee Trail',
+    });
   });
 
   it('ignores a trail in a Casual embed and selects the decoded route', () => {
@@ -60,45 +48,45 @@ describe('useUrlDeepLink', () => {
       '/embed?trail=cherokee-trail&route=riverwalk',
     );
 
-    renderHook(() =>
-      useUrlDeepLink({ trails: false, routes: true, route: 'riverwalk' }),
+    renderHook(
+      () => useUrlDeepLink({ trails: false, routes: true, route: 'riverwalk' }),
+      { wrapper },
     );
 
-    expect(selections).toEqual([
-      {
-        type: MAP_EVENTS.ROUTE_SELECT,
-        detail: { routeId: 'riverwalk-layer' },
-      },
-    ]);
+    expect(selection.get()).toEqual({
+      kind: 'route',
+      routeId: 'riverwalk-layer',
+    });
   });
 
   it('ignores a route in an MTB embed', () => {
     window.history.replaceState(null, '', '/embed?mode=mtb&route=riverwalk');
 
-    renderHook(() =>
-      useUrlDeepLink({ trails: true, routes: false, route: 'riverwalk' }),
+    renderHook(
+      () => useUrlDeepLink({ trails: true, routes: false, route: 'riverwalk' }),
+      { wrapper },
     );
 
-    expect(selections).toEqual([]);
+    expect(selection.get()).toBeNull();
   });
 
   it('prefers the pre-decoded trail over the raw query value', () => {
     window.history.replaceState(null, '', '/embed?mode=mtb&trail=%20');
 
-    renderHook(() =>
-      useUrlDeepLink({
-        trails: true,
-        routes: false,
-        trail: 'cherokee-trail',
-      }),
+    renderHook(
+      () =>
+        useUrlDeepLink({
+          trails: true,
+          routes: false,
+          trail: 'cherokee-trail',
+        }),
+      { wrapper },
     );
 
-    expect(selections).toEqual([
-      {
-        type: MAP_EVENTS.TRAIL_SELECT,
-        detail: { trailName: 'Cherokee Trail' },
-      },
-    ]);
+    expect(selection.get()).toEqual({
+      kind: 'trail',
+      trailName: 'Cherokee Trail',
+    });
   });
 
   it('uses the stable route id when a stale trail link cannot be resolved', () => {
@@ -107,9 +95,10 @@ describe('useUrlDeepLink', () => {
       '',
       '/?trail=removed&route=riverwalk-layer',
     );
-    renderHook(() => useUrlDeepLink());
-    expect(selections).toEqual([
-      { type: MAP_EVENTS.ROUTE_SELECT, detail: { routeId: 'riverwalk-layer' } },
-    ]);
+    renderHook(() => useUrlDeepLink(), { wrapper });
+    expect(selection.get()).toEqual({
+      kind: 'route',
+      routeId: 'riverwalk-layer',
+    });
   });
 });

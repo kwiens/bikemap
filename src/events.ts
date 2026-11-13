@@ -1,27 +1,18 @@
 // Custom DOM events for component communication.
 //
-// The map, the sidebar, the rides panel and the elevation pane are siblings
-// that never share React state; they talk over `window` events. Every event
-// name lives in MAP_EVENTS and every payload shape in MapEventDetails, so a
+// Map selection lives in components/map-selection.tsx. These window events
+// carry transient actions and notifications. Every event name lives in
+// MAP_EVENTS and every payload shape in MapEventDetails, so a
 // dispatcher and its listeners agree at compile time. Use `dispatchMapEvent`
 // and `onMapEvent` (or the `useMapEvent` hook) rather than `new CustomEvent`
 // and `addEventListener` directly — the raw forms take any detail at all,
 // and a payload mismatch between two files was a reliable source of glitches.
 
-import type { ElevationProfile } from '@/data/mountain-bike-trails';
 import type { LocationProps } from '@/components/sidebar/types';
 import type { EmbedLayer } from '@/utils/embed';
 import type { RideStyle } from '@/utils/settings';
 
 export const MAP_EVENTS = {
-  ROUTE_SELECT: 'route-select',
-  ROUTE_DESELECT: 'route-deselect',
-  TRAIL_SELECT: 'trail-select',
-  TRAIL_DESELECT: 'trail-deselect',
-  // OSM trail selected on the map — carries a ready-built ElevationProfile for
-  // the elevation pane (OSM trails have no curated JSON to load by name).
-  OSM_TRAIL_SELECT: 'osm-trail-select',
-  AREA_SELECT: 'area-select',
   LAYER_TOGGLE: 'layer-toggle',
   CENTER_LOCATION: 'center-location',
   SIDEBAR_TOGGLE: 'sidebar-toggle',
@@ -31,8 +22,6 @@ export const MAP_EVENTS = {
   RIDE_RECORDING_START: 'ride-recording-start',
   RIDE_RECORDING_STOP: 'ride-recording-stop',
   RIDE_RECORDING_UPDATE: 'ride-recording-update',
-  RIDE_SELECT: 'ride-select',
-  RIDE_DESELECT: 'ride-deselect',
   RIDES_PANEL_TOGGLE: 'rides-panel-toggle',
   TOAST: 'toast',
   MAP_READY: 'map-ready',
@@ -61,14 +50,6 @@ export type RideRecordingUpdateDetail =
  * detail type.
  */
 export interface MapEventDetails {
-  'route-select': { routeId: string };
-  'route-deselect': undefined;
-  /** `autoDetected` marks a selection made by the recorder's trail detection
-   *  rather than the rider, so the map doesn't fly away from them. */
-  'trail-select': { trailName: string; autoDetected?: boolean };
-  'trail-deselect': undefined;
-  'osm-trail-select': { profile: ElevationProfile };
-  'area-select': { areaName: string };
   'layer-toggle': { layer: MapLayerId; visible: boolean };
   'center-location': { location: LocationProps };
   'sidebar-toggle': { isOpen: boolean };
@@ -80,9 +61,6 @@ export interface MapEventDetails {
   /** `rideId` is present only when the stop produced a saved ride. */
   'ride-recording-stop': { rideId?: string };
   'ride-recording-update': RideRecordingUpdateDetail;
-  /** `openPanel` asks the rides panel to open itself (elevation pane title). */
-  'ride-select': { rideId: string; openPanel?: boolean };
-  'ride-deselect': undefined;
   'rides-panel-toggle': { isOpen: boolean };
   toast: { message: string };
   'map-ready': undefined;

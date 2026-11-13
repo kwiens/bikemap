@@ -143,7 +143,7 @@ The Python trail-elevation pipeline is optional and documented in [docs/DEPLOYIN
 
 Tests live next to source as `*.test.ts(x)` and run under Vitest with jsdom — covering GBFS integration, ride stats and storage, DEM correction, GPX building, compass smoothing, and sidebar components.
 
-Use `dispatchMapEvent` from `src/events.ts` to test application reactions to map selection. Use a browser pointer action to verify Mapbox hit-testing.
+Use `mapSelectionHarness` from `src/test/map-selection.tsx` to test application reactions to map selection. Use a browser pointer action to verify Mapbox hit-testing.
 
 ## Deploying for your community
 

@@ -17,19 +17,19 @@ describe('MAP_EVENTS', () => {
 describe('dispatchMapEvent / onMapEvent', () => {
   it('delivers the detail to a typed listener', () => {
     const seen: string[] = [];
-    const off = onMapEvent(MAP_EVENTS.ROUTE_SELECT, ({ routeId }) => {
-      seen.push(routeId);
+    const off = onMapEvent(MAP_EVENTS.TOAST, ({ message }) => {
+      seen.push(message);
     });
-    dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId: 'zoo-loop' });
+    dispatchMapEvent(MAP_EVENTS.TOAST, { message: 'zoo-loop' });
     off();
-    dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId: 'after-off' });
+    dispatchMapEvent(MAP_EVENTS.TOAST, { message: 'after-off' });
     expect(seen).toEqual(['zoo-loop']);
   });
 
   it('dispatches detail-less events as plain Events', () => {
     const handler = vi.fn();
-    const off = onMapEvent(MAP_EVENTS.ROUTE_DESELECT, handler);
-    dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
+    const off = onMapEvent(MAP_EVENTS.RIDE_RECORDING_START, handler);
+    dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_START);
     off();
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(undefined);

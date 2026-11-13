@@ -26,20 +26,22 @@ describe('useMapEvent', () => {
     const second = vi.fn();
     const { rerender } = renderHook(
       ({ handler }: { handler: () => void }) =>
-        useMapEvent(MAP_EVENTS.RIDE_DESELECT, handler),
+        useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, handler),
       { initialProps: { handler: first } },
     );
     const subscriptions = addSpy.mock.calls.filter(
-      ([type]) => type === MAP_EVENTS.RIDE_DESELECT,
+      ([type]) => type === MAP_EVENTS.RIDE_RECORDING_START,
     ).length;
 
     rerender({ handler: second });
-    dispatchMapEvent(MAP_EVENTS.RIDE_DESELECT);
+    dispatchMapEvent(MAP_EVENTS.RIDE_RECORDING_START);
 
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledTimes(1);
     expect(
-      addSpy.mock.calls.filter(([type]) => type === MAP_EVENTS.RIDE_DESELECT),
+      addSpy.mock.calls.filter(
+        ([type]) => type === MAP_EVENTS.RIDE_RECORDING_START,
+      ),
     ).toHaveLength(subscriptions);
     addSpy.mockRestore();
   });

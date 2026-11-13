@@ -4,6 +4,11 @@ import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import mapboxgl from 'mapbox-gl';
 import { MapLegendProvider } from '@/components/MapLegend';
+import {
+  useMapSelectionStore,
+  type MapSelection,
+} from '@/components/map-selection';
+import { OSM_TRAILS_HIT_LAYER_ID } from '@/data/osm-trails';
 import { EmbedAttribution } from '@/components/EmbedAttribution';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
@@ -60,7 +65,9 @@ import {
   loadOptimizedMapStyle,
   queryNearbyLineFeatures,
   registerPointerCursor,
-  registerOsmTrailSelection,
+  osmTrailAtPoint,
+  clearOsmTrailHighlight,
+  highlightOsmTrail,
   hideStyleLayers,
   hideStrayStyleLayers,
   BIKE_ROUTE_LAYER_ID,
@@ -72,7 +79,6 @@ import {
   detectTrailAtPoint,
   toLngLatBounds,
 } from '@/utils/map';
-import { loadRide } from '@/utils/ride-storage';
 import { splitRideSegments } from '@/data/ride';
 import { mapConfig } from '@/config/map.config';
 import {
@@ -123,6 +129,7 @@ const MapboxMap = memo(function MapboxMap({
   attractions: MapFeature[];
 }) {
   const { isEmbed, options: embedOptions } = useEmbed();
+  const selectionStore = useMapSelectionStore();
   const isMtbEmbed = isEmbed && embedOptions.mode === 'mtb';
   const bikeRoutes = useMemo(
     () => (isMtbEmbed ? [] : getBikeRoutes()),
@@ -135,8 +142,7 @@ const MapboxMap = memo(function MapboxMap({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const routeArrows = useRef<RouteArrowOverlay | null>(null);
-  // Removes the OSM trail selection's window listeners on teardown/restyle.
-  const osmSelectionCleanup = useRef<(() => void) | null>(null);
+
   const [recordingActive, setRecordingActive] = useState(false);
   // Set when init throws or the style errors — a token can be present but
   // revoked, which `hasMapboxToken` (a build-time constant) cannot detect.
@@ -164,7 +170,6 @@ const MapboxMap = memo(function MapboxMap({
 
   // Trail auto-detection during ride recording
   const autoDetectEnabledRef = useRef(false);
-  const autoDetectedTrailRef = useRef<string | null>(null);
   const lastDetectTimeRef = useRef(0);
   const detectCandidateRef = useRef<string | null>(null);
   const detectConfirmCountRef = useRef(0);
@@ -208,68 +213,6 @@ const MapboxMap = memo(function MapboxMap({
     [bikeRoutes],
   );
 
-  const rideSelectionRef = useRef<symbol | null>(null);
-  const clearSavedRide = useCallback(() => {
-    if (!rideSelectionRef.current) return;
-    rideSelectionRef.current = null;
-    if (map.current) removeRideLayer(map.current);
-  }, []);
-
-  // Handle ride select — show ride on map
-  const handleRideSelect = useCallback(
-    async ({ rideId }: MapEventDetails['ride-select']) => {
-      const selectedMap = map.current;
-      if (!selectedMap || isRecordingRef.current) return;
-      const selection = Symbol();
-      rideSelectionRef.current = selection;
-      const ride = await loadRide(rideId).catch((error: unknown) => {
-        console.error('Failed to load ride:', error);
-        return null;
-      });
-      if (
-        !ride ||
-        rideSelectionRef.current !== selection ||
-        map.current !== selectedMap
-      ) {
-        return;
-      }
-
-      const segments = splitRideSegments(ride.points).map((segment) =>
-        segment.map((p) => [p.lng, p.lat] as [number, number]),
-      );
-      addRideLayer(map.current, segments);
-
-      // Dim other routes/trails
-      updateRouteSelection(null, {
-        selected: 0.1,
-        unselected: 0.1,
-      });
-      updateMtnBikeOpacity(map.current, null);
-
-      // Fly to ride bounds
-      const [swLng, swLat, neLng, neLat] = ride.bounds;
-      const bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
-      pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-      flyToBounds(map.current, bounds);
-    },
-    [updateRouteSelection],
-  );
-
-  // Handle ride deselect — remove ride from map
-  const handleRideDeselect = useCallback(() => {
-    if (!map.current) return;
-    if (!rideSelectionRef.current) return;
-    clearSavedRide();
-    updateRouteSelection(null, {
-      selected: 1,
-      unselected: 1,
-    });
-    updateMtnBikeOpacity(map.current, null);
-  }, [clearSavedRide, updateRouteSelection]);
-
-  useMapEvent(MAP_EVENTS.RIDE_SELECT, handleRideSelect);
-  useMapEvent(MAP_EVENTS.RIDE_DESELECT, handleRideDeselect);
-
   // Accumulate the live track across recording updates.
   useEffect(() => {
     const liveSegments: [number, number][][] = [[]];
@@ -312,10 +255,13 @@ const MapboxMap = memo(function MapboxMap({
       lastDetectTimeRef.current = now;
 
       const detected = detectTrailAtPoint(map.current, point);
+      const active = selectionStore.get();
+      const autoDetectedTrail =
+        active?.kind === 'trail' && active.autoDetected
+          ? active.trailName
+          : null;
       const threshold =
-        autoDetectedTrailRef.current === null
-          ? DETECT_CONFIRM_COUNT
-          : DETECT_SWITCH_COUNT;
+        autoDetectedTrail === null ? DETECT_CONFIRM_COUNT : DETECT_SWITCH_COUNT;
 
       if (detected === detectCandidateRef.current) {
         detectConfirmCountRef.current++;
@@ -326,16 +272,12 @@ const MapboxMap = memo(function MapboxMap({
 
       if (detectConfirmCountRef.current < threshold) return;
 
-      if (detected !== null && detected !== autoDetectedTrailRef.current) {
-        autoDetectedTrailRef.current = detected;
-        dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, {
-          trailName: detected,
-          autoDetected: true,
-        });
-      } else if (detected === null && autoDetectedTrailRef.current !== null) {
-        autoDetectedTrailRef.current = null;
-        dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
-      }
+      if (detected === autoDetectedTrail) return;
+      selectionStore.select(
+        detected
+          ? { kind: 'trail', trailName: detected, autoDetected: true }
+          : null,
+      );
     };
     const stopHandler = () => {
       // Flush any unrendered points so the full route is briefly visible
@@ -358,7 +300,7 @@ const MapboxMap = memo(function MapboxMap({
     return () => {
       for (const unsubscribe of unsubscribes) unsubscribe();
     };
-  }, []);
+  }, [selectionStore]);
 
   // Pause auto-centering (but keep tracking/compass mode active) when the
   // user interacts with the map via drag, pinch-zoom, or scroll-wheel.
@@ -373,141 +315,119 @@ const MapboxMap = memo(function MapboxMap({
     map.current.on('wheel', pauseRecenter);
   }
 
-  // Handle route selection events - outside the map initialization
-  const handleRouteSelect = useCallback(
-    ({ routeId }: MapEventDetails['route-select']) => {
-      if (!map.current) {
+  const renderRouteSelection = useCallback(
+    (selection: MapSelection) => {
+      if (selection?.kind === 'route') {
+        updateRouteSelection(selection.routeId, {
+          selected: 0.8,
+          unselected: 0.2,
+        });
+      } else {
+        const dimmed =
+          selection?.kind === 'trail' ||
+          selection?.kind === 'area' ||
+          selection?.kind === 'ride' ||
+          Object.values(markerLayersVisibleRef.current).some(Boolean);
+        const opacity = dimmed ? 0.1 : 1;
+        updateRouteSelection(null, { selected: opacity, unselected: opacity });
+      }
+    },
+    [updateRouteSelection],
+  );
+
+  const renderSelection = useCallback(
+    (
+      currentMap: mapboxgl.Map,
+      selection: MapSelection,
+      previous: MapSelection,
+    ) => {
+      // Profile completion updates the pane without repainting the same OSM line.
+      if (
+        selection?.kind === 'osm' &&
+        previous?.kind === 'osm' &&
+        selection.lines === previous.lines
+      )
         return;
+
+      renderRouteSelection(selection);
+      if (previous?.kind === 'osm' && selection?.kind !== 'osm') {
+        clearOsmTrailHighlight(currentMap);
+      }
+      if (previous?.kind === 'ride' && previous.ride)
+        removeRideLayer(currentMap);
+      if (selection?.kind !== 'area') {
+        updateMtnBikeOpacity(
+          currentMap,
+          selection?.kind === 'trail' ? selection.trailName : null,
+        );
       }
 
-      clearSavedRide();
-      // Find the selected route to get its name
-      const selectedRoute = bikeRoutes.find((route) => route.id === routeId);
-
-      // Show toast with route name
-      if (selectedRoute) {
-        showToast(selectedRoute.name);
-      }
-
-      // Update opacities for all routes and reset mountain bike trails
-      updateRouteSelection(routeId, {
-        selected: 0.8,
-        unselected: 0.2,
-      });
-      updateMtnBikeOpacity(map.current, null);
-
-      // Fall back to defaultBounds when runtime bounds aren't available
-      const bounds =
-        selectedRoute?.bounds ?? toLngLatBounds(selectedRoute?.defaultBounds);
-
-      if (bounds) {
-        pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-        flyToBounds(map.current, bounds);
-      }
-    },
-    [bikeRoutes, clearSavedRide, showToast, updateRouteSelection],
-  );
-
-  // Handle trail selection events
-  const handleTrailSelect = useCallback(
-    ({ trailName, autoDetected }: MapEventDetails['trail-select']) => {
-      if (!map.current) return;
-      clearSavedRide();
-      const trail = getMountainBikeTrails().find(
-        (t) => t.trailName === trailName,
-      );
-
-      // Manual selection during recording disables auto-detect and clears
-      // any prior auto-detected trail so stop doesn't deselect the manual pick.
-      if (!autoDetected && isRecordingRef.current) {
+      if (isRecordingRef.current && !selection) {
+        autoDetectEnabledRef.current = true;
+        detectCandidateRef.current = null;
+        detectConfirmCountRef.current = 0;
+      } else if (
+        isRecordingRef.current &&
+        !(selection?.kind === 'trail' && selection.autoDetected)
+      ) {
         autoDetectEnabledRef.current = false;
-        autoDetectedTrailRef.current = null;
       }
 
-      if (trail) {
-        showToast(trail.displayName);
+      let bounds: mapboxgl.LngLatBounds | undefined | null;
+      switch (selection?.kind) {
+        case 'route': {
+          const route = bikeRoutes.find(({ id }) => id === selection.routeId);
+          if (route) showToast(route.name);
+          bounds = route?.bounds ?? toLngLatBounds(route?.defaultBounds);
+          break;
+        }
+        case 'trail': {
+          const trail = getMountainBikeTrails().find(
+            (trail) => trail.trailName === selection.trailName,
+          );
+          if (trail) {
+            showToast(trail.displayName);
+            trail.bounds ??=
+              calculateTrailBounds(currentMap, selection.trailName) ??
+              undefined;
+          }
+          if (!selection.autoDetected)
+            bounds = trail?.bounds ?? toLngLatBounds(trail?.defaultBounds);
+          break;
+        }
+        case 'area': {
+          const trails = getMountainBikeTrails();
+          highlightMtnBikeArea(currentMap, trails, selection.areaName);
+          showToast(selection.areaName);
+          bounds = getAreaBounds(trails, selection.areaName);
+          break;
+        }
+        case 'osm':
+          highlightOsmTrail(currentMap, selection.lines);
+          break;
+        case 'ride': {
+          if (!selection.ride || isRecordingRef.current) break;
+          const {
+            points,
+            bounds: [swLng, swLat, neLng, neLat],
+          } = selection.ride;
+          addRideLayer(
+            currentMap,
+            splitRideSegments(points).map((segment) =>
+              segment.map(({ lng, lat }) => [lng, lat]),
+            ),
+          );
+          bounds = new mapboxgl.LngLatBounds([swLng, swLat], [neLng, neLat]);
+          break;
+        }
       }
-
-      // Dim bike routes and highlight the selected trail
-      updateRouteSelection(null, {
-        selected: 0.1,
-        unselected: 0.1,
-      });
-      updateMtnBikeOpacity(map.current, trailName);
-
-      // Calculate bounds lazily if not yet available
-      if (trail && !trail.bounds) {
-        trail.bounds =
-          calculateTrailBounds(map.current, trailName) ?? undefined;
-      }
-
-      // Fall back to defaultBounds when runtime bounds aren't available
-      // (e.g. trail tiles not loaded for the current viewport)
-      const bounds = trail?.bounds ?? toLngLatBounds(trail?.defaultBounds);
-
-      // Skip flyToBounds for auto-detected trails (map already follows user)
-      if (!autoDetected && bounds) {
-        pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-        flyToBounds(map.current, bounds);
-      }
-    },
-    [clearSavedRide, showToast, updateRouteSelection],
-  );
-
-  // Routes' resting opacity: dimmed while any marker layer is shown so the
-  // markers stand out, full otherwise. Matches the layer-toggle behavior.
-  const restingRouteOpacity = useCallback(
-    () =>
-      Object.values(markerLayersVisibleRef.current).some(Boolean)
-        ? { selected: 0.1, unselected: 0.1 }
-        : { selected: 1, unselected: 1 },
-    [],
-  );
-
-  // Reset route opacities when routes are deselected (empty-map click,
-  // sidebar trail selection, OSM trail selection, ...).
-  const handleRouteDeselect = useCallback(() => {
-    if (!map.current) return;
-    updateRouteSelection(null, restingRouteOpacity());
-  }, [restingRouteOpacity, updateRouteSelection]);
-
-  const handleTrailDeselect = useCallback(() => {
-    if (!map.current) return;
-    updateMtnBikeOpacity(map.current, null);
-    // Trail selection dims the bike routes — restore them on deselect.
-    updateRouteSelection(null, restingRouteOpacity());
-
-    // Re-enable auto-detect if recording is active
-    if (isRecordingRef.current) {
-      autoDetectEnabledRef.current = true;
-      autoDetectedTrailRef.current = null;
-      detectCandidateRef.current = null;
-      detectConfirmCountRef.current = 0;
-    }
-  }, [restingRouteOpacity, updateRouteSelection]);
-
-  // Handle area (rec area heading) selection — zoom to area bounds
-  const handleAreaSelect = useCallback(
-    ({ areaName }: MapEventDetails['area-select']) => {
-      if (!map.current) return;
-      clearSavedRide();
-      const bounds = getAreaBounds(getMountainBikeTrails(), areaName);
-
-      showToast(areaName);
-
-      // Dim bike routes, highlight trails in selected area
-      updateRouteSelection(null, {
-        selected: 0.1,
-        unselected: 0.1,
-      });
-      highlightMtnBikeArea(map.current, getMountainBikeTrails(), areaName);
 
       if (bounds) {
         pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
-        flyToBounds(map.current, bounds);
+        flyToBounds(currentMap, bounds);
       }
     },
-    [clearSavedRide, showToast, updateRouteSelection],
+    [bikeRoutes, renderRouteSelection, showToast],
   );
 
   // Handle layer toggle events
@@ -516,7 +436,11 @@ const MapboxMap = memo(function MapboxMap({
       // Record the desired state before the map-exists guard below. These refs
       // are what style.load replays, so writing them after the bail-out made
       // that recovery unreachable for the toggles it was meant to catch.
-      if (layer === 'osmTrails') osmTrailsVisibleRef.current = visible;
+      if (layer === 'osmTrails') {
+        osmTrailsVisibleRef.current = visible;
+        if (!visible && selectionStore.get()?.kind === 'osm')
+          selectionStore.select(null);
+      }
       if (layer === 'bikeNetwork') bikeNetworkVisibleRef.current = visible;
       if (
         layer === 'attractions' ||
@@ -553,15 +477,10 @@ const MapboxMap = memo(function MapboxMap({
         return;
       }
 
-      // Compute route dimming from "any marker layer visible" so the result is
-      // independent of the order the sidebar dispatches its OFF/ON events.
-      // This runs before the bikeRentals GBFS await below on purpose: doing it
-      // afterwards would deselect a route the user (or an embed's `?route=`
-      // deep link) selected while that request was still in flight.
-      updateRouteSelection(null, restingRouteOpacity());
-      if (visible) {
-        dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
-      }
+      // Clear a selected route before any asynchronous marker work.
+      const selection = selectionStore.get();
+      if (visible && selection?.kind === 'route') selectionStore.select(null);
+      else if (!selection) renderRouteSelection(null);
 
       if (layer === 'bikeRentals') {
         if (visible) {
@@ -617,7 +536,7 @@ const MapboxMap = memo(function MapboxMap({
         }
       }
     },
-    [restingRouteOpacity, updateRouteSelection],
+    [renderRouteSelection, selectionStore],
   );
 
   // Handler for centering on a specific location
@@ -783,14 +702,6 @@ const MapboxMap = memo(function MapboxMap({
   // miss an event in the gap).
   useMapEvent(MAP_EVENTS.LAYER_TOGGLE, handleLayerToggle);
   useMapEvent(MAP_EVENTS.CENTER_LOCATION, handleCenterLocation);
-  useMapEvent(MAP_EVENTS.ROUTE_SELECT, handleRouteSelect);
-  // Reset route opacities whenever a route is deselected (empty-map click,
-  // sidebar deselect, rides panel, ...). Without this the map kept the last
-  // selection's dim/highlight forever.
-  useMapEvent(MAP_EVENTS.ROUTE_DESELECT, handleRouteDeselect);
-  useMapEvent(MAP_EVENTS.TRAIL_SELECT, handleTrailSelect);
-  useMapEvent(MAP_EVENTS.TRAIL_DESELECT, handleTrailDeselect);
-  useMapEvent(MAP_EVENTS.AREA_SELECT, handleAreaSelect);
   // Toasts from other components (sidebar, rides panel, elevation pane).
   useMapEvent(MAP_EVENTS.TOAST, ({ message }) => showToast(message));
 
@@ -858,6 +769,7 @@ const MapboxMap = memo(function MapboxMap({
     }
 
     let compassButton: Element | null = null;
+    let unsubscribeSelection: (() => void) | undefined;
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
     const styleRequestController = new AbortController();
@@ -1085,8 +997,7 @@ const MapboxMap = memo(function MapboxMap({
           // One screen-space query replaces a wide transparent layer for every
           // route and curated trail. It preserves a 24px tap target while
           // removing layers the renderer otherwise evaluates on every frame.
-          // Register before the nationwide OSM handler so curated content wins
-          // wherever the geometries overlap.
+          // Check curated routes and trails before the nationwide OSM layer.
           newMap.on('click', (e) => {
             if (e.defaultPrevented) return;
             const target = e.originalEvent.target as HTMLElement;
@@ -1104,8 +1015,7 @@ const MapboxMap = memo(function MapboxMap({
                   : routeFeature.layer?.id;
               if (bikeRoutes.some((route) => route.id === routeId)) {
                 e.preventDefault();
-                dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
-                dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId });
+                selectionStore.select({ kind: 'route', routeId });
                 return;
               }
             }
@@ -1130,28 +1040,24 @@ const MapboxMap = memo(function MapboxMap({
                   : null;
               if (trailName) {
                 e.preventDefault();
-                dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, { trailName });
+                selectionStore.select({ kind: 'trail', trailName });
                 return;
               }
             }
 
-            if (rideSelectionRef.current) {
-              dispatchMapEvent(MAP_EVENTS.RIDE_DESELECT);
+            const osm = osmTrailsVisibleRef.current
+              ? osmTrailAtPoint(newMap, e)
+              : null;
+            if (osm) {
+              e.preventDefault();
+              void selectionStore.selectOsmTrail(osm.lines, osm.loadProfile);
+            } else {
+              selectionStore.select(null);
             }
-            dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
-            dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
           });
 
-          // Register the OSM trail click handler AFTER the curated route + MTB
-          // screen-space handler above. Mapbox fires click handlers in
-          // registration order, so where an OSM way overlaps a curated trail the
-          // curated handler runs first and preventDefault()s; the OSM handler
-          // then bails on the already-handled click. Clear any prior registration
-          // first in case the style reloads and re-runs this block.
-          osmSelectionCleanup.current?.();
-          if (showTrails) {
-            osmSelectionCleanup.current = registerOsmTrailSelection(newMap);
-          }
+          if (showTrails)
+            registerPointerCursor(newMap, OSM_TRAILS_HIT_LAYER_ID);
 
           // Tapping the Mapbox north-arrow compass button should exit
           // compass (heading-up) mode so the bearing stays north.
@@ -1202,6 +1108,15 @@ const MapboxMap = memo(function MapboxMap({
           // (Strict Mode's double-mount, Fast Refresh). Signalling ready then
           // would fire onMapReady consumers at a map that no longer exists.
           if (map.current !== newMap) return;
+          let previous: MapSelection = null;
+          const applySelection = () => {
+            const selection = selectionStore.get();
+            const last = previous;
+            previous = selection;
+            renderSelection(newMap, selection, last);
+          };
+          unsubscribeSelection = selectionStore.subscribe(applySelection);
+          applySelection();
           setMapReady();
         } catch (error) {
           if (!cancelled) {
@@ -1231,11 +1146,7 @@ const MapboxMap = memo(function MapboxMap({
       bikeResourceMarkersRef.clear();
       bikeRentalMarkersRef.clear();
 
-      // Drop the OSM selection's window listeners before the map goes away.
-      if (osmSelectionCleanup.current) {
-        osmSelectionCleanup.current();
-        osmSelectionCleanup.current = null;
-      }
+      unsubscribeSelection?.();
 
       routeArrows.current?.remove();
       routeArrows.current = null;
@@ -1275,7 +1186,7 @@ const MapboxMap = memo(function MapboxMap({
   // Enable location tracking when recording starts, disable when it stops
   // Also toggle CSS class on map container for Mapbox control positioning
   const handleRecordingStart = () => {
-    handleRideDeselect();
+    selectionStore.select(null);
     recordingOwnsTrackingRef.current = !tracking.isTracking;
     setRecordingActive(true);
     tracking.setTracking(true);
@@ -1283,7 +1194,6 @@ const MapboxMap = memo(function MapboxMap({
     // Enable trail auto-detection
     isRecordingRef.current = true;
     autoDetectEnabledRef.current = true;
-    autoDetectedTrailRef.current = null;
     detectCandidateRef.current = null;
     detectConfirmCountRef.current = 0;
     lastDetectTimeRef.current = 0;
@@ -1297,11 +1207,11 @@ const MapboxMap = memo(function MapboxMap({
     mapContainer.current?.classList.remove('recording-active');
     // Clean up auto-detected trail selection
     isRecordingRef.current = false;
-    if (autoDetectedTrailRef.current !== null) {
-      dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
+    const selection = selectionStore.get();
+    if (selection?.kind === 'trail' && selection.autoDetected) {
+      selectionStore.select(null);
     }
     autoDetectEnabledRef.current = false;
-    autoDetectedTrailRef.current = null;
     detectCandidateRef.current = null;
     detectConfirmCountRef.current = 0;
   };

@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
+import {
+  useMapSelection,
+  useMapSelectionStore,
+} from '@/components/map-selection';
 import { useMapEvent } from '@/hooks/useMapEvent';
 import {
   getLayout,
@@ -74,8 +78,11 @@ export function MapLegendProvider({
       : (getSetting('sidebarOpen') ?? true),
   }));
   const { sidebarOpen: isOpen, ridesPanelOpen } = useLayout();
-  const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
-  const [selectedTrail, setSelectedTrail] = useState<string | null>(null);
+  const selection = useMapSelection();
+  const { select } = useMapSelectionStore();
+  const selectedRoute = selection?.kind === 'route' ? selection.routeId : null;
+  const selectedTrail =
+    selection?.kind === 'trail' ? selection.trailName : null;
   const [activeSection, setActiveSection] = useState<'routes' | 'trails'>(
     () => {
       if (isEmbed) {
@@ -128,20 +135,11 @@ export function MapLegendProvider({
     closeOnMobile,
   );
 
-  // Selections made on the map itself. Only state changes here — the map
-  // already handled the visual update before dispatching.
-  useMapEvent(MAP_EVENTS.ROUTE_SELECT, ({ routeId }) => {
-    setSelectedRoute(routeId);
-    setSelectedTrail(null);
-    setActiveSection('routes');
-  });
-  useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName }) => {
-    setSelectedTrail(trailName);
-    setSelectedRoute(null);
-    setActiveSection('trails');
-  });
-  useMapEvent(MAP_EVENTS.ROUTE_DESELECT, () => setSelectedRoute(null));
-  useMapEvent(MAP_EVENTS.TRAIL_DESELECT, () => setSelectedTrail(null));
+  useEffect(() => {
+    if (selection?.kind === 'route') setActiveSection('routes');
+    if (selection?.kind === 'trail' || selection?.kind === 'area')
+      setActiveSection('trails');
+  }, [selection]);
 
   // Ride style chosen in the welcome modal picks the matching tab.
   useMapEvent(MAP_EVENTS.RIDE_STYLE_CHOSEN, ({ style }) => {
@@ -151,31 +149,27 @@ export function MapLegendProvider({
   // Function to handle route selection
   const handleRouteSelect = useCallback(
     (routeId: string) => {
-      dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
-      dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId });
+      select({ kind: 'route', routeId });
       closeOnMobile();
     },
-    [closeOnMobile],
+    [closeOnMobile, select],
   );
 
   // Function to handle trail selection
   const handleTrailSelect = useCallback(
     (trailName: string) => {
-      dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
-      dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, { trailName });
+      select({ kind: 'trail', trailName });
       closeOnMobile();
     },
-    [closeOnMobile],
+    [closeOnMobile, select],
   );
 
-  // Function to handle area (rec area heading) selection
-  const handleAreaSelect = useCallback((areaName: string) => {
-    // Deselect first — trail-deselect resets mountain bike opacity,
-    // so it must fire before area-select sets the highlight
-    dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
-    dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
-    dispatchMapEvent(MAP_EVENTS.AREA_SELECT, { areaName });
-  }, []);
+  const handleAreaSelect = useCallback(
+    (areaName: string) => {
+      select({ kind: 'area', areaName });
+    },
+    [select],
+  );
 
   // Helper to toggle a layer with radio-button behavior:
   // turning one layer ON turns the other two OFF

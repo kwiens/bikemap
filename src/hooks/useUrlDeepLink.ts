@@ -3,7 +3,7 @@ import { getBikeRoutes } from '@/data/route-source';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { routeFromLink } from '@/data/bike-routes';
-import { MAP_EVENTS, dispatchMapEvent } from '@/events';
+import { useMapSelectionStore } from '@/components/map-selection';
 import { onMapReady } from '@/utils/map-ready';
 
 interface UrlDeepLinkOptions {
@@ -26,11 +26,10 @@ interface UrlDeepLinkOptions {
 }
 
 /**
- * Reads `?trail=` / `?route=` from the URL on mount and dispatches
- * `TRAIL_SELECT` / `ROUTE_SELECT` once the map is ready, so a shared link
- * auto-selects the right trail or route.
+ * Selects a shared trail or route link once the map is ready.
  */
 export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
+  const { select } = useMapSelectionStore();
   const trailsEnabled = options?.trails ?? true;
   const routesEnabled = options?.routes ?? true;
   const routeOverride = options?.route;
@@ -56,7 +55,8 @@ export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
           (t) => slugForTrail(t) === trailSlug,
         );
         if (found) {
-          dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, {
+          select({
+            kind: 'trail',
             trailName: found.trailName,
           });
           return;
@@ -65,7 +65,7 @@ export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
       if (routeSlug) {
         const found = routeFromLink(getBikeRoutes(), routeSlug);
         if (found) {
-          dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId: found.id });
+          select({ kind: 'route', routeId: found.id });
         }
       }
     };
@@ -75,6 +75,7 @@ export function useUrlDeepLink(options?: UrlDeepLinkOptions): void {
     hasDecodedOptions,
     routeOverride,
     routesEnabled,
+    select,
     trailOverride,
     trailsEnabled,
   ]);

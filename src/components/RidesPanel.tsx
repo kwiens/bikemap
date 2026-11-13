@@ -2,7 +2,10 @@
 
 import { useState, useRef, useCallback, useId, memo } from 'react';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
-import { useMapEvent } from '@/hooks/useMapEvent';
+import {
+  useMapSelection,
+  useMapSelectionStore,
+} from '@/components/map-selection';
 import {
   getLayout,
   isMobileViewport,
@@ -34,7 +37,8 @@ const PulseDot = memo(function PulseDot() {
 export function RidesPanel() {
   const { ridesPanelOpen: isOpen, sidebarOpen } = useLayout();
   const panelId = useId();
-  const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
+  const selection = useMapSelection();
+  const { selectRide, select, get } = useMapSelectionStore();
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const rideActionPendingRef = useRef(false);
@@ -86,10 +90,10 @@ export function RidesPanel() {
         const ride = await recoverRide();
         if (ride) {
           notify('Ride recovered!');
-          dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId: ride.id });
+          void selectRide(ride.id);
         }
       }),
-    [recoverRide, notify, runRideAction],
+    [recoverRide, notify, runRideAction, selectRide],
   );
 
   const handleContinueRide = useCallback(
@@ -111,25 +115,13 @@ export function RidesPanel() {
     closeOnMobile,
   );
 
-  useMapEvent(MAP_EVENTS.RIDE_SELECT, ({ rideId, openPanel }) => {
-    setSelectedRideId(rideId);
-    if (openPanel) setRidesPanelOpen(true);
-  });
-  const clearRideSelection = () => setSelectedRideId(null);
-  useMapEvent(MAP_EVENTS.RIDE_DESELECT, clearRideSelection);
-  useMapEvent(MAP_EVENTS.ROUTE_SELECT, clearRideSelection);
-  useMapEvent(MAP_EVENTS.TRAIL_SELECT, clearRideSelection);
-  useMapEvent(MAP_EVENTS.AREA_SELECT, clearRideSelection);
-  useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, clearRideSelection);
-
   const handleRideSelect = useCallback(
     (rideId: string) => {
-      dispatchMapEvent(MAP_EVENTS.ROUTE_DESELECT);
-      dispatchMapEvent(MAP_EVENTS.TRAIL_DESELECT);
-      dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId });
+      if (isRecording) return;
+      void selectRide(rideId);
       closeOnMobile();
     },
-    [closeOnMobile],
+    [closeOnMobile, isRecording, selectRide],
   );
 
   // The recorder reports the outcome (saved / too short / save failed) through
@@ -140,7 +132,7 @@ export function RidesPanel() {
         if (isRecording) {
           const ride = await stopRecording();
           if (ride) {
-            dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, { rideId: ride.id });
+            void selectRide(ride.id);
           }
         } else {
           // A new recording checkpoints into the same slot the unfinished ride
@@ -167,6 +159,7 @@ export function RidesPanel() {
       recoverRide,
       notify,
       runRideAction,
+      selectRide,
     ],
   );
 
@@ -286,7 +279,15 @@ export function RidesPanel() {
             </div>
           )}
           <RideHistory
-            selectedRideId={selectedRideId}
+            selectedRide={selection?.kind === 'ride' ? selection.ride : null}
+            pendingRideId={
+              selection?.kind === 'ride' && !selection.ride
+                ? selection.rideId
+                : undefined
+            }
+            onRideDeselect={() => {
+              if (get() === selection) select(null);
+            }}
             onRideSelect={handleRideSelect}
             isRecording={isRecording}
           />

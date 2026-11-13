@@ -6,6 +6,7 @@ import React from 'react';
 import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
 import { WelcomeModal } from '@/components/WelcomeModal';
 import { type CityContent, publishCityContent } from '@/data/city-content';
+import { MapSelectionProvider } from '@/components/map-selection';
 import { useUrlDeepLink } from '@/hooks/useUrlDeepLink';
 
 // Dynamically import the Map component with no SSR since Mapbox requires window
@@ -29,14 +30,22 @@ export default function HomeClient({
   const isActiveCity = publishCityContent(content);
   const attractions = isActiveCity ? (content.attractions ?? []) : [];
 
-  // On mount, check URL for shared trail/route link and auto-select
-  useUrlDeepLink();
-
   return (
     <main className="overflow-hidden fixed inset-0 m-0 p-0">
-      <BikeMap attractions={attractions} />
+      <MapSelectionProvider>
+        <HomeMap attractions={attractions} />
+      </MapSelectionProvider>
       <PwaInstallPrompt />
       <WelcomeModal />
     </main>
   );
+}
+
+function HomeMap({
+  attractions,
+}: {
+  attractions: NonNullable<CityContent['attractions']>;
+}) {
+  useUrlDeepLink();
+  return <BikeMap attractions={attractions} />;
 }

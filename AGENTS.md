@@ -6,7 +6,7 @@ This file provides guidance to AI coding agents when working with code in this r
 
 | If you are changing | Start with | Verification |
 |---|---|---|
-| Public map, route arrows, or layer selection | [Map.tsx](src/components/Map.tsx), [map utilities](src/utils/map.ts), [route arrows](src/utils/route-arrows.ts), [typed events](src/events.ts) | Map utility tests and a browser check of map and sidebar selection |
+| Public map, route arrows, or layer selection | [selection store](src/components/map-selection.tsx), [Map.tsx](src/components/Map.tsx), [map utilities](src/utils/map.ts), [route arrows](src/utils/route-arrows.ts), [typed events](src/events.ts) | Map utility tests and a browser check of map and sidebar selection |
 | Map sidebar or ride panel | [MapLegend.tsx](src/components/MapLegend.tsx), [RidesPanel.tsx](src/components/RidesPanel.tsx), [layout store](src/hooks/useLayout.ts) | Adjacent component and layout tests, including a narrow viewport |
 | Embeds or multi-city links | [Embed page](src/app/(frontend)/embed/page.tsx), [URL options](src/utils/embed.ts), [deep links](src/hooks/useUrlDeepLink.ts), [city config](src/config/map.config.ts) | Embed page, snippet builder, and deep-link tests |
 | Admin geometry or snapping | [Editor entry points](docs/guides/osm-trail-editor.md#editor-entry-points), [routing graph](src/payload/routing/graph.ts), [editor controller](src/payload/routing/editor-controller.ts) | Geometry editor and routing tests, plus save/reopen and basemap switching |
@@ -141,9 +141,17 @@ src/
    - `geo_data.ts`: barrel re-exporting the **active city's** static config (`bikeResources`, route/network URLs, and trail-layer config). Published routes and trails reach the map through `route-source.ts` and `trail-source.ts`. Published attractions are read by `src/payload/read/attractions.ts` and passed to the map and sidebar as props.
    - `gbfs.ts`: live bike share data (station-based for Chattanooga, free-bike/Veo for Bend — a discriminated `GBFSConfig` union)
 
-### Event-Driven Communication
+### Map selection and events
 
-The app uses custom DOM events on `window` for component communication. **All event names live in `src/events.ts` (`MAP_EVENTS`) and every payload shape in `MapEventDetails`** — never use string literals, and never call `new CustomEvent` / `addEventListener` for these directly. Use the typed helpers:
+`src/components/map-selection.tsx` owns the active route, trail, area, OSM way,
+or saved ride. The public page and embed each mount a `MapSelectionProvider`.
+Read the snapshot with `useMapSelection()`. Use `useMapSelectionStore()` to
+select a feature or clear it with `select(null)`. The Mapbox map subscribes
+once its layers are ready. The store loads a saved ride once for the map,
+profile, and history, and applies asynchronous ride and OSM results only while
+their selection is still current.
+
+Use custom DOM events on `window` for transient commands and notifications. **All event names live in `src/events.ts` (`MAP_EVENTS`) and every payload shape in `MapEventDetails`** — never use string literals, and never call `new CustomEvent` / `addEventListener` for these directly. Use the typed helpers:
 
 - `dispatchMapEvent(MAP_EVENTS.X, detail)` — the detail is checked against `MapEventDetails`; detail-less events take one argument.
 - `onMapEvent(MAP_EVENTS.X, (detail) => …)` — returns the unsubscribe function (return it from a `useEffect`, or collect several for a manual teardown).
@@ -157,10 +165,6 @@ The full set:
 
 | Event | Purpose |
 |-------|---------|
-| `route-select` / `route-deselect` | Curated route selection (bidirectional Map ⇄ sidebar; deselect resets route opacity on the map) |
-| `trail-select` / `trail-deselect` | Curated MTB trail selection (bidirectional; drives elevation pane) |
-| `osm-trail-select` | Nationwide OSM trail clicked — carries a ready-built `ElevationProfile` |
-| `area-select` | Rec-area heading clicked — zoom to area bounds |
 | `layer-toggle` | Show/hide a layer: `attractions`, `bikeResources`, `bikeRentals` (radio-style markers), `osmTrails`, `bikeNetwork` |
 | `center-location` | Pan map to a location (and open its popup) |
 | `sidebar-toggle` | Sidebar opened/closed — dispatched by the layout store (`src/hooks/useLayout.ts`); the map resizes on it |
@@ -168,12 +172,10 @@ The full set:
 | `location-update` | GPS fix — recenter / elevation-pane location dot |
 | `ride-style-chosen` | Welcome modal preference — selects default sidebar tab |
 | `ride-recording-start/stop/update` | Ride recorder lifecycle → live map track |
-| `ride-select` / `ride-deselect` | Saved ride selection (map track + elevation pane + panel) |
 | `rides-panel-toggle` | Rides panel opened/closed — dispatched by the layout store |
 | `toast` | Show a toast via the map's toast host |
 | `map-ready` | Map fully initialized (also sets `window.__mapReady` for late listeners) |
 
-**Important**: `route-select` and `trail-select` are bidirectional — both Map and MapLegend listen. When clicking on the map, the map dispatches and MapLegend updates its selection state; when clicking in the sidebar, MapLegend dispatches and Map handles the visual update. Payload shapes are in `MapEventDetails` (`src/events.ts`).
 
 ### Marker System
 
@@ -315,18 +317,11 @@ from the curated Chattanooga MTB/route layers and off by default.
   picked per-category from the Mapbox style's built-in **Maki** sprite (`parking`
   / `information`) — no custom sprite/spreet step. It shares the trails toggle
   via `setOsmTrailsVisible`.
-- Selectable: a transparent extra-wide hit layer (`OSM_TRAILS_HIT_LAYER_ID`) is
-  the tap target. `registerOsmTrailSelection` (`utils/map.ts`) handles a click by
-  (1) reassembling the way's geometry across tiles by `OSM_ID`
-  (`collectOsmWayLines`), (2) highlighting the whole trail (`highlightOsmTrail` —
-  a blue line over a white casing, like a selected route), and (3) dispatching
-  `OSM_TRAIL_SELECT` with a ready-built `ElevationProfile` so the shared
-  `ElevationProfile` pane shows the trail's name + distance + elevation chart
-  (there is **no** popup — the pane is the only info surface). A `selectionId`
-  guards against a stale async terrain sample showing the wrong trail; selecting
-  a curated route/trail or any deselect clears the highlight, and the pane clears
-  via its own listeners. `ElevationProfile` seeds `profileCache` for the OSM name
-  so its `trailName` effect doesn't try to fetch a non-existent curated JSON.
+- A transparent wide layer (`OSM_TRAILS_HIT_LAYER_ID`) provides the tap
+  target. `osmTrailAtPoint` (`utils/map.ts`) collects the way across loaded
+  tiles. `Map.tsx` checks curated features first, then selects the OSM line.
+  The map draws the highlight immediately and the selection store publishes
+  the elevation profile when it is ready.
 
 #### Precomputed length + elevation
 
@@ -381,7 +376,7 @@ clicked way, those stats drive the pane's **headline numbers** (via
 - **Client**: `lookupPrecomputedElevation(osmId, lng, lat)` in
   `src/utils/osm-elevation.ts` loads the manifest once, then lazily loads + caches
   the region file(s) whose bbox covers the clicked point and looks up the way id.
-  `registerOsmTrailSelection` (`utils/map.ts`) passes any hit to
+  `osmTrailAtPoint` (`utils/map.ts`) passes any hit to
   `buildOsmElevationProfile(lines, name, token, precomputed)` so the precomputed
   totals become the pane's headline stats; on a miss the totals are computed from
   the real-time samples instead.
@@ -442,7 +437,7 @@ The map can be framed on third-party sites via `<iframe src="https://bikechatt.c
 
 - **Everything is URL-driven.** `parseEmbedOptions` / `buildEmbedSearch` in `src/utils/embed.ts` are the single encoder/decoder for the supported params (`mode`, `sidebar`, `route`, `trail`, `center`, `zoom`, `layers`). Never rely on cookies or `localStorage` in embed mode — browsers drop the settings cookie (no `SameSite=None`) and partition storage inside a third-party frame. Anything that also needs a decoded param (e.g. `useUrlDeepLink`) takes it as an argument rather than re-reading the query string, so there is exactly one decoder.
 - **`layers` keeps at most one marker layer.** `attractions` / `bikeResources` / `bikeRentals` (`MARKER_LAYERS`) are a radio group in the map — `handleLayerToggle` hides the others when one is shown — so `parseLayers` keeps only the first of them and drops the rest; `bikeNetwork` is an independent line overlay and may accompany it. The snippet builder mirrors this with a radio group so a partner cannot generate an impossible combination.
-- **Embed mode loads one route family.** Casual embeds skip `ensureMtnBikeSource` / `initMtnBikeLayers` / `ensureOsmTrailsSource` / `registerOsmTrailSelection`, keeping trail tile traffic off the critical path. MTB embeds attach that stack and suppress Casual route data and interactions.
+- **Embed mode loads one route family.** Casual embeds skip `ensureMtnBikeSource` / `initMtnBikeLayers` / `ensureOsmTrailsSource`, keeping trail tile traffic off the critical path. MTB embeds attach that stack and suppress Casual route data and interactions.
 - **`EmbedProvider` / `useEmbed()`** (`src/components/EmbedContext.tsx`) is how `Map.tsx` and `MapLegend.tsx` learn they are embedded. Outside `/embed` the context defaults to `isEmbed: false`, so the main app never branches on it. In embed mode: the host fixes the Casual or MTB section, there is no in-frame route-family pill, the sidebar is closed by default, there is no `RidesPanel` / `WelcomeModal` / `PwaInstallPrompt`, settings never write cookies, and an `EmbedAttribution` "Open in …" link overlays the map.
 - **Framing headers** come from `embedHeaders()` in `src/utils/embed-headers.ts`, wired into `next.config.ts`. `/embed` — that exact path, not a prefix — gets `frame-ancestors` from the `EMBED_ALLOWED_ORIGINS` env var (unset = any site); every other path, `/embed/demo` included, gets `frame-ancestors 'self'`. The two `source` patterns must stay mutually exclusive: Next appends the headers of every matching rule and browsers intersect multiple CSPs, so an overlap silently applies the stricter one and blanks the frame. `EMBED_ALLOWED_ORIGINS` is read at **build** time, so changing it needs a redeploy. The Mapbox token's URL restriction keeps working because the iframe document's origin is ours.
 - **Partner snippet requirements:** `allow="geolocation; fullscreen; gyroscope; accelerometer; magnetometer"` for locate-me/compass, and an explicit height (the snippet uses `aspect-ratio`). `public/register-sw.js` skips registration inside frames.
@@ -505,7 +500,7 @@ Coverage spans ~90 test files: map utilities (`src/utils/map.test.ts`), config/c
 
 **Synthetic events don't trigger Mapbox layer clicks.** Mapbox's internal event system requires real user interactions to detect clicks on map layers. When testing:
 - You cannot programmatically click on route lines using `MouseEvent`
-- Use `dispatchMapEvent(MAP_EVENTS.ROUTE_SELECT, { routeId })` to simulate what the map would do (from DevTools or a test, the raw `window.dispatchEvent(new CustomEvent('route-select', { detail: { routeId } }))` is equivalent — that is the only place raw dispatch belongs)
+- In component tests, use `mapSelectionHarness` from `src/test/map-selection.tsx` to select a route or trail through the same store the map uses.
 - The Chrome DevTools MCP server can take screenshots but cannot trigger Mapbox layer events
 
 ### Browser Testing
@@ -787,9 +782,12 @@ Things to know before touching it:
   Re-run `pnpm generate:types` after any collection change and commit both.
 - **Re-run `pnpm generate:importmap`** after adding or renaming an admin
   component, or Payload won't find it.
-- **`GeometryMapEditor` owns the map lifecycle.** Map handlers use stable
-  callbacks and read changing form values through refs. Pointer-rate updates
-  render directly to Mapbox, Terra Draw, or the live distance DOM node.
+- **`use-geometry-editor-map.ts` owns the map lifecycle.** It creates the
+  map and tools, reinstalls their layers on `style.load`, and disposes them on
+  unmount. `GeometryMapEditor` owns geometry, undo, and Payload writes. The
+  lifecycle hook reads the latest callbacks without rebuilding the map.
+  Pointer-rate updates render directly to Mapbox, Terra Draw, or the live
+  distance DOM node.
 - **Completed line edits use editor-owned history.** `edit-history.ts` holds
   geometry and ownership snapshots. Terra Draw's mode history handles the
   unfinished stroke, and `route-tool.ts` handles unfinished snapped clicks.

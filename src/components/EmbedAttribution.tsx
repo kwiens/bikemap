@@ -1,12 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { getMountainBikeTrails } from '@/data/trail-source';
 import { slugForTrail } from '@/data/mountain-bike-trails';
 import { getBikeRoutes } from '@/data/route-source';
-import { routeFromLink } from '@/data/bike-routes';
-import { MAP_EVENTS } from '@/events';
-import { useMapEvent } from '@/hooks/useMapEvent';
+import { useMapSelection } from '@/components/map-selection';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 import { useEmbed } from '@/components/EmbedContext';
@@ -21,35 +18,18 @@ export function EmbedAttribution() {
   const { isEmbed, options } = useEmbed();
 
   const isMtb = options.mode === 'mtb';
-  const [slug, setSlug] = useState(() =>
-    isMtb
-      ? getMountainBikeTrails().some(
-          (trail) => slugForTrail(trail) === options.trail,
-        )
-        ? options.trail
-        : undefined
-      : routeFromLink(getBikeRoutes(), options.route)?.id,
-  );
-
-  useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName }) => {
-    if (!isEmbed || !isMtb) return;
-    const trail = getMountainBikeTrails().find(
-      (item) => item.trailName === trailName,
-    );
-    setSlug(trail ? slugForTrail(trail) : undefined);
-  });
-  useMapEvent(MAP_EVENTS.ROUTE_SELECT, ({ routeId }) => {
-    if (!isEmbed || isMtb) return;
-    setSlug(getBikeRoutes().find((route) => route.id === routeId)?.id);
-  });
-  useMapEvent(MAP_EVENTS.TRAIL_DESELECT, () => {
-    if (isEmbed && isMtb) setSlug(undefined);
-  });
-  useMapEvent(MAP_EVENTS.ROUTE_DESELECT, () => {
-    if (isEmbed && !isMtb) setSlug(undefined);
-  });
-
+  const selection = useMapSelection();
   if (!isEmbed) return null;
+
+  let slug;
+  if (isMtb && selection?.kind === 'trail') {
+    const trail = getMountainBikeTrails().find(
+      (item) => item.trailName === selection.trailName,
+    );
+    if (trail) slug = slugForTrail(trail);
+  } else if (!isMtb && selection?.kind === 'route') {
+    slug = getBikeRoutes().find((route) => route.id === selection.routeId)?.id;
+  }
 
   const url = new URL(siteConfig.url);
   if (slug) url.searchParams.set(isMtb ? 'trail' : 'route', slug);

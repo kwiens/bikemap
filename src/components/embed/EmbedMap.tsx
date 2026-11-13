@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import type { MapFeature } from '@/data/map-features';
 import BikeMap from '@/components/Map';
+import { MapSelectionProvider } from '@/components/map-selection';
 import { EmbedProvider } from '@/components/EmbedContext';
-import { parseEmbedOptions } from '@/utils/embed';
+import { parseEmbedOptions, type EmbedOptions } from '@/utils/embed';
 import { useUrlDeepLink } from '@/hooks/useUrlDeepLink';
 
 // Only ever rendered client-side (the /embed page imports it with
@@ -17,6 +18,22 @@ export default function EmbedMap({
 }) {
   const [options] = useState(() => parseEmbedOptions(window.location.search));
 
+  return (
+    <EmbedProvider options={options}>
+      <MapSelectionProvider>
+        <EmbedMapContent attractions={attractions} options={options} />
+      </MapSelectionProvider>
+    </EmbedProvider>
+  );
+}
+
+function EmbedMapContent({
+  attractions,
+  options,
+}: {
+  attractions: MapFeature[];
+  options: EmbedOptions;
+}) {
   // Use the already-decoded selection for the chosen route family so query
   // parsing has one source of truth and an irrelevant route/trail parameter
   // cannot select hidden content.
@@ -27,9 +44,5 @@ export default function EmbedMap({
     trail: options.trail,
   });
 
-  return (
-    <EmbedProvider options={options}>
-      <BikeMap attractions={attractions} />
-    </EmbedProvider>
-  );
+  return <BikeMap attractions={attractions} />;
 }

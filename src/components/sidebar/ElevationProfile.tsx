@@ -22,10 +22,10 @@ import {
 import { buildProfileGpx } from '@/utils/gpx';
 import { MAP_EVENTS, dispatchMapEvent } from '@/events';
 import { useMapEvent } from '@/hooks/useMapEvent';
-import { useLayout } from '@/hooks/useLayout';
+import { setRidesPanelOpen, useLayout } from '@/hooks/useLayout';
+import { useMapSelection } from '@/components/map-selection';
 import { usePlatform } from '@/platform/context';
 import type { ExportFile } from '@/platform/types';
-import { loadRide } from '@/utils/ride-storage';
 import { rideToElevationProfile } from '@/utils/ride-stats';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -132,8 +132,6 @@ const PANE_CONTROL_CLASS =
   'inline-flex min-h-12 min-w-12 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-gray-700 hover:bg-gray-100';
 const PANE_ACTION_CLASS =
   'flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-sm font-medium text-gray-800 hover:bg-gray-100 active:bg-gray-200';
-
-type ProfileSource = 'trail' | 'osm' | 'route' | 'ride' | null;
 
 export function gradeToColor(grade: number): string {
   const g = Math.min(Math.abs(grade), GRADE_RED);
@@ -306,211 +304,77 @@ export function ElevationProfile() {
   // phone, whether it shows at all).
   const { sidebarOpen, ridesPanelOpen } = useLayout();
   const { share } = usePlatform();
-  const [trailName, setTrailName] = useState<string | null>(null);
-  const [profileSource, setProfileSource] = useState<ProfileSource>(null);
-  const [profile, setProfile] = useState<ElevationProfileData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const selection = useMapSelection();
+  const curatedTrail = selection?.kind === 'trail' ? selection.trailName : null;
+  const ride = selection?.kind === 'ride' ? selection.ride : null;
+  const [loadedTrail, setLoadedTrail] = useState<{
+    name: string;
+    profile: ElevationProfileData;
+  } | null>(null);
+  const rideProfile = useMemo(
+    () => (ride ? rideToElevationProfile(ride) : null),
+    [ride],
+  );
+  const profile =
+    selection?.kind === 'osm'
+      ? selection.profile
+      : curatedTrail && loadedTrail?.name === curatedTrail
+        ? loadedTrail.profile
+        : rideProfile;
+  const trailName = curatedTrail ?? ride?.name ?? profile?.trail;
   const [hover, setHover] = useState<number | string | null>(null);
   const hoverIndex = typeof hover === 'number' ? hover : null;
   const [locationIndex, setLocationIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(800);
   const svgRef = useRef<SVGSVGElement>(null);
-  // Track whether current profile is from a route, trail, or ride selection
-  const sourceRef = useRef<ProfileSource>(null);
-  const rideIdRef = useRef<string | null>(null);
-  // Keep profile in a ref so location handler always sees latest
-  const profileRef = useRef<ElevationProfileData | null>(null);
-
   const [collapsed, setCollapsed] = useState(false);
   const [isShowingActions, setIsShowingActions] = useState(false);
+  const hasTrailInUrl = useRef(false);
 
-  // Compare individual requests so reselecting the same ride still supersedes
-  // an earlier IndexedDB read.
-  const rideSelectionRef = useRef<symbol | null>(null);
-
-  const clearProfile = () => {
-    rideSelectionRef.current = null;
-    setIsShowingActions(false);
-    sourceRef.current = null;
-    setProfileSource(null);
-    setTrailName(null);
-    setProfile(null);
-    profileRef.current = null;
-  };
-  const clearUrlState = () => {
-    window.history.replaceState(window.history.state, '', trailSelectionUrl());
-  };
-
-  useMapEvent(MAP_EVENTS.TRAIL_SELECT, ({ trailName: name }) => {
-    rideSelectionRef.current = null;
-    if (sourceRef.current !== 'trail' || trailName !== name) {
-      setIsShowingActions(false);
+  useEffect(() => {
+    if (curatedTrail || hasTrailInUrl.current) {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        trailSelectionUrl(curatedTrail ?? undefined),
+      );
+      hasTrailInUrl.current = Boolean(curatedTrail);
     }
-    sourceRef.current = 'trail';
-    setProfileSource('trail');
-    rideIdRef.current = null;
-    setTrailName(name);
-    window.history.replaceState(
-      window.history.state,
-      '',
-      trailSelectionUrl(name),
-    );
-  });
+  }, [curatedTrail]);
 
-  // OSM trails ship a ready-built profile (no curated JSON to load by name),
-  // and aren't restorable by slug on reload, so no URL state is written.
-  // Seed the cache so the trailName effect takes its cache-hit path instead of
-  // fetching a non-existent /data/elevation/<city>/<slug>.json and clearing us.
-  useMapEvent(MAP_EVENTS.OSM_TRAIL_SELECT, ({ profile: osmProfile }) => {
-    rideSelectionRef.current = null;
+  useEffect(() => {
     setIsShowingActions(false);
-    sourceRef.current = 'osm';
-    setProfileSource('osm');
-    rideIdRef.current = null;
-    // Cache keys are namespaced by source: an OSM way sharing a curated
-    // trail's name must not shadow the curated /data/elevation JSON.
-    profileCache.set(`osm:${osmProfile.trail}`, osmProfile);
-    setTrailName(osmProfile.trail);
-    setProfile(osmProfile);
-    profileRef.current = osmProfile;
     setHover(null);
     setLocationIndex(null);
-    setLoading(false);
-  });
-
-  // Routes never show an elevation profile, so selecting one must clear
-  // whatever profile is currently displayed (trail or ride) — otherwise a map
-  // route-click leaves the previous trail's chart visible.
-  useMapEvent(MAP_EVENTS.ROUTE_SELECT, () => {
-    // Also supersedes a ride still loading when nothing is showing yet.
-    rideSelectionRef.current = null;
-    if (sourceRef.current !== null) {
-      clearProfile();
-      clearUrlState();
-    }
-  });
-
-  useMapEvent(MAP_EVENTS.AREA_SELECT, () => {
-    if (rideSelectionRef.current) clearProfile();
-  });
-
-  useMapEvent(MAP_EVENTS.TRAIL_DESELECT, () => {
-    if (sourceRef.current === 'trail' || sourceRef.current === 'osm') {
-      setIsShowingActions(false);
-      sourceRef.current = null;
-      setProfileSource(null);
-      setTrailName(null);
-      clearUrlState();
-    }
-  });
-
-  useMapEvent(MAP_EVENTS.RIDE_SELECT, async ({ rideId }) => {
-    const selection = Symbol();
-    rideSelectionRef.current = selection;
-    // Ride storage is IndexedDB, which some private windows block; a failed
-    // read just leaves the pane as it was.
-    const ride = await loadRide(rideId).catch((error: unknown) => {
-      console.error('Failed to load ride:', error);
-      return null;
-    });
-    if (!ride || rideSelectionRef.current !== selection) return;
-    const elevProfile = rideToElevationProfile(ride);
-    setIsShowingActions(false);
-    sourceRef.current = 'ride';
-    setProfileSource('ride');
-    rideIdRef.current = rideId;
-    if (elevProfile) {
-      setTrailName(ride.name);
-      setProfile(elevProfile);
-      profileRef.current = elevProfile;
-      setHover(null);
-      setLocationIndex(null);
-      setLoading(false);
-    } else {
-      setTrailName(null);
-      setProfile(null);
-      profileRef.current = null;
-    }
-  });
-
-  useMapEvent(MAP_EVENTS.RIDE_DESELECT, () => {
-    rideSelectionRef.current = null;
-    if (sourceRef.current === 'ride') {
-      clearProfile();
-      clearUrlState();
-    }
-  });
-
-  // Hide the elevation profile during recording — not enough data for a
-  // meaningful chart and the panel just gets in the way.
-  useMapEvent(MAP_EVENTS.RIDE_RECORDING_START, clearProfile);
-  useMapEvent(MAP_EVENTS.RIDE_RECORDING_STOP, () => {
-    if (sourceRef.current === 'ride') clearProfile();
-  });
+    dispatchMapEvent(MAP_EVENTS.ELEVATION_HOVER, { lng: null, lat: null });
+  }, [selection]);
 
   // Follow the rider along the displayed profile.
   useMapEvent(MAP_EVENTS.LOCATION_UPDATE, ({ lng, lat }) => {
-    if (!profileRef.current) {
-      setLocationIndex(null);
-      return;
-    }
-    const idx = findClosestProfileIndex(profileRef.current.profile, lng, lat);
+    const idx = profile
+      ? findClosestProfileIndex(profile.profile, lng, lat)
+      : null;
     setLocationIndex((prev) => (prev === idx ? prev : idx));
   });
 
   useEffect(() => {
-    if (!trailName) {
-      setLoading(false);
-      setProfile(null);
-      profileRef.current = null;
-      setLocationIndex(null);
-      return;
-    }
-
-    // Ride profiles are set directly by the RIDE_SELECT handler — skip fetch
-    if (profileSource === 'ride') return;
-
-    const cacheKey = `${profileSource ?? 'trail'}:${trailName}`;
-    const cached = profileCache.get(cacheKey);
+    if (!curatedTrail) return;
+    const cached = profileCache.get(curatedTrail);
     if (cached) {
-      setLoading(false);
-      setProfile(cached);
-      profileRef.current = cached;
-      setHover(null);
-      setLocationIndex(null);
+      setLoadedTrail({ name: curatedTrail, profile: cached });
       return;
     }
-
-    // OSM profiles are seeded into the cache by their select handler and have
-    // no curated JSON to fetch — a miss here just means nothing to show.
-    if (profileSource === 'osm') return;
-
-    setLoading(true);
-    setProfile(null);
-    profileRef.current = null;
-    setHover(null);
-    setLocationIndex(null);
 
     const controller = new AbortController();
-    const slug = profileSlug(trailName);
-
-    // `activeCityId` is the browser's own resolution (this runs on the client,
-    // so it sees window.location) — the API needs it because slugs are unique
-    // per city, not globally.
-    loadProfile(slug, activeCityId, controller.signal)
-      .then((data: ElevationProfileData) => {
+    loadProfile(profileSlug(curatedTrail), activeCityId, controller.signal)
+      .then((data) => {
         if (controller.signal.aborted) return;
-        profileCache.set(`trail:${trailName}`, data);
-        setProfile(data);
-        profileRef.current = data;
-        setLoading(false);
+        profileCache.set(curatedTrail, data);
+        setLoadedTrail({ name: curatedTrail, profile: data });
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
+      .catch(() => {});
     return () => controller.abort();
-  }, [trailName, profileSource]);
+  }, [curatedTrail]);
 
   // Measure chart width via ResizeObserver
   useEffect(() => {
@@ -596,8 +460,7 @@ export function ElevationProfile() {
     [grades],
   );
 
-  const hasProfile =
-    !!trailName && !loading && !!profile && profile.profile.length >= 2;
+  const hasProfile = !!trailName && !!profile && profile.profile.length >= 2;
 
   if (!hasProfile || !profile) return null;
 
@@ -635,18 +498,10 @@ export function ElevationProfile() {
     >
       <div className="mb-1 flex items-center gap-1">
         <div className="min-w-0 flex-1">
-          {profileSource === 'ride' && rideIdRef.current ? (
+          {ride ? (
             <button
               type="button"
-              onClick={() => {
-                const rideId = rideIdRef.current;
-                if (rideId) {
-                  dispatchMapEvent(MAP_EVENTS.RIDE_SELECT, {
-                    rideId,
-                    openPanel: true,
-                  });
-                }
-              }}
+              onClick={() => setRidesPanelOpen(true)}
               className="block min-h-12 max-w-full cursor-pointer truncate text-left text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline"
             >
               {trailName}
