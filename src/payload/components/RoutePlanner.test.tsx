@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   write: vi.fn(),
   ensure: vi.fn(),
   queryRenderedFeatures: vi.fn(),
+  layers: [] as string[],
+  sources: new Map<string, unknown>(),
+  setStyle: vi.fn(),
 }));
 vi.mock('@payloadcms/ui', () => ({
   useField: ({ path }: { path: string }) => ({
@@ -31,16 +34,25 @@ vi.mock('@/config/map.config', () => ({
   cityConfigs: { bend: { defaultView: { zoom: 10 } } },
   isCityId: (value: unknown) => value === 'bend',
 }));
-vi.mock('./editor-map', () => ({
+vi.mock('./editor-map', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./editor-map')>()),
   createEditorMap: vi.fn(() => ({
     on: (name: string, ...args: unknown[]) =>
       mocks.handlers.set(name, args.at(-1) as (event: unknown) => void),
     doubleClickZoom: { disable: vi.fn() },
     queryRenderedFeatures: mocks.queryRenderedFeatures,
-    getSource: () => undefined,
+    getSource: (id: string) =>
+      mocks.sources.has(id)
+        ? { setData: (data: unknown) => mocks.sources.set(id, data) }
+        : undefined,
+    addSource: (id: string, { data }: { data: unknown }) =>
+      mocks.sources.set(id, data),
+    addLayer: ({ id }: { id: string }) => mocks.layers.push(id),
+    getZoom: () => 10,
+    setPaintProperty: vi.fn(),
+    setStyle: mocks.setStyle,
     remove: vi.fn(),
   })),
-  useEditorBasemap: vi.fn(),
 }));
 vi.mock('mapbox-gl', () => ({
   default: {
@@ -66,6 +78,9 @@ vi.mock('@/payload/routing/network-store', () => ({
     graphFor() {
       return null;
     }
+    allWays() {
+      return [];
+    }
     setTrails() {}
   },
 }));
@@ -88,6 +103,16 @@ function deferred() {
 beforeEach(() => {
   vi.mocked(createEditorMap).mockClear();
   mocks.handlers.clear();
+  mocks.layers = ['outdoors'];
+  mocks.sources.clear();
+  mocks.setStyle
+    .mockReset()
+    .mockImplementation((style: string, options?: { diff: boolean }) => {
+      mocks.layers = [style];
+      mocks.sources.clear();
+      // Mapbox style diffs can remove overlays without emitting style.load.
+      if (options?.diff === false) mocks.handlers.get('style.load')?.(null);
+    });
   mocks.plan = EMPTY_PLAN;
   mocks.write.mockReset();
   mocks.ensure.mockReset().mockResolvedValue(undefined);
@@ -97,6 +122,41 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+it('restores the route above the basemap after repeated satellite switches', async () => {
+  const coordinates: Position[] = [
+    [-121.4, 44],
+    [-121.39, 44],
+  ];
+  mocks.plan = {
+    version: 1,
+    waypoints: coordinates,
+    legs: [{ coordinates, mode: 'straight', steps: [] }],
+  };
+  render(<RoutePlanner path="plan" />);
+  await act(async () => mocks.handlers.get('style.load')?.(null));
+
+  const toggle = screen.getByRole('button', { name: 'Satellite' });
+  const basemaps = [
+    'mapbox://styles/mapbox/satellite-streets-v12',
+    'mapbox://styles/mapbox/outdoors-v12',
+    'mapbox://styles/mapbox/satellite-streets-v12',
+  ];
+  for (const basemap of basemaps) {
+    fireEvent.click(toggle);
+    expect(mocks.layers[0]).toBe(basemap);
+    expect(mocks.layers.slice(-3)).toEqual([
+      'route-editor-route-casing',
+      'route-editor-route',
+      'route-editor-route-hit',
+    ]);
+    expect(mocks.sources.get('route-editor-route')).toMatchObject({
+      features: [{ geometry: { coordinates } }],
+    });
+  }
+  expect(createEditorMap).toHaveBeenCalledTimes(1);
+  expect(mocks.write).not.toHaveBeenCalled();
 });
 
 describe('route waypoint network races', () => {

@@ -41,6 +41,7 @@ import {
   createArrowSdfImage,
   ROUTE_DIRECTION_ARROW_IMAGE_ID,
   syncRouteArrowLayer,
+  setRouteArrowsVisible,
   calculateTrailBounds,
   initTrailBoundsFromDefaults,
   initRouteBoundsFromDefaults,
@@ -988,6 +989,16 @@ const MapboxMap = memo(function MapboxMap() {
           // Source queries only include loaded tiles. Refresh after the map
           // settles following a pan/zoom so arrows cover the new viewport.
           syncRouteArrows();
+          let areRouteArrowsHidden = false;
+          const hideRouteArrowsDuringZoom = () => {
+            if (areRouteArrowsHidden) return;
+            // The old symbol tiles can pack arrows too tightly as they scale.
+            setRouteArrowsVisible(newMap, bikeRoutes, false);
+            areRouteArrowsHidden = true;
+          };
+          newMap.on('zoomstart', hideRouteArrowsDuringZoom);
+          if (newMap.isZooming()) hideRouteArrowsDuringZoom();
+
           let routeArrowSyncScheduled = false;
           const scheduleRouteArrowSync = () => {
             if (routeArrowSyncScheduled) return;
@@ -995,6 +1006,10 @@ const MapboxMap = memo(function MapboxMap() {
             newMap.once('idle', () => {
               routeArrowSyncScheduled = false;
               syncRouteArrows();
+              if (areRouteArrowsHidden) {
+                setRouteArrowsVisible(newMap, bikeRoutes, true);
+                areRouteArrowsHidden = false;
+              }
             });
           };
           scheduleRouteArrowSync();

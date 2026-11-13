@@ -339,6 +339,20 @@ export function syncRouteArrowLayer(
   );
 }
 
+export function setRouteArrowsVisible(
+  map: mapboxgl.Map,
+  routes: readonly BikeRoute[],
+  visible: boolean,
+): void {
+  setLayersVisibility(
+    map,
+    routes
+      .filter((route) => !route.hideArrows)
+      .map((route) => `${route.id}-arrows`),
+    visible,
+  );
+}
+
 export function updateRouteOpacity(
   map: mapboxgl.Map,
   routes: BikeRoute[],
