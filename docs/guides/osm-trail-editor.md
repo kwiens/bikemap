@@ -1,8 +1,8 @@
 # OSM trail editor
 
-An online flow for curating trails: pick the OpenStreetMap ways a trail rides
-on, press save, and the geometry, distance, elevation, and bounds are rebuilt
-from OSM server-side. No Python, no local tooling, no drawing.
+Curate trails and routes in Payload. For an OSM-backed trail, choose the ways,
+refresh the preview, then save the reviewed line. You can also trace, draw,
+or import a GPX file and adjust the points before saving.
 
 See [ADR-0001](../adr/0001-admin-ui-and-content-backend.md) for how this was
 chosen.
@@ -10,6 +10,21 @@ chosen.
 **The public map now reads trails from Payload.** It still falls back to the
 checked-in data in `src/data/` when there is no database, so the app runs fine
 without one — see [Reading trails on the public map](#reading-trails-on-the-public-map).
+
+## Editor entry points
+
+| Task | Start with | Geometry saved by |
+|---|---|---|
+| Pick OSM ways and refresh a trail | [TrailMapEditor](../../src/payload/components/TrailMapEditor.tsx) and [the preview endpoint](../../src/payload/endpoints/preview-trail-geometry.ts) | [resolveTrailGeometry](../../src/payload/hooks/resolveTrailGeometry.ts) validates the reviewed line and measures it |
+| Draw or edit points, import GPX, or change the basemap | [GeometryMapEditor](../../src/payload/components/GeometryMapEditor.tsx), [editor controls](../../src/payload/components/geometry-editor-controls.tsx), [editor-map](../../src/payload/components/editor-map.ts), and [line edits](../../src/payload/osm/line-edits.ts) | The field adapter writes trail geometry, direct route geometry, or a composed plan override |
+| Trace a trail or a blank route with the shared map | [route-tool](../../src/payload/components/route-tool.ts) and [point selection](../../src/payload/components/point-selection-tool.ts) | The shared editor commits the finished line into the field |
+| Build a composed route from waypoints | [RouteMapEditor](../../src/payload/components/RouteMapEditor.tsx), [RoutePlanner](../../src/payload/components/RoutePlanner.tsx), and [editor-controller](../../src/payload/routing/editor-controller.ts) | [resolveRouteSource](../../src/payload/hooks/resolveRouteSource.ts) derives geometry, distance, and bounds from the plan |
+| Draw a route with no waypoint plan | [RouteLineEditor](../../src/payload/components/RouteLineEditor.tsx) | [resolveRouteSource](../../src/payload/hooks/resolveRouteSource.ts) measures the submitted line |
+
+Start with `GeometryMapEditor.test.tsx` for form behavior and undo history,
+`RoutePlanner.test.tsx` for waypoint interactions, and the hook tests for
+validation on save. A browser check should include saving and reopening the
+document, switching basemaps, and trying the tools with a touch pointer.
 
 ## The idea
 

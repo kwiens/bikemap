@@ -6,13 +6,13 @@ end-to-end checklist. A condensed version is at the [bottom](#checklist).
 
 ## Prerequisites
 
-- **Node.js 20+** and **pnpm 10+**
+- Node.js and pnpm pinned in [`.nvmrc`](../.nvmrc) and [`package.json`](../package.json)
 - A free **[Mapbox](https://account.mapbox.com/)** account (map rendering,
   vector tilesets, terrain)
 - **Python 3.10+** — only if you have mountain bike trails to process
 - A host for the build — **Vercel** works with zero config
-- A **Postgres** database — only if you want the admin (step 10). The public map
-  runs without one.
+- A **Postgres** database for Payload admin and published routes (step 10).
+  The public map can use configured trail and attraction fallbacks without it.
 
 ## 1. Fork and run locally
 
@@ -24,8 +24,7 @@ cp .env.example .env.local
 pnpm dev                       # http://localhost:3000
 ```
 
-The map will be blank until you add a Mapbox token (next step) — the browser
-console says so explicitly.
+The public map shows an unavailable state until you add a Mapbox token.
 
 For a multi-city checkout, `?city=<id>` overrides hostname and
 `NEXT_PUBLIC_CITY_ID` selection on public pages. For example, use

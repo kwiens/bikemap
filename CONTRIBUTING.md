@@ -62,8 +62,10 @@ pnpm test:run     # single run (CI)
 ```
 
 Mapbox layer-click events cannot be triggered synthetically in tests. To
-exercise map-driven behavior, dispatch the relevant custom event from
-`src/events.ts` directly — see existing tests for the pattern.
+exercise map-driven behavior, use `dispatchMapEvent` from `src/events.ts`.
+The helper checks the payload for each event. See `MapLegend.test.tsx` for
+a component example and the [task index](AGENTS.md#start-here) for code entry
+points.
 
 ## Commit messages
 

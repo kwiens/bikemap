@@ -2,6 +2,18 @@
 
 This file provides guidance to AI coding agents when working with code in this repository.
 
+## Start here
+
+| If you are changing | Start with | Verification |
+|---|---|---|
+| Public map, route arrows, or layer selection | [Map.tsx](src/components/Map.tsx), [map utilities](src/utils/map.ts), [route arrows](src/utils/route-arrows.ts), [typed events](src/events.ts) | Map utility tests and a browser check of map and sidebar selection |
+| Map sidebar or ride panel | [MapLegend.tsx](src/components/MapLegend.tsx), [RidesPanel.tsx](src/components/RidesPanel.tsx), [layout store](src/hooks/useLayout.ts) | Adjacent component and layout tests, including a narrow viewport |
+| Embeds or multi-city links | [Embed page](src/app/(frontend)/embed/page.tsx), [URL options](src/utils/embed.ts), [deep links](src/hooks/useUrlDeepLink.ts), [city config](src/config/map.config.ts) | Embed page, snippet builder, and deep-link tests |
+| Admin geometry or snapping | [Editor entry points](docs/guides/osm-trail-editor.md#editor-entry-points), [routing graph](src/payload/routing/graph.ts), [editor controller](src/payload/routing/editor-controller.ts) | Geometry editor and routing tests, plus save/reopen and basemap switching |
+| Payload fields, reads, or seed data | [Collections](src/payload/collections), [public readers](src/payload/read), [migrations](src/migrations/index.ts), [data sources](docs/DATA.md) | Affected reader or hook tests and migration checks |
+| GPS, compass, wake lock, or sharing | [Platform contracts](src/platform/types.ts), [location tracking](src/hooks/useLocationTracking.ts), [ride recording](src/hooks/useRideRecording.ts), [native protocol](docs/guides/native-shell.md) | Platform and hook tests. Native behavior also needs a host app |
+| Deployment or CI | [Deployment guide](docs/DEPLOYING.md), [build policy](scripts/ci-build-policy.ts), [test workflow](.github/workflows/test.yml) | `pnpm check`, `pnpm test:run`, and an isolated build |
+
 ## Commands
 
 ```bash
@@ -9,7 +21,7 @@ pnpm dev          # Start development server at localhost:3000
 pnpm build        # Build for production
 pnpm test         # Run tests in watch mode
 pnpm test:run     # Run tests once
-pnpm check        # Run ESLint, Biome formatting, types, and Knip
+pnpm check        # Run ESLint, Biome, TypeScript, Knip, and the lockfile dedupe check
 pnpm lint:fix     # Auto-fix ESLint and formatting issues
 pnpm dedupe:check # Verify the lockfile has no avoidable duplicates
 ```
@@ -269,12 +281,13 @@ The script outputs:
 - `public/data/elevation/chattanooga/{slug}.json` — per-trail elevation profile (distance, gain, loss, min, max, coordinate samples). Elevation JSONs are city-scoped: Bend's live in `public/data/elevation/bend/` (written by `scripts/build_bend_trails.py`), and the client fetches from `elevationBasePath` (`geo_data.ts`).
 - Updates `src/data/mountain-bike-trails.data.ts` — summary stats (distance, elevationGain, elevationLoss, elevationMin, elevationMax)
 
-#### Adding a New Trail
+#### Adding a new curated trail
 
-1. Find the trail name in Chrome DevTools (see above)
-2. Add an entry to the `mountainBikeTrails` array in `src/data/mountain-bike-trails.data.ts` with `trailName`, `displayName`, `recArea`, `rating`, `color`, and `icon`
-3. Run `scripts/add_trail_elevation.py --trail "Trail Name"` to generate elevation data and populate `distance`, elevation stats, and `defaultBounds`
-4. If the trail is in a new `recArea`, add it to `REGION_MAP` in `mountain-bike-trails.ts`
+Create a Trail in Payload, select its city and trail complex, then pick OSM
+ways and refresh the preview or draw/import a line. Save and publish the
+reviewed geometry. Follow the [editor guide](docs/guides/osm-trail-editor.md)
+for editing and the [GIS import guide](docs/guides/chattanooga-gis-import.md)
+for Chattanooga seed and fallback updates.
 
 ### Nationwide OSM Bike Trails
 
@@ -418,10 +431,10 @@ compass. Everything that touches a device capability goes through
 
 ### Mapbox UI Overlays
 
-- The Mapbox canvas (`.map-container`) uses `position: absolute` with `z-index: 500` and covers the full viewport. It will obscure any sibling or child elements with a lower z-index.
-- To overlay UI on the map, render elements **inside the `MapboxMap` component's fragment** (the `<>` in its return), as siblings of `.map-container`. Do **not** place overlays in the outer `BikeMap` wrapper — they will be hidden behind the map canvas.
-- Overlay elements must use `z-index: 1000` or higher and `position: absolute` to appear above the map. See the route toast in `Map.tsx` and elevation overlay in `ElevationProfile.tsx` for working examples.
-- The sidebar (MapLegend) manages its own stacking context separately and is not affected by this.
+`MapboxMap` renders the absolute map container and its controls as siblings.
+Follow the existing stacking order in `Map.tsx`, `MapLegend.tsx`, and
+`RidesPanel.tsx`. Route arrows render inside the Mapbox canvas container
+with pointer events disabled so route hit-testing stays on the map canvas.
 
 ### Embed Mode (`/embed`)
 
@@ -521,27 +534,27 @@ an unsaved preview; after a curator reviews it, the `resolveTrailGeometry`
 fetching OSM again. `distance` and the elevation fields are always read-only —
 they are measured from the line, never typed.
 
-The admin has **one map** (`TrailMapEditor`, the "Trail geometry" field) with
-three modes: **Pick ways** (the default), **Move points**, and **Draw**. When
-OSM is wrong or missing, the latter two let a curator drag/insert/delete points
-or draw a line from scratch. **The first such edit flips `geometrySource` to
-`'edited'`**, which stops the trail from tracking OSM. The line is then owned in
-the CMS; only the measurements are still derived, via the same `measureParts`
-the OSM path uses. Choosing OSM segments and refreshing previews a replacement;
-only the following ordinary save keeps it.
+Trails and routes share `GeometryMapEditor`. Trails use **Pick ways** to
+preview a replacement from OSM ids. **Move points**, **Draw**, **Follow trail**,
+and **Route** edit the current line and flip a trail to
+`geometrySource: 'edited'`. The CMS then owns the geometry and derives
+measurements with the same `measureParts` used for OSM previews. The ordinary
+Save button persists the reviewed geometry. See the
+[editor entry points](docs/guides/osm-trail-editor.md#editor-entry-points)
+for the controller and tests behind each tool.
 
 - `src/payload/osm/overpass.ts` — fetch full-resolution ways by id (retry/backoff)
 - `src/payload/osm/assemble.ts` — join ways end to end; report gaps, never drop
-- `src/payload/osm/geometry.ts` — parse/validate `geom`; the editor's vertex ops
+- `src/payload/osm/geometry.ts` — parse and validate GeoJSON `geom`
 - `src/payload/osm/terrain.ts` — terrain sampling via `sharp` (Node has no canvas)
 - `src/payload/osm/measure.ts` — distance/bounds/elevation, shared by both paths
 - `src/payload/osm/build.ts` — orchestrates the OSM path
-- `src/payload/components/TrailMapEditor.tsx` — the one admin map (pick/move/draw)
+- `src/payload/components/TrailMapEditor.tsx` — binds the shared geometry editor to trail fields
 - `src/payload/read/trails.ts` — reads trails back out for the public map
 - `src/payload/collections/Routes.ts` + `src/payload/read/routes.ts` — Casual
   route records and the public map read path. A route is either built on the
-  map (`composed`, the default — see "Route editor" below), owns imported
-  geometry, selects a same-city Trail and reuses its current measurements, or
+  map (`composed`, the default — see "Route editor" below), owns imported or
+  drawn geometry, selects a same-city Trail and reuses its current measurements, or
   explicitly names a legacy Mapbox Studio layer that has not been migrated.
   Casual reads Routes only; linking a Trail is how a curator exposes it there
   without duplicating its line. Use
@@ -576,9 +589,9 @@ server component: it calls `getCityContent()` (`src/payload/read/city-content.ts
 which reads every published object type through Payload's Local API in parallel
 (a typed function call, no HTTP hop) and returns one `CityContent` bundle.
 `HomeClient` hands it to `publishCityContent()` (`src/data/city-content.ts`)
-during render, which writes each list into its content store
-(`src/data/trail-source.ts`, `src/data/route-source.ts`, both built on
-`createContentStore` in `src/data/content-store.ts`). The page resolves its
+during render. Trail and route consumers use `src/data/trail-source.ts` and
+`src/data/route-source.ts`, both built on `src/data/content-store.ts`.
+Attractions travel as props to marker consumers. The page resolves its
 city from the request hostname, so it reads `headers()` and renders per
 request. The trail summaries and GeoJSON use separate 24-hour Data Cache
 entries that collection hooks expire after content edits. `/api/map/trails`
@@ -593,16 +606,14 @@ edit.
    do), also add `afterChange` / `afterDelete` hooks that revalidate its tag —
    see `src/payload/cache/` — or the admin's edits won't show for 24 hours.
    `getCityRoutes` is uncached; pick deliberately.
-2. Create a store with `createContentStore(fallback?)` next to the type's data
-   module (a fallback keeps the checked-in data when the database hands back
-   nothing; no fallback means the database is the only truth).
-3. Add the list to `CityContentData` and the store to `contentStores` in
-   `city-content.ts`, and read it in `getCityContent`. The return type
-   requires every list, so forgetting the read is a type error.
-4. Consumers call the store's `get()` at render time and rebuild anything
-   derived through `subscribe`.
+2. Add the list to the bundle in `src/data/city-content.ts` and read it in
+   `getCityContent`. `FullCityContent` requires every list.
+3. Pass the list to its consumers as a prop, as attractions do. For content
+   used by Mapbox callbacks across components, follow the existing trail
+   and route stores and subscribe where consumers cache derived state.
 
-`HomeClient` and `page.tsx` need no change. If an embed mode renders the new type, also add its reader to `embed/page.tsx`; each embed loads only the content it uses.
+If an embed mode renders the new type, add its reader to `embed/page.tsx`.
+Each embed loads the content it renders.
 
 Things to know before touching it:
 
@@ -627,13 +638,12 @@ Things to know before touching it:
   city in both lookups so same-named trails cannot collide. Chattanooga's seed
   imports its prepared profiles directly; `pnpm backfill:elevation` measures
   any trail that still has geometry but no profile, without touching Overpass.
-- **Multi-part lines are measured in walking order, not stored order.**
-  `measureParts` walks every line in `walkingOrder` (`osm/assemble.ts`), so
-  pieces stored out of sequence or backwards (common in the GIS import) don't
-  make the chart leap between far ends of the trail. Gain and
-  loss swap when a piece is walked the other way, so changing that ordering
-  changes stored numbers: regenerate with `pnpm prepare:chattanooga-measurements`
-  and re-measure the database with
+- **Multi-part lines are measured by continuous section.**
+  `elevationSections` joins nearby endpoints and orders the resulting
+  sections for display. `measureParts` samples each section independently
+  so gaps contribute neither distance nor climbing. Changing ordering can
+  change gain and loss. Regenerate the static artifacts with
+  `pnpm prepare:chattanooga-measurements` and refresh stored measurements with
   `pnpm backfill:elevation -- --city=<city> --force --multipart`.
 - **`computeElevation`'s spike filter needs a run cap.** It replaces readings
   further than `ELEVATION_SPIKE_THRESHOLD` (25 m) from a running EMA. On a
@@ -739,9 +749,9 @@ Things to know before touching it:
   Theme global. Class names like `.btn__content` are internals that move between
   releases. `--theme-elevation-*` resolves to a `--color-base-*` scale that dark
   mode *inverts*, so retinting that ramp themes both modes at once.
-- **`getThemeCss` never throws**, same rule as the public trail readers — a
-  theme row must never lock anyone out of the admin. Its `customCss` is injected verbatim,
-  so `sanitizeCss` strips `<`/`>`; don't remove that.
+- **`getThemeCss` falls back to the default palette on read errors.** It
+  emits CSS variables from validated hex colors. `getFrontendThemeCss`
+  applies the same saved palette to the public app.
 - **The project is ESM** (`"type": "module"` — Payload 3's CLI requires it). New
   root config files must be ESM or `.cjs`.
 - **There is no root `src/app/layout.tsx`, on purpose.** Payload's `RootLayout`
@@ -777,36 +787,18 @@ Things to know before touching it:
   Re-run `pnpm generate:types` after any collection change and commit both.
 - **Re-run `pnpm generate:importmap`** after adding or renaming an admin
   component, or Payload won't find it.
-- **`TrailMapEditor`'s init effect must never re-run.** Its cleanup calls
-  `map.remove()`, so any dependency that changes identity tears the map down
-  mid-drag. Every callback it lists is `useCallback(fn, [])`; anything that
-  varies (form values, `setValue`) is read from a ref. For the same reason
-  nothing in it may `setState` at mousemove rate — that re-renders the entire
-  Payload document form on every frame.
-- **Terra Draw does the line editing** (`terra-draw` +
-  `terra-draw-mapbox-gl-adapter`): drag/insert/delete points, snapping, and
-  undo/redo. It edits `LineString`s, so parts map 1:1 to features via
-  `partsToFeatures`/`featuresToParts`. Its `change` event can't distinguish our
-  writes from a user's, so `loadingRef` guards the load — without it, opening a
-  trail marks the form dirty and flips it to "Edited by hand".
-- **Picking a way does not add it to the line.** Geometry is assembled from
-  Overpass server-side on save, so a just-picked way has no editable points until
-  then — `TrailMapEditor` tracks the ways the current line was built from and
-  warns when they diverge. Selecting a feature also fires three `change` events,
-  so `readBack` commits only when the line actually moved; otherwise clicking a
-  line marks the trail "Edited by hand".
-- **Terra Draw's undo/redo is opt-in.** Without the `undoRedo` constructor
-  option, `undo()`/`redo()` exist and do nothing. `sessionLevel` undoes completed
-  actions (a dragged point); `modeLevel` undoes steps inside an unfinished draw.
-  Both are wired, plus keyboard shortcuts.
-- **Right-click removes a point; `Delete` removes the whole piece** — and Terra
-  Draw **cannot undo the second**, while `canUndo()`/`undo()` both claim success.
-  Left-clicking a point then pressing `Delete` does *not* delete the point, it
-  deletes the selected feature. `src/payload/osm/deleted-pieces.ts` snapshots the
-  line whenever the piece count drops so the editor's Undo can restore it; the
-  toolbar's `canUndo` is the union of that stack and Terra Draw's. Don't reword
-  the Move points hint without re-reading `terra-draw-gestures.test.ts` — the
-  hint used to recommend the destructive gesture as the way to remove a point.
+- **`GeometryMapEditor` owns the map lifecycle.** Map handlers use stable
+  callbacks and read changing form values through refs. Pointer-rate updates
+  render directly to Mapbox, Terra Draw, or the live distance DOM node.
+- **Completed line edits use editor-owned history.** `edit-history.ts` holds
+  geometry and ownership snapshots. Terra Draw's mode history handles the
+  unfinished stroke, and `route-tool.ts` handles unfinished snapped clicks.
+- **Picked OSM ways are inputs to a preview.** The line becomes editable
+  after refresh. Compare coordinates in `readBack` before committing because
+  selecting a feature also emits Terra Draw changes.
+- **Right-click removes a vertex and Delete removes the selected piece in
+  Adjust line.** Use Select points for explicit multi-point deletion. See
+  `terra-draw-gestures.test.ts` for the adapter behavior.
 - **Terra Draw features must carry `properties.mode`**, and `addFeatures`
   *returns* rejections instead of throwing (`{ valid: false, reason: 'Mode
   property does not exist' }`). Miss either and the line silently never enters
@@ -829,7 +821,7 @@ Things to know before touching it:
 
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
