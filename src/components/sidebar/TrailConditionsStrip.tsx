@@ -1,75 +1,64 @@
 'use client';
 
-/**
- * Conditions in the selected-trail pane: what it is like now, what it has been
- * like, and the way to say what you found.
- *
- * One line under the pane header, like the OSM tag strip beside it. The report
- * button stays even with no reports — an unreported trail is the one worth
- * asking about.
- */
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronDown,
-  faChevronRight,
-  faLock,
-  faPenToSquare,
-} from '@fortawesome/free-solid-svg-icons';
+import { faLock } from '@fortawesome/free-solid-svg-icons';
 import { activeCityId } from '@/config/map.config';
-import { useEmbed } from '@/components/EmbedContext';
 import { useTrailConditions } from '@/components/TrailConditionsProvider';
 import {
   type ConditionReport,
   conditionAgeLabel,
   isConditionCurrent,
 } from '@/data/trail-conditions';
-import { MAP_EVENTS } from '@/events';
-import { cn } from '@/lib/utils';
 import { ConditionBadge } from './ConditionBadge';
 
-const LINK_CLASS =
-  'bg-transparent border-none p-0 cursor-pointer text-[10px] text-blue-600 hover:underline shrink-0';
-
 export function TrailConditionsStrip({
+  report,
+  lockedReason,
+}: {
+  report?: ConditionReport;
+  lockedReason: string | null;
+}) {
+  return (
+    <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
+      {report ? (
+        isConditionCurrent(report) ? (
+          <ConditionBadge report={report} showAge />
+        ) : (
+          <span>
+            Last reported {conditionAgeLabel(report.observedAt)} —{' '}
+            {report.name.toLowerCase()}
+          </span>
+        )
+      ) : (
+        <span>No recent condition reports</span>
+      )}
+      {lockedReason !== null && (
+        <span className="flex items-baseline gap-1">
+          <FontAwesomeIcon aria-hidden="true" icon={faLock} />
+          <span>{lockedReason}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function TrailConditionHistory({
   slug,
-  trailName,
+  canReport,
 }: {
   slug: string;
-  trailName: string;
+  canReport: boolean;
 }) {
-  const {
-    latest,
-    historyRevision = 0,
-    lockedReason: reasonFor,
-    options,
-  } = useTrailConditions();
-  // Embeds are read-only: no report form is mounted to answer the button.
-  const { isEmbed } = useEmbed();
-  const [expanded, setExpanded] = useState(false);
+  const { historyRevision } = useTrailConditions();
   const [history, setHistory] = useState<ConditionReport[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const current = latest[slug];
-
-  // Collapse when the pane moves on, or the previous trail's history shows
-  // until the refetch lands.
+  // A submission can change history even when it leaves the latest badge alone.
   useEffect(() => {
-    setExpanded(false);
-    setHistory(null);
-  }, [slug]);
-
-  // A local submission may be older than the badge and still belongs in
-  // history. Its revision also refreshes a history that was already open.
-  useEffect(() => {
-    if (!expanded) {
-      return;
-    }
-
     const controller = new AbortController();
-    setLoading(true);
+    setIsLoading(true);
 
-    // `async` so a synchronous throw is caught too, as in the provider.
     async function load() {
       try {
         const response = await fetch(
@@ -81,114 +70,50 @@ export function TrailConditionsStrip({
           : null;
         if (controller.signal.aborted) return;
         setHistory(data?.reports ?? []);
-        setLoading(false);
-      } catch (error) {
-        if ((error as Error)?.name !== 'AbortError') {
-          // "Nobody has reported this yet" beats an error on a small panel.
-          setHistory([]);
-          setLoading(false);
-        }
+      } catch {
+        if (controller.signal.aborted) return;
+        setHistory([]);
       }
+      setIsLoading(false);
     }
 
     void load();
-
     return () => controller.abort();
-  }, [expanded, slug, historyRevision]);
+  }, [slug, historyRevision]);
 
-  const openReport = useCallback(() => {
-    window.dispatchEvent(
-      new CustomEvent(MAP_EVENTS.CONDITION_REPORT_OPEN, {
-        detail: { slug, trailName },
-      }),
+  if (isLoading) {
+    return (
+      <p role="status" className="py-3 text-sm text-gray-600">
+        Loading condition history…
+      </p>
     );
-  }, [slug, trailName]);
-
-  // No vocabulary means no database, so nothing to show and nowhere to send.
-  if (options.length === 0) {
-    return null;
   }
 
-  // A closure never goes stale, so this is never true for one.
-  const stale = current && !isConditionCurrent(current);
-  const lockedReason = reasonFor(slug);
-  const canReport = lockedReason === null && !isEmbed;
+  if (!history?.length) {
+    return (
+      <p className="py-3 text-sm text-gray-600">
+        {canReport
+          ? 'Nothing reported yet. Ridden it lately?'
+          : 'Nothing reported.'}
+      </p>
+    );
+  }
 
   return (
-    <div className="text-[10px] text-gray-500 mb-1 -mt-0.5">
-      <div className="flex items-center gap-2">
-        {current ? (
-          <>
-            <ConditionBadge report={current} showAge />
-            {/* The badge hides a stale report, which would leave this row
-                looking like nobody had ever reported the trail. */}
-            {stale && (
-              <span className="truncate">
-                Last reported {conditionAgeLabel(current.observedAt)} —{' '}
-                {current.name.toLowerCase()}
-              </span>
-            )}
-          </>
-        ) : (
-          <span className="truncate">No recent condition reports</span>
-        )}
-
-        <button
-          type="button"
-          className={cn(LINK_CLASS, 'ml-auto')}
-          onClick={() => setExpanded((open) => !open)}
-        >
-          <FontAwesomeIcon
-            icon={expanded ? faChevronDown : faChevronRight}
-            className="mr-1"
-          />
-          History
-        </button>
-        {canReport && (
-          <button type="button" className={LINK_CLASS} onClick={openReport}>
-            <FontAwesomeIcon icon={faPenToSquare} className="mr-1" />
-            Report
-          </button>
-        )}
-        {/* The steward's sentence, where the button was. The badge and history
-            stay: closing the form does not unsay what was already reported. */}
-        {lockedReason !== null && (
+    <ul className="divide-y divide-gray-200">
+      {history.map((report) => (
+        <li key={report.id} className="flex items-center gap-3 py-3 text-sm">
           <span
-            className="flex items-center gap-1 shrink-0 max-w-[55%] text-gray-400"
-            title={lockedReason}
-          >
-            <FontAwesomeIcon icon={faLock} />
-            <span className="truncate">{lockedReason}</span>
+            aria-hidden="true"
+            className="size-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: report.color }}
+          />
+          <span className="min-w-0 flex-1 text-gray-800">{report.name}</span>
+          <span className="shrink-0 text-gray-600">
+            {conditionAgeLabel(report.observedAt)}
           </span>
-        )}
-      </div>
-
-      {expanded && (
-        <div className="mt-1 max-h-24 overflow-y-auto pr-1">
-          {loading && <div className="py-0.5">Loading…</div>}
-          {!loading && history?.length === 0 && (
-            <div className="py-0.5">
-              {/* Don't invite a report the trail won't take. */}
-              {canReport
-                ? 'Nothing reported yet. Ridden it lately?'
-                : 'Nothing reported.'}
-            </div>
-          )}
-          {!loading &&
-            history?.map((report) => (
-              <div key={report.id} className="flex items-center gap-2 py-0.5">
-                <span
-                  className="shrink-0 w-2 h-2 rounded-full"
-                  style={{ backgroundColor: report.color }}
-                />
-                <span className="truncate">{report.name}</span>
-                <span className="ml-auto shrink-0 opacity-70">
-                  {conditionAgeLabel(report.observedAt)}
-                </span>
-              </div>
-            ))}
-        </div>
-      )}
-    </div>
+        </li>
+      ))}
+    </ul>
   );
 }

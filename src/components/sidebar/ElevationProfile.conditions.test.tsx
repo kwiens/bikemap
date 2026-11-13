@@ -77,13 +77,19 @@ describe('ElevationProfile conditions without a chart', () => {
         expect.objectContaining({ signal: expect.any(AbortSignal) }),
       );
       expect(
-        screen.getByRole('button', { name: 'Report' }),
+        screen.getByRole('button', { name: 'Actions' }),
       ).toBeInTheDocument();
     });
     expect(
       screen.queryByRole('img', { name: /Elevation profile/ }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Download GPX')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Report' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    expect(
+      screen.queryByRole('button', { name: 'Download GPX' }),
+    ).not.toBeInTheDocument();
 
     const reportOpened = vi.fn();
     window.addEventListener(MAP_EVENTS.CONDITION_REPORT_OPEN, reportOpened, {
@@ -119,8 +125,19 @@ describe('ElevationProfile conditions without a chart', () => {
     expect(
       screen.getByRole('img', { name: /Elevation profile/ }),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    expect(
+      screen.queryByRole('img', { name: /Elevation profile/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Download GPX' }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Report' }),
     ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+    expect(
+      screen.getByRole('img', { name: /Elevation profile/ }),
+    ).toBeInTheDocument();
   });
 });

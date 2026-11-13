@@ -1,13 +1,23 @@
 /** @vitest-environment jsdom */
 
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { EmbedProvider } from '@/components/EmbedContext';
 import { DEFAULT_EMBED_OPTIONS } from '@/utils/embed';
-import { TrailConditionsStrip } from './TrailConditionsStrip';
+import { ElevationProfile } from './ElevationProfile';
 import type { ConditionReport } from '@/data/trail-conditions';
-import { MAP_EVENTS } from '@/events';
+import { dispatchMapEvent, MAP_EVENTS } from '@/events';
+
+vi.mock('@/data/trail-source', () => ({
+  getMountainBikeTrails: () => [{ trailName: 'Pondo', slug: 'pondo' }],
+}));
 
 /**
  * What a rider can do on a trail that is, or is not, taking reports.
@@ -44,23 +54,38 @@ vi.mock('@/components/TrailConditionsProvider', () => ({
   }),
 }));
 
-function renderStrip() {
-  return render(<TrailConditionsStrip slug="pondo" trailName="Pondo" />);
+function openActions() {
+  act(() => dispatchMapEvent(MAP_EVENTS.TRAIL_SELECT, { trailName: 'Pondo' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
 }
 
-describe('TrailConditionsStrip', () => {
+function renderActions() {
+  const view = render(<ElevationProfile />);
+  openActions();
+  return view;
+}
+
+describe('Trail condition actions', () => {
   beforeEach(() => {
     historyRevision = 0;
     lockedReason.mockReset();
     lockedReason.mockReturnValue(null);
-    global.fetch = vi.fn().mockResolvedValue({
-      json: async () => ({ reports: [] }),
-      ok: true,
-    }) as unknown as typeof fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url.startsWith('/api/map/conditions/')
+          ? { json: async () => ({ reports: [] }), ok: true }
+          : { ok: false, status: 404 },
+      ),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('refreshes already-open history after a submission, even if the badge is unchanged', async () => {
-    const view = renderStrip();
+    const view = renderActions();
     fireEvent.click(screen.getByRole('button', { name: /history/i }));
     await screen.findByText('Nothing reported yet. Ridden it lately?');
     vi.mocked(fetch).mockResolvedValue({
@@ -70,20 +95,27 @@ describe('TrailConditionsStrip', () => {
       }),
     } as Response);
     historyRevision += 1;
-    view.rerender(<TrailConditionsStrip slug="pondo" trailName="Pondo" />);
+    view.rerender(<ElevationProfile />);
     await screen.findByText('Older observation just filed');
-    expect(fetch).toHaveBeenCalledTimes(2);
+    const historyCalls = () =>
+      vi
+        .mocked(fetch)
+        .mock.calls.filter(([url]) =>
+          String(url).startsWith('/api/map/conditions/'),
+        );
+    expect(historyCalls()).toHaveLength(2);
     expect(fetch).toHaveBeenLastCalledWith(
       expect.any(String),
       expect.objectContaining({ cache: 'no-store' }),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    expect(screen.getByRole('button', { name: 'History' })).toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: /history/i }));
-    fireEvent.click(screen.getByRole('button', { name: /history/i }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(historyCalls()).toHaveLength(3));
   });
 
   it('offers the report button when the trail is open', () => {
-    renderStrip();
+    renderActions();
     expect(screen.getByRole('button', { name: /report/i })).toBeInTheDocument();
   });
 
@@ -91,7 +123,7 @@ describe('TrailConditionsStrip', () => {
     const listener = vi.fn();
     window.addEventListener(MAP_EVENTS.CONDITION_REPORT_OPEN, listener);
 
-    renderStrip();
+    renderActions();
     fireEvent.click(screen.getByRole('button', { name: /report/i }));
 
     expect(listener).toHaveBeenCalled();
@@ -103,7 +135,7 @@ describe('TrailConditionsStrip', () => {
 
   it('replaces the button with the steward’s note when locked', () => {
     lockedReason.mockReturnValue('Closed for logging until 1 May.');
-    renderStrip();
+    renderActions();
 
     expect(
       screen.queryByRole('button', { name: /report/i }),
@@ -117,14 +149,14 @@ describe('TrailConditionsStrip', () => {
     // The whole point of not hiding conditions on a closed trail: knowing it is
     // shut, and what it was like, is the most useful thing on the page.
     lockedReason.mockReturnValue('Closed for logging until 1 May.');
-    renderStrip();
+    renderActions();
 
     expect(screen.getByText('Muddy — stay off')).toBeInTheDocument();
   });
 
   it('keeps the history open while locked', () => {
     lockedReason.mockReturnValue('Closed for logging until 1 May.');
-    renderStrip();
+    renderActions();
 
     expect(
       screen.getByRole('button', { name: /history/i }),
@@ -133,7 +165,7 @@ describe('TrailConditionsStrip', () => {
 
   it('stops inviting a report the trail will not take', async () => {
     lockedReason.mockReturnValue('Closed for logging until 1 May.');
-    renderStrip();
+    renderActions();
     fireEvent.click(screen.getByRole('button', { name: /history/i }));
 
     expect(await screen.findByText('Nothing reported.')).toBeInTheDocument();
@@ -141,7 +173,7 @@ describe('TrailConditionsStrip', () => {
   });
 
   it('does invite one when the trail is open', async () => {
-    renderStrip();
+    renderActions();
     fireEvent.click(screen.getByRole('button', { name: /history/i }));
 
     expect(await screen.findByText(/Ridden it lately/)).toBeInTheDocument();
@@ -150,9 +182,10 @@ describe('TrailConditionsStrip', () => {
   it('is read-only in an embed, which has no report form', async () => {
     render(
       <EmbedProvider options={{ ...DEFAULT_EMBED_OPTIONS, mode: 'mtb' }}>
-        <TrailConditionsStrip slug="pondo" trailName="Pondo" />
+        <ElevationProfile />
       </EmbedProvider>,
     );
+    openActions();
 
     expect(
       screen.queryByRole('button', { name: /report/i }),
