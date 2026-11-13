@@ -16,7 +16,7 @@ without one — see [Reading trails on the public map](#reading-trails-on-the-pu
 | Task | Start with | Geometry saved by |
 |---|---|---|
 | Pick OSM ways and refresh a trail | [TrailMapEditor](../../src/payload/components/TrailMapEditor.tsx) and [the preview endpoint](../../src/payload/endpoints/preview-trail-geometry.ts) | [resolveTrailGeometry](../../src/payload/hooks/resolveTrailGeometry.ts) validates the reviewed line and measures it |
-| Draw or edit points, import GPX, or change the basemap | [GeometryMapEditor](../../src/payload/components/GeometryMapEditor.tsx), [editor controls](../../src/payload/components/geometry-editor-controls.tsx), [editor-map](../../src/payload/components/editor-map.ts), and [line edits](../../src/payload/osm/line-edits.ts) | The field adapter writes trail geometry, direct route geometry, or a composed plan override |
+| Draw or edit points, import GPX, or change the basemap | [GeometryMapEditor](../../src/payload/components/GeometryMapEditor.tsx), [editor controls](../../src/payload/components/geometry-editor-controls.tsx), [Mapbox lifecycle hook](../../src/payload/components/use-geometry-editor-map.ts), and [line edits](../../src/payload/osm/line-edits.ts) | The field adapter writes trail geometry, direct route geometry, or a composed plan override |
 | Trace a trail or a blank route with the shared map | [route-tool](../../src/payload/components/route-tool.ts) and [point selection](../../src/payload/components/point-selection-tool.ts) | The shared editor commits the finished line into the field |
 | Build a composed route from waypoints | [RouteMapEditor](../../src/payload/components/RouteMapEditor.tsx), [RoutePlanner](../../src/payload/components/RoutePlanner.tsx), and [editor-controller](../../src/payload/routing/editor-controller.ts) | [resolveRouteSource](../../src/payload/hooks/resolveRouteSource.ts) derives geometry, distance, and bounds from the plan |
 | Draw a route with no waypoint plan | [RouteLineEditor](../../src/payload/components/RouteLineEditor.tsx) | [resolveRouteSource](../../src/payload/hooks/resolveRouteSource.ts) measures the submitted line |
@@ -167,6 +167,9 @@ Existing waypoint-only plans keep working without a database migration.
 `TrailMapEditor` adapts trail fields and OSM preview measurements. Both point
 editing surfaces render `GeometryMapEditor`; changes to its gestures, toolbar,
 selection, or history apply to routes and trails together.
+`useGeometryEditorMap` owns Mapbox, Terra Draw registration, and tool teardown.
+`GeometryMapEditor` synchronizes the working line with the field and keeps undo
+history across basemap switches.
 
 ## The map
 

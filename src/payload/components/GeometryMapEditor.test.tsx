@@ -15,6 +15,7 @@ import {
   type TrailGeometry,
 } from '@/payload/osm/geometry';
 import { geometryPlan } from '@/payload/routing/plan';
+import { GeometryMapEditor } from './GeometryMapEditor';
 import { RouteLineEditor } from './RouteLineEditor';
 import { RouteMapEditor } from './RouteMapEditor';
 import { TrailMapEditor } from './TrailMapEditor';
@@ -278,6 +279,56 @@ async function upload(container: HTMLElement, text = GPX) {
 }
 
 describe('shared geometry editor', () => {
+  it('syncs new form geometry and setters without recreating the map', async () => {
+    const firstWrite = vi.fn();
+    const latestWrite = vi.fn();
+    const updated: TrailGeometry = {
+      type: 'MultiLineString',
+      coordinates: [
+        [
+          [-85, 35],
+          [-85.02, 35.01],
+        ],
+      ],
+    };
+    const { rerender, unmount } = render(
+      <GeometryMapEditor
+        label="Line"
+        name={{ value: 'Test line', setValue: () => {} }}
+        geometry={{ value: ORIGINAL, setValue: firstWrite }}
+      />,
+    );
+    await act(async () => ui.loadStyle());
+
+    await act(async () => {
+      rerender(
+        <GeometryMapEditor
+          label="Line"
+          name={{ value: 'Test line', setValue: () => {} }}
+          geometry={{ value: updated, setValue: latestWrite }}
+        />,
+      );
+    });
+    expect(ui.features[0]?.geometry).toMatchObject({
+      coordinates: updated.coordinates[0],
+    });
+    expect(latestWrite).not.toHaveBeenCalled();
+    const newEnd: [number, number] = [-85.03, 35.01];
+    dragLastPoint(newEnd);
+
+    expect(firstWrite).not.toHaveBeenCalled();
+    expect(latestWrite).toHaveBeenCalledWith({
+      type: 'MultiLineString',
+      coordinates: [[[-85, 35], newEnd]],
+    });
+    expect(ui.mapOptions).toHaveBeenCalledTimes(1);
+    expect(ui.removeMap).not.toHaveBeenCalled();
+
+    unmount();
+    expect(ui.drawLifecycle).toEqual(['start', 'stop']);
+    expect(ui.removeMap).toHaveBeenCalledTimes(1);
+  });
+
   it('restores a directly edited route and its undo history across basemap switches', async () => {
     render(<RouteMapEditor path="plan" />);
     expect(ui.mapOptions).toHaveBeenCalledWith(

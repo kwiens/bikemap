@@ -50,26 +50,20 @@
  * who owned the line (`LineOwner`), so undoing past the first hand edit, or past
  * an OSM refresh, puts the trail's source and OSM report back as they were.
  *
- * ## Two rules this component lives by
- *
- * Both were bugs in an earlier version, and both are invisible until you put a
- * real pointer on it:
- *
- * 1. Every callback the map's handlers touch must be **referentially stable**,
- *    or the init effect re-runs and calls `map.remove()` mid-interaction.
- *    Anything that closes over a form value is read from a ref instead.
- * 2. Nothing may call `setState` at mousemove rate. A custom field lives inside
- *    Payload's document form, so one `setState` per frame re-renders the whole
- *    form while you drag. The live distance readout is written straight to a
- *    DOM node.
+ * The map lifecycle is in use-geometry-editor-map.ts. This component owns
+ * working geometry, form writes, and undo history. The live distance readout
+ * writes directly to its DOM node to avoid rendering Payload on every drag.
  */
+import type { EditorBasemap } from './editor-map';
 import {
-  createEditorMap,
-  useEditorBasemap,
-  type EditorBasemap,
-} from './editor-map';
+  LINESTRING,
+  SELECT,
+  paintHistoryPoint,
+  useGeometryEditorMap,
+  useGeometryEditorMapRefs,
+  type GeometryEditorMode,
+} from './use-geometry-editor-map';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
 // The public app pulls this in from its own layout, but the (payload) route
 // group is a separate tree — without it the map renders with broken controls.
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -81,20 +75,8 @@ import {
   useFormProcessing,
 } from '@payloadcms/ui';
 import { formatAdminURL } from 'payload/shared';
-import {
-  TerraDraw,
-  TerraDrawLineStringMode,
-  TerraDrawModeUndoRedo,
-  TerraDrawSelectMode,
-} from 'terra-draw';
-import { TerraDrawMapboxGLAdapter } from 'terra-draw-mapbox-gl-adapter';
+import type { TerraDraw } from 'terra-draw';
 import { mapConfig } from '@/config/map.config';
-import {
-  OSM_BIKE_TRAIL_FILTER,
-  OSM_TRAILS_SOURCE_ID,
-  OSM_TRAILS_SOURCE_LAYER,
-  OSM_TRAILS_TILEJSON_URL,
-} from '@/data/osm-trails';
 import type { TrailNetworkResponse } from '@/payload/endpoints/trail-network';
 import { boundsOf, lengthMeters } from '@/payload/osm/assemble';
 import {
@@ -104,7 +86,6 @@ import {
 import type { PreviewTrailGeometryResponse } from '@/payload/endpoints/preview-trail-geometry';
 import {
   cloneParts,
-  COORDINATE_DECIMALS,
   featuresToParts,
   parseTrailGeometry,
   partsToFeatures,
@@ -139,50 +120,9 @@ import {
   SelectBar,
 } from './geometry-editor-controls';
 import { Banner, type Tone } from './admin-ui';
-import {
-  createPointSelectionTool,
-  type PointSelectionTool,
-} from './point-selection-tool';
-import {
-  createRouteTool,
-  type LineAddition,
-  type RouteStatus,
-  type RouteTool,
-} from './route-tool';
-import { removeSelectedLinePointAt } from './terra-draw-point-removal';
+import { type LineAddition, type RouteStatus } from './route-tool';
 
 type Parts = [number, number][][];
-type Mode = 'draw' | 'move' | 'pick' | 'route' | 'select';
-
-const WAYS_LAYER = 'osm-ways';
-const WAYS_HIT_LAYER = 'osm-ways-hit';
-const HISTORY_POINT_LAYER = 'editor-history-point';
-
-const PICKED_COLOR = '#2563EB';
-const UNPICKED_COLOR = '#9CA3AF';
-const LINE_COLOR = '#2563EB';
-const DRAW_LAYER_PREFIX = 'editor-draw';
-
-/** Terra Draw mode names. `static` is its own name for "registered but inert". */
-const SELECT = 'select';
-const LINESTRING = 'linestring';
-const STATIC = 'static';
-
-/**
- * How close a click has to land, in pixels.
- *
- * Terra Draw's default is tight. Singletrack nodes sit ~10 m apart, which at the
- * zoom you actually edit at is a handful of pixels, so the grab radius is what
- * decides whether this feels usable at all.
- */
-const POINTER_DISTANCE = 20;
-
-/**
- * Snapping. Closing a gap between two pieces means landing an endpoint exactly
- * on its neighbour, and doing that by eye is precisely the fiddly part.
- */
-const SNAPPING = { toCoordinate: true, toLine: true } as const;
-
 /**
  * Who a line belongs to, as the form records it. An undo step restores this
  * along with the points, because the points alone don't say whether saving
@@ -279,10 +219,9 @@ export function GeometryMapEditor({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const statsRef = useRef<HTMLSpanElement | null>(null);
   const gpxInputRef = useRef<HTMLInputElement | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const drawRef = useRef<TerraDraw | null>(null);
-  const routeToolRef = useRef<RouteTool | null>(null);
-  const selectionToolRef = useRef<PointSelectionTool | null>(null);
+  const mapHandles = useGeometryEditorMapRefs();
+  const { drawRef, mapRef, routeToolRef, selectionToolRef, startedRef } =
+    mapHandles;
 
   /** The working copy. Written at drag rate, so it cannot live in state. */
   const partsRef = useRef<Parts>([]);
@@ -295,17 +234,14 @@ export function GeometryMapEditor({
   const settledOwnerRef = useRef<LineOwner>(EDITED_OWNER);
   /** True while *we* are writing into Terra Draw's store. See the change handler. */
   const loadingRef = useRef(false);
-  /** Terra Draw throws if started twice or stopped before starting. */
-  const startedRef = useRef(false);
   /** Undo and redo for every edit. See `edit-history.ts`. */
   const historyRef = useRef(createEditHistory(cloneSnapshot));
   const historyPointRef = useRef<LineSnapshot['point']>(undefined);
   const refreshRequestRef = useRef<AbortController | null>(null);
   const gpxImportRef = useRef(0);
 
-  const [ready, setReady] = useState(false);
   const [drawFailed, setDrawFailed] = useState(false);
-  const [mode, setMode] = useState<Mode>(() =>
+  const [mode, setMode] = useState<GeometryEditorMode>(() =>
     osm
       ? 'pick'
       : parseTrailGeometry(geomValue).parts?.length
@@ -349,11 +285,10 @@ export function GeometryMapEditor({
     return parsed.ok ? parsed.ids : [];
   }, [osmIdsValue]);
 
-  // Everything the map's handlers read goes through a ref — see the note above.
+  // Imperative edits read current form values without subscribing at drag rate.
   const idsRef = useRef(ids);
   const modeRef = useRef(mode);
   const readOnlyRef = useRef(Boolean(readOnly));
-  const isRemovingPointRef = useRef(false);
   const sourceRef = useRef(geometrySource);
   const rebuildRef = useRef(rebuildValue);
   const osmReportRef = useRef(osmReportValue);
@@ -369,7 +304,6 @@ export function GeometryMapEditor({
   idsRef.current = ids;
   modeRef.current = mode;
   readOnlyRef.current = Boolean(readOnly);
-  isRemovingPointRef.current = isRemovingPoint;
   sourceRef.current = geometrySource;
   rebuildRef.current = rebuildValue;
   osmReportRef.current = osmReportValue;
@@ -458,14 +392,15 @@ export function GeometryMapEditor({
       canUndo:
         Boolean(route?.hasRoute()) || isDrawing || historyRef.current.canUndo(),
     });
-  }, []);
+  }, [drawRef, routeToolRef, startedRef]);
 
-  const setHistoryPoint = useCallback((point?: LineSnapshot['point']) => {
-    historyPointRef.current = point;
-    const source =
-      mapRef.current?.getSource<mapboxgl.GeoJSONSource>(HISTORY_POINT_LAYER);
-    source?.setData(historyPointData(point));
-  }, []);
+  const setHistoryPoint = useCallback(
+    (point?: LineSnapshot['point']) => {
+      historyPointRef.current = point;
+      paintHistoryPoint(mapRef.current, point);
+    },
+    [mapRef],
+  );
 
   const recordEdit = useCallback(
     (base: Parts, next: Parts, addition?: LineAddition) => {
@@ -543,7 +478,7 @@ export function GeometryMapEditor({
         commit();
       }
     },
-    [commit, paintStats],
+    [commit, paintStats, drawRef],
   );
 
   const togglePick = useCallback(
@@ -583,61 +518,64 @@ export function GeometryMapEditor({
    * left to undo. Undo, redo, the bulk edits, and a basemap switch pass false,
    * because the history is still every bit as valid as it was a moment ago.
    */
-  const loadDraw = useCallback((parts: Parts, baseline = true) => {
-    const draw = drawRef.current;
-    if (!draw || !startedRef.current) {
-      return;
-    }
-
-    // Guards the `change` handler from mistaking this for an edit. Reset in a
-    // microtask rather than immediately, so it still covers the event if a
-    // future version of Terra Draw emits it asynchronously.
-    loadingRef.current = true;
-    try {
-      draw.clear();
-      if (parts.length > 0) {
-        // `addFeatures` *returns* its failures rather than throwing them. A
-        // rejected feature is simply absent — no line, nothing to grab, and
-        // nothing in the console — so the result has to be checked.
-        const rejected = draw
-          .addFeatures(
-            partsToFeatures(parts, LINESTRING) as Parameters<
-              TerraDraw['addFeatures']
-            >[0],
-          )
-          .filter((validation) => !validation.valid);
-
-        if (rejected.length > 0) {
-          console.error(
-            'Terra Draw rejected this trail’s geometry',
-            rejected.map((validation) => validation.reason),
-          );
-        }
-        setDrawFailed(rejected.length > 0);
-      } else {
-        setDrawFailed(false);
+  const loadDraw = useCallback(
+    (parts: Parts, baseline = true) => {
+      const draw = drawRef.current;
+      if (!draw || !startedRef.current) {
+        return;
       }
-    } finally {
-      queueMicrotask(() => {
-        loadingRef.current = false;
-      });
-    }
 
-    // Whatever is being loaded is the new baseline; undoing past it would be
-    // undoing someone else's save.
-    if (baseline) {
-      draw.clearUndoRedoHistory();
-      historyRef.current.clear();
-      settledRef.current = cloneParts(parts);
-      settledOwnerRef.current = {
-        hasUnsavedPreview: false,
-        rebuild: rebuildRef.current,
-        report: osmReportRef.current,
-        source: sourceRef.current,
-      };
-      setHistory({ canRedo: false, canUndo: false });
-    }
-  }, []);
+      // Guards the `change` handler from mistaking this for an edit. Reset in a
+      // microtask rather than immediately, so it still covers the event if a
+      // future version of Terra Draw emits it asynchronously.
+      loadingRef.current = true;
+      try {
+        draw.clear();
+        if (parts.length > 0) {
+          // `addFeatures` *returns* its failures rather than throwing them. A
+          // rejected feature is simply absent — no line, nothing to grab, and
+          // nothing in the console — so the result has to be checked.
+          const rejected = draw
+            .addFeatures(
+              partsToFeatures(parts, LINESTRING) as Parameters<
+                TerraDraw['addFeatures']
+              >[0],
+            )
+            .filter((validation) => !validation.valid);
+
+          if (rejected.length > 0) {
+            console.error(
+              'Terra Draw rejected this trail’s geometry',
+              rejected.map((validation) => validation.reason),
+            );
+          }
+          setDrawFailed(rejected.length > 0);
+        } else {
+          setDrawFailed(false);
+        }
+      } finally {
+        queueMicrotask(() => {
+          loadingRef.current = false;
+        });
+      }
+
+      // Whatever is being loaded is the new baseline; undoing past it would be
+      // undoing someone else's save.
+      if (baseline) {
+        draw.clearUndoRedoHistory();
+        historyRef.current.clear();
+        settledRef.current = cloneParts(parts);
+        settledOwnerRef.current = {
+          hasUnsavedPreview: false,
+          rebuild: rebuildRef.current,
+          report: osmReportRef.current,
+          source: sourceRef.current,
+        };
+        setHistory({ canRedo: false, canUndo: false });
+      }
+    },
+    [drawRef, startedRef],
+  );
 
   /**
    * Selects the line so its points appear.
@@ -660,7 +598,7 @@ export function GeometryMapEditor({
     if (lines.length === 1 && lines[0].id !== undefined) {
       draw.selectFeature(lines[0].id, SELECT);
     }
-  }, []);
+  }, [drawRef, startedRef]);
 
   /**
    * Puts a whole new line on screen and into the form, without touching the
@@ -693,7 +631,16 @@ export function GeometryMapEditor({
       }
       syncHistory();
     },
-    [autoSelect, commit, loadDraw, paintStats, setHistoryPoint, syncHistory],
+    [
+      autoSelect,
+      commit,
+      loadDraw,
+      paintStats,
+      setHistoryPoint,
+      syncHistory,
+      routeToolRef,
+      selectionToolRef,
+    ],
   );
 
   /**
@@ -741,53 +688,8 @@ export function GeometryMapEditor({
       selectionToolRef.current?.setSelection(result.selection);
       setEditNote(note);
     },
-    [applyEdit],
+    [applyEdit, selectionToolRef],
   );
-
-  const unmountDraw = useCallback(() => {
-    if (!startedRef.current) return;
-    drawRef.current?.stop();
-    startedRef.current = false;
-  }, []);
-
-  /**
-   * Registers Terra Draw against the current style, and restores the line.
-   *
-   * **Must not run before the style has loaded.** The Mapbox adapter's
-   * `register` calls `map.addSource` / `map.addLayer` with no style-loaded guard
-   * of its own — no `isStyleLoaded` check, no `styledata` listener — so starting
-   * it against a map that is still fetching its style throws and takes the whole
-   * trail form down with it.
-   *
-   * It also has to run *again* after every basemap switch: `setStyle` discards
-   * every source and layer, including the adapter's, and it does not put them
-   * back. Re-registering is why the line survives a switch to satellite. The
-   * undo history survives too, because it is the editor's rather than Terra
-   * Draw's.
-   */
-  const mountDraw = useCallback(() => {
-    const draw = drawRef.current;
-    if (!draw) {
-      return;
-    }
-
-    try {
-      draw.start();
-      startedRef.current = true;
-    } catch (error) {
-      // A dead editor is bad; a trail page that won't render is worse, because
-      // it locks the whole document — including fields that have nothing to do
-      // with geometry.
-      console.error('Terra Draw could not attach to the map', error);
-      setDrawFailed(true);
-      return;
-    }
-
-    setDrawFailed(false);
-    draw.setMode(terraModeFor(modeRef.current, !readOnlyRef.current));
-    loadDraw(partsRef.current, false);
-    if (modeRef.current === 'move') autoSelect();
-  }, [autoSelect, loadDraw]);
 
   const fetchNetwork = useCallback(async (cell: string) => {
     const { apiRoute: api, serverURL: server } = apiRef.current;
@@ -818,71 +720,33 @@ export function GeometryMapEditor({
     return body.ways;
   }, []);
 
-  // --- the map -----------------------------------------------------------
-
-  /**
-   * Builds the map and the Terra Draw instance. Runs **once**.
-   *
-   * Every callback in the dependency list is `useCallback(fn, [])` or depends
-   * only on such callbacks, so none change identity and this never re-runs.
-   * That is load-bearing: re-running it calls `map.remove()` out from under an
-   * in-progress interaction. If you give one of these a dependency that varies —
-   * a form value, say — the map will start tearing itself down mid-drag. Read it
-   * from a ref instead.
-   */
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) {
-      return;
-    }
-    if (!mapConfig.mapbox.accessToken) {
-      return;
-    }
-
-    // Shift-drag is box selection here, rather than Mapbox's box zoom.
-    const map = createEditorMap(
-      containerRef.current,
-      mapConfig.defaultView,
-      false,
-    );
-    mapRef.current = map;
-
-    map.on('click', WAYS_HIT_LAYER, (event) => {
-      if (readOnlyRef.current || modeRef.current !== 'pick') {
-        return;
-      }
-      const feature = event.features?.[0];
-      const osmId = Number(feature?.properties?.OSM_ID);
-      if (!Number.isInteger(osmId) || osmId <= 0) {
-        return;
-      }
-      togglePick(osmId, String(feature?.properties?.name ?? `way ${osmId}`));
-    });
-
-    map.on('mouseenter', WAYS_HIT_LAYER, () => {
-      if (!readOnlyRef.current && modeRef.current === 'pick') {
-        map.getCanvas().style.cursor = 'pointer';
-      }
-    });
-    map.on('mouseleave', WAYS_HIT_LAYER, () => {
-      map.getCanvas().style.cursor = '';
-    });
-
-    map.on('click', (event) => {
-      const draw = drawRef.current;
-      if (
-        !draw ||
-        readOnlyRef.current ||
-        modeRef.current !== 'move' ||
-        !isRemovingPointRef.current
-      ) {
-        return;
-      }
-
-      const result = removeSelectedLinePointAt(
-        draw,
-        event.lngLat,
-        POINTER_DISTANCE,
-      );
+  const ready = useGeometryEditorMap({
+    ...mapHandles,
+    basemap,
+    container: containerRef,
+    onModeChange() {
+      setEditNote(null);
+      syncHistory();
+    },
+    onRouteDeactivate: () => setRouteStatus(IDLE_ROUTE),
+    ids,
+    mode,
+    editable,
+    isRemovingPoint,
+    historyPoint: historyPointRef,
+    networkKind: hasPathSnappingToggle ? 'route' : 'trail',
+    getParts: () => partsRef.current,
+    fetchNetwork,
+    onRouteFinish: (next, addition) => applyEdit(next, undefined, addition),
+    onRouteStatus(status) {
+      setRouteStatus(status);
+      syncHistory();
+    },
+    onPointEdit: applyEdit,
+    onPointSelection: setSelection,
+    onPointPreview: previewLine,
+    onPick: togglePick,
+    onPointRemoval(result) {
       if (result === 'minimum-points') {
         setPointRemovalNote(
           'A line piece needs at least two points. Press Delete to remove the whole selected piece.',
@@ -893,86 +757,43 @@ export function GeometryMapEditor({
         setPointRemovalNote(null);
         settle();
       }
-    });
-
-    const draw = new TerraDraw({
-      // Terra Draw defaults to 9 decimals. The line the editor stores, and the
-      // copy the form-sync effect compares against, are rounded to
-      // COORDINATE_DECIMALS — a dragged point at 9 decimals never matched its
-      // own echo, so every edit reloaded the line as a new document.
-      adapter: new TerraDrawMapboxGLAdapter({
-        coordinatePrecision: COORDINATE_DECIMALS,
-        map,
-        prefixId: DRAW_LAYER_PREFIX,
-      }),
-      modes: [
-        new TerraDrawSelectMode({
-          flags: {
-            [LINESTRING]: {
-              feature: {
-                coordinates: {
-                  deletable: true,
-                  draggable: true,
-                  midpoints: { draggable: true },
-                  snappable: true,
-                },
-                // Dragging a whole trail somewhere else is never what you meant;
-                // only its individual points move.
-                draggable: false,
-              },
-            },
-          },
-          pointerDistance: POINTER_DISTANCE,
-        }),
-        new TerraDrawLineStringMode({
-          editable: true,
-          pointerDistance: POINTER_DISTANCE,
-          snapping: SNAPPING,
-          styles: { lineStringColor: LINE_COLOR, lineStringWidth: 4 },
-        }),
-      ],
-      // Undo/redo is **opt-in**. Without this the `undo()` and `redo()` methods
-      // exist and do nothing at all — the base mode's implementations are empty
-      // functions.
-      //
-      // Only the mode level: taking back the last point while still drawing a
-      // piece. Completed edits undo through the editor's own history, which
-      // also covers what Terra Draw's session level never could — deleted
-      // pieces and the bulk edits. Its keyboard shortcuts are left off too;
-      // the map's own key handler routes Ctrl+Z to the right stack.
-      undoRedo: {
-        modeLevel: new TerraDrawModeUndoRedo(),
-      },
-    });
-    drawRef.current = draw;
-
-    // Terra Draw fires `change` for its own edits *and* for our own writes into
-    // its store, and the event carries nothing to tell them apart — so we track
-    // it. Without this, loading the stored line looks like an edit: the trail
-    // would flip to "Edited by hand" and the form would go dirty on open,
-    // before anyone touched anything.
-    draw.on('change', (_changedIds, type) => {
-      if (type === 'styling') {
-        return;
-      }
-      readBack(!loadingRef.current && !readOnlyRef.current);
-      // The Delete key removes a whole piece without a `finish` event, so it
-      // closes its own undo step.
+    },
+    onDrawStart() {
+      loadDraw(partsRef.current, false);
+      if (mode === 'move') autoSelect();
+    },
+    onDrawError: () => setDrawFailed(true),
+    onDrawChange(_ids, type) {
+      if (type === 'styling') return;
+      // Terra Draw emits changes for our own writes as well as rider edits.
+      readBack(!loadingRef.current && editable);
       if (
         type === 'delete' &&
         !loadingRef.current &&
-        modeRef.current === 'move'
+        editable &&
+        mode === 'move'
       ) {
-        queueMicrotask(settle);
+        // Delete removes a piece without a finish event.
+        const draw = drawRef.current;
+        queueMicrotask(() => {
+          if (
+            draw &&
+            drawRef.current === draw &&
+            startedRef.current &&
+            !readOnlyRef.current
+          )
+            settle();
+        });
       }
-    });
-
-    draw.on('finish', (id, { mode, action }) => {
-      if (mode === LINESTRING && action === 'draw') {
-        const lines = draw
-          .getSnapshot()
+    },
+    onDrawFinish(id, { mode: drawMode, action }) {
+      if (!editable) return;
+      if (drawMode === LINESTRING && action === 'draw') {
+        const lines = drawRef.current
+          ?.getSnapshot()
           .filter((feature) => feature.geometry.type === 'LineString');
-        const partIndex = lines.findIndex((feature) => feature.id === id);
+        const partIndex =
+          lines?.findIndex((feature) => feature.id === id) ?? -1;
         const part = partsRef.current[partIndex];
         if (part) {
           settle({ partIndex, pointCounts: part.map((_, index) => index + 1) });
@@ -980,151 +801,14 @@ export function GeometryMapEditor({
         }
       }
       settle();
-    });
-
-    // Fires for every push, undo, and redo of a piece still being drawn, so the
-    // toolbar reflects what is actually on the stacks.
-    draw.on('history', syncHistory);
-
-    const routeTool = createRouteTool(map, {
-      apply: (next, addition) => applyEdit(next, undefined, addition),
-      fetchNetwork,
-      getParts: () => partsRef.current,
-      isActive: () => !readOnlyRef.current && modeRef.current === 'route',
-      networkKind: usesRouteNetworkRef.current ? 'route' : 'trail',
-      onStatus: (status) => {
-        setRouteStatus(status);
-        syncHistory();
-      },
-    });
-    routeToolRef.current = routeTool;
-
-    const selectionTool = createPointSelectionTool(map, {
-      apply: applyEdit,
-      getParts: () => partsRef.current,
-      isActive: () => !readOnlyRef.current && modeRef.current === 'select',
-      onSelection: setSelection,
-      preview: previewLine,
-    });
-    selectionToolRef.current = selectionTool;
-
-    // Fires on the first load *and* on every basemap switch, which discards
-    // every source and layer — ours and Terra Draw's alike. So the way layers,
-    // the Terra Draw registration, and the tools' layers are all rebuilt here,
-    // and `mountDraw` is the only place `draw.start()` is ever called. The
-    // tools go last so their points and previews draw above the line.
-    map.on('style.load', () => {
-      installWayLayers(map);
-      applyWayStyle(map, idsRef.current, modeRef.current);
-      mountDraw();
-      // The adapter uses an empty dash array for solid lines. Mapbox can
-      // drop those strokes when it rebuilds line tiles at a different zoom.
-      // The geometry editor uses solid strokes in every Terra Draw mode.
-      const drawLineLayer = `${DRAW_LAYER_PREFIX}-linestring`;
-      if (map.getLayer(drawLineLayer)) {
-        map.setPaintProperty(drawLineLayer, 'line-dasharray', undefined);
-      }
-      map.addSource(HISTORY_POINT_LAYER, {
-        type: 'geojson',
-        data: historyPointData(historyPointRef.current),
-      });
-      map.addLayer({
-        id: HISTORY_POINT_LAYER,
-        type: 'circle',
-        source: HISTORY_POINT_LAYER,
-        paint: {
-          'circle-color': LINE_COLOR,
-          'circle-radius': 5,
-          'circle-stroke-color': '#fff',
-          'circle-stroke-width': 2,
-        },
-      });
-      routeTool.install();
-      selectionTool.install();
-      setReady(true);
-    });
-
-    return () => {
-      // Before the map goes: a tool left running would keep its timers and
-      // window listeners pointed at a removed map.
-      routeTool.dispose();
-      selectionTool.dispose();
-      unmountDraw();
-      drawRef.current = null;
-      routeToolRef.current = null;
-      selectionToolRef.current = null;
-      map.remove();
-      mapRef.current = null;
-      setReady(false);
-    };
-  }, [
-    applyEdit,
-    fetchNetwork,
-    mountDraw,
-    previewLine,
-    readBack,
-    settle,
-    syncHistory,
-    togglePick,
-    unmountDraw,
-  ]);
+    },
+    onDrawHistory: syncHistory,
+  });
 
   useEffect(() => {
-    const draw = drawRef.current;
-    if (!draw || !ready || !startedRef.current) {
-      return;
-    }
-    // Setting a mode cleans up Terra Draw's unfinished stroke and its history.
-    const terraMode = terraModeFor(mode, editable);
-    if (draw.getMode() !== terraMode) {
-      draw.setMode(terraMode);
-    }
-    if (mode === 'move' && editable) {
+    if (ready && startedRef.current && mode === 'move' && editable)
       autoSelect();
-    }
-  }, [autoSelect, editable, mode, ready]);
-
-  useEffect(() => {
-    if (mapRef.current && ready) {
-      applyWayStyle(mapRef.current, ids, mode);
-    }
-  }, [ids, mode, ready]);
-
-  // Entering and leaving the custom modes. Leaving Follow trails keeps any
-  // route in progress, and a double-click there finishes the route instead of
-  // zooming.
-  useEffect(() => {
-    const map = mapRef.current;
-    const routeTool = routeToolRef.current;
-    const selectionTool = selectionToolRef.current;
-    if (!map || !routeTool || !selectionTool || !ready) {
-      return;
-    }
-    map.getCanvas().style.cursor = '';
-    setEditNote(null);
-    if (mode === 'route' && editable) {
-      map.doubleClickZoom.disable();
-      routeTool.activate();
-    }
-    selectionTool.refresh();
-    syncHistory();
-
-    return () => {
-      // On unmount the init effect's cleanup has already removed the map, and
-      // there is nothing left to finish a route into.
-      if (mapRef.current !== map) {
-        return;
-      }
-      if (mode === 'route') {
-        map.doubleClickZoom.enable();
-        routeTool.deactivate();
-        setRouteStatus(IDLE_ROUTE);
-      }
-      if (mode === 'select') {
-        selectionTool.clear();
-      }
-    };
-  }, [editable, mode, ready, syncHistory]);
+  }, [autoSelect, editable, mode, ready, startedRef]);
 
   useEffect(() => {
     if (mode !== 'move' || !editable) {
@@ -1132,10 +816,6 @@ export function GeometryMapEditor({
       setPointRemovalNote(null);
     }
   }, [editable, mode]);
-
-  // Stop the adapter while its layers still exist. The next style.load
-  // registers it again and restores the working line.
-  useEditorBasemap(mapRef, basemap, unmountDraw);
 
   /**
    * Shows a line that came from outside the editor — a document load, a save
@@ -1166,7 +846,15 @@ export function GeometryMapEditor({
         map.fitBounds(bounds, { animate: false, padding: 60 });
       }
     },
-    [autoSelect, loadDraw, paintStats, setHistoryPoint],
+    [
+      autoSelect,
+      loadDraw,
+      paintStats,
+      setHistoryPoint,
+      mapRef,
+      routeToolRef,
+      selectionToolRef,
+    ],
   );
 
   // Pull the stored line in — on first load, and after a save replaces it with
@@ -1187,7 +875,7 @@ export function GeometryMapEditor({
     // Whatever ways are on the record right now are the ones this line came
     // from — the server rebuilt it from them on the save that produced it.
     setLineWays(idsRef.current);
-  }, [geomValue, ready, receiveLine]);
+  }, [geomValue, ready, receiveLine, drawRef]);
 
   /** The line now, for the history to keep as the step redo or undo returns to. */
   const currentSnapshot = useCallback(
@@ -1223,7 +911,15 @@ export function GeometryMapEditor({
       selectionToolRef.current?.clear();
       setEditNote(null);
     }
-  }, [currentSnapshot, setLine, settle, syncHistory]);
+  }, [
+    currentSnapshot,
+    setLine,
+    settle,
+    syncHistory,
+    drawRef,
+    routeToolRef,
+    selectionToolRef,
+  ]);
 
   const redo = useCallback(() => {
     if (modeRef.current === 'route') {
@@ -1249,7 +945,14 @@ export function GeometryMapEditor({
       selectionToolRef.current?.clear();
       setEditNote(null);
     }
-  }, [currentSnapshot, setLine, syncHistory]);
+  }, [
+    currentSnapshot,
+    setLine,
+    syncHistory,
+    drawRef,
+    routeToolRef,
+    selectionToolRef,
+  ]);
 
   // --- Select points operations -------------------------------------------
   //
@@ -1265,7 +968,7 @@ export function GeometryMapEditor({
       deletePoints(partsRef.current, chosen),
       `Deleted ${plural(chosen.length, 'point')}.`,
     );
-  }, [runEdit]);
+  }, [runEdit, selectionToolRef]);
 
   const splitSelected = useCallback(() => {
     const chosen = selectionToolRef.current?.selection() ?? [];
@@ -1281,7 +984,7 @@ export function GeometryMapEditor({
       result,
       `Split into ${plural(result.parts.length - before + 1, 'piece')}.`,
     );
-  }, [runEdit]);
+  }, [runEdit, selectionToolRef]);
 
   const joinSelected = useCallback(() => {
     const chosen = selectionToolRef.current?.selection() ?? [];
@@ -1299,7 +1002,7 @@ export function GeometryMapEditor({
       joinParts(partsRef.current, targets),
       `Joined ${plural(targets.length, 'piece')} into one. Any gap between them is bridged with a straight line.`,
     );
-  }, [runEdit]);
+  }, [runEdit, selectionToolRef]);
 
   const reverseSelected = useCallback(() => {
     const chosen = selectionToolRef.current?.selection() ?? [];
@@ -1311,7 +1014,7 @@ export function GeometryMapEditor({
       reverseParts(partsRef.current, targets, chosen),
       `Reversed ${plural(targets.length, 'piece')}.`,
     );
-  }, [runEdit]);
+  }, [runEdit, selectionToolRef]);
 
   const simplifySelected = useCallback(() => {
     const chosen = selectionToolRef.current?.selection() ?? [];
@@ -1330,7 +1033,7 @@ export function GeometryMapEditor({
       result,
       `Simplified ${chosen.length > 0 ? 'the selection' : 'the line'} from ${before.toLocaleString()} to ${after.toLocaleString()} points.`,
     );
-  }, [runEdit, toleranceMeters]);
+  }, [runEdit, toleranceMeters, selectionToolRef]);
 
   /**
    * Keys for the map, while it has focus. Undo/redo work in every editing mode;
@@ -1382,7 +1085,7 @@ export function GeometryMapEditor({
         event.stopPropagation();
       }
     },
-    [deleteSelected, redo, undo],
+    [deleteSelected, redo, undo, routeToolRef, selectionToolRef],
   );
 
   async function refreshFromOsm(): Promise<void> {
@@ -1545,7 +1248,7 @@ export function GeometryMapEditor({
         tone: 'info',
       });
     },
-    [applyEdit, setTrailName, trailName, hasOsmSource],
+    [applyEdit, setTrailName, trailName, hasOsmSource, mapRef],
   );
 
   // --- render ------------------------------------------------------------
@@ -1867,20 +1570,6 @@ export function GeometryMapEditor({
 }
 
 /**
- * Maps a toolbar mode onto a Terra Draw mode.
- *
- * `static` is Terra Draw's own name for "registered but inert" — it keeps
- * rendering the line without offering to edit it, which is what Pick ways and
- * a read-only form both want.
- */
-function terraModeFor(mode: Mode, editable: boolean): string {
-  if (!editable || mode === 'pick' || mode === 'route' || mode === 'select') {
-    return STATIC;
-  }
-  return mode === 'draw' ? LINESTRING : SELECT;
-}
-
-/**
  * Warns when the line on screen no longer matches the picked ways.
  *
  * This is the trap the editor kept walking into: pick a way, switch to Move
@@ -1890,7 +1579,7 @@ function terraModeFor(mode: Mode, editable: boolean): string {
  * looked broken.
  */
 function staleLineNote(
-  mode: Mode,
+  mode: GeometryEditorMode,
   ids: number[],
   lineWays: number[],
   source: string,
@@ -1924,7 +1613,7 @@ function sameOrderedIds(a: number[], b: number[]): boolean {
 }
 
 function hintFor(
-  mode: Mode,
+  mode: GeometryEditorMode,
   source: string,
   hasLine: boolean,
   hasWays: boolean,
@@ -2059,115 +1748,9 @@ function messageFrom(value: unknown): string {
   return 'The trail line could not be refreshed.';
 }
 
-/**
- * The nationwide OSM trails, and a transparent hit layer over them.
- *
- * These are vector-tile features from a remote tileset, so they are ours to
- * handle rather than Terra Draw's — there is nothing in its store to edit. The
- * wide transparent line is what makes them clickable; singletrack rendered at
- * its true width is far too thin to hit reliably.
- */
-function installWayLayers(map: mapboxgl.Map) {
-  if (!map.getSource(OSM_TRAILS_SOURCE_ID)) {
-    map.addSource(OSM_TRAILS_SOURCE_ID, {
-      type: 'vector',
-      url: OSM_TRAILS_TILEJSON_URL,
-    });
-  }
-
-  map.addLayer({
-    id: WAYS_LAYER,
-    filter: OSM_BIKE_TRAIL_FILTER,
-    paint: {
-      'line-color': UNPICKED_COLOR,
-      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 16, 4],
-    },
-    source: OSM_TRAILS_SOURCE_ID,
-    'source-layer': OSM_TRAILS_SOURCE_LAYER,
-    type: 'line',
-  });
-
-  map.addLayer({
-    id: WAYS_HIT_LAYER,
-    filter: OSM_BIKE_TRAIL_FILTER,
-    paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 },
-    source: OSM_TRAILS_SOURCE_ID,
-    'source-layer': OSM_TRAILS_SOURCE_LAYER,
-    type: 'line',
-  });
-}
-
-/** Highlights the picked ways, and dims them all while the line is being edited. */
-function applyWayStyle(map: mapboxgl.Map, ids: number[], mode: Mode) {
-  if (!map.getLayer(WAYS_LAYER)) {
-    return;
-  }
-  const picking = mode === 'pick';
-
-  const isPicked = [
-    'in',
-    ['to-string', ['get', 'OSM_ID']],
-    ['literal', ids.map(String)],
-  ];
-
-  map.setPaintProperty(WAYS_LAYER, 'line-color', [
-    'case',
-    isPicked,
-    PICKED_COLOR,
-    UNPICKED_COLOR,
-  ]);
-  // `zoom` may only appear at the top level of an `interpolate`/`step`, so the
-  // picked/unpicked choice goes in the interpolation *outputs* rather than
-  // wrapping the interpolation in a `case` — that form is rejected outright and
-  // leaves the layer unstyled.
-  map.setPaintProperty(WAYS_LAYER, 'line-width', [
-    'interpolate',
-    ['linear'],
-    ['zoom'],
-    10,
-    ['case', isPicked, 4, 1.5],
-    16,
-    ['case', isPicked, 7, 4],
-  ]);
-  // Dimmed while editing so they stay as context without competing with the
-  // line being worked on — except in Follow trails, where they are what the
-  // line follows.
-  map.setPaintProperty(
-    WAYS_LAYER,
-    'line-opacity',
-    picking || mode === 'route' ? 1 : 0.35,
-  );
-
-  if (map.getLayer(WAYS_HIT_LAYER)) {
-    // Off while editing, or a click meant for a point gets eaten by a way.
-    map.setLayoutProperty(
-      WAYS_HIT_LAYER,
-      'visibility',
-      picking ? 'visible' : 'none',
-    );
-  }
-}
-
 function ignoreChange() {}
 
 function cloneSnapshot(snapshot: LineSnapshot): LineSnapshot {
   // The owner is replaced whole, never mutated, so it can be shared.
   return { ...snapshot, parts: cloneParts(snapshot.parts) };
-}
-
-function historyPointData(
-  point: LineSnapshot['point'],
-): GeoJSON.FeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: point
-      ? [
-          {
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: point },
-            properties: {},
-          },
-        ]
-      : [],
-  };
 }
