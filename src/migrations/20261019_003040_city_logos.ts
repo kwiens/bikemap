@@ -5,7 +5,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   // for explicit selection rather than assigning it to the wrong city.
   await db.execute(sql`
    ALTER TABLE "theme" DROP CONSTRAINT "theme_logo_id_media_id_fk";
-  
+
   DROP INDEX "theme_logo_idx";
   ALTER TABLE "theme" ADD COLUMN "logos_chattanooga_id" integer;
   ALTER TABLE "theme" ADD COLUMN "logos_bend_id" integer;
@@ -19,9 +19,9 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
 export async function down({ db }: MigrateDownArgs): Promise<void> {
   await db.execute(sql`
    ALTER TABLE "theme" DROP CONSTRAINT "theme_logos_chattanooga_id_media_id_fk";
-  
+
   ALTER TABLE "theme" DROP CONSTRAINT "theme_logos_bend_id_media_id_fk";
-  
+
   DROP INDEX "theme_logos_logos_chattanooga_idx";
   DROP INDEX "theme_logos_logos_bend_idx";
   ALTER TABLE "theme" ADD COLUMN "logo_id" integer;
