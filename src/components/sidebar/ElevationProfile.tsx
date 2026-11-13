@@ -34,6 +34,7 @@ import {
   faClockRotateLeft,
   faDownload,
   faPenToSquare,
+  faTriangleExclamation,
   faShareAlt,
   faChartArea,
   faTimes,
@@ -358,6 +359,7 @@ export function ElevationProfile() {
 
   const {
     latest: conditions,
+    issueReportingAvailable,
     lockedReason: reasonFor,
     options: conditionOptions,
   } = useTrailConditions();
@@ -652,11 +654,12 @@ export function ElevationProfile() {
   const lockedReason =
     hasConditions && conditionSlug ? reasonFor(conditionSlug) : null;
   const canReport = hasConditions && lockedReason === null && !isEmbed;
+  const canReportIssue = !!conditionSlug && !isEmbed && issueReportingAvailable;
   const isShowingHistory = paneView === 'history' && hasConditions;
   const isShowingActions = paneView === 'actions';
   const isShowingProfile = !isShowingActions && !isShowingHistory;
 
-  if (!hasProfile && !hasConditions) {
+  if (!hasProfile && !hasConditions && !canReportIssue) {
     return null;
   }
 
@@ -808,7 +811,25 @@ export function ElevationProfile() {
               }}
             >
               <FontAwesomeIcon aria-hidden="true" icon={faPenToSquare} />
-              Report
+              Report condition
+            </button>
+          )}
+          {canReportIssue && conditionSlug && trailName && (
+            <button
+              type="button"
+              className={PANE_ACTION_CLASS}
+              onClick={() => {
+                dispatchMapEvent(MAP_EVENTS.ISSUE_REPORT_OPEN, {
+                  slug: conditionSlug,
+                  trailName,
+                });
+              }}
+            >
+              <FontAwesomeIcon
+                aria-hidden="true"
+                icon={faTriangleExclamation}
+              />
+              Report trail issue
             </button>
           )}
           <button

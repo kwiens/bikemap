@@ -32,6 +32,7 @@ interface TrailConditionsValue {
   latest: Record<string, ConditionReport>;
   /** Changes after a local submission, including an older observation. */
   historyRevision: number;
+  issueReportingAvailable: boolean;
   /** True until the first fetch settles, either way. */
   loading: boolean;
   /**
@@ -85,6 +86,7 @@ const REFRESH_INTERVAL_MS = 60_000;
 const EMPTY: TrailConditionsValue = {
   latest: {},
   historyRevision: 0,
+  issueReportingAvailable: false,
   loading: false,
   lockedReason: () => null,
   options: [],
@@ -190,6 +192,7 @@ export function TrailConditionsProvider({
     () => ({
       latest: summary.latest,
       historyRevision,
+      issueReportingAvailable: summary.issueReportingAvailable === true,
       loading,
       lockedReason: (slug: string) => lockFor(summary, slug),
       options: summary.options,

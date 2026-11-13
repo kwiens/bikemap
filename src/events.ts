@@ -38,6 +38,7 @@ export const MAP_EVENTS = {
   // an event rather than a prop so the one modal at the page root serves every
   // place that might offer it — today the elevation pane, tomorrow wherever.
   CONDITION_REPORT_OPEN: 'condition-report-open',
+  ISSUE_REPORT_OPEN: 'issue-report-open',
   TOAST: 'toast',
   MAP_READY: 'map-ready',
 } as const;
@@ -91,6 +92,7 @@ export interface MapEventDetails {
   toast: { message: string };
   'map-ready': undefined;
   'condition-report-open': { slug: string; trailName: string };
+  'issue-report-open': { slug: string; trailName: string };
 }
 
 type DetailArgs<K extends MapEventName> = MapEventDetails[K] extends undefined

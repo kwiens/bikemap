@@ -70,6 +70,7 @@ export interface Config {
     routes: Route;
     trails: Trail;
     'trail-conditions': TrailCondition;
+    'trail-issues': TrailIssue;
     'trail-areas': TrailArea;
     'trail-ratings': TrailRating;
     'trail-kinds': TrailKind;
@@ -86,6 +87,7 @@ export interface Config {
     routes: RoutesSelect<false> | RoutesSelect<true>;
     trails: TrailsSelect<false> | TrailsSelect<true>;
     'trail-conditions': TrailConditionsSelect<false> | TrailConditionsSelect<true>;
+    'trail-issues': TrailIssuesSelect<false> | TrailIssuesSelect<true>;
     'trail-areas': TrailAreasSelect<false> | TrailAreasSelect<true>;
     'trail-ratings': TrailRatingsSelect<false> | TrailRatingsSelect<true>;
     'trail-kinds': TrailKindsSelect<false> | TrailKindsSelect<true>;
@@ -495,7 +497,7 @@ export interface TrailCondition {
   trail: number | Trail;
   condition: number | TrailConditionType;
   /**
-   * When it was ridden, not when this was typed.
+   * When the condition was observed. Rider reports use the submission time.
    */
   observedAt: string;
   /**
@@ -553,6 +555,26 @@ export interface TrailConditionType {
    * What this means locally. Optional.
    */
   description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Rider reports for stewards to review and resolve.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-issues".
+ */
+export interface TrailIssue {
+  id: number;
+  status: 'open' | 'resolved' | 'dismissed';
+  category: 'down-tree' | 'washed-out' | 'broken-feature' | 'missing-sign' | 'other';
+  trail?: (number | null) | Trail;
+  trailName: string;
+  city: 'chattanooga' | 'bend';
+  comment?: string | null;
+  hasPhoto?: boolean | null;
+  reporterHash: string;
+  submissionId: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -628,6 +650,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'trail-conditions';
         value: number | TrailCondition;
+      } | null)
+    | ({
+        relationTo: 'trail-issues';
+        value: number | TrailIssue;
       } | null)
     | ({
         relationTo: 'trail-areas';
@@ -769,6 +795,23 @@ export interface TrailConditionsSelect<T extends boolean = true> {
   hidden?: T;
   city?: T;
   reporterHash?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trail-issues_select".
+ */
+export interface TrailIssuesSelect<T extends boolean = true> {
+  status?: T;
+  category?: T;
+  trail?: T;
+  trailName?: T;
+  city?: T;
+  comment?: T;
+  hasPhoto?: T;
+  reporterHash?: T;
+  submissionId?: T;
   updatedAt?: T;
   createdAt?: T;
 }

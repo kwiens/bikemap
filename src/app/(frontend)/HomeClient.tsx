@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import dynamic from 'next/dynamic';
 import React from 'react';
 import { ConditionReportModal } from '@/components/ConditionReportModal';
+import { IssueReportModal } from '@/components/IssueReportModal';
 import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
 import { TrailConditionsProvider } from '@/components/TrailConditionsProvider';
 import { WelcomeModal } from '@/components/WelcomeModal';
@@ -41,6 +42,7 @@ export default function HomeClient({
       <TrailConditionsProvider>
         <BikeMap />
         <ConditionReportModal />
+        <IssueReportModal />
       </TrailConditionsProvider>
       <PwaInstallPrompt />
       <WelcomeModal />

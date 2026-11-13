@@ -7,6 +7,7 @@ import { Routes } from './payload/collections/Routes';
 import { TrailAreas } from './payload/collections/TrailAreas';
 import { TrailConditions } from './payload/collections/TrailConditions';
 import { TrailConditionTypes } from './payload/collections/TrailConditionTypes';
+import { TrailIssues } from './payload/collections/TrailIssues';
 import { TrailKinds } from './payload/collections/TrailKinds';
 import { TrailRatings } from './payload/collections/TrailRatings';
 import { Trails } from './payload/collections/Trails';
@@ -49,6 +50,7 @@ export default buildConfig({
     Routes,
     Trails,
     TrailConditions,
+    TrailIssues,
     TrailAreas,
     TrailRatings,
     TrailKinds,

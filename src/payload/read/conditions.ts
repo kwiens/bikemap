@@ -201,7 +201,7 @@ export async function getConditionSummary(
   try {
     const payload = await getPayload({ config });
 
-    const [types, reports, settings] = await Promise.all([
+    const [types, reports, settings, issueSchema] = await Promise.all([
       payload.find({
         collection: 'trail-condition-types',
         depth: 0,
@@ -213,6 +213,9 @@ export async function getConditionSummary(
       }),
       latestReports(payload, city),
       payload.findGlobal({ slug: 'condition-reporting', depth: 0 }),
+      payload.db.drizzle.execute<{ available: boolean }>(sql`
+        select to_regclass('trail_issue_photos') is not null as available
+      `),
     ]);
 
     // A global nobody has opened has no row at all, so absent means on.
@@ -239,6 +242,7 @@ export async function getConditionSummary(
     }
 
     return {
+      issueReportingAvailable: issueSchema.rows[0]?.available === true,
       latest,
       // Skipped when the site switch is off — `reporting` already says every
       // trail is closed, in one field rather than hundreds of identical entries.

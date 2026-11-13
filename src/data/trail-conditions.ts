@@ -63,6 +63,7 @@ export interface ConditionSummary {
    */
   locked: Record<string, string>;
   options: ConditionOption[];
+  issueReportingAvailable?: boolean;
   /** The site-wide switch, so a global closure needn't name every slug. */
   reporting: { enabled: boolean; message: string };
 }

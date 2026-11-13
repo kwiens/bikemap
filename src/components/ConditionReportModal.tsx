@@ -17,6 +17,7 @@ import { useTrailConditions } from '@/components/TrailConditionsProvider';
 import type { ConditionReport } from '@/data/trail-conditions';
 import { MAP_EVENTS } from '@/events';
 import { cn } from '@/lib/utils';
+import { ReportSelect } from './ReportSelect';
 
 interface OpenDetail {
   slug: string;
@@ -161,7 +162,7 @@ export function ConditionReportModal() {
               className="text-lg font-bold text-app-secondary leading-tight"
               id="condition-report-title"
             >
-              How was it?
+              Report condition
             </h2>
             <p className="text-[13px] text-gray-500 truncate">
               {target.trailName}
@@ -198,8 +199,7 @@ export function ConditionReportModal() {
           >
             Condition
           </label>
-          <select
-            className="w-full py-2 px-3 border border-gray-300 rounded-lg text-sm text-app-secondary bg-white outline-none focus:border-app-primary focus:ring-2 focus:ring-app-primary/30"
+          <ReportSelect
             id="condition-report-condition"
             onChange={(event) => setCondition(event.target.value)}
             ref={selectRef}
@@ -214,7 +214,7 @@ export function ConditionReportModal() {
                 {option.name}
               </option>
             ))}
-          </select>
+          </ReportSelect>
           {/* The curator's own words for what this means locally. */}
           {selected?.description && (
             <p className="text-[11px] text-gray-500 mt-1">
@@ -230,7 +230,7 @@ export function ConditionReportModal() {
 
           <button
             className={cn(
-              'w-full mt-5 py-2.5 rounded-xl border-none font-semibold text-[15px] transition-colors',
+              'w-full min-h-12 mt-5 py-2.5 rounded-xl border-none font-semibold text-[15px] transition-colors',
               submitting
                 ? 'bg-gray-200 text-gray-700 cursor-wait'
                 : 'bg-emerald-600 text-white cursor-pointer hover:bg-emerald-700',

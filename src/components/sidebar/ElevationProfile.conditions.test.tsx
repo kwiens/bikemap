@@ -33,6 +33,7 @@ beforeEach(() => {
         return {
           ok: true,
           json: async () => ({
+            issueReportingAvailable: true,
             latest: {},
             locked: {},
             options: [
@@ -84,9 +85,12 @@ describe('ElevationProfile conditions without a chart', () => {
       screen.queryByRole('img', { name: /Elevation profile/ }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Report' }),
+      screen.queryByRole('button', { name: 'Report condition' }),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    expect(
+      screen.getByRole('button', { name: 'Report trail issue' }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Download GPX' }),
     ).not.toBeInTheDocument();
@@ -95,7 +99,7 @@ describe('ElevationProfile conditions without a chart', () => {
     window.addEventListener(MAP_EVENTS.CONDITION_REPORT_OPEN, reportOpened, {
       once: true,
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Report' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Report condition' }));
     expect(reportOpened).toHaveBeenCalledWith(
       expect.objectContaining({
         detail: { slug: 'unmeasured', trailName: 'Unmeasured Trail' },
@@ -133,7 +137,10 @@ describe('ElevationProfile conditions without a chart', () => {
       screen.getByRole('button', { name: 'Download GPX' }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Report' }),
+      screen.queryByRole('button', { name: 'Report condition' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Report trail issue' }),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
     expect(

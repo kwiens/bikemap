@@ -18,6 +18,8 @@ import * as refreshChattanoogaElevation from './20261112_233931_refresh_chattano
 
 import * as addRouteFeatured from './20261112_235419_add_route_featured';
 
+import * as addTrailIssues from './20261113_003527_add_trail_issues';
+
 export const migrations = [
   {
     up: migration_20260807_044718_initial_schema.up,
@@ -103,5 +105,10 @@ export const migrations = [
     up: addRouteFeatured.up,
     down: addRouteFeatured.down,
     name: '20261112_235419_add_route_featured',
+  },
+  {
+    up: addTrailIssues.up,
+    down: addTrailIssues.down,
+    name: '20261113_003527_add_trail_issues',
   },
 ];

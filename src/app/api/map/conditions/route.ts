@@ -5,8 +5,8 @@
  *   POST /api/map/conditions             → file a report
  *
  * Under /api/map because Payload owns /api/<collection>, and
- * /api/trail-conditions is deliberately shut. **This is the only public write
- * path in the app**; everything it lets through, it has checked first.
+ * /api/trail-conditions is restricted to staff. This handler validates rider
+ * reports before writing.
  *
  * Both verbs share a file so the client has one URL — hence the GET's caching is
  * a header, not `export const revalidate`, which applies to the whole segment.

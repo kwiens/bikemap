@@ -10,27 +10,33 @@ report is curated in the admin.
 
 ---
 
-## What a report is
+## Rider reporting
 
-A **condition** and a **date**. That is the whole thing.
+Open **Actions** on a selected curated trail. **Report condition** records
+the current rideability from the Payload-managed list. The server timestamps it
+at submission. The latest visible condition drives the badge and history.
 
-Deliberately. Each of the obvious additions was considered and left out:
+**Report trail issue** sends a maintenance report to the stewards. Riders can
+choose **Down tree**, **Washed out**, **Broken feature**, **Missing sign**, or
+**Other**, and optionally include a comment and one photo. An issue leaves
+the current condition and any closure as they were.
 
-- **A note** needs moderating, and a free-text field on an anonymous form is the
-  single most abused thing on the internet.
-- **A photo** needs blob storage, which every fork would have to configure — and
-  image moderation, which is a different project.
-- **A name** nobody verifies is decoration that reads like attribution.
+Payload's **Conditions → Trail issues** list shows open, resolved, and
+dismissed issues. Staff can filter by city, trail, category, or status. The
+issue and its photo are visible to staff with access to the report's city.
+The issue keeps the trail name if the original trail record is deleted.
 
-The date is when the trail was *ridden*, not when the form was submitted, so
-someone can log Saturday's ride on Sunday morning. It is bounded: no more than
-30 days back, no more than a day forward.
+The app resizes photos to a 1,600-pixel longest edge on the device. The server
+accepts up to 3 MB, validates and re-encodes the image, and strips metadata.
+A separate Postgres table stores the photo bytes in the same transaction as
+the issue, so normal Payload reads only fetch report metadata. Issue deletion
+also removes its photo. A retry after a lost response reuses the submission ID.
 
 ## Where it shows
 
 - **A pill on each sidebar trail row**, so you can scan a whole complex at once.
-- **The selected-trail pane**, with the age, a history disclosure, and the
-  button that opens the form.
+- **The selected-trail pane**, with the age and an Actions pane for history
+  and the reporting forms.
 
 Both go through `ConditionBadge`, which is also where the staleness rule lives.
 
@@ -173,8 +179,7 @@ table would double the write volume to express one boolean.
 
 ## How an anonymous write stays safe
 
-This is the only public write path in the application, so it is worth being
-precise about.
+The map has separate public endpoints for conditions and issues.
 
 ### One door
 
@@ -210,7 +215,7 @@ door.** Don't.
    in an afternoon, the cooldown stops one opinion being repeated until it looks
    like a consensus.
 3. **Validation** — the trail must be published in this city, the condition must
-   be an active row, the date must be in the window.
+   be an active row, and the server supplies the observation time.
 
 ### The threat model, stated plainly
 
