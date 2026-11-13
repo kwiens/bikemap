@@ -57,8 +57,10 @@ export class MarkerManager {
     });
   }
 
-  getMarkers(): mapboxgl.Marker[] {
-    return this.markers;
+  findAttractionById(id: number): mapboxgl.Marker | undefined {
+    return this.markers.find(
+      (marker) => marker.getElement().dataset.attractionId === String(id),
+    );
   }
 
   openPopupFor(marker: mapboxgl.Marker): void {
@@ -171,6 +173,7 @@ export function createAttractionMarker(feature: MapFeature): mapboxgl.Marker {
     `fa-${attractionIcon(feature.icon).iconName}`,
     '#3b82f6',
   );
+  el.dataset.attractionId = String(feature.id);
 
   // Create popup
   const popup = new mapboxgl.Popup({

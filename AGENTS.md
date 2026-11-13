@@ -19,6 +19,7 @@ Content backend (Payload + OSM — see below):
 ```bash
 pnpm db:up              # Start local Postgres via docker compose
 pnpm db:migrate         # Apply migrations
+pnpm db:seed:attractions # Import Chattanooga and Bend attractions once
 pnpm db:seed:bend       # Import Bend's trails and Casual routes
 pnpm db:seed:bend-routes # Sync only Bend's 8 Casual routes (also runs on deploy)
 pnpm db:seed:chattanooga-routes # Sync 5 legacy Studio-backed route rows
@@ -480,8 +481,9 @@ measurements are still derived, via the same `measureParts` the OSM path uses.
   GeoJSON. Bend's seed derives its eight imported routes directly from the
   committed bike-network source.
 - `src/payload/collections/Attractions.ts` + `src/payload/read/attractions.ts` —
-  editable point listings for the public map and embeds. Migrations seed the
-  original listings once. Make subsequent changes in Payload admin.
+  editable point listings for the public map and embeds. Run
+  `pnpm db:seed:attractions` to import the bundled cities once. Make subsequent
+  changes in Payload admin.
 - `src/payload/globals/Theme.ts` + `read/theme.ts` — admin appearance, editable
   at `/admin/globals/theme` and injected by the admin layout
 - `src/payload/collections/{Organizations,TrailAreas}.ts` — the options behind

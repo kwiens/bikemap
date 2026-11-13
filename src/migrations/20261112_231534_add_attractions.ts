@@ -3,7 +3,6 @@ import {
   type MigrateUpArgs,
   sql,
 } from '@payloadcms/db-postgres';
-import initialAttractions from './data/initial-attractions.json';
 
 export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.execute(sql`
@@ -61,42 +60,11 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   CREATE INDEX "_attractions_v_latest_idx" ON "_attractions_v" USING btree ("latest");
   ALTER TABLE "payload_locked_documents_rels" ADD CONSTRAINT "payload_locked_documents_rels_attractions_fk" FOREIGN KEY ("attractions_id") REFERENCES "public"."attractions"("id") ON DELETE cascade ON UPDATE no action;
   CREATE INDEX "payload_locked_documents_rels_attractions_id_idx" ON "payload_locked_documents_rels" USING btree ("attractions_id");`);
-
-  // Seed the published records and their first revisions in the same transaction.
-  await db.execute(sql`
-    WITH published AS (
-      INSERT INTO "attractions" (
-        "city", "name", "description", "address", "latitude", "longitude", "icon", "_status"
-      )
-      SELECT
-        (entry->>'city')::enum_attractions_city,
-        entry->>'name',
-        entry->>'description',
-        entry->>'address',
-        (entry->>'latitude')::numeric,
-        (entry->>'longitude')::numeric,
-        (entry->>'icon')::enum_attractions_icon,
-        'published'
-      FROM jsonb_array_elements(${JSON.stringify(initialAttractions)}::jsonb)
-        WITH ORDINALITY AS seed(entry, position)
-      ORDER BY position
-      RETURNING *
-    )
-    INSERT INTO "_attractions_v" (
-      "parent_id", "version_city", "version_name", "version_description",
-      "version_address", "version_latitude", "version_longitude", "version_icon",
-      "version__status", "version_created_at", "version_updated_at", "latest"
-    )
-    SELECT
-      "id", "city"::text::enum__attractions_v_version_city, "name", "description",
-      "address", "latitude", "longitude", "icon"::text::enum__attractions_v_version_icon,
-      'published', "created_at", "updated_at", true
-    FROM published;
-  `);
 }
 
 export async function down({ db }: MigrateDownArgs): Promise<void> {
   await db.execute(sql`
+    DELETE FROM "payload_kv" WHERE "key" = 'bikemap:attractions-seed';
     ALTER TABLE "payload_locked_documents_rels" DROP COLUMN "attractions_id";
     DROP TABLE "_attractions_v";
     DROP TABLE "attractions";

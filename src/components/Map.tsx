@@ -713,7 +713,10 @@ const MapboxMap = memo(function MapboxMap({
       let coordinates: [number, number] | null = null;
 
       // If we have latitude and longitude, use them directly
-      if (location.latitude && location.longitude) {
+      if (
+        Number.isFinite(location.latitude) &&
+        Number.isFinite(location.longitude)
+      ) {
         coordinates = [location.longitude, location.latitude];
       }
       // If we have an address, geocode it
@@ -724,7 +727,7 @@ const MapboxMap = memo(function MapboxMap({
         );
       }
 
-      if (coordinates) {
+      if (coordinates && map.current) {
         pauseRecenterUntil.current = Date.now() + PAUSE_FLY_MS;
         map.current.flyTo({
           center: coordinates,
@@ -750,6 +753,23 @@ const MapboxMap = memo(function MapboxMap({
         // dispatches below run their handler synchronously, so the ref reflects
         // the just-enabled layer while this closure's state is still stale.
         const markersVisible = markerLayersVisibleRef.current;
+
+        // Attraction cards carry the Payload id. Coordinates can be shared
+        // by several listings or by an attraction and a bike resource.
+        if (typeof location.id === 'number') {
+          if (!markersVisible.attractions) {
+            window.dispatchEvent(
+              new CustomEvent(MAP_EVENTS.LAYER_TOGGLE, {
+                detail: { layer: 'attractions', visible: true },
+              }),
+            );
+          }
+          const marker = attractionMarkers.current.findAttractionById(
+            location.id,
+          );
+          if (marker) attractionMarkers.current.openPopupFor(marker);
+          return;
+        }
 
         // Check if this location is an attraction - show the markers if they're not already shown
         const isAttraction = findLocationInArray(attractions, coordinates);

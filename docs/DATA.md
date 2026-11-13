@@ -75,10 +75,12 @@ Choose its city, fill in its name, description, and address, set its latitude
 and longitude, then choose an icon and publish. The public map and embeds read
 the published attractions for their city.
 
-The migrations seed both cities' existing listings and the three Chattanooga
-school traffic gardens once. Make subsequent changes in Payload. The map
-uses the migration snapshots when Payload is unavailable. An empty list from
-Payload means the city has no published attractions.
+Run `pnpm db:seed:attractions` after migrating to import the bundled cities and
+the three Chattanooga school traffic gardens once. Make subsequent changes
+in Payload. The map uses `src/data/attraction-seed.json` when Payload is
+unavailable. An empty list from Payload means the city has no published
+attractions. The school traffic garden pins use campus coordinates from the
+[NCES school location dataset](https://catalog.data.gov/dataset/public-school-locations-2024-25).
 
 ## BikeResource (`bike-resources.ts`)
 

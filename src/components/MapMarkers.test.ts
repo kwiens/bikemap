@@ -11,6 +11,7 @@ interface MockPopup {
 }
 
 interface MockMarker {
+  getElement: Mock;
   getLngLat: Mock;
   getPopup: Mock;
   togglePopup: Mock;
@@ -45,9 +46,17 @@ const makePopup = (open = false): MockPopup => {
   };
 };
 
-const makeMarker = (lng: number, lat: number): MockMarker => {
+const makeMarker = (
+  lng: number,
+  lat: number,
+  attractionId?: number,
+): MockMarker => {
   const popup = makePopup();
+  const element = document.createElement('div');
+  if (attractionId !== undefined)
+    element.dataset.attractionId = String(attractionId);
   return {
+    getElement: vi.fn().mockReturnValue(element),
     getLngLat: vi.fn().mockReturnValue({ lng, lat }),
     getPopup: vi.fn().mockReturnValue(popup),
     togglePopup: vi.fn(() => popup.trigger('open')),
@@ -100,6 +109,19 @@ describe('MarkerManager', () => {
 
     expect(manager.findByCoordinates(-85.3, 35.0)).toBe(asMarker(m1));
     expect(manager.findByCoordinates(-85.4, 35.1)).toBe(asMarker(m2));
+  });
+
+  it('opens the selected attraction at coordinates shared by another attraction', () => {
+    const first = makeMarker(-85.3, 35, 1);
+    const second = makeMarker(-85.3, 35, 2);
+    manager.setMarkers([asMarker(first), asMarker(second)]);
+
+    const selected = manager.findAttractionById(2);
+    expect(selected).toBe(asMarker(second));
+    if (selected) manager.openPopupFor(selected);
+
+    expect(first.togglePopup).not.toHaveBeenCalled();
+    expect(second.togglePopup).toHaveBeenCalledOnce();
   });
 
   describe('openPopupFor()', () => {

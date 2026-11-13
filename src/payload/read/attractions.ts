@@ -4,8 +4,7 @@ import { getPayload } from 'payload';
 import config from '@payload-config';
 import type { CityId } from '@/data/cities/types';
 import type { MapFeature } from '@/data/map-features';
-import initialAttractions from '@/migrations/data/initial-attractions.json';
-import { schoolTrafficGardens } from '@/migrations/data/school-traffic-gardens';
+import attractionSeed from '@/data/attraction-seed.json';
 
 /** The map and its embed share the same published, city-scoped listings. */
 export async function getCityAttractions(city: CityId): Promise<MapFeature[]> {
@@ -42,7 +41,7 @@ export async function getCityAttractions(city: CityId): Promise<MapFeature[]> {
 }
 
 function bundledAttractions(city: CityId): MapFeature[] {
-  return [...initialAttractions, ...schoolTrafficGardens]
+  return attractionSeed
     .filter((row) => row.city === city)
     .map(({ city: _city, ...row }, index) => ({
       ...row,
