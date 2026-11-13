@@ -733,6 +733,12 @@ export function GeometryMapEditor({
     [applyEdit],
   );
 
+  const unmountDraw = useCallback(() => {
+    if (!startedRef.current) return;
+    drawRef.current?.stop();
+    startedRef.current = false;
+  }, []);
+
   /**
    * Registers Terra Draw against the current style, and restores the line.
    *
@@ -754,15 +760,6 @@ export function GeometryMapEditor({
       return;
     }
 
-    if (startedRef.current) {
-      try {
-        draw.stop();
-      } catch {
-        // Already stopped; nothing to unregister.
-      }
-      startedRef.current = false;
-    }
-
     try {
       draw.start();
       startedRef.current = true;
@@ -778,7 +775,8 @@ export function GeometryMapEditor({
     setDrawFailed(false);
     draw.setMode(terraModeFor(modeRef.current, !readOnlyRef.current));
     loadDraw(partsRef.current, false);
-  }, [loadDraw]);
+    if (modeRef.current === 'move') autoSelect();
+  }, [autoSelect, loadDraw]);
 
   const fetchNetwork = useCallback(async (cell: string) => {
     const { apiRoute: api, serverURL: server } = apiRef.current;
@@ -1032,12 +1030,7 @@ export function GeometryMapEditor({
       // window listeners pointed at a removed map.
       routeTool.dispose();
       selectionTool.dispose();
-      try {
-        draw.stop();
-      } catch {
-        // Throws if it was never started; there is nothing to clean up then.
-      }
-      startedRef.current = false;
+      unmountDraw();
       drawRef.current = null;
       routeToolRef.current = null;
       selectionToolRef.current = null;
@@ -1054,6 +1047,7 @@ export function GeometryMapEditor({
     settle,
     syncHistory,
     togglePick,
+    unmountDraw,
   ]);
 
   useEffect(() => {
@@ -1120,11 +1114,9 @@ export function GeometryMapEditor({
     }
   }, [editable, mode]);
 
-  // Basemap switching. Satellite is what you want when checking a line against
-  // the singletrack visible on the ground. `style.load` fires again afterwards,
-  // which is what re-registers Terra Draw and restores the line — the adapter
-  // does not survive a `setStyle` on its own.
-  useEditorBasemap(mapRef, basemap);
+  // Stop the adapter while its layers still exist. The next style.load
+  // registers it again and restores the working line.
+  useEditorBasemap(mapRef, basemap, unmountDraw);
 
   /**
    * Shows a line that came from outside the editor — a document load, a save
