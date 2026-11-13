@@ -30,7 +30,7 @@ Open Bike Map is a fork-and-edit, not a rewrite. Everything a community controls
 - **`src/data/*`** — routes, trails, shops, and points of interest as plain typed arrays. The map runs on these alone, with no database.
 - **`public/*`** — logos, icons, splash screens.
 
-Optionally, add Postgres and you also get **`/admin`** — a CMS where someone without a GitHub account can curate trails, and where riders' condition reports land.
+Optionally, add Postgres and you also get **`/admin`** — a CMS where someone without a GitHub account can curate trails.
 
 The full step-by-step is in **[docs/DEPLOYING.md](docs/DEPLOYING.md)**; the data-file contract is in **[docs/DATA.md](docs/DATA.md)**.
 
@@ -163,7 +163,6 @@ The plan is a thin Expo (React Native) shell around the existing web app, shippi
 ### Other things on the roadmap
 
 - **Multi-community switcher** — host several cities from one deployment by selecting `mapConfig` per route or subdomain.
-- **Trail conditions / closures** — community-curated overlay so locals can flag a trail as wet, closed, or rerouted.
 - **Cloud ride sync (opt-in)** — rides are local-only today; an optional account would sync history across devices.
 - **Heatmaps from recorded rides** — anonymized aggregate to surface which informal connectors riders actually use.
 
