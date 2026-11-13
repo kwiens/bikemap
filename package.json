@@ -55,6 +55,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "server-only": "0.0.1",
+    "sharp": "0.35.5",
     "tailwind-merge": "3.7.0",
     "terra-draw": "1.39.0",
     "terra-draw-mapbox-gl-adapter": "1.5.0"
@@ -83,7 +84,6 @@
     "knip": "6.44.1",
     "lint-staged": "17.6.0",
     "postcss": "8.5.32",
-    "sharp": "0.35.5",
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
